@@ -17,6 +17,14 @@ const EVENT_TYPES: { id: TimelineEventType; label: string; desc: string }[] = [
 ]
 
 const QUICK_TAGS = ['Linguagem', 'Autonomia', 'Acolhimento', 'Brincadeira', 'Movimento', 'Musicalizacao', 'Rotina', 'Familia']
+const MAX_ATTACHMENT_SIZE_MB = 10
+const ACCEPTED_ATTACHMENT_TYPES = [
+  'image/',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+]
 
 export default function NewTimelineEventSubscreen() {
   const { closeSubscreen } = useNavStore()
@@ -52,6 +60,16 @@ export default function NewTimelineEventSubscreen() {
   function selectFile(files: FileList | null) {
     const file = files?.[0]
     if (!file) return
+    setError('')
+    if (file.size > MAX_ATTACHMENT_SIZE_MB * 1024 * 1024) {
+      setError(`O arquivo precisa ter ate ${MAX_ATTACHMENT_SIZE_MB} MB.`)
+      return
+    }
+    if (!ACCEPTED_ATTACHMENT_TYPES.some((type) => file.type.startsWith(type) || file.type === type)) {
+      setError('Use imagem, PDF, Word ou TXT.')
+      return
+    }
+
     if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl)
     setAttachmentFile(file)
     setAttachmentName(file.name)
@@ -162,7 +180,7 @@ export default function NewTimelineEventSubscreen() {
             <div className="flex-1">
               <p className="text-[13px] font-bold text-ink">Foto ou documento opcional</p>
               <p className="text-[11px] text-muted leading-[1.5] mt-1">
-                Arquivos de criancas serao privados no Supabase Storage.
+                Arquivos de criancas ficam privados no Supabase Storage.
               </p>
               {attachmentName && <p className="text-[12px] text-soft bg-cream rounded-app-sm px-3 py-2 mt-3">{attachmentName}</p>}
               {attachmentPreviewUrl && (

@@ -1,4 +1,4 @@
-import { ChevronLeft, MoveRight, Pencil, Plus, Sparkles } from 'lucide-react'
+import { ChevronLeft, ExternalLink, FileText, MoveRight, Pencil, Plus, Sparkles } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import type { TimelineEvent, TimelineEventType } from '@/types'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
@@ -174,11 +174,25 @@ export default function StudentProfileSubscreen() {
                   <h3 className="text-[13px] font-bold text-ink">{event.title}</h3>
                   <p className="text-[12px] text-soft leading-[1.6] mt-1">{event.text}</p>
                   {event.attachmentUrl && event.attachmentKind === 'image' && (
-                    <img
-                      src={event.attachmentUrl}
-                      alt=""
-                      className="mt-3 w-full max-h-56 object-cover rounded-app-sm border border-border"
-                    />
+                    <a href={event.attachmentUrl} target="_blank" rel="noreferrer" className="block mt-3">
+                      <img
+                        src={event.attachmentUrl}
+                        alt=""
+                        className="w-full max-h-56 object-cover rounded-app-sm border border-border"
+                      />
+                    </a>
+                  )}
+                  {event.attachmentUrl && event.attachmentKind === 'file' && (
+                    <a
+                      href={event.attachmentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 flex items-center gap-2 rounded-app-sm border border-gp bg-gbg px-3 py-3 text-[12px] font-bold text-gm"
+                    >
+                      <FileText size={15} />
+                      <span className="flex-1 truncate">{event.attachmentName ?? 'Anexo privado'}</span>
+                      <ExternalLink size={14} />
+                    </a>
                   )}
                   {event.tags && event.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
@@ -187,8 +201,9 @@ export default function StudentProfileSubscreen() {
                       ))}
                     </div>
                   )}
-                  {event.attachmentName && !event.attachmentUrl && <p className="text-[10px] text-muted mt-2">Anexo: {event.attachmentName}</p>}
-                  {event.attachmentName && event.attachmentKind === 'file' && <p className="text-[10px] text-muted mt-2">Anexo privado: {event.attachmentName}</p>}
+                  {event.attachmentName && !event.attachmentUrl && (
+                    <p className="text-[10px] text-muted mt-2">Anexo privado: {event.attachmentName}</p>
+                  )}
                   <p className="text-[10px] text-muted mt-2">{event.date}</p>
                 </div>
               </article>

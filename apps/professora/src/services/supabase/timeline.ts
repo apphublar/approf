@@ -104,7 +104,8 @@ async function uploadTimelineAttachment(ownerId: string, studentId: string, even
   if (!supabase) throw new Error('Supabase nao esta configurado.')
 
   const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const path = `${ownerId}/${studentId}/timeline/${eventId}-${Date.now()}.${extension}`
+  const safeName = sanitizeFileName(file.name, extension)
+  const path = `${ownerId}/${studentId}/timeline/${eventId}-${Date.now()}-${safeName}`
   const { error } = await supabase.storage.from('child-photos').upload(path, file, {
     cacheControl: '3600',
     upsert: true,
@@ -125,11 +126,24 @@ async function getSignedTimelineAttachmentUrl(path: string) {
 }
 
 function getFileName(path: string) {
-  return path.split('/').pop() ?? 'Arquivo privado'
+  const rawName = path.split('/').pop() ?? 'Arquivo privado'
+  return rawName.replace(/^[0-9a-f-]+-\d+-/i, '')
 }
 
 function isImagePath(path: string) {
   return /\.(apng|avif|gif|jpe?g|png|webp)$/i.test(path)
+}
+
+function sanitizeFileName(fileName: string, fallbackExtension: string) {
+  const sanitized = fileName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+
+  if (!sanitized) return `arquivo.${fallbackExtension}`
+  return sanitized.includes('.') ? sanitized : `${sanitized}.${fallbackExtension}`
 }
 
 function formatTimelineDate(value: string) {
