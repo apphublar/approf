@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
+import { formatAiUsageMessage, reserveAiUsage, type AiGenerationType } from '@/services/ai-usage'
 import type { Annotation } from '@/types'
 
 const DIRECTION_SUGGESTIONS = [
@@ -50,6 +51,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [portfolioOutput, setPortfolioOutput] = useState<PortfolioOutput>('text')
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
+  const [usageMessage, setUsageMessage] = useState('')
+  const [usageError, setUsageError] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const studentAnnotations = useMemo(
@@ -60,6 +63,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   useEffect(() => {
     setSelectedAnnotationIds(studentAnnotations.map((annotation) => annotation.id))
     setGenerated(false)
+    setUsageMessage('')
+    setUsageError('')
   }, [selectedStudentId, studentAnnotations])
 
   const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
@@ -122,13 +127,43 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setAttachments((current) => current.filter((item) => item.id !== id))
   }
 
-  function generate() {
+  async function generate() {
     if (!canGenerate) return
+    setUsageError('')
+    setUsageMessage('')
     setGenerating(true)
-    setTimeout(() => {
+
+    try {
+      const result = await reserveAiUsage({
+        generationType: getReportGenerationType(reportKind, portfolioOutput),
+        classId: selectedStudent?.classId ?? null,
+        studentId: selectedStudent?.id ?? null,
+        promptVersion: 'professora-report-v1',
+        requestSummary: {
+          reportKind,
+          portfolioOutput,
+          mode,
+          selectedAnnotationCount: selectedAnnotations.length,
+          attachmentCount: attachments.length,
+          hasExtraContext: extraContext.trim().length > 0,
+        },
+      })
+
+      if (!result.allowed) {
+        setUsageError(result.message || 'Esta geracao precisa de pacote extra.')
+        setGenerating(false)
+        return
+      }
+
+      setUsageMessage(formatAiUsageMessage(result))
+      window.setTimeout(() => {
+        setGenerating(false)
+        setGenerated(true)
+      }, 900)
+    } catch (error) {
       setGenerating(false)
-      setGenerated(true)
-    }, 1900)
+      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel gerar com IA.')
+    }
   }
 
   return (
@@ -364,9 +399,21 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             >
               {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> Gerar com IA</>}
             </button>
+            {(usageError || usageMessage) && (
+              <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
+                usageError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
+              }`}>
+                {usageError || usageMessage}
+              </p>
+            )}
           </div>
         ) : (
           <div className="py-4">
+            {usageMessage && (
+              <p className="mb-3 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[12px] text-gd">
+                {usageMessage}
+              </p>
+            )}
             <div className="bg-white rounded-app p-5 border border-border shadow-card mb-4">
               <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink leading-[1.7]">{mockReport}</pre>
             </div>
@@ -387,6 +434,15 @@ function matchesStudent(annotation: Annotation, studentId: string, studentName?:
   if (annotation.studentId && annotation.studentId === studentId) return true
   if (studentName && annotation.studentName === studentName) return true
   return false
+}
+
+function getReportGenerationType(reportKind: string, portfolioOutput: PortfolioOutput): AiGenerationType {
+  if (reportKind === 'Relatorio de desenvolvimento') return 'development_report'
+  if (reportKind === 'Portfolio pedagogico') {
+    return portfolioOutput === 'image' ? 'portfolio_image' : 'portfolio_text'
+  }
+  if (isSpecialistReport(reportKind) || reportKind === 'Rel. Atipico') return 'specialist_report'
+  return 'general_report'
 }
 
 function createReportPreview(input: {

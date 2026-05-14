@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Sparkles, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
+import { formatAiUsageMessage, reserveAiUsage } from '@/services/ai-usage'
 
 interface PedagogicalGeneratorProps {
   data?: unknown
@@ -46,9 +47,12 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
+  const [usageMessage, setUsageMessage] = useState('')
+  const [usageError, setUsageError] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const canGenerate = theme.trim().length >= 2 && objective.trim().length >= 5
+  const selectedClassData = classes.find((item) => item.name === selectedClass)
 
   function addDirection(text: string) {
     setExtraContext((current) => current ? `${current}\n${text}.` : `${text}.`)
@@ -82,13 +86,43 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     })
   }
 
-  function generate() {
+  async function generate() {
     if (!canGenerate) return
+    setUsageError('')
+    setUsageMessage('')
     setGenerating(true)
-    setTimeout(() => {
+
+    try {
+      const result = await reserveAiUsage({
+        generationType: 'planning',
+        classId: selectedClassData?.id ?? null,
+        promptVersion: 'professora-planning-v1',
+        requestSummary: {
+          docKind,
+          ageGroup,
+          theme,
+          bnccFields,
+          attachmentCount: attachments.length,
+          hasExtraContext: extraContext.trim().length > 0,
+          useAnnotations,
+        },
+      })
+
+      if (!result.allowed) {
+        setUsageError(result.message || 'Esta geracao precisa de pacote extra.')
+        setGenerating(false)
+        return
+      }
+
+      setUsageMessage(formatAiUsageMessage(result))
+      window.setTimeout(() => {
+        setGenerating(false)
+        setGenerated(true)
+      }, 800)
+    } catch (error) {
       setGenerating(false)
-      setGenerated(true)
-    }, 1600)
+      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel gerar com IA.')
+    }
   }
 
   const preview = createPreview({
@@ -278,9 +312,21 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
             >
               {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> Gerar com IA</>}
             </button>
+            {(usageError || usageMessage) && (
+              <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
+                usageError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
+              }`}>
+                {usageError || usageMessage}
+              </p>
+            )}
           </div>
         ) : (
           <div className="py-4">
+            {usageMessage && (
+              <p className="mb-3 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[12px] text-gd">
+                {usageMessage}
+              </p>
+            )}
             <div className="bg-white rounded-app p-5 border border-border shadow-card mb-4">
               <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink leading-[1.7]">{preview}</pre>
             </div>
