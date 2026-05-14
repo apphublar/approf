@@ -16,6 +16,9 @@ importers:
       '@approf/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@supabase/supabase-js':
+        specifier: ^2.105.4
+        version: 2.105.4
       lucide-react:
         specifier: ^0.511.0
         version: 0.511.0(react@19.2.5)

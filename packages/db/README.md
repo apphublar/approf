@@ -39,6 +39,35 @@ O schema inicial esta em `supabase/migrations/0001_initial_privacy_foundation.sq
 0006_ai_usage_and_giztokens.sql
 ```
 
+## Reserva De IA
+
+O endpoint server-side inicial fica no admin:
+
+```txt
+POST /api/ai/reserve
+Authorization: Bearer <supabase_access_token>
+```
+
+Payload minimo:
+
+```json
+{
+  "generationType": "development_report",
+  "classId": "uuid-opcional",
+  "studentId": "uuid-opcional",
+  "promptVersion": "bncc-v1",
+  "requestSummary": {}
+}
+```
+
+Ordem de cobranca prevista:
+
+```txt
+1. GizTokens mensais, se houver saldo e custo incluso abaixo do teto.
+2. Cota semestral por crianca para development_report ou portfolio_image.
+3. Pacote extra pago quando saldo/cota acabarem ou teto incluso for atingido.
+```
+
 ## Convencao De Storage
 
 ```txt
