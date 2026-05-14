@@ -11,6 +11,7 @@ export interface Database {
           email: string
           phone: string | null
           avatar_url: string | null
+          estimated_student_count: number
           created_at: string
           updated_at: string
         }
@@ -21,6 +22,7 @@ export interface Database {
           email: string
           phone?: string | null
           avatar_url?: string | null
+          estimated_student_count?: number
           created_at?: string
           updated_at?: string
         }
@@ -30,6 +32,7 @@ export interface Database {
           email?: string
           phone?: string | null
           avatar_url?: string | null
+          estimated_student_count?: number
           updated_at?: string
         }
       }

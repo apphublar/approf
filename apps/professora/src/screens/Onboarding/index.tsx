@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { useAppStore, useOnboardingStore } from '@/store'
+import { getAppDataMode } from '@/services/app-data'
+import { isSupabaseConfigured } from '@/services/supabase/config'
+import { updateTeacherOnboardingProfile } from '@/services/supabase/profile'
 import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 
 const SHIFTS = ['Manha', 'Tarde', 'Integral']
@@ -14,8 +17,11 @@ export default function Onboarding() {
   const [s1Shift, setS1Shift] = useState(data.shift ?? SHIFTS[0])
   const [s2Class, setS2Class] = useState(data.className ?? '')
   const [s2Age, setS2Age] = useState(data.ageGroup ?? '0 a 5 anos')
+  const [s2StudentCount, setS2StudentCount] = useState(String(data.estimatedStudentCount ?? 20))
   const [s3Note, setS3Note] = useState(data.firstNote ?? '')
   const [name, setName] = useState('Prof.')
+  const [finishing, setFinishing] = useState(false)
+  const [finishError, setFinishError] = useState('')
 
   function goStep2() {
     if (!s1School.trim()) return alert('Informe o nome da escola.')
@@ -26,32 +32,50 @@ export default function Onboarding() {
 
   function goStep3() {
     if (!s2Class.trim()) return alert('Informe o nome da turma.')
-    setData({ className: s2Class, ageGroup: s2Age })
+    const estimatedStudentCount = clampStudentCount(Number(s2StudentCount))
+    setData({ className: s2Class, ageGroup: s2Age, estimatedStudentCount })
     setStep(3)
   }
 
-  function finish() {
+  async function finish() {
     if (!s3Note.trim()) return alert('Escreva sua primeira anotacao.')
-    setData({ firstNote: s3Note })
-    if (name.trim()) setUserName(name.trim())
-    addAnnotation({
-      id: `ob-${Date.now()}`,
-      category: 'formacao',
-      label: 'Anotacao pessoal',
-      badgeClass: 'badge-ev',
-      studentName: null,
-      text: s3Note,
-      date: 'Agora',
-      tags: ['Anotacao pessoal'],
-      scope: 'personal',
-    })
-    confetti({
-      particleCount: 160,
-      spread: 80,
-      origin: { y: 0.6 },
-      colors: ['#83C451', '#C2E8A0', '#FDFAF6', '#4F8341', '#1B4332'],
-    })
-    setTimeout(() => complete(), 800)
+    const estimatedStudentCount = clampStudentCount(Number(s2StudentCount))
+    setFinishing(true)
+    setFinishError('')
+
+    try {
+      if (getAppDataMode() === 'supabase' && isSupabaseConfigured()) {
+        await updateTeacherOnboardingProfile({
+          fullName: name,
+          estimatedStudentCount,
+        })
+      }
+
+      setData({ firstNote: s3Note, estimatedStudentCount })
+      if (name.trim()) setUserName(name.trim())
+      addAnnotation({
+        id: `ob-${Date.now()}`,
+        category: 'formacao',
+        label: 'Anotacao pessoal',
+        badgeClass: 'badge-ev',
+        studentName: null,
+        text: s3Note,
+        date: 'Agora',
+        tags: ['Anotacao pessoal'],
+        scope: 'personal',
+      })
+      confetti({
+        particleCount: 160,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#83C451', '#C2E8A0', '#FDFAF6', '#4F8341', '#1B4332'],
+      })
+      setTimeout(() => complete(), 800)
+    } catch (error) {
+      setFinishError(error instanceof Error ? error.message : 'Nao foi possivel finalizar agora.')
+    } finally {
+      setFinishing(false)
+    }
   }
 
   return (
@@ -98,11 +122,19 @@ export default function Onboarding() {
             setClassName={setS2Class}
             ageGroup={s2Age}
             setAgeGroup={setS2Age}
+            estimatedStudentCount={s2StudentCount}
+            setEstimatedStudentCount={setS2StudentCount}
             onNext={goStep3}
           />
         )}
         {step === 3 && (
-          <StepThree note={s3Note} setNote={setS3Note} onFinish={finish} />
+          <StepThree
+            note={s3Note}
+            setNote={setS3Note}
+            onFinish={finish}
+            finishing={finishing}
+            error={finishError}
+          />
         )}
       </div>
     </div>
@@ -176,12 +208,20 @@ function StepOne({
 }
 
 function StepTwo({
-  className, setClassName, ageGroup, setAgeGroup, onNext,
+  className,
+  setClassName,
+  ageGroup,
+  setAgeGroup,
+  estimatedStudentCount,
+  setEstimatedStudentCount,
+  onNext,
 }: {
   className: string
   setClassName: (v: string) => void
   ageGroup: string
   setAgeGroup: (v: string) => void
+  estimatedStudentCount: string
+  setEstimatedStudentCount: (v: string) => void
   onNext: () => void
 }) {
   return (
@@ -209,6 +249,22 @@ function StepTwo({
         <Field label="Faixa etaria">
           <AgeRangeSelector value={ageGroup} onChange={setAgeGroup} />
         </Field>
+
+        <Field label="Quantidade aproximada de criancas">
+          <input
+            className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors"
+            type="number"
+            min={1}
+            max={300}
+            inputMode="numeric"
+            placeholder="Ex: 30"
+            value={estimatedStudentCount}
+            onChange={(event) => setEstimatedStudentCount(event.target.value)}
+          />
+          <p className="text-[11px] text-muted leading-[1.5] mt-2">
+            Usamos esse numero para estimar GizTokens e garantir os relatorios semestrais enquanto voce cadastra as criancas.
+          </p>
+        </Field>
       </div>
 
       <NextButton onClick={onNext} label="Continuar" />
@@ -217,11 +273,13 @@ function StepTwo({
 }
 
 function StepThree({
-  note, setNote, onFinish,
+  note, setNote, onFinish, finishing, error,
 }: {
   note: string
   setNote: (v: string) => void
   onFinish: () => void
+  finishing: boolean
+  error: string
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -250,11 +308,13 @@ function StepThree({
 
       <button
         onClick={onFinish}
-        className="w-full py-4 rounded-app bg-gm text-white font-bold text-base flex items-center justify-center gap-2 shadow-fab"
+        disabled={finishing}
+        className="w-full py-4 rounded-app bg-gm text-white font-bold text-base flex items-center justify-center gap-2 shadow-fab disabled:opacity-60"
       >
         <Check size={18} strokeWidth={2.5} />
-        Comecar a usar o Approf
+        {finishing ? 'Salvando...' : 'Comecar a usar o Approf'}
       </button>
+      {error && <p className="text-[12px] text-white/80 text-center leading-[1.5]">{error}</p>}
     </div>
   )
 }
@@ -278,4 +338,9 @@ function NextButton({ onClick, label }: { onClick: () => void; label: string }) 
       <ChevronRight size={18} strokeWidth={2.5} />
     </button>
   )
+}
+
+function clampStudentCount(value: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(300, Math.round(value)))
 }

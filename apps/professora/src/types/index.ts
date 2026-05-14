@@ -162,6 +162,7 @@ export interface OnboardingData {
   shift: string
   className: string
   ageGroup: string
+  estimatedStudentCount: number
   firstNote: string
 }
 
