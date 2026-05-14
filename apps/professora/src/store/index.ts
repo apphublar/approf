@@ -80,11 +80,19 @@ interface AppStore {
   activeClassId: string | null
   activeStudentId: string | null
   isCommunityEnabled: () => boolean
-  hydrateWorkspace: (data: { userId: string; userName: string; schoolName: string; classes: ClassData[]; annotations?: Annotation[] }) => void
+  hydrateWorkspace: (data: {
+    userId: string
+    userName: string
+    schoolName: string
+    classes: ClassData[]
+    annotations?: Annotation[]
+    attendanceRecords?: AttendanceRecord[]
+  }) => void
   setUserName: (name: string) => void
   setSchoolName: (name: string) => void
   addAnnotation: (ann: Annotation) => void
   saveAttendanceRecord: (record: Omit<AttendanceRecord, 'id' | 'createdAt' | 'updatedAt'>) => void
+  upsertAttendanceRecord: (record: AttendanceRecord) => void
   addBoardNote: (note: BoardNote) => void
   deleteBoardNote: (id: string) => void
   setCalendarEvents: (events: CalendarEvent[]) => void
@@ -150,6 +158,7 @@ export const useAppStore = create<AppStore>()(
           schoolName: data.schoolName,
           classes: data.classes,
           annotations: data.annotations ?? [],
+          attendanceRecords: data.attendanceRecords ?? [],
           activeClassId: data.classes[0]?.id ?? null,
           activeStudentId: null,
         }),
@@ -174,6 +183,20 @@ export const useAppStore = create<AppStore>()(
             attendanceRecords: existing
               ? state.attendanceRecords.map((item) => (item.id === existing.id ? nextRecord : item))
               : [nextRecord, ...state.attendanceRecords],
+          }
+        }),
+      upsertAttendanceRecord: (record) =>
+        set((state) => {
+          const exists = state.attendanceRecords.some((item) => item.id === record.id)
+          return {
+            attendanceRecords: exists
+              ? state.attendanceRecords.map((item) => (item.id === record.id ? record : item))
+              : [
+                  record,
+                  ...state.attendanceRecords.filter(
+                    (item) => !(item.classId === record.classId && item.date === record.date),
+                  ),
+                ],
           }
         }),
       addBoardNote: (note: BoardNote) =>

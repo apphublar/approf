@@ -4,6 +4,7 @@ import { getSupabaseClient } from './client'
 import { mapSupabaseStudent } from './students'
 import { loadSupabaseTimelineEvents } from './timeline'
 import { loadSupabaseAnnotations } from './annotations'
+import { loadSupabaseAttendanceRecords } from './attendance'
 
 export interface ClassInput {
   name: string
@@ -30,7 +31,7 @@ export async function loadTeacherWorkspace() {
 
   if (profileError) throw profileError
 
-  const [schoolsResult, classesResult, studentsResult, timelineEvents] = await Promise.all([
+  const [schoolsResult, classesResult, studentsResult, timelineEvents, attendanceRecords] = await Promise.all([
     supabase.from('schools').select('id, name').eq('owner_id', user.id),
     supabase
       .from('classes')
@@ -40,6 +41,7 @@ export async function loadTeacherWorkspace() {
       .order('created_at', { ascending: false }),
     loadStudentsWithPhotoPositionFallback(user.id),
     loadSupabaseTimelineEvents(user.id),
+    loadSupabaseAttendanceRecords(user.id),
   ])
 
   if (schoolsResult.error) throw schoolsResult.error
@@ -87,6 +89,7 @@ export async function loadTeacherWorkspace() {
     schoolName: schoolsResult.data?.[0]?.name ?? 'Escola nao informada',
     classes,
     annotations,
+    attendanceRecords,
   }
 }
 

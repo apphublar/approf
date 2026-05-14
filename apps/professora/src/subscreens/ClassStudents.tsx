@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { BarChart3, CalendarDays, Check, ChevronLeft, ClipboardCheck, Pencil, Users } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
+import { saveSupabaseAttendanceRecord } from '@/services/supabase/attendance'
+import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import type { AttendanceRecord, Student } from '@/types'
 
@@ -12,7 +14,7 @@ const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
 export default function ClassStudentsSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes, activeClassId, setActiveStudent, attendanceRecords, saveAttendanceRecord } = useAppStore()
+  const { classes, activeClassId, setActiveStudent, attendanceRecords, saveAttendanceRecord, upsertAttendanceRecord } = useAppStore()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<StudentFilter>('all')
   const [activeTool, setActiveTool] = useState<ClassTool>('students')
@@ -21,6 +23,8 @@ export default function ClassStudentsSubscreen() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(getTodayKey())
   const [presentStudentIds, setPresentStudentIds] = useState<string[]>([])
   const [savedMessage, setSavedMessage] = useState('')
+  const [savingAttendance, setSavingAttendance] = useState(false)
+  const [attendanceError, setAttendanceError] = useState('')
 
   const cls = classes.find((c) => c.id === activeClassId) ?? classes[0]
   const classAttendanceRecords = useMemo(
@@ -77,15 +81,33 @@ export default function ClassStudentsSubscreen() {
     setPresentStudentIds([])
   }
 
-  function saveAttendance() {
-    saveAttendanceRecord({
+  async function saveAttendance() {
+    setSavingAttendance(true)
+    setAttendanceError('')
+    setSavedMessage('')
+
+    try {
+      const input = {
       classId: cls.id,
       date: attendanceDate,
       presentStudentIds,
-    })
+      }
+
+      if (isSupabaseAuthEnabled()) {
+        const record = await saveSupabaseAttendanceRecord(input)
+        upsertAttendanceRecord(record)
+      } else {
+        saveAttendanceRecord(input)
+      }
+
     setSelectedCalendarDate(attendanceDate)
     setMonthDate(startOfMonth(parseDateKey(attendanceDate)))
     setSavedMessage('Chamada registrada com sucesso.')
+    } catch (error) {
+      setAttendanceError(error instanceof Error ? error.message : 'Nao foi possivel salvar a chamada.')
+    } finally {
+      setSavingAttendance(false)
+    }
   }
 
   const absentCount = Math.max(cls.students.length - presentStudentIds.length, 0)
@@ -247,8 +269,15 @@ export default function ClassStudentsSubscreen() {
             {savedMessage && (
               <p className="text-[12px] font-bold text-gm text-center mt-4">{savedMessage}</p>
             )}
-            <button onClick={saveAttendance} className="w-full mt-4 py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none">
-              Salvar chamada
+            {attendanceError && (
+              <p className="text-[12px] text-[#C1440E] text-center mt-4 leading-[1.5]">{attendanceError}</p>
+            )}
+            <button
+              onClick={saveAttendance}
+              disabled={savingAttendance}
+              className="w-full mt-4 py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none disabled:opacity-50"
+            >
+              {savingAttendance ? 'Salvando...' : 'Salvar chamada'}
             </button>
           </div>
         )}
