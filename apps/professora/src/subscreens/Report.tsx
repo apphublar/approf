@@ -23,6 +23,7 @@ interface ReportAttachment {
 }
 
 type ReportMode = 'annotations' | 'blank'
+type PortfolioOutput = 'text' | 'image'
 
 export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const { closeSubscreen } = useNavStore()
@@ -46,6 +47,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [blankContext, setBlankContext] = useState('')
   const [extraContext, setExtraContext] = useState('')
   const [attachments, setAttachments] = useState<ReportAttachment[]>([])
+  const [portfolioOutput, setPortfolioOutput] = useState<PortfolioOutput>('text')
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -62,9 +64,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
   const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
   const firstName = selectedStudent?.name.split(' ')[0] ?? 'A crianca'
+  const isPortfolio = reportKind === 'Portfolio pedagogico'
   const canGenerate = mode === 'blank'
     ? blankContext.trim().length >= 20
-    : selectedAnnotations.length > 0 || extraContext.trim().length >= 10
+    : Boolean(selectedStudent)
 
   const mockReport = createReportPreview({
     reportKind,
@@ -77,6 +80,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     blankContext,
     extraContext,
     attachments,
+    portfolioOutput,
   })
 
   function addDirection(text: string) {
@@ -146,7 +150,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 </div>
                 <div className="flex-1">
                   <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
-                  <p className="text-[12px] text-muted leading-snug">Escolha a crianca e a base que a IA deve usar.</p>
+                  <p className="text-[12px] text-muted leading-snug">Escolha a crianca. Orientacoes extras e anexos sao opcionais.</p>
                 </div>
               </div>
 
@@ -191,6 +195,34 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 </button>
               </div>
             </div>
+
+            {isPortfolio && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
+                  Tipo de portifolio
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setPortfolioOutput('text')}
+                    className={`rounded-app-sm border px-3 py-3 text-left ${
+                      portfolioOutput === 'text' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                    }`}
+                  >
+                    <span className="block text-[13px] font-bold">Texto com Claude</span>
+                    <span className="block text-[11px] mt-1">Narrativa pedagogica e evidencias</span>
+                  </button>
+                  <button
+                    onClick={() => setPortfolioOutput('image')}
+                    className={`rounded-app-sm border px-3 py-3 text-left ${
+                      portfolioOutput === 'image' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                    }`}
+                  >
+                    <span className="block text-[13px] font-bold">Imagem com ChatGPT</span>
+                    <span className="block text-[11px] mt-1">Capa ou painel visual</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {mode === 'annotations' ? (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
@@ -284,7 +316,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 <div className="flex-1">
                   <p className="text-[13px] font-bold text-ink">Anexos complementares</p>
                   <p className="text-[11px] text-muted leading-[1.5] mt-1">
-                    Imagens, documentos e evidencias serao privados quando o Storage estiver conectado.
+                    Voce pode anexar mais de um arquivo, ou gerar sem anexar nada.
                   </p>
                   {attachments.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
@@ -330,7 +362,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               disabled={!canGenerate || generating}
               className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> Gerar documento</>}
+              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> Gerar com IA</>}
             </button>
           </div>
         ) : (
@@ -368,6 +400,7 @@ function createReportPreview(input: {
   blankContext: string
   extraContext: string
   attachments: ReportAttachment[]
+  portfolioOutput: PortfolioOutput
 }) {
   const annotationBlock = input.selectedAnnotations.length
     ? input.selectedAnnotations.map((annotation) => `- ${annotation.date} | ${annotation.label}: ${annotation.text}`).join('\n')
@@ -472,6 +505,30 @@ Documento gerado com auxilio de IA a partir das informacoes autorizadas pela pro
   }
 
   if (input.reportKind === 'Portfolio pedagogico') {
+    if (input.portfolioOutput === 'image') {
+      return `${header}
+
+PORTIFOLIO VISUAL COM CHATGPT
+
+Objetivo da imagem:
+Gerar uma capa ou painel visual para o portifolio pedagogico de ${input.firstName}, usando apenas informacoes e anexos autorizados pela professora.
+
+Direcao visual:
+- composicao clara, delicada e apropriada para educacao infantil;
+- espacos para titulo, nome da crianca, turma e periodo;
+- elementos de aprendizagem, brincadeira, natureza, artes e descobertas;
+- nao expor outras criancas;
+- usar fotos e documentos anexados apenas como referencia autorizada.
+
+Prompt base para imagem:
+"Criar uma capa de portifolio pedagogico infantil para ${input.firstName}, turma ${input.className}, com estetica acolhedora, organizada e profissional para educacao infantil. Usar tons suaves, elementos de aprendizagem, brincadeira, natureza, artes e descobertas. Evitar texto pequeno ilegivel e nao expor outras criancas."
+
+Observacao:
+Quando a API de imagem estiver ligada, esta opcao usara ChatGPT para gerar a imagem do portifolio. O texto pedagogico pode continuar sendo gerado separadamente.${formatAttachments(input.attachments)}
+
+Imagem preparada com auxilio de IA a partir das informacoes autorizadas pela professora.`
+    }
+
     return `${header}
 
 PORTFOLIO PEDAGOGICO

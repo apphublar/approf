@@ -125,7 +125,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                 </div>
                 <div className="flex-1">
                   <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
-                  <p className="text-[12px] text-muted leading-snug">Informe o contexto para a IA criar um documento util para a rotina.</p>
+                  <p className="text-[12px] text-muted leading-snug">Informe o contexto principal. Orientacoes extras e anexos sao opcionais.</p>
                 </div>
               </div>
             </div>
@@ -242,7 +242,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                 </div>
                 <div className="flex-1">
                   <p className="text-[13px] font-bold text-ink">Anexos de apoio</p>
-                  <p className="text-[11px] text-muted leading-[1.5] mt-1">Fotos e documentos serao privados quando o Supabase estiver conectado.</p>
+                  <p className="text-[11px] text-muted leading-[1.5] mt-1">Voce pode anexar mais de um arquivo, ou gerar sem anexar nada.</p>
                   {attachments.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
                       {attachments.map((item) => (
@@ -276,7 +276,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
               disabled={!canGenerate || generating}
               className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> Gerar documento</>}
+              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> Gerar com IA</>}
             </button>
           </div>
         ) : (
