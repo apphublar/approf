@@ -1,0 +1,30 @@
+{
+  "name": "Approf",
+  "short_name": "Approf",
+  "description": "App PWA para professoras registrarem anotações, turmas, alunos e relatórios pedagógicos.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FDFAF6",
+  "theme_color": "#1B4332",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova anotação",
+      "short_name": "Anotar",
+      "description": "Abrir o Approf para registrar uma nova anotação.",
+      "url": "/?shortcut=new-annotation",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

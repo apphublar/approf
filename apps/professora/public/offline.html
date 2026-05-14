@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1B4332" />
+    <title>Approf offline</title>
+    <style>
+      :root {
+        --gd: #1b4332;
+        --gm: #4f8341;
+        --cream: #fdfaf6;
+        --border: #d4ebc8;
+        --ink: #1a1a1a;
+        --muted: #6f766f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: var(--cream);
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(100%, 380px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fff;
+        padding: 24px;
+        box-shadow: 0 16px 40px rgba(27, 67, 50, 0.1);
+      }
+
+      .mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: var(--gd);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        color: var(--gd);
+        font-size: 24px;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark">A</div>
+      <h1>Você está offline</h1>
+      <p>As telas já abertas continuam disponíveis. Novos registros offline serão preparados para sincronização quando o backend estiver conectado.</p>
+    </main>
+  </body>
+</html>

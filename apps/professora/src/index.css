@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'DM Sans', sans-serif;
+  background: #FDFAF6;
+  color: #1A1A1A;
+}
+
+/* App container — max 430px, centered (for desktop preview) */
+#app-root {
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+  height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #FDFAF6;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 4px 40px rgba(0,0,0,0.12);
+}
+
+/* Scrollable areas */
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 88px;
+}
+
+/* Chalkboard texture */
+.chalk-bg {
+  background-color: #1B4332;
+  background-image:
+    radial-gradient(circle at 14% 22%, rgba(255,255,255,0.055), transparent 18%),
+    radial-gradient(circle at 78% 18%, rgba(255,255,255,0.038), transparent 16%),
+    radial-gradient(circle at 62% 74%, rgba(255,255,255,0.045), transparent 20%),
+    linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.028) 42%, transparent 68%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 31px,
+      rgba(255,255,255,0.028) 31px,
+      rgba(255,255,255,0.028) 32px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 34px,
+      rgba(255,255,255,0.018) 34px,
+      rgba(255,255,255,0.018) 35px
+    );
+  background-blend-mode: screen, screen, screen, soft-light, normal, normal;
+}
+
+/* Subscreen slide transitions */
+.subscreen-enter {
+  transform: translateX(100%);
+}
+.subscreen-enter-active {
+  transform: translateX(0);
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.subscreen-exit {
+  transform: translateX(0);
+}
+.subscreen-exit-active {
+  transform: translateX(100%);
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Bottom sheet modal */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.bottom-sheet {
+  animation: slideUp 0.24s ease;
+}
+
+/* Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid #C2E8A0;
+  border-top-color: #4F8341;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Toast */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "approf",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:site": "pnpm --filter @approf/site dev",
+    "dev:professora": "pnpm --filter @approf/professora dev",
+    "dev:admin": "pnpm --filter @approf/admin dev",
+    "build:site": "pnpm --filter @approf/site build",
+    "build:professora": "pnpm --filter @approf/professora build",
+    "build:admin": "pnpm --filter @approf/admin build",
+    "build": "pnpm -r build"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}
