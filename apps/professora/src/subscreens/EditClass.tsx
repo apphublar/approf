@@ -3,8 +3,8 @@ import { ChevronLeft } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { updateSupabaseClass } from '@/services/supabase/classes'
+import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 
-const AGE_GROUPS = ['Bercario I', 'Bercario II', 'Maternal I', 'Maternal II', 'Jardim I', 'Jardim II', 'Pre-escola']
 const SHIFTS = ['Manha', 'Tarde', 'Integral']
 
 export default function EditClassSubscreen() {
@@ -15,7 +15,7 @@ export default function EditClassSubscreen() {
   const [name, setName] = useState(cls?.name ?? '')
   const [school, setSchool] = useState(cls?.school ?? '')
   const [shift, setShift] = useState(cls?.shift ?? SHIFTS[0])
-  const [ageGroup, setAgeGroup] = useState(cls?.ageGroup ?? AGE_GROUPS[2])
+  const [ageGroup, setAgeGroup] = useState(cls?.ageGroup ?? '0 a 5 anos')
   const [notes, setNotes] = useState(cls?.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -93,19 +93,7 @@ export default function EditClassSubscreen() {
         </div>
 
         <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Faixa etaria</label>
-        <div className="grid grid-cols-2 gap-2 mt-2 mb-4">
-          {AGE_GROUPS.map((item) => (
-            <button
-              key={item}
-              onClick={() => setAgeGroup(item)}
-              className={`rounded-app-sm border px-2 py-3 text-xs font-bold ${
-                ageGroup === item ? 'bg-gm border-gm text-white' : 'bg-white border-border text-muted'
-              }`}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
+        <AgeRangeSelector value={ageGroup} onChange={setAgeGroup} />
 
         <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Observacoes gerais</label>
         <textarea

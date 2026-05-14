@@ -18,6 +18,7 @@ export default function AnnotationCard({
   onClick?: () => void
 }) {
   const badgeStyle = BADGE_STYLES[annotation.category] ?? BADGE_STYLES['evolucao']
+  const scopeLabel = annotation.scope === 'personal' ? 'Pessoal' : null
   return (
     <div
       onClick={onClick}
@@ -29,6 +30,9 @@ export default function AnnotationCard({
         </span>
         {annotation.studentName && (
           <span className="text-[11px] text-muted ml-auto">{annotation.studentName}</span>
+        )}
+        {scopeLabel && !annotation.studentName && (
+          <span className="text-[11px] text-muted ml-auto">{scopeLabel}</span>
         )}
       </div>
       <p className="text-[13px] text-soft leading-[1.5]">{annotation.text}</p>

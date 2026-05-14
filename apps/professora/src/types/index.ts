@@ -80,6 +80,7 @@ export interface Annotation {
   tags?: string[]
   persistence?: AnnotationPersistence[]
   attachmentName?: string | null
+  scope?: 'personal'
 }
 
 export type AnnotationPersistence =

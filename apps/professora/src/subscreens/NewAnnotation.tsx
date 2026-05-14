@@ -6,8 +6,8 @@ import { createSupabaseAnnotation } from '@/services/supabase/annotations'
 import { isSupabaseConfigured } from '@/services/supabase/config'
 import type { AnnotationCategory, AnnotationPersistence } from '@/types'
 
-type WorkKind = '' | 'report' | 'planning' | 'memory'
-type Scope = 'child' | 'class' | 'optional-class'
+type WorkKind = '' | 'report' | 'planning' | 'memory' | 'personal'
+type Scope = 'child' | 'class' | 'optional-class' | 'teacher'
 
 interface ModelOption {
   id: string
@@ -41,6 +41,12 @@ const MEMORY_MODELS: ModelOption[] = [
   { id: 'evolucao', label: 'Evolucao da crianca', desc: 'Marco, progresso, fala, autonomia ou interacao.', scope: 'child' },
   { id: 'observacao', label: 'Observacao importante', desc: 'Algo que precisa acompanhar a rotina pedagogica.', scope: 'child' },
   { id: 'ideia', label: 'Ideia solta para depois', desc: 'Pensamento rapido para usar em relatorio ou planejamento.', scope: 'optional-class' },
+]
+
+const PERSONAL_MODELS: ModelOption[] = [
+  { id: 'pessoal', label: 'Anotacao pessoal', desc: 'Registro privado da professora, sem vinculo com crianca ou turma.', scope: 'teacher' },
+  { id: 'lembrete', label: 'Lembrete de rotina', desc: 'Algo para lembrar depois sobre organizacao, materiais ou combinados.', scope: 'teacher' },
+  { id: 'ideia-pessoal', label: 'Ideia para desenvolver', desc: 'Uma ideia livre para amadurecer antes de virar planejamento.', scope: 'teacher' },
 ]
 
 const TAGS = [
@@ -95,8 +101,8 @@ export default function NewAnnotationSubscreen() {
     setError('')
 
     const fallbackClass = activeClass ?? classes[0]
-    setClassId(fallbackClass?.id ?? '')
-    setStudentId(activeStudent?.id ?? fallbackClass?.students[0]?.id ?? '')
+    setClassId(value === 'personal' ? '' : fallbackClass?.id ?? '')
+    setStudentId(value === 'personal' ? '' : activeStudent?.id ?? fallbackClass?.students[0]?.id ?? '')
   }
 
   function chooseModel(value: string) {
@@ -104,6 +110,10 @@ export default function NewAnnotationSubscreen() {
     setModelId(value)
 
     if (nextModel?.scope === 'class' || nextModel?.scope === 'optional-class') {
+      setStudentId('')
+    }
+    if (nextModel?.scope === 'teacher') {
+      setClassId('')
       setStudentId('')
     }
     if (nextModel?.scope === 'child' && !studentId) {
@@ -138,13 +148,16 @@ export default function NewAnnotationSubscreen() {
     setSaving(true)
     setError('')
     const resolved = resolveAnnotation(workKind, selectedModel)
+    const targetClassId = selectedModel.scope === 'teacher' ? undefined : classId || undefined
+    const targetStudentId = selectedModel.scope === 'child' ? selectedStudent?.id : undefined
+    const targetStudentName = selectedModel.scope === 'child' ? selectedStudent?.name ?? null : null
     const annotationInput = {
       category: resolved.category,
       label: resolved.label,
       text: text.trim(),
-      classId: classId || undefined,
-      studentId: selectedStudent?.id,
-      studentName: selectedStudent?.name ?? null,
+      classId: targetClassId,
+      studentId: targetStudentId,
+      studentName: targetStudentName,
       tags,
       persistence: resolved.persistence,
       attachmentName: attachmentName || null,
@@ -154,20 +167,21 @@ export default function NewAnnotationSubscreen() {
       category: resolved.category,
       label: resolved.label,
       badgeClass: 'badge-ev',
-      studentName: selectedStudent?.name ?? null,
+      studentName: targetStudentName,
       text: text.trim(),
       date: 'Agora',
-      classId: classId || undefined,
-      studentId: selectedStudent?.id,
+      classId: targetClassId,
+      studentId: targetStudentId,
       tags: [selectedModel.label, ...tags],
       persistence: resolved.persistence,
       attachmentName: attachmentName || null,
+      scope: selectedModel.scope === 'teacher' ? 'personal' as const : undefined,
     }
 
     try {
       if (getAppDataMode() === 'supabase' && isSupabaseConfigured()) {
         const savedAnnotation = await createSupabaseAnnotation(annotationInput)
-        addAnnotation({ ...savedAnnotation, studentName: selectedStudent?.name ?? savedAnnotation.studentName })
+        addAnnotation({ ...savedAnnotation, studentName: targetStudentName ?? savedAnnotation.studentName })
       } else {
         addAnnotation(localAnnotation)
       }
@@ -213,6 +227,7 @@ export default function NewAnnotationSubscreen() {
           <ChoiceButton selected={workKind === 'report'} title="Relatorio ou documento" desc="Desenvolvimento, portfolio, diario de bordo, especialista, reuniao." onClick={() => chooseWorkKind('report')} />
           <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Anual, mensal, semanal, plano de aula ou projeto pedagogico." onClick={() => chooseWorkKind('planning')} />
           <ChoiceButton selected={workKind === 'memory'} title="Memoria pedagogica" desc="Registro rapido de evolucao, observacao importante ou ideia solta." onClick={() => chooseWorkKind('memory')} />
+          <ChoiceButton selected={workKind === 'personal'} title="Anotacao pessoal" desc="Ideias e lembretes privados da professora, sem crianca vinculada." onClick={() => chooseWorkKind('personal')} />
         </div>
 
         {workKind && (
@@ -318,6 +333,7 @@ function getModelOptions(workKind: WorkKind) {
   if (workKind === 'report') return REPORT_MODELS
   if (workKind === 'planning') return PLANNING_MODELS
   if (workKind === 'memory') return MEMORY_MODELS
+  if (workKind === 'personal') return PERSONAL_MODELS
   return []
 }
 
@@ -357,6 +373,10 @@ function resolveAnnotation(workKind: WorkKind, model: ModelOption): {
 
   if (workKind === 'memory') {
     return { category: 'evolucao', label: model.label, persistence: ['observacao-continua', 'observacao-importante'] }
+  }
+
+  if (workKind === 'personal') {
+    return { category: 'formacao', label: model.label, persistence: ['observacao-importante'] }
   }
 
   if (model.id === 'portfolio') {

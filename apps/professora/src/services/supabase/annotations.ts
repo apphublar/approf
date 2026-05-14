@@ -131,6 +131,7 @@ function mapAnnotation(
 ): Annotation {
   const studentTarget = targets.find((target) => target.target_type === 'student' && target.target_id)
   const classTarget = targets.find((target) => target.target_type === 'class' && target.target_id)
+  const teacherTarget = targets.find((target) => target.target_type === 'teacher')
   const tags = annotation.tags ?? []
   const label = fallback?.label ?? tags[0] ?? labelForCategory(annotation.category)
   const studentName = fallback?.studentName
@@ -143,7 +144,7 @@ function mapAnnotation(
     category: annotation.category,
     label,
     badgeClass: 'badge-ev',
-    studentName: fallback?.studentId ? null : studentName,
+    studentName,
     text: annotation.body,
     date: formatAnnotationDate(annotation.occurred_at),
     classId: fallback?.classId ?? classTarget?.target_id ?? undefined,
@@ -151,6 +152,7 @@ function mapAnnotation(
     tags,
     persistence: annotation.persistence ?? [],
     attachmentName: annotation.attachment_path ? getFileName(annotation.attachment_path) : null,
+    scope: teacherTarget ? 'personal' : undefined,
   }
 }
 
