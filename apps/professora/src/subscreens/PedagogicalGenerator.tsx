@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Sparkles, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { formatAiUsageMessage, reserveAiUsage } from '@/services/ai-usage'
+import { celebrateAiGeneration } from '@/utils/celebration'
 
 interface PedagogicalGeneratorProps {
   data?: unknown
@@ -116,6 +117,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
       setUsageMessage(formatAiUsageMessage(result))
       window.setTimeout(() => {
+        celebrateAiGeneration()
         setGenerating(false)
         setGenerated(true)
       }, 800)

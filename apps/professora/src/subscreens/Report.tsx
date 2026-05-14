@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, reserveAiUsage, type AiGenerationType } from '@/services/ai-usage'
+import { celebrateAiGeneration } from '@/utils/celebration'
 import type { Annotation } from '@/types'
 
 const DIRECTION_SUGGESTIONS = [
@@ -157,6 +158,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
       setUsageMessage(formatAiUsageMessage(result))
       window.setTimeout(() => {
+        celebrateAiGeneration()
         setGenerating(false)
         setGenerated(true)
       }, 900)
