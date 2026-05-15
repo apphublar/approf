@@ -43,6 +43,69 @@ export interface AiTextGenerationResult extends AiUsageReservationResult {
   model?: string
 }
 
+export interface AiUsageSummary {
+  wallet: {
+    giztokensIncluded: number
+    giztokensUsed: number
+    giztokensRemaining: number
+    includedCostLimitCents: number
+    includedCostUsedCents: number
+    includedCostRemainingCents: number
+    periodStart: string | null
+    periodEnd: string | null
+  }
+  entitlements: Array<{
+    entitlementType: string
+    cycleLabel: string
+    includedQuantity: number
+    usedQuantity: number
+    remainingQuantity: number
+  }>
+  generatedThisMonth: number
+}
+
+export async function getAiUsageSummary(): Promise<AiUsageSummary> {
+  const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
+  if (!apiBaseUrl) {
+    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase nao configurado para consultar uso de IA.')
+  }
+
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+
+  const token = data.session?.access_token
+  if (!token) {
+    throw new Error('Sessao expirada. Entre novamente para consultar uso de IA.')
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/usage-summary`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  const result = await response.json().catch(() => null) as AiUsageSummary | { error?: string } | null
+
+  if (!response.ok) {
+    const message = result && 'error' in result && typeof result.error === 'string'
+      ? result.error
+      : 'Nao foi possivel consultar o saldo de IA.'
+    throw new Error(message)
+  }
+
+  if (!result || !('wallet' in result)) {
+    throw new Error('Resposta invalida do backend de IA.')
+  }
+
+  return result
+}
+
 export async function reserveAiUsage(input: AiUsageReservationInput): Promise<AiUsageReservationResult> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
 

@@ -22,6 +22,7 @@ export type Subscreen =
   | 'new-timeline-event'
   | 'pedagogical-generator'
   | 'document-detail'
+  | 'pending'
 
 export type FeatureKey = 'community'
 
@@ -193,4 +194,14 @@ export interface GeneratedDocument {
   is_final_version: boolean
   created_at: string
   updated_at: string
+}
+
+/** Documento pessoal da professora (certificados, diplomas, histórico etc.). */
+export interface TeacherPersonalDocument {
+  id: string
+  name: string
+  mimeType: string
+  size: number
+  dataUrl: string
+  uploadedAt: string
 }

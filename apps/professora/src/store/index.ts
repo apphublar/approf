@@ -11,6 +11,7 @@ import type {
   OnboardingData,
   Subscreen,
   Tab,
+  TeacherPersonalDocument,
   TimelineEvent,
 } from '@/types'
 import { getInitialAppData } from '@/services/app-data'
@@ -77,6 +78,7 @@ interface AppStore {
   calendarEvents: CalendarEvent[]
   communityAccess: FeatureAccess
   communityPosts: CommunityPost[]
+  personalDocuments: TeacherPersonalDocument[]
   activeClassId: string | null
   activeStudentId: string | null
   isCommunityEnabled: () => boolean
@@ -98,6 +100,8 @@ interface AppStore {
   setCalendarEvents: (events: CalendarEvent[]) => void
   addCalendarEvent: (event: CalendarEvent) => void
   addCommunityPost: (post: CommunityPost) => void
+  addPersonalDocument: (doc: TeacherPersonalDocument) => void
+  removePersonalDocument: (id: string) => void
   addClass: (classData: ClassData) => void
   updateClass: (classId: string, updates: Partial<Omit<ClassData, 'id' | 'students'>>) => void
   addStudent: (classId: string, student: ClassData['students'][number]) => void
@@ -123,6 +127,7 @@ export const useAppStore = create<AppStore>()(
         global: false,
         allowedUserIds: ['demo-teacher-ana'],
       },
+      personalDocuments: [],
       communityPosts: [
         {
           id: 'cp-1',
@@ -208,6 +213,12 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ calendarEvents: [event, ...state.calendarEvents] })),
       addCommunityPost: (post: CommunityPost) =>
         set((state) => ({ communityPosts: [post, ...state.communityPosts] })),
+      addPersonalDocument: (doc: TeacherPersonalDocument) =>
+        set((state) => ({ personalDocuments: [doc, ...state.personalDocuments] })),
+      removePersonalDocument: (id: string) =>
+        set((state) => ({
+          personalDocuments: state.personalDocuments.filter((item) => item.id !== id),
+        })),
       addClass: (classData: ClassData) =>
         set((state) => ({ classes: [classData, ...state.classes] })),
       updateClass: (classId, updates) =>

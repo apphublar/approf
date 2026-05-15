@@ -1,94 +1,54 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, FileText, Search } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ChevronLeft, FileText, Paperclip, Search, Trash2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
-import { listReports } from '@/services/reports'
-import type { GeneratedDocument, ReportStatus } from '@/types'
+import type { TeacherPersonalDocument } from '@/types'
 
-interface DocumentsSubscreenProps {
-  data?: unknown
-}
+const MAX_FILE_BYTES = 4 * 1024 * 1024
+const ACCEPTED_TYPES = 'image/*,.pdf,.doc,.docx,.txt,.odt,.rtf'
 
-type ReportFilter = 'all' | 'development_report' | 'planning' | 'portfolio_text' | 'general_report' | 'specialist_report' | 'other'
-
-const FILTERS: Array<{ id: ReportFilter; label: string }> = [
-  { id: 'all', label: 'Todos' },
-  { id: 'development_report', label: 'Rel. desenvolvimento' },
-  { id: 'planning', label: 'Planejamento' },
-  { id: 'portfolio_text', label: 'Portf\u00f3lio' },
-]
-
-export default function DocumentsSubscreen({ data }: DocumentsSubscreenProps) {
-  const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes } = useAppStore()
-  const [documents, setDocuments] = useState<GeneratedDocument[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+export default function DocumentsSubscreen(_props?: { data?: unknown }) {
+  const { closeSubscreen } = useNavStore()
+  const { personalDocuments, addPersonalDocument, removePersonalDocument } = useAppStore()
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<ReportFilter>(
-    typeof data === 'object' && data && 'reportType' in data && typeof (data as { reportType?: string }).reportType === 'string'
-      ? (((data as { reportType?: string }).reportType as ReportFilter) || 'all')
-      : 'all',
-  )
-  const focusReportId = typeof data === 'object' && data && 'focusReportId' in data
-    ? String((data as { focusReportId?: string }).focusReportId ?? '')
-    : ''
-  const initialStudentId = typeof data === 'object' && data && 'studentId' in data
-    ? String((data as { studentId?: string }).studentId ?? '')
-    : ''
-
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setError('')
-    listReports({ limit: 120 })
-      .then((items) => {
-        if (!active) return
-        setDocuments(items)
-      })
-      .catch((err) => {
-        if (!active) return
-        setError(err instanceof Error ? err.message : 'N\u00e3o foi poss\u00edvel carregar documentos.')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  const studentNames = useMemo(() => {
-    const map = new Map<string, string>()
-    classes.forEach((classItem) => {
-      classItem.students.forEach((student) => map.set(student.id, student.name))
-    })
-    return map
-  }, [classes])
-
-  const classNames = useMemo(() => new Map(classes.map((item) => [item.id, item.name])), [classes])
-
-  const versionsByStudent = useMemo(() => {
-    const map = new Map<string, number>()
-    documents.forEach((item) => {
-      if (item.report_type !== 'development_report' || !item.student_id) return
-      map.set(item.student_id, (map.get(item.student_id) ?? 0) + 1)
-    })
-    return map
-  }, [documents])
+  const [uploadError, setUploadError] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const visibleDocuments = useMemo(() => {
     const normalizedQuery = normalizeText(query)
-    return documents.filter((doc) => {
-      if (filter !== 'all' && doc.report_type !== filter) return false
-      if (initialStudentId && doc.student_id !== initialStudentId) return false
-      if (!normalizedQuery) return true
-      const studentName = doc.student_id ? studentNames.get(doc.student_id) : ''
-      const className = doc.class_id ? classNames.get(doc.class_id) : ''
-      const target = `${doc.report_type} ${studentName ?? ''} ${className ?? ''} ${doc.prompt_version ?? ''}`
-      return normalizeText(target).includes(normalizedQuery)
-    })
-  }, [documents, filter, query, studentNames, classNames])
+    if (!normalizedQuery) return personalDocuments
+    return personalDocuments.filter((doc) => normalizeText(doc.name).includes(normalizedQuery))
+  }, [personalDocuments, query])
+
+  async function handleFileSelect(files: FileList | null) {
+    const file = files?.[0]
+    if (!file) return
+
+    setUploadError('')
+    if (file.size > MAX_FILE_BYTES) {
+      setUploadError('Arquivo muito grande. Use arquivos de até 4 MB.')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      const doc: TeacherPersonalDocument = {
+        id: `pdoc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        dataUrl,
+        uploadedAt: new Date().toISOString(),
+      }
+      addPersonalDocument(doc)
+    } catch {
+      setUploadError('Não foi possível anexar o arquivo. Tente novamente.')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
@@ -101,78 +61,67 @@ export default function DocumentsSubscreen({ data }: DocumentsSubscreenProps) {
 
       <div className="scroll-area px-[18px]">
         <div className="py-5">
+          <div className="bg-gbg border border-gp rounded-app p-4 mb-4">
+            <p className="text-[13px] font-bold text-gd mb-2">Seus arquivos pessoais</p>
+            <p className="text-[12px] text-muted leading-[1.6]">
+              Guarde aqui certificados de cursos, diplomas, histórico escolar, comprovantes e outros documentos da sua
+              trajetória profissional. Eles ficam salvos neste aparelho, com acesso restrito a você.
+            </p>
+            <p className="text-[11px] text-muted mt-2 leading-[1.5]">
+              Formatos: imagens, PDF e documentos de texto. Tamanho máximo por arquivo: 4 MB.
+            </p>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_TYPES}
+            className="hidden"
+            onChange={(event) => void handleFileSelect(event.target.files)}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 mb-4 disabled:opacity-50"
+          >
+            <Paperclip size={15} />
+            {uploading ? 'Anexando...' : 'Anexar documento'}
+          </button>
+
+          {uploadError && (
+            <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError}</p>
+          )}
+
           <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
             <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
               <Search size={16} className="text-muted flex-shrink-0" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por tipo, crian\u00e7a, turma..."
+                placeholder="Buscar por nome do arquivo..."
                 className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
               />
             </div>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2 mb-4">
-            {FILTERS.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setFilter(item.id)}
-                className={`px-3 py-2 rounded-full text-xs font-bold border whitespace-nowrap ${
-                  filter === item.id ? 'bg-gm border-gm text-white' : 'bg-white border-border text-muted'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          {loading ? (
-            <div className="bg-white rounded-app p-4 border border-border shadow-card text-[12px] text-muted">
-              Carregando documentos...
-            </div>
-          ) : error ? (
-            <div className="bg-white rounded-app p-4 border border-red-200 shadow-card text-[12px] text-red-700">
-              {error}
-            </div>
-          ) : visibleDocuments.length === 0 ? (
-            <div className="bg-white rounded-app p-4 border border-border shadow-card text-[12px] text-muted">
-              Nenhum documento encontrado com os filtros atuais.
+          {visibleDocuments.length === 0 ? (
+            <div className="bg-white rounded-app p-5 border border-border shadow-card text-center">
+              <FileText size={24} className="text-gm mx-auto mb-2" />
+              <p className="text-[13px] font-bold text-ink">Nenhum documento anexado</p>
+              <p className="text-[12px] text-muted mt-1 leading-[1.5]">
+                Toque em &quot;Anexar documento&quot; para guardar certificados, diplomas ou outros arquivos importantes.
+              </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-[11px]">
-              {visibleDocuments.map((doc) => {
-                const studentName = doc.student_id ? studentNames.get(doc.student_id) : null
-                const className = doc.class_id ? classNames.get(doc.class_id) : null
-                const isFocused = focusReportId && doc.id === focusReportId
-                const versionCount = doc.student_id ? versionsByStudent.get(doc.student_id) ?? 0 : 0
-
-                return (
-                  <button
-                    key={doc.id}
-                    onClick={() => openSubscreen('document-detail', { reportId: doc.id })}
-                    className={`bg-white rounded-app px-[15px] py-[15px] border shadow-card flex items-center gap-[13px] text-left ${
-                      isFocused ? 'border-gp' : 'border-border'
-                    }`}
-                  >
-                    <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center bg-gbg text-gm flex-shrink-0">
-                      <FileText size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-bold text-ink truncate">{formatReportType(doc.report_type)}</p>
-                      <p className="text-[11px] text-muted truncate">
-                        {studentName ?? 'Sem crian\u00e7a'} {'\u2022'} {className ?? 'Sem turma'}
-                      </p>
-                      <p className="text-[10px] text-muted mt-1">
-                        {formatDateTime(doc.updated_at)} {'\u2022'} {formatStatus(doc.status)}
-                        {doc.is_final_version ? ' \u2022 Vers\u00e3o final' : ''}
-                        {doc.report_type === 'development_report' && versionCount > 1 ? ` \u2022 ${versionCount} vers\u00f5es` : ''}
-                      </p>
-                    </div>
-                    <span className="text-muted text-[18px] flex-shrink-0">{'\u203a'}</span>
-                  </button>
-                )
-              })}
+            <div className="flex flex-col gap-[9px] pb-8">
+              {visibleDocuments.map((doc) => (
+                <PersonalDocumentRow
+                  key={doc.id}
+                  doc={doc}
+                  onRemove={() => removePersonalDocument(doc.id)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -181,31 +130,67 @@ export default function DocumentsSubscreen({ data }: DocumentsSubscreenProps) {
   )
 }
 
-function formatReportType(type: string) {
-  switch (type) {
-    case 'development_report': return 'Relat\u00f3rio de desenvolvimento'
-    case 'planning': return 'Planejamento'
-    case 'portfolio_text': return 'Portf\u00f3lio pedag\u00f3gico'
-    case 'specialist_report': return 'Relat\u00f3rio para especialista'
-    case 'general_report': return 'Relat\u00f3rio pedag\u00f3gico'
-    default: return type
-  }
+function PersonalDocumentRow({
+  doc,
+  onRemove,
+}: {
+  doc: TeacherPersonalDocument
+  onRemove: () => void
+}) {
+  return (
+    <div className="bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[13px]">
+      <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center bg-gbg text-gm flex-shrink-0">
+        <FileText size={18} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-bold text-ink truncate">{doc.name}</p>
+        <p className="text-[11px] text-muted">
+          {formatFileSize(doc.size)} · {formatDate(doc.uploadedAt)}
+        </p>
+        <a
+          href={doc.dataUrl}
+          download={doc.name}
+          className="text-[11px] font-bold text-gm mt-1 inline-block"
+        >
+          Abrir ou baixar
+        </a>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white flex-shrink-0"
+        aria-label="Remover documento"
+      >
+        <Trash2 size={15} />
+      </button>
+    </div>
+  )
 }
 
-function formatStatus(status: ReportStatus) {
-  switch (status) {
-    case 'draft': return 'Rascunho'
-    case 'generating': return 'Gerando'
-    case 'ready': return 'Pronto'
-    case 'failed': return 'Falhou'
-    case 'archived': return 'Arquivado'
-    default: return status
-  }
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result)
+      else reject(new Error('invalid'))
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 }
 
-function formatDateTime(value: string) {
-  const date = new Date(value)
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
 }
 
 function normalizeText(value: string) {

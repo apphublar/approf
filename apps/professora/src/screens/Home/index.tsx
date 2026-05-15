@@ -5,6 +5,7 @@ import { useAppStore, useNavStore } from '@/store'
 import { toTitleCaseName } from '@/utils/text'
 import type { BoardNote } from '@/types'
 import AnnotationCard from '@/components/ui/AnnotationCard'
+import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
 
 const QUICK_ACCESS = [
   { label: 'Anotações',    desc: 'Registre o dia a dia da turma',      icon: '📝', bg: '#D8F3DC', tab: 'annotations' as const, sub: null },
@@ -21,11 +22,14 @@ export default function HomeScreen() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [modalNote, setModalNote] = useState<BoardNote | null | 'new'>('new')
   const [modalOpen, setModalOpen] = useState(false)
+  const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null)
   const touchStartX = useRef(0)
 
   const firstName = getDisplayFirstName(userName)
-  const totalStudents = classes.reduce((acc, c) => acc + c.students.length, 0)
   const recentNotes = annotations.slice(0, 3)
+  const pendingCount = getPendingCount(annotations, classes)
+  const giztokensRemaining = aiUsage?.wallet.giztokensRemaining ?? 1000
+  const docsGenerated = aiUsage?.generatedThisMonth ?? 0
 
   const allSlides: ({ isMain: true } | { isMain: false; note: BoardNote })[] = [
     { isMain: true },
@@ -39,6 +43,20 @@ export default function HomeScreen() {
   useEffect(() => {
     if (currentSlide !== safeSlide) setCurrentSlide(safeSlide)
   }, [safeSlide, currentSlide])
+
+  useEffect(() => {
+    let active = true
+    getAiUsageSummary()
+      .then((summary) => {
+        if (active) setAiUsage(summary)
+      })
+      .catch(() => {
+        if (active) setAiUsage(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   function handleQuickAccess(tab: typeof QUICK_ACCESS[number]['tab'], sub: typeof QUICK_ACCESS[number]['sub']) {
     if (tab) setTab(tab)
@@ -101,9 +119,14 @@ export default function HomeScreen() {
               {slide.isMain ? (
                 <MainSlide
                   name={firstName}
-                  classes={classes.length}
-                  students={totalStudents}
                   annotations={annotations.length}
+                  giztokens={giztokensRemaining}
+                  documents={docsGenerated}
+                  pending={pendingCount}
+                  onOpenAi={() => openSubscreen('ai')}
+                  onOpenAnnotations={() => setTab('annotations')}
+                  onOpenDocuments={() => openSubscreen('ai')}
+                  onOpenPending={() => openSubscreen('pending')}
                 />
               ) : (
                 <NoteSlide note={slide.note} />
@@ -313,29 +336,50 @@ export default function HomeScreen() {
 
 /* ── MainSlide ── */
 function MainSlide({
-  name, classes, students, annotations,
-}: { name: string; classes: number; students: number; annotations: number }) {
+  name,
+  annotations,
+  giztokens,
+  documents,
+  pending,
+  onOpenAi,
+  onOpenAnnotations,
+  onOpenDocuments,
+  onOpenPending,
+}: {
+  name: string
+  annotations: number
+  giztokens: number
+  documents: number
+  pending: number
+  onOpenAi: () => void
+  onOpenAnnotations: () => void
+  onOpenDocuments: () => void
+  onOpenPending: () => void
+}) {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+  const stats = [
+    { n: formatCompactNumber(giztokens), l: 'GizTokens', onClick: onOpenAi },
+    { n: formatCompactNumber(annotations), l: 'Anotações', onClick: onOpenAnnotations },
+    { n: formatCompactNumber(documents), l: 'Gerados', onClick: onOpenDocuments },
+    { n: formatCompactNumber(pending), l: 'Pendências', onClick: onOpenPending },
+  ]
   return (
     <div className="relative z-10">
       <p className="font-chalk text-base" style={{ color: 'rgba(255,255,255,0.55)' }}>✏︎ {greeting},</p>
       <h1 className="font-chalk text-white text-[34px] font-bold leading-[1.05] mb-[5px] break-words pr-12">{name}</h1>
       <div className="w-[52%] h-[2px] rounded-sm mb-4" style={{ background: 'rgba(255,255,255,0.15)' }} />
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { n: classes, l: 'Turmas' },
-          { n: students, l: 'Alunos' },
-          { n: annotations, l: 'Anotações' },
-        ].map((s) => (
-          <div
+      <div className="grid grid-cols-4 gap-[7px]">
+        {stats.map((s) => (
+          <button
             key={s.l}
-            className="rounded-xl p-[10px] text-center"
+            onClick={s.onClick}
+            className="rounded-xl p-[8px] text-center active:scale-[.98] transition-transform"
             style={{ background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.10)' }}
           >
-            <span className="block text-xl font-bold text-white">{s.n}</span>
-            <span className="block text-[10px] mt-[1px]" style={{ color: 'rgba(255,255,255,0.60)' }}>{s.l}</span>
-          </div>
+            <span className="block text-[17px] font-bold text-white leading-none">{s.n}</span>
+            <span className="block text-[9px] mt-[5px] leading-tight" style={{ color: 'rgba(255,255,255,0.64)' }}>{s.l}</span>
+          </button>
         ))}
       </div>
     </div>
@@ -540,4 +584,31 @@ function getDisplayFirstName(name: string) {
 
   const firstName = toTitleCaseName(cleaned).split(/\s+/)[0] || 'Professora'
   return firstName === 'Professora' ? firstName : `Prof. ${firstName}`
+}
+
+function getPendingCount(
+  annotations: ReturnType<typeof useAppStore.getState>['annotations'],
+  classes: ReturnType<typeof useAppStore.getState>['classes'],
+) {
+  const undirectedNotes = annotations.filter((annotation) =>
+    !annotation.studentId && !annotation.classId && !annotation.studentName && annotation.scope !== 'personal'
+  ).length
+
+  const now = Date.now()
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  const studentsWithoutRecentNote = classes.flatMap((classData) => classData.students).filter((student) => {
+    const last = annotations
+      .filter((annotation) => annotation.studentId === student.id || annotation.studentName === student.name)
+      .map((annotation) => new Date(annotation.date).getTime())
+      .filter((time) => Number.isFinite(time))
+      .sort((a, b) => b - a)[0]
+    return !last || now - last > sevenDaysMs
+  }).length
+
+  return undirectedNotes + studentsWithoutRecentNote
+}
+
+function formatCompactNumber(value: number) {
+  if (value >= 1000) return `${Math.floor(value / 100) / 10}k`
+  return String(value)
 }

@@ -22,6 +22,7 @@ import NewTimelineEventSubscreen from '@/subscreens/NewTimelineEvent'
 import PedagogicalGeneratorSubscreen from '@/subscreens/PedagogicalGenerator'
 import DocumentsSubscreen from '@/subscreens/Documents'
 import DocumentDetailSubscreen from '@/subscreens/DocumentDetail'
+import PendingSubscreen from '@/subscreens/Pending'
 
 export default function AppShell() {
   const { activeTab, subscreens } = useNavStore()
@@ -107,6 +108,7 @@ function renderSubscreen(screen: string, data?: unknown) {
     case 'pedagogical-generator': return <PedagogicalGeneratorSubscreen data={data} />
     case 'documents':       return <DocumentsSubscreen data={data} />
     case 'document-detail': return <DocumentDetailSubscreen data={data} />
+    case 'pending':         return <PendingSubscreen />
     default:                return null
   }
 }

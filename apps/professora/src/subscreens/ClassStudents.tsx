@@ -193,19 +193,21 @@ export default function ClassStudentsSubscreen() {
             <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mt-[14px] mb-[10px]">
               {filteredStudents.length} de {cls.students.length} alunos
             </p>
-            {filteredStudents.map((student) => (
-              <StudentRow
-                key={student.id}
-                student={student}
-                rightSlot={
-                  <div className="text-right flex-shrink-0">
-                    <span className="text-[11px] font-semibold text-gm">{student.annotationCount}</span>
-                    <span className="text-[10px] text-muted block">anotacoes</span>
-                  </div>
-                }
-                onClick={() => openStudent(student.id)}
-              />
-            ))}
+            <div className="flex flex-col gap-[9px] pb-8">
+              {filteredStudents.map((student) => (
+                <StudentRow
+                  key={student.id}
+                  student={student}
+                  rightSlot={
+                    <div className="text-right flex-shrink-0">
+                      <span className="text-[11px] font-semibold text-gm">{student.annotationCount}</span>
+                      <span className="text-[10px] text-muted block">anotacoes</span>
+                    </div>
+                  }
+                  onClick={() => openStudent(student.id)}
+                />
+              ))}
+            </div>
           </>
         )}
 
