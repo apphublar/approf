@@ -47,29 +47,58 @@ interface GeneratePedagogicalTextResult {
 
 export class PublicAiGenerationError extends Error {}
 
+const DEFAULT_ANTHROPIC_TEXT_MODEL = 'claude-sonnet-4-20250514'
+
+function resolveAnthropicTextModelFallback(): string {
+  const fromEnv = process.env.ANTHROPIC_TEXT_MODEL?.trim()
+  return fromEnv || DEFAULT_ANTHROPIC_TEXT_MODEL
+}
+
+function resolveDraftModelId(): string {
+  const v = process.env.ANTHROPIC_DRAFT_MODEL?.trim()
+  return v || resolveAnthropicTextModelFallback()
+}
+
+function resolveReviewModelId(): string {
+  const v = process.env.ANTHROPIC_REVIEW_MODEL?.trim()
+  return v || resolveAnthropicTextModelFallback()
+}
+
+function resolveRefineModelId(): string {
+  const v = process.env.ANTHROPIC_REFINE_MODEL?.trim()
+  return v || resolveAnthropicTextModelFallback()
+}
+
 export async function generatePedagogicalText(
   input: GeneratePedagogicalTextInput,
 ): Promise<GeneratePedagogicalTextResult> {
   const summary = input.requestSummary ?? {}
   const promptInput = buildPromptInputFromSummary(input, summary)
 
+  const modelDraft = resolveDraftModelId()
+  const modelReview = resolveReviewModelId()
+  const modelRefine = resolveRefineModelId()
+
   let reportId: string | null = null
 
   try {
     const stage1Prompt = buildStage1DraftPrompt(promptInput)
     const s1 = await runPipelineStage(1, stage1Prompt.system, stage1Prompt.user, {
+      model: modelDraft,
       maxTokens: 2200,
       temperature: 0.35,
     })
 
     const stage2Prompt = buildStage2BnccReviewPrompt(promptInput, s1.text)
     const s2 = await runPipelineStage(2, stage2Prompt.system, stage2Prompt.user, {
+      model: modelReview,
       maxTokens: 2400,
       temperature: 0.2,
     })
 
     const stage3Prompt = buildStage3FinalRefinementPrompt(promptInput, s2.text)
     const s3 = await runPipelineStage(3, stage3Prompt.system, stage3Prompt.user, {
+      model: modelRefine,
       maxTokens: 2000,
       temperature: 0.45,
     })
@@ -94,7 +123,7 @@ export async function generatePedagogicalText(
       reportId,
       input.ownerId,
       'anthropic',
-      `${s3.model}+3stage`,
+      `3stage:${s1.model}|${s2.model}|${s3.model}`,
       inputTokens,
       outputTokens,
       actualCostCents,
@@ -142,7 +171,7 @@ async function runPipelineStage(
   stageNumber: 1 | 2 | 3,
   system: string,
   user: string,
-  opts: { maxTokens: number; temperature: number },
+  opts: { model: string; maxTokens: number; temperature: number },
 ) {
   try {
     return await requestClaudeText(system, user, opts)
@@ -158,17 +187,18 @@ export async function rollbackGeneratedArtifacts(input: { reportId: string; owne
 }
 
 interface RequestClaudeOptions {
+  model: string
   maxTokens?: number
   temperature?: number
 }
 
-async function requestClaudeText(system: string, user: string, options?: RequestClaudeOptions) {
+async function requestClaudeText(system: string, user: string, options: RequestClaudeOptions) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     throw new PublicAiGenerationError('Servico de IA indisponivel no momento. Tente novamente em instantes.')
   }
 
-  const model = process.env.ANTHROPIC_TEXT_MODEL || 'claude-sonnet-4-20250514'
+  const model = options.model
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -178,8 +208,8 @@ async function requestClaudeText(system: string, user: string, options?: Request
     },
     body: JSON.stringify({
       model,
-      max_tokens: options?.maxTokens ?? 1800,
-      temperature: options?.temperature ?? 0.4,
+      max_tokens: options.maxTokens ?? 1800,
+      temperature: options.temperature ?? 0.4,
       system,
       messages: [{ role: 'user', content: user }],
     }),
@@ -319,9 +349,22 @@ async function deleteReport(reportId: string, ownerId: string) {
 }
 
 function estimateClaudeCostCents(model: string, inputTokens: number, outputTokens: number) {
-  const isSonnet = model.toLowerCase().includes('sonnet')
-  const inputCostPerMillion = isSonnet ? 3 : 3
-  const outputCostPerMillion = isSonnet ? 15 : 15
+  const m = model.toLowerCase()
+  let inputCostPerMillion: number
+  let outputCostPerMillion: number
+  if (m.includes('haiku')) {
+    inputCostPerMillion = 0.25
+    outputCostPerMillion = 1.25
+  } else if (m.includes('sonnet')) {
+    inputCostPerMillion = 3
+    outputCostPerMillion = 15
+  } else if (m.includes('opus')) {
+    inputCostPerMillion = 15
+    outputCostPerMillion = 75
+  } else {
+    inputCostPerMillion = 3
+    outputCostPerMillion = 15
+  }
   const usd = (inputTokens / 1_000_000) * inputCostPerMillion + (outputTokens / 1_000_000) * outputCostPerMillion
   const brlApprox = usd * 5.5
   return Math.max(1, Math.round(brlApprox * 100))
