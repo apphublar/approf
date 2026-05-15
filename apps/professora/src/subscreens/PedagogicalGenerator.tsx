@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Sparkles, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
-import { formatAiUsageMessage, reserveAiUsage } from '@/services/ai-usage'
+import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
+import { updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
 
 interface PedagogicalGeneratorProps {
@@ -32,7 +33,7 @@ const QUICK_DIRECTIONS = [
 ]
 
 export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGeneratorProps) {
-  const { closeSubscreen } = useNavStore()
+  const { closeSubscreen, openSubscreen } = useNavStore()
   const { classes } = useAppStore()
   const docKind = typeof data === 'object' && data && 'docKind' in data
     ? String((data as { docKind?: string }).docKind)
@@ -48,6 +49,11 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
+  const [savedContent, setSavedContent] = useState('')
+  const [editableContent, setEditableContent] = useState('')
+  const [reportId, setReportId] = useState('')
+  const [editingDocument, setEditingDocument] = useState(false)
+  const [savingDocument, setSavingDocument] = useState(false)
   const [usageMessage, setUsageMessage] = useState('')
   const [usageError, setUsageError] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -92,20 +98,26 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     setUsageError('')
     setUsageMessage('')
     setGenerating(true)
+    setSavedContent('')
+    setEditableContent('')
+    setReportId('')
+    setEditingDocument(false)
 
     try {
-      const result = await reserveAiUsage({
+      const result = await generateAiTextDocument({
         generationType: 'planning',
         classId: selectedClassData?.id ?? null,
         promptVersion: 'professora-planning-v1',
         requestSummary: {
           docKind,
+          className: selectedClassData?.name ?? selectedClass,
           ageGroup,
           theme,
+          objective,
           bnccFields,
-          attachmentCount: attachments.length,
-          hasExtraContext: extraContext.trim().length > 0,
+          extraContext,
           useAnnotations,
+          attachments,
         },
       })
 
@@ -116,6 +128,10 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
       }
 
       setUsageMessage(formatAiUsageMessage(result))
+      const generatedBody = result.generatedText || preview
+      setSavedContent(generatedBody)
+      setEditableContent(generatedBody)
+      setReportId(result.reportId ?? '')
       window.setTimeout(() => {
         celebrateAiGeneration()
         setGenerating(false)
@@ -124,6 +140,43 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     } catch (error) {
       setGenerating(false)
       setUsageError(error instanceof Error ? error.message : 'Nao foi possivel gerar com IA.')
+    }
+  }
+
+  async function saveDocument() {
+    if (!reportId) {
+      setUsageError('Documento ainda nao foi salvo no backend.')
+      return
+    }
+
+    setSavingDocument(true)
+    setUsageError('')
+    try {
+      const updated = await updateReport(reportId, { body: editableContent, status: 'ready' })
+      setSavedContent(updated.body ?? '')
+      setEditableContent(updated.body ?? '')
+      setEditingDocument(false)
+      setUsageMessage('Documento salvo com sucesso.')
+    } catch (error) {
+      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel salvar o documento.')
+    } finally {
+      setSavingDocument(false)
+    }
+  }
+
+  async function archiveDocument() {
+    if (!reportId) return
+    const confirmed = window.confirm('Deseja arquivar este documento?')
+    if (!confirmed) return
+    setSavingDocument(true)
+    setUsageError('')
+    try {
+      await updateReport(reportId, { archive: true })
+      setUsageMessage('Documento arquivado.')
+    } catch (error) {
+      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel arquivar o documento.')
+    } finally {
+      setSavingDocument(false)
     }
   }
 
@@ -139,10 +192,18 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     attachments,
   })
 
+  function handleBack() {
+    if (generated && editingDocument && editableContent !== savedContent) {
+      const discard = window.confirm('Voce tem alteracoes nao salvas. Deseja sair sem salvar?')
+      if (!discard) return
+    }
+    closeSubscreen()
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
-        <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
+        <button onClick={handleBack} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1">
@@ -330,12 +391,52 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
               </p>
             )}
             <div className="bg-white rounded-app p-5 border border-border shadow-card mb-4">
-              <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink leading-[1.7]">{preview}</pre>
+              {editingDocument ? (
+                <textarea
+                  className="w-full min-h-[320px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 text-[13px] text-ink outline-none leading-[1.65]"
+                  value={editableContent}
+                  onChange={(event) => setEditableContent(event.target.value)}
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink leading-[1.7]">{editableContent || savedContent || preview}</pre>
+              )}
             </div>
-            <button className="w-full py-[13px] rounded-app-sm bg-gm text-white font-bold text-sm border-none mb-2 cursor-pointer">
-              Exportar / salvar documento
+
+            <button
+              onClick={() => openSubscreen('documents', { focusReportId: reportId })}
+              className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2"
+            >
+              Meus documentos
             </button>
-            <button onClick={() => setGenerated(false)} className="w-full py-[11px] border-none bg-transparent text-muted text-sm cursor-pointer">
+
+            {editingDocument ? (
+              <button
+                onClick={saveDocument}
+                disabled={savingDocument || editableContent === savedContent}
+                className="w-full py-[13px] rounded-app-sm bg-gm text-white font-bold text-sm border-none mb-2 disabled:opacity-50"
+              >
+                {savingDocument ? 'Salvando...' : 'Salvar'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setEditingDocument(true)}
+                className="w-full py-[13px] rounded-app-sm bg-gm text-white font-bold text-sm border-none mb-2"
+              >
+                Editar
+              </button>
+            )}
+
+            <button onClick={archiveDocument} className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2">
+              Arquivar
+            </button>
+
+            <button onClick={() => {
+              if (editingDocument && editableContent !== savedContent) {
+                const discard = window.confirm('Voce tem alteracoes nao salvas. Deseja descartar?')
+                if (!discard) return
+              }
+              setGenerated(false)
+            }} className="w-full py-[11px] border-none bg-transparent text-muted text-sm cursor-pointer">
               Gerar novamente
             </button>
           </div>

@@ -21,6 +21,7 @@ export type Subscreen =
   | 'transfer-student'
   | 'new-timeline-event'
   | 'pedagogical-generator'
+  | 'document-detail'
 
 export type FeatureKey = 'community'
 
@@ -176,4 +177,20 @@ export interface ChildSearchPreview {
   lastTeacher: string
   recordsCount: number
   timelineSummary: string[]
+}
+
+export type ReportStatus = 'draft' | 'generating' | 'ready' | 'failed' | 'archived'
+
+export interface GeneratedDocument {
+  id: string
+  owner_id: string
+  student_id: string | null
+  class_id: string | null
+  status: ReportStatus
+  report_type: string
+  prompt_version: string | null
+  body: string | null
+  is_final_version: boolean
+  created_at: string
+  updated_at: string
 }

@@ -2,6 +2,25 @@
 
 Atualizado em: 2026-05-13
 
+## Atualizacao de planejamento (2026-05-14)
+
+- Foi criado o backlog executivo de producao em `docs/backlog-producao-approf.md`.
+- Este backlog consolida as prioridades para sair de preview/mock, com foco imediato em IA real com persistencia no banco.
+- Diretriz desta etapa: Approf como app de anotacao e organizacao da rotina da professora, com IA pedagogica segura e auditavel.
+
+## Implementacao IA real (2026-05-15)
+
+- Foi criada a rota server-side `apps/admin/app/api/ai/generate-text/route.ts` para gerar texto real com Claude.
+- A geracao agora usa prompts pedagogicos versionados em `apps/admin/app/lib/pedagogical-prompts.ts`.
+- Foi criada a camada `apps/admin/app/lib/ai-generation.ts` para:
+  - gerar texto real com `ANTHROPIC_API_KEY`;
+  - salvar o resultado em `reports`;
+  - salvar consumo em `reports_usage`;
+  - finalizar ou marcar falha em `ai_generation_logs`.
+- O app da professora passou a chamar a rota real via `generateAiTextDocument` em `apps/professora/src/services/ai-usage.ts`.
+- Fluxos de `Report` e `PedagogicalGenerator` agora exibem o texto real retornado pelo backend e mantem fallback visual caso necessario.
+- Variaveis de ambiente de IA foram documentadas em `apps/admin/.env.example`.
+
 ## Decisao de arquitetura
 
 O projeto sera mantido como monorepo profissional. Essa e a decisao oficial do projeto, mesmo que documentos antigos mencionem repositorios separados.
@@ -221,3 +240,11 @@ Quando a conta for liberada, voltar para:
 ## Regra importante
 
 Dados de professoras e fotos de criancas sao dados sensiveis. Nenhuma foto de crianca deve ficar publica. Todo arquivo desse tipo deve usar bucket privado e caminho por professora/aluno.
+
+## Arquitetura de IA registrada
+
+- Em 2026-05-15, o arquivo local `approf-arquitetura-ia.docx` foi analisado e consolidado em `docs/arquitetura-ia.md`.
+- O registro separa arquitetura desejada, estado atual do codigo, pontos alinhados, pontos de cuidado e ordem recomendada para as proximas implementacoes de IA.
+- Foi definido que documentos pedagogicos importantes devem evoluir para 3 etapas Claude em cascata: rascunho, revisao BNCC e refinamento final.
+- Foi definido que portfolio visual de evolucao deve usar conteudo pedagogico estruturado pelas anotacoes da professora, com controle de custo por GizTokens.
+- Os precos do documento de arquitetura sao referencia de planejamento, nao regra fixa do produto. O limite operacional continua sendo controlado por GizTokens/cotas.

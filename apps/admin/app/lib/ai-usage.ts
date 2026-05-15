@@ -31,44 +31,76 @@ interface PricingEstimate {
   imageCount: number
 }
 
+interface WalletSummary {
+  giztokensIncluded: number
+  giztokensUsed: number
+  giztokensRemaining: number
+  includedCostLimitCents: number
+  includedCostUsedCents: number
+  includedCostRemainingCents: number
+}
+
+interface EntitlementSummary {
+  cycleLabel: string
+  includedQuantity: number
+  usedQuantity: number
+  remainingQuantity: number
+}
+
+interface ReserveAiUsageResult {
+  allowed: boolean
+  reason?: 'included_cost_limit_reached' | 'paid_extra_required'
+  message: string
+  chargeSource?: ChargeSource
+  logId?: string
+  estimate?: PricingEstimate
+  wallet?: WalletSummary
+  entitlement?: EntitlementSummary
+}
+
 const MONTHLY_GIZTOKENS_DEFAULT = 1000
 const INCLUDED_COST_LIMIT_CENTS = 10000
 
+/**
+ * Estimativas de reserva para geração textual via pipeline Claude em 3 etapas (rascunho → BNCC/segurança → refinamento).
+ * Tokens e custo são agregados conservadores (etapas 2–3 reenviam o texto anterior no prompt).
+ * portfolio_image permanece no modelo de chamada única.
+ */
 const PRICING: Record<AiGenerationType, PricingEstimate> = {
   development_report: {
     provider: 'anthropic',
-    model: 'claude-text',
-    giztokens: 45,
-    estimatedCostCents: 35,
-    inputTokens: 2500,
-    outputTokens: 1800,
+    model: 'claude-text-3stage',
+    giztokens: 115,
+    estimatedCostCents: 140,
+    inputTokens: 10500,
+    outputTokens: 5800,
     imageCount: 0,
   },
   general_report: {
     provider: 'anthropic',
-    model: 'claude-text',
-    giztokens: 60,
-    estimatedCostCents: 45,
-    inputTokens: 3000,
-    outputTokens: 2200,
+    model: 'claude-text-3stage',
+    giztokens: 155,
+    estimatedCostCents: 175,
+    inputTokens: 12800,
+    outputTokens: 7200,
     imageCount: 0,
   },
   planning: {
     provider: 'anthropic',
-    model: 'claude-text',
-    giztokens: 55,
-    estimatedCostCents: 40,
-    inputTokens: 2600,
-    outputTokens: 2100,
+    model: 'claude-text-3stage',
+    giztokens: 145,
+    estimatedCostCents: 155,
+    inputTokens: 11200,
+    outputTokens: 6800,
     imageCount: 0,
   },
   portfolio_text: {
     provider: 'anthropic',
-    model: 'claude-text',
-    giztokens: 70,
-    estimatedCostCents: 55,
-    inputTokens: 3200,
-    outputTokens: 2600,
+    model: 'claude-text-3stage',
+    giztokens: 185,
+    estimatedCostCents: 210,
+    inputTokens: 13800,
+    outputTokens: 8200,
     imageCount: 0,
   },
   portfolio_image: {
@@ -82,220 +114,144 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   },
   specialist_report: {
     provider: 'anthropic',
-    model: 'claude-text',
-    giztokens: 80,
-    estimatedCostCents: 65,
-    inputTokens: 3600,
-    outputTokens: 2800,
+    model: 'claude-text-3stage',
+    giztokens: 205,
+    estimatedCostCents: 245,
+    inputTokens: 15500,
+    outputTokens: 8800,
     imageCount: 0,
   },
   other: {
     provider: 'anthropic',
-    model: 'claude-text',
-    giztokens: 50,
-    estimatedCostCents: 40,
-    inputTokens: 2400,
-    outputTokens: 1800,
+    model: 'claude-text-3stage',
+    giztokens: 130,
+    estimatedCostCents: 145,
+    inputTokens: 10000,
+    outputTokens: 5600,
     imageCount: 0,
   },
 }
 
-export async function reserveAiUsage(input: AiUsageRequest) {
+export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUsageResult> {
   const supabase = createSupabaseServiceClient()
   const estimate = PRICING[input.generationType] ?? PRICING.other
   const { start: monthStart, end: monthEnd } = getMonthPeriod(new Date())
-  const wallet = await ensureMonthlyWallet(input.ownerId, monthStart, monthEnd)
-  const nextCost = wallet.included_cost_used_cents + estimate.estimatedCostCents
-
-  if (nextCost > wallet.included_cost_limit_cents) {
-    return {
-      allowed: false,
-      reason: 'included_cost_limit_reached',
-      message: 'Seu uso incluso do periodo foi concluido. Para continuar, compre um pacote extra de GizTokens.',
-      estimate,
-      wallet: summarizeWallet(wallet),
-    }
-  }
-
-  const remainingGiztokens = wallet.giztokens_included - wallet.giztokens_used
-  if (remainingGiztokens >= estimate.giztokens) {
-    const { data: updatedWallet, error: walletError } = await supabase
-      .from('ai_usage_wallets')
-      .update({
-        giztokens_used: wallet.giztokens_used + estimate.giztokens,
-        included_cost_used_cents: nextCost,
-      })
-      .eq('id', wallet.id)
-      .select('*')
-      .single()
-
-    if (walletError) throw toError(walletError, 'Nao foi possivel reservar GizTokens.')
-    const log = await createGenerationLog(input, estimate, 'giztokens', updatedWallet.id)
-    return {
-      allowed: true,
-      chargeSource: 'giztokens' as const,
-      logId: log.id,
-      estimate,
-      wallet: summarizeWallet(updatedWallet),
-    }
-  }
-
   const entitlementType = getEntitlementType(input.generationType)
-  if (entitlementType && input.studentId) {
-    const entitlement = await ensureSemesterEntitlement({
-      ownerId: input.ownerId,
-      classId: input.classId ?? null,
-      studentId: input.studentId,
-      entitlementType,
-    })
 
-    if (entitlement.used_quantity < entitlement.included_quantity) {
-      const { data: updatedEntitlement, error: entitlementError } = await supabase
-        .from('ai_semester_entitlements')
-        .update({ used_quantity: entitlement.used_quantity + 1 })
-        .eq('id', entitlement.id)
-        .select('*')
-        .single()
+  const semester = getSemesterPeriod(new Date())
+  const semesterIncludedQuantity = entitlementType === 'development_report' ? 2 : 1
 
-      if (entitlementError) throw toError(entitlementError, 'Nao foi possivel usar a cota semestral.')
+  const { data, error } = await supabase.rpc('reserve_ai_usage_atomic', {
+    p_owner_id: input.ownerId,
+    p_generation_type: input.generationType,
+    p_class_id: input.classId ?? null,
+    p_student_id: input.studentId ?? null,
+    p_prompt_version: input.promptVersion ?? 'bncc-v1',
+    p_request_summary: input.requestSummary ?? {},
+    p_provider: estimate.provider,
+    p_model: estimate.model,
+    p_estimated_cost_cents: estimate.estimatedCostCents,
+    p_estimated_input_tokens: estimate.inputTokens,
+    p_estimated_output_tokens: estimate.outputTokens,
+    p_estimated_image_count: estimate.imageCount,
+    p_giztokens_cost: estimate.giztokens,
+    p_entitlement_type: entitlementType,
+    p_month_period_start: monthStart,
+    p_month_period_end: monthEnd,
+    p_monthly_giztokens_included: MONTHLY_GIZTOKENS_DEFAULT,
+    p_included_cost_limit_cents: INCLUDED_COST_LIMIT_CENTS,
+    p_semester_cycle_label: semester.label,
+    p_semester_cycle_start: semester.start,
+    p_semester_cycle_end: semester.end,
+    p_semester_included_quantity: semesterIncludedQuantity,
+  })
 
-      const { data: updatedWallet, error: walletError } = await supabase
-        .from('ai_usage_wallets')
-        .update({ included_cost_used_cents: nextCost })
-        .eq('id', wallet.id)
-        .select('*')
-        .single()
-
-      if (walletError) throw toError(walletError, 'Nao foi possivel registrar custo da cota semestral.')
-      const log = await createGenerationLog(input, estimate, 'semester_entitlement', updatedWallet.id, updatedEntitlement.id)
-
-      return {
-        allowed: true,
-        chargeSource: 'semester_entitlement' as const,
-        logId: log.id,
-        estimate,
-        wallet: summarizeWallet(updatedWallet),
-        entitlement: summarizeEntitlement(updatedEntitlement),
-      }
-    }
+  if (error) {
+    throw toError(error, 'Nao foi possivel reservar uso de IA.')
   }
+
+  const result = Array.isArray(data) ? data[0] : data
+  if (!result) {
+    throw new Error('Resposta invalida ao reservar uso de IA.')
+  }
+
+  const walletSummary: WalletSummary | undefined = result.wallet_id ? {
+    giztokensIncluded: result.wallet_giztokens_included ?? 0,
+    giztokensUsed: result.wallet_giztokens_used ?? 0,
+    giztokensRemaining: Math.max(0, (result.wallet_giztokens_included ?? 0) - (result.wallet_giztokens_used ?? 0)),
+    includedCostLimitCents: result.wallet_included_cost_limit_cents ?? 0,
+    includedCostUsedCents: result.wallet_included_cost_used_cents ?? 0,
+    includedCostRemainingCents: Math.max(
+      0,
+      (result.wallet_included_cost_limit_cents ?? 0) - (result.wallet_included_cost_used_cents ?? 0),
+    ),
+  } : undefined
+
+  const entitlementSummary: EntitlementSummary | undefined = result.entitlement_id ? {
+    cycleLabel: result.entitlement_cycle_label ?? semester.label,
+    includedQuantity: result.entitlement_included_quantity ?? semesterIncludedQuantity,
+    usedQuantity: result.entitlement_used_quantity ?? 0,
+    remainingQuantity: Math.max(
+      0,
+      (result.entitlement_included_quantity ?? semesterIncludedQuantity) - (result.entitlement_used_quantity ?? 0),
+    ),
+  } : undefined
 
   return {
-    allowed: false,
-    reason: 'paid_extra_required',
-    message: 'Seu saldo incluso para esta geracao acabou. Escolha um pacote extra para continuar.',
+    allowed: Boolean(result.allowed),
+    reason: result.reason ?? undefined,
+    message: typeof result.message === 'string' ? result.message : 'Nao foi possivel reservar uso de IA.',
+    chargeSource: result.charge_source ?? undefined,
+    logId: result.log_id ?? undefined,
     estimate,
-    wallet: summarizeWallet(wallet),
+    wallet: walletSummary,
+    entitlement: entitlementSummary,
   }
 }
 
-async function ensureMonthlyWallet(ownerId: string, periodStart: string, periodEnd: string) {
-  const supabase = createSupabaseServiceClient()
-  const { data: existing, error: selectError } = await supabase
-    .from('ai_usage_wallets')
-    .select('*')
-    .eq('owner_id', ownerId)
-    .eq('period_type', 'monthly')
-    .eq('period_start', periodStart)
-    .eq('period_end', periodEnd)
-    .maybeSingle()
-
-  if (selectError) throw toError(selectError, 'Nao foi possivel carregar carteira de GizTokens.')
-  if (existing) return existing
-
-  const { data, error } = await supabase
-    .from('ai_usage_wallets')
-    .insert({
-      owner_id: ownerId,
-      period_type: 'monthly',
-      period_start: periodStart,
-      period_end: periodEnd,
-      giztokens_included: MONTHLY_GIZTOKENS_DEFAULT,
-      included_cost_limit_cents: INCLUDED_COST_LIMIT_CENTS,
-    })
-    .select('*')
-    .single()
-
-  if (error) throw toError(error, 'Nao foi possivel criar carteira de GizTokens.')
-  return data
-}
-
-async function ensureSemesterEntitlement(input: {
-  ownerId: string
-  classId: string | null
-  studentId: string
-  entitlementType: EntitlementType
+export async function completeAiUsageReservation(input: {
+  logId: string
+  actualCostCents: number
+  resultSummary?: Record<string, unknown>
 }) {
   const supabase = createSupabaseServiceClient()
-  const cycle = getSemesterPeriod(new Date())
-  const includedQuantity = input.entitlementType === 'development_report' ? 2 : 1
+  const { data, error } = await supabase.rpc('finalize_ai_usage_reservation', {
+    p_log_id: input.logId,
+    p_actual_cost_cents: clampNonNegativeInt(input.actualCostCents),
+    p_result_summary: input.resultSummary ?? {},
+  })
 
-  const { data: existing, error: selectError } = await supabase
-    .from('ai_semester_entitlements')
-    .select('*')
-    .eq('owner_id', input.ownerId)
-    .eq('student_id', input.studentId)
-    .eq('entitlement_type', input.entitlementType)
-    .eq('cycle_start', cycle.start)
-    .eq('cycle_end', cycle.end)
-    .maybeSingle()
+  if (error) {
+    throw toError(error, 'Nao foi possivel finalizar a geracao de IA.')
+  }
 
-  if (selectError) throw toError(selectError, 'Nao foi possivel carregar cota semestral.')
-  if (existing) return existing
-
-  const { data, error } = await supabase
-    .from('ai_semester_entitlements')
-    .insert({
-      owner_id: input.ownerId,
-      class_id: input.classId,
-      student_id: input.studentId,
-      entitlement_type: input.entitlementType,
-      cycle_label: cycle.label,
-      cycle_start: cycle.start,
-      cycle_end: cycle.end,
-      included_quantity: includedQuantity,
-    })
-    .select('*')
-    .single()
-
-  if (error) throw toError(error, 'Nao foi possivel criar cota semestral.')
-  return data
+  const result = Array.isArray(data) ? data[0] : data
+  if (result?.status === 'refunded') {
+    throw new Error('A reserva desta geracao ja foi estornada.')
+  }
 }
 
-async function createGenerationLog(
-  input: AiUsageRequest,
-  estimate: PricingEstimate,
-  chargeSource: ChargeSource,
-  walletId: string,
-  entitlementId?: string,
-) {
+export async function refundAiUsageReservation(input: {
+  logId: string
+  reason: string
+  markAsFailed?: boolean
+  reservedCostCentsOverride?: number
+}) {
   const supabase = createSupabaseServiceClient()
-  const { data, error } = await supabase
-    .from('ai_generation_logs')
-    .insert({
-      owner_id: input.ownerId,
-      class_id: input.classId ?? null,
-      student_id: input.studentId ?? null,
-      wallet_id: walletId,
-      entitlement_id: entitlementId ?? null,
-      generation_type: input.generationType,
-      provider: estimate.provider,
-      model: estimate.model,
-      charge_source: chargeSource,
-      status: 'estimated',
-      input_tokens: estimate.inputTokens,
-      output_tokens: estimate.outputTokens,
-      image_count: estimate.imageCount,
-      giztokens_charged: chargeSource === 'giztokens' ? estimate.giztokens : 0,
-      estimated_cost_cents: estimate.estimatedCostCents,
-      prompt_version: input.promptVersion ?? 'bncc-v1',
-      request_summary: input.requestSummary ?? {},
-    })
-    .select('id')
-    .single()
+  const status = input.markAsFailed ? 'failed' : 'refunded'
+  const { error } = await supabase.rpc('refund_ai_usage_reservation', {
+    p_log_id: input.logId,
+    p_reason: input.reason,
+    p_status: status,
+    p_reserved_cost_override:
+      typeof input.reservedCostCentsOverride === 'number'
+        ? clampNonNegativeInt(input.reservedCostCentsOverride)
+        : null,
+  })
 
-  if (error) throw toError(error, 'Nao foi possivel registrar uso de IA.')
-  return data
+  if (error) {
+    throw toError(error, 'Nao foi possivel registrar estorno da geracao.')
+  }
 }
 
 function getEntitlementType(generationType: AiGenerationType): EntitlementType | null {
@@ -329,35 +285,6 @@ function formatDate(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-function summarizeWallet(wallet: {
-  giztokens_included: number
-  giztokens_used: number
-  included_cost_limit_cents: number
-  included_cost_used_cents: number
-}) {
-  return {
-    giztokensIncluded: wallet.giztokens_included,
-    giztokensUsed: wallet.giztokens_used,
-    giztokensRemaining: Math.max(0, wallet.giztokens_included - wallet.giztokens_used),
-    includedCostLimitCents: wallet.included_cost_limit_cents,
-    includedCostUsedCents: wallet.included_cost_used_cents,
-    includedCostRemainingCents: Math.max(0, wallet.included_cost_limit_cents - wallet.included_cost_used_cents),
-  }
-}
-
-function summarizeEntitlement(entitlement: {
-  included_quantity: number
-  used_quantity: number
-  cycle_label: string
-}) {
-  return {
-    cycleLabel: entitlement.cycle_label,
-    includedQuantity: entitlement.included_quantity,
-    usedQuantity: entitlement.used_quantity,
-    remainingQuantity: Math.max(0, entitlement.included_quantity - entitlement.used_quantity),
-  }
-}
-
 function toError(error: unknown, fallbackMessage: string) {
   if (error instanceof Error) return error
   if (error && typeof error === 'object') {
@@ -366,4 +293,9 @@ function toError(error: unknown, fallbackMessage: string) {
     if (message) return new Error(message)
   }
   return new Error(fallbackMessage)
+}
+
+function clampNonNegativeInt(value: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.round(value))
 }

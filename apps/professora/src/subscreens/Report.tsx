@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
-import { formatAiUsageMessage, reserveAiUsage, type AiGenerationType } from '@/services/ai-usage'
+import { formatAiUsageMessage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
+import { updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import type { Annotation } from '@/types'
 
@@ -28,7 +29,7 @@ type ReportMode = 'annotations' | 'blank'
 type PortfolioOutput = 'text' | 'image'
 
 export default function ReportSubscreen({ data }: ReportSubscreenProps) {
-  const { closeSubscreen } = useNavStore()
+  const { closeSubscreen, openSubscreen } = useNavStore()
   const { classes, activeStudentId, annotations } = useAppStore()
 
   const allStudents = useMemo(
@@ -52,6 +53,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [portfolioOutput, setPortfolioOutput] = useState<PortfolioOutput>('text')
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
+  const [savedContent, setSavedContent] = useState('')
+  const [editableContent, setEditableContent] = useState('')
+  const [reportId, setReportId] = useState('')
+  const [editingDocument, setEditingDocument] = useState(false)
+  const [savingDocument, setSavingDocument] = useState(false)
   const [usageMessage, setUsageMessage] = useState('')
   const [usageError, setUsageError] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -64,6 +70,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   useEffect(() => {
     setSelectedAnnotationIds(studentAnnotations.map((annotation) => annotation.id))
     setGenerated(false)
+    setSavedContent('')
+    setEditableContent('')
+    setReportId('')
+    setEditingDocument(false)
     setUsageMessage('')
     setUsageError('')
   }, [selectedStudentId, studentAnnotations])
@@ -88,6 +98,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     attachments,
     portfolioOutput,
   })
+
+  function handleBack() {
+    if (generated && editingDocument && editableContent !== savedContent) {
+      const discard = window.confirm('Voce tem alteracoes nao salvas. Deseja sair sem salvar?')
+      if (!discard) return
+    }
+    closeSubscreen()
+  }
 
   function addDirection(text: string) {
     setExtraContext((current) => current ? `${current}\n${text}.` : `${text}.`)
@@ -133,21 +151,39 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setUsageError('')
     setUsageMessage('')
     setGenerating(true)
+    setSavedContent('')
+    setEditableContent('')
+    setReportId('')
+    setEditingDocument(false)
 
     try {
-      const result = await reserveAiUsage({
+      const requestSummary = {
+        reportKind,
+        portfolioOutput,
+        mode,
+        studentName: selectedStudent?.name ?? null,
+        className: selectedStudent?.className ?? null,
+        selectedAnnotations: selectedAnnotations.map((annotation) => ({
+          date: annotation.date,
+          label: annotation.label,
+          text: annotation.text,
+        })),
+        ignoredNotes,
+        blankContext,
+        extraContext,
+        attachments: attachments.map((item) => ({
+          name: item.name,
+          type: item.type,
+          size: item.size,
+        })),
+      }
+
+      const result = await generateAiTextDocument({
         generationType: getReportGenerationType(reportKind, portfolioOutput),
         classId: selectedStudent?.classId ?? null,
         studentId: selectedStudent?.id ?? null,
         promptVersion: 'professora-report-v1',
-        requestSummary: {
-          reportKind,
-          portfolioOutput,
-          mode,
-          selectedAnnotationCount: selectedAnnotations.length,
-          attachmentCount: attachments.length,
-          hasExtraContext: extraContext.trim().length > 0,
-        },
+        requestSummary,
       })
 
       if (!result.allowed) {
@@ -157,6 +193,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       }
 
       setUsageMessage(formatAiUsageMessage(result))
+      const generatedBody = result.generatedText || mockReport
+      setSavedContent(generatedBody)
+      setEditableContent(generatedBody)
+      setReportId(result.reportId ?? '')
       window.setTimeout(() => {
         celebrateAiGeneration()
         setGenerating(false)
@@ -168,10 +208,48 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     }
   }
 
+  async function saveDocument() {
+    if (!reportId) {
+      setUsageError('Documento ainda nao foi salvo no backend.')
+      return
+    }
+
+    setSavingDocument(true)
+    setUsageError('')
+    try {
+      const updated = await updateReport(reportId, { body: editableContent, status: 'ready' })
+      setSavedContent(updated.body ?? '')
+      setEditableContent(updated.body ?? '')
+      setEditingDocument(false)
+      setUsageMessage('Documento salvo com sucesso.')
+    } catch (error) {
+      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel salvar o documento.')
+    } finally {
+      setSavingDocument(false)
+    }
+  }
+
+  async function archiveDocument() {
+    if (!reportId) return
+    const confirmed = window.confirm('Deseja arquivar este documento?')
+    if (!confirmed) return
+
+    setSavingDocument(true)
+    setUsageError('')
+    try {
+      await updateReport(reportId, { archive: true })
+      setUsageMessage('Documento arquivado.')
+    } catch (error) {
+      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel arquivar o documento.')
+    } finally {
+      setSavingDocument(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
-        <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
+        <button onClick={handleBack} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
         <span className="font-serif text-[18px] text-gd flex-1">{reportKind}</span>
@@ -417,12 +495,61 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </p>
             )}
             <div className="bg-white rounded-app p-5 border border-border shadow-card mb-4">
-              <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink leading-[1.7]">{mockReport}</pre>
+              {editingDocument ? (
+                <textarea
+                  className="w-full min-h-[320px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 text-[13px] text-ink outline-none leading-[1.65]"
+                  value={editableContent}
+                  onChange={(event) => setEditableContent(event.target.value)}
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink leading-[1.7]">{editableContent || savedContent || mockReport}</pre>
+              )}
             </div>
-            <button className="w-full py-[13px] rounded-app-sm bg-gm text-white font-bold text-sm border-none mb-2 cursor-pointer">
-              Compartilhar / Exportar PDF
+
+            <button
+              onClick={() => openSubscreen('documents', { focusReportId: reportId })}
+              className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2"
+            >
+              Meus documentos
             </button>
-            <button onClick={() => setGenerated(false)} className="w-full py-[11px] border-none bg-transparent text-muted text-sm cursor-pointer">
+
+            {editingDocument ? (
+              <button
+                onClick={saveDocument}
+                disabled={savingDocument || editableContent === savedContent}
+                className="w-full py-[13px] rounded-app-sm bg-gm text-white font-bold text-sm border-none mb-2 disabled:opacity-50"
+              >
+                {savingDocument ? 'Salvando...' : 'Salvar'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setEditingDocument(true)}
+                className="w-full py-[13px] rounded-app-sm bg-gm text-white font-bold text-sm border-none mb-2"
+              >
+                Editar
+              </button>
+            )}
+
+            <button onClick={archiveDocument} className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2">
+              Arquivar
+            </button>
+
+            {reportKind === 'Relatorio de desenvolvimento' && selectedStudent?.id && (
+              <button
+                onClick={() => openSubscreen('documents', { reportType: 'development_report', studentId: selectedStudent.id })}
+                className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2"
+              >
+                Ver versoes desta crianca
+              </button>
+            )}
+
+            <button onClick={() => {
+              if (editingDocument && editableContent !== savedContent) {
+                const discard = window.confirm('Voce tem alteracoes nao salvas. Deseja descartar?')
+                if (!discard) return
+              }
+              setGenerated(false)
+            }} className="w-full py-[11px] border-none bg-transparent text-muted text-sm cursor-pointer">
               Gerar novamente
             </button>
           </div>

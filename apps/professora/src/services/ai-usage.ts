@@ -31,6 +31,18 @@ export interface AiUsageReservationResult {
   }
 }
 
+export interface AiTextGenerationInput extends AiUsageReservationInput {
+  requestSummary?: Record<string, unknown>
+}
+
+export interface AiTextGenerationResult extends AiUsageReservationResult {
+  generatedText?: string
+  reportId?: string
+  promptVersion?: string
+  provider?: string
+  model?: string
+}
+
 export async function reserveAiUsage(input: AiUsageReservationInput): Promise<AiUsageReservationResult> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
 
@@ -79,6 +91,61 @@ export async function reserveAiUsage(input: AiUsageReservationInput): Promise<Ai
     chargeSource: result.chargeSource,
     wallet: result.wallet,
     entitlement: result.entitlement,
+  }
+}
+
+export async function generateAiTextDocument(input: AiTextGenerationInput): Promise<AiTextGenerationResult> {
+  const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
+  if (!apiBaseUrl) {
+    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase nao configurado para registrar uso de IA.')
+  }
+
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+
+  const token = data.session?.access_token
+  if (!token) {
+    throw new Error('Sessao expirada. Entre novamente para gerar com IA.')
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/generate-text`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  })
+
+  const result = await response.json().catch(() => null) as Partial<AiTextGenerationResult> | { error?: string } | null
+
+  if (!response.ok && response.status !== 402) {
+    const message = result && 'error' in result && typeof result.error === 'string'
+      ? result.error
+      : 'Nao foi possivel gerar documento com IA.'
+    throw new Error(message)
+  }
+
+  if (!result || !('allowed' in result)) {
+    throw new Error('Resposta invalida do backend de IA.')
+  }
+
+  return {
+    allowed: Boolean(result.allowed),
+    message: typeof result.message === 'string' ? result.message : '',
+    chargeSource: result.chargeSource,
+    wallet: result.wallet,
+    entitlement: result.entitlement,
+    generatedText: typeof result.generatedText === 'string' ? result.generatedText : undefined,
+    reportId: typeof result.reportId === 'string' ? result.reportId : undefined,
+    promptVersion: typeof result.promptVersion === 'string' ? result.promptVersion : undefined,
+    provider: typeof result.provider === 'string' ? result.provider : undefined,
+    model: typeof result.model === 'string' ? result.model : undefined,
   }
 }
 

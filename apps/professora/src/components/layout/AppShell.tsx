@@ -9,7 +9,6 @@ import NewAnnotationSubscreen from '@/subscreens/NewAnnotation'
 import ClassStudentsSubscreen from '@/subscreens/ClassStudents'
 import StudentProfileSubscreen from '@/subscreens/StudentProfile'
 import ReportSubscreen from '@/subscreens/Report'
-import ComingSoonSubscreen from '@/subscreens/ComingSoon'
 import AiPedagogicaSubscreen from '@/subscreens/AiPedagogica'
 import CalendarSubscreen from '@/subscreens/Calendar'
 import CommunitySubscreen from '@/subscreens/Community'
@@ -21,6 +20,8 @@ import FindChildSubscreen from '@/subscreens/FindChild'
 import TransferStudentSubscreen from '@/subscreens/TransferStudent'
 import NewTimelineEventSubscreen from '@/subscreens/NewTimelineEvent'
 import PedagogicalGeneratorSubscreen from '@/subscreens/PedagogicalGenerator'
+import DocumentsSubscreen from '@/subscreens/Documents'
+import DocumentDetailSubscreen from '@/subscreens/DocumentDetail'
 
 export default function AppShell() {
   const { activeTab, subscreens } = useNavStore()
@@ -104,7 +105,8 @@ function renderSubscreen(screen: string, data?: unknown) {
     case 'transfer-student': return <TransferStudentSubscreen />
     case 'new-timeline-event': return <NewTimelineEventSubscreen />
     case 'pedagogical-generator': return <PedagogicalGeneratorSubscreen data={data} />
-    case 'documents':       return <ComingSoonSubscreen screen="documents" />
+    case 'documents':       return <DocumentsSubscreen data={data} />
+    case 'document-detail': return <DocumentDetailSubscreen data={data} />
     default:                return null
   }
 }
