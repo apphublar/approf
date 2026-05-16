@@ -53,6 +53,19 @@ export async function GET(request: Request) {
 
     if (countError) throw countError
 
+    const { data: monthlyTypeRows, error: monthlyTypesError } = await supabase
+      .from('ai_generation_logs')
+      .select('generation_type')
+      .eq('owner_id', ownerId)
+      .eq('status', 'completed')
+      .gte('created_at', `${start}T00:00:00.000Z`)
+      .lte('created_at', `${end}T23:59:59.999Z`)
+
+    if (monthlyTypesError) throw monthlyTypesError
+
+    const generatedImagesThisMonth = (monthlyTypeRows ?? []).filter((item) => item.generation_type === 'portfolio_image').length
+    const generatedDocumentsThisMonth = Math.max(0, (monthlyTypeRows ?? []).length - generatedImagesThisMonth)
+
     const { data: recentLogs, error: recentLogsError } = await supabase
       .from('ai_generation_logs')
       .select('id,generation_type,status,provider,model,charge_source,giztokens_charged,estimated_cost_cents,actual_cost_cents,result_summary,student_id,class_id,created_at')
@@ -95,6 +108,8 @@ export async function GET(request: Request) {
           remainingQuantity: Math.max(0, (item.included_quantity ?? 0) - (item.used_quantity ?? 0)),
         })),
         generatedThisMonth: count ?? 0,
+        generatedDocumentsThisMonth,
+        generatedImagesThisMonth,
         recentUsage: (recentLogs ?? []).map((item) => ({
           id: item.id,
           generationType: item.generation_type,

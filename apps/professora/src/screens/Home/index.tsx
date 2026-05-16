@@ -17,7 +17,7 @@ const QUICK_ACCESS = [
 ] as const
 
 export default function HomeScreen() {
-  const { userName, annotations, boardNotes, classes } = useAppStore()
+  const { userName, annotations, boardNotes } = useAppStore()
   const { setTab, openSubscreen } = useNavStore()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [modalNote, setModalNote] = useState<BoardNote | null | 'new'>('new')
@@ -27,9 +27,9 @@ export default function HomeScreen() {
 
   const firstName = getDisplayFirstName(userName)
   const recentNotes = annotations.slice(0, 3)
-  const pendingCount = getPendingCount(annotations, classes)
   const giztokensRemaining = aiUsage?.wallet.giztokensRemaining ?? 6000
-  const docsGenerated = aiUsage?.generatedThisMonth ?? 0
+  const docsGenerated = aiUsage?.generatedDocumentsThisMonth ?? aiUsage?.generatedThisMonth ?? 0
+  const imagesGenerated = aiUsage?.generatedImagesThisMonth ?? 0
 
   const allSlides: ({ isMain: true } | { isMain: false; note: BoardNote })[] = [
     { isMain: true },
@@ -122,11 +122,11 @@ export default function HomeScreen() {
                   annotations={annotations.length}
                   giztokens={giztokensRemaining}
                   documents={docsGenerated}
-                  pending={pendingCount}
+                  images={imagesGenerated}
                   onOpenGizTokens={() => openSubscreen('giztokens')}
                   onOpenAnnotations={() => setTab('annotations')}
-                  onOpenDocuments={() => openSubscreen('generated-documents')}
-                  onOpenPending={() => openSubscreen('pending')}
+                  onOpenDocuments={() => openSubscreen('generated-documents', { kind: 'documents' })}
+                  onOpenImages={() => openSubscreen('generated-documents', { kind: 'images' })}
                 />
               ) : (
                 <NoteSlide note={slide.note} />
@@ -340,29 +340,29 @@ function MainSlide({
   annotations,
   giztokens,
   documents,
-  pending,
+  images,
   onOpenGizTokens,
   onOpenAnnotations,
   onOpenDocuments,
-  onOpenPending,
+  onOpenImages,
 }: {
   name: string
   annotations: number
   giztokens: number
   documents: number
-  pending: number
+  images: number
   onOpenGizTokens: () => void
   onOpenAnnotations: () => void
   onOpenDocuments: () => void
-  onOpenPending: () => void
+  onOpenImages: () => void
 }) {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
   const stats = [
     { n: formatFullNumber(giztokens), l: 'GizTokens', onClick: onOpenGizTokens },
     { n: formatCompactNumber(annotations), l: 'Anotações', onClick: onOpenAnnotations },
-    { n: formatCompactNumber(documents), l: 'Gerados', onClick: onOpenDocuments },
-    { n: formatCompactNumber(pending), l: 'Pendências', onClick: onOpenPending },
+    { n: formatCompactNumber(documents), l: 'Documentos', onClick: onOpenDocuments },
+    { n: formatCompactNumber(images), l: 'Imagens', onClick: onOpenImages },
   ]
   return (
     <div className="relative z-10">
@@ -584,28 +584,6 @@ function getDisplayFirstName(name: string) {
 
   const firstName = toTitleCaseName(cleaned).split(/\s+/)[0] || 'Professora'
   return firstName === 'Professora' ? firstName : `Prof. ${firstName}`
-}
-
-function getPendingCount(
-  annotations: ReturnType<typeof useAppStore.getState>['annotations'],
-  classes: ReturnType<typeof useAppStore.getState>['classes'],
-) {
-  const undirectedNotes = annotations.filter((annotation) =>
-    !annotation.studentId && !annotation.classId && !annotation.studentName && annotation.scope !== 'personal'
-  ).length
-
-  const now = Date.now()
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
-  const studentsWithoutRecentNote = classes.flatMap((classData) => classData.students).filter((student) => {
-    const last = annotations
-      .filter((annotation) => annotation.studentId === student.id || annotation.studentName === student.name)
-      .map((annotation) => new Date(annotation.date).getTime())
-      .filter((time) => Number.isFinite(time))
-      .sort((a, b) => b - a)[0]
-    return !last || now - last > sevenDaysMs
-  }).length
-
-  return undirectedNotes + studentsWithoutRecentNote
 }
 
 function formatCompactNumber(value: number) {

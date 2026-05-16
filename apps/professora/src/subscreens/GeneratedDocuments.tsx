@@ -6,12 +6,15 @@ import type { GeneratedDocument } from '@/types'
 
 interface GeneratedDocumentsData {
   reportType?: string
+  reportTypes?: string[]
+  kind?: 'documents' | 'images' | 'all'
   studentId?: string
   classId?: string
   focusReportId?: string
 }
 
 type PeriodFilter = 'month' | 'all'
+type ArchiveFilter = 'active' | 'archived'
 
 export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen, openSubscreen } = useNavStore()
@@ -20,6 +23,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   const [documents, setDocuments] = useState<GeneratedDocument[]>([])
   const [query, setQuery] = useState('')
   const [period, setPeriod] = useState<PeriodFilter>('month')
+  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -27,15 +31,13 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
     let active = true
     setLoading(true)
     listReports({
-      limit: 120,
-      reportType: filters.reportType,
+      limit: 200,
       studentId: filters.studentId,
       classId: filters.classId,
     })
       .then((items) => {
         if (active) {
-          const activeItems = items.filter((item) => item.status !== 'archived')
-          setDocuments(sortFocusedFirst(activeItems, filters.focusReportId))
+          setDocuments(sortFocusedFirst(items, filters.focusReportId))
           setError('')
         }
       })
@@ -49,11 +51,20 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
     return () => {
       active = false
     }
-  }, [filters.classId, filters.focusReportId, filters.reportType, filters.studentId])
+  }, [filters.classId, filters.focusReportId, filters.studentId])
 
   const visibleDocuments = useMemo(() => {
     const normalizedQuery = normalizeText(query)
-    const periodDocuments = period === 'month' ? documents.filter(isFromCurrentMonth) : documents
+    const selectedTypes = filters.reportTypes?.length
+      ? filters.reportTypes
+      : filters.reportType
+        ? [filters.reportType]
+        : []
+    const scopedDocuments = documents
+      .filter((doc) => selectedTypes.length === 0 || selectedTypes.includes(doc.report_type))
+      .filter((doc) => filterByKind(doc, filters.kind ?? 'all'))
+      .filter((doc) => archiveFilter === 'archived' ? doc.status === 'archived' : doc.status !== 'archived')
+    const periodDocuments = period === 'month' ? scopedDocuments.filter(isFromCurrentMonth) : scopedDocuments
     if (!normalizedQuery) return periodDocuments
     return periodDocuments.filter((doc) =>
       normalizeText([
@@ -63,7 +74,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
         doc.body ?? '',
       ].join(' ')).includes(normalizedQuery),
     )
-  }, [documents, period, query, classes])
+  }, [documents, period, query, classes, filters.reportType, filters.reportTypes, filters.kind, archiveFilter])
 
   const title = getTitle(filters)
   const subtitle = getSubtitle(filters, classes)
@@ -101,6 +112,22 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
           ))}
         </div>
 
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {(['active', 'archived'] as const).map((option) => (
+            <button
+              key={option}
+              onClick={() => setArchiveFilter(option)}
+              className={`rounded-app-sm border px-3 py-2 text-[12px] font-bold transition-colors ${
+                archiveFilter === option
+                  ? 'bg-gm text-white border-gm'
+                  : 'bg-white text-muted border-border'
+              }`}
+            >
+              {option === 'active' ? 'Ativos' : 'Arquivados'}
+            </button>
+          ))}
+        </div>
+
         <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
           <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
             <Search size={16} className="text-muted flex-shrink-0" />
@@ -124,9 +151,13 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
         ) : visibleDocuments.length === 0 ? (
           <div className="bg-white rounded-app p-5 border border-border shadow-card text-center">
             <FileText size={24} className="text-gm mx-auto mb-2" />
-            <p className="text-[13px] font-bold text-ink">Nenhum documento gerado</p>
+            <p className="text-[13px] font-bold text-ink">
+              {archiveFilter === 'archived' ? 'Nenhum item arquivado' : getEmptyTitle(filters)}
+            </p>
             <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-              Quando voce gerar com IA, o item salvo aparece aqui.
+              {archiveFilter === 'archived'
+                ? 'Quando voce arquivar documentos ou imagens, eles aparecem aqui para consulta e recuperacao.'
+                : 'Quando voce gerar com IA, o item salvo aparece aqui.'}
             </p>
           </div>
         ) : (
@@ -152,7 +183,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                   <p className="text-[11px] text-muted mt-1">
                     {findStudentName(doc.student_id, classes) ?? 'Sem crianca'} - {formatDate(doc.created_at)}
                   </p>
-                  {doc.report_type === 'portfolio_image' && doc.ai_artifacts?.imageDataUrl && (
+                  {isImageReport(doc) && doc.ai_artifacts?.imageDataUrl && (
                     <img
                       src={doc.ai_artifacts.imageDataUrl}
                       alt="Imagem de portfolio gerada"
@@ -160,7 +191,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                     />
                   )}
                   <p className="text-[11px] text-muted mt-1 line-clamp-2">
-                    {doc.report_type === 'portfolio_image'
+                    {isImageReport(doc)
                       ? 'Imagem gerada com IA. Toque para visualizar.'
                       : (doc.body ?? '').slice(0, 150) || formatStatus(doc.status)}
                   </p>
@@ -205,6 +236,10 @@ function parseGeneratedDocumentsData(data: unknown): GeneratedDocumentsData {
   const record = data as Record<string, unknown>
   return {
     reportType: typeof record.reportType === 'string' ? record.reportType : undefined,
+    reportTypes: Array.isArray(record.reportTypes)
+      ? record.reportTypes.filter((item): item is string => typeof item === 'string')
+      : undefined,
+    kind: record.kind === 'documents' || record.kind === 'images' || record.kind === 'all' ? record.kind : undefined,
     studentId: typeof record.studentId === 'string' ? record.studentId : undefined,
     classId: typeof record.classId === 'string' ? record.classId : undefined,
     focusReportId: typeof record.focusReportId === 'string' ? record.focusReportId : undefined,
@@ -227,6 +262,8 @@ function isFromCurrentMonth(doc: GeneratedDocument) {
 }
 
 function getTitle(filters: GeneratedDocumentsData) {
+  if (filters.kind === 'images') return 'Imagens'
+  if (filters.kind === 'documents') return 'Documentos'
   if (filters.reportType === 'portfolio_image' || filters.reportType === 'portfolio_text') return 'Portfolios'
   if (filters.reportType === 'development_report') return 'Relatorios'
   if (filters.reportType === 'planning') return 'Planejamentos'
@@ -242,9 +279,23 @@ function getSubtitle(filters: GeneratedDocumentsData, classes: ReturnType<typeof
     }
   }
   return {
-    heading: 'Historico gerado com IA',
-    body: 'Documentos, planejamentos, relatorios e imagens salvos ficam aqui para visualizar, editar, arquivar ou marcar versao final.',
+    heading: filters.kind === 'images' ? 'Historico de imagens geradas' : filters.kind === 'documents' ? 'Historico de documentos gerados' : 'Historico gerado com IA',
+    body: 'Documentos, planejamentos, relatorios e imagens salvos ficam aqui para visualizar, editar, arquivar, recuperar ou marcar versao final.',
   }
+}
+
+function isImageReport(doc: GeneratedDocument) {
+  return doc.report_type === 'portfolio_image' || doc.ai_artifacts?.kind === 'portfolio_image'
+}
+
+function filterByKind(doc: GeneratedDocument, kind: 'documents' | 'images' | 'all') {
+  if (kind === 'all') return true
+  return kind === 'images' ? isImageReport(doc) : !isImageReport(doc)
+}
+
+function getEmptyTitle(filters: GeneratedDocumentsData) {
+  if (filters.kind === 'images') return 'Nenhuma imagem gerada'
+  return 'Nenhum documento gerado'
 }
 
 function formatStatus(status: string) {

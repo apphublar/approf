@@ -81,6 +81,8 @@ export interface AiUsageSummary {
     remainingQuantity: number
   }>
   generatedThisMonth: number
+  generatedDocumentsThisMonth?: number
+  generatedImagesThisMonth?: number
   recentUsage?: Array<{
     id: string
     generationType: AiGenerationType

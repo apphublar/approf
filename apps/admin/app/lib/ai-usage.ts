@@ -110,9 +110,9 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   },
   portfolio_image: {
     provider: 'openai',
-    model: 'gpt-image-1',
-    giztokens: toGizTokens(35),
-    estimatedCostCents: 35,
+    model: 'gpt-image-2',
+    giztokens: toGizTokens(120),
+    estimatedCostCents: 120,
     inputTokens: 1200,
     outputTokens: 0,
     imageCount: 1,

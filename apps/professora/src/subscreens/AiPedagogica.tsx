@@ -206,9 +206,20 @@ export default function AiPedagogicaSubscreen() {
 
             {visibleSections.length > 0 ? visibleSections.map((section) => (
               <section key={section.title} className="mb-6">
-                <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-[10px]">
-                  {section.title}
-                </p>
+                <div className="flex items-center justify-between gap-3 mb-[10px]">
+                  <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">
+                    {section.title}
+                  </p>
+                  <button
+                    onClick={() => openSubscreen('generated-documents', {
+                      reportTypes: getSectionReportTypes(section.title),
+                      kind: section.title === 'Relatorios pedagogicos' ? 'all' : 'documents',
+                    })}
+                    className="text-[11px] font-bold text-gm"
+                  >
+                    Historico
+                  </button>
+                </div>
 
                 <div className="flex flex-col gap-[11px]">
                   {section.actions.map((item) => (
@@ -261,4 +272,12 @@ function normalizeText(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
+}
+
+function getSectionReportTypes(sectionTitle: SectionTitle) {
+  if (sectionTitle === 'Relatorios pedagogicos') return ['development_report', 'general_report', 'portfolio_text', 'portfolio_image']
+  if (sectionTitle === 'Planejamentos') return ['planning']
+  if (sectionTitle === 'Especialistas e encaminhamentos') return ['specialist_report']
+  if (sectionTitle === 'Documentacao complementar') return ['general_report', 'other']
+  return undefined
 }

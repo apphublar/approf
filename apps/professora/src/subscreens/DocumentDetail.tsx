@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { getReportById, updateReport } from '@/services/reports'
+import { generateAiPortfolioImage } from '@/services/ai-usage'
 import type { GeneratedDocument, ReportStatus } from '@/types'
 
 interface DocumentDetailSubscreenProps {
@@ -19,6 +20,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [generatingImage, setGeneratingImage] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
@@ -36,6 +38,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
         if (!active) return
         setDocument(item)
         setDraft(item.body ?? '')
+        setImagePrompt(getImagePrompt(item))
       })
       .catch((err) => {
         if (!active) return
@@ -64,6 +67,8 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     return classes.find((item) => item.id === document.class_id)?.name ?? null
   }, [document?.class_id, classes])
 
+  const [imagePrompt, setImagePrompt] = useState('')
+  const isImageDocument = document?.report_type === 'portfolio_image' || document?.ai_artifacts?.kind === 'portfolio_image'
   const hasChanges = document ? draft !== (document.body ?? '') : false
 
   function goBack() {
@@ -99,6 +104,65 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     const confirmed = window.confirm('Deseja arquivar este documento?')
     if (!confirmed) return
     await save('archived')
+  }
+
+  async function restore() {
+    if (!document) return
+    setSaving(true)
+    setError('')
+    setMessage('')
+    try {
+      const updated = await updateReport(document.id, {
+        status: 'ready',
+      })
+      setDocument(updated)
+      setDraft(updated.body ?? '')
+      setImagePrompt(getImagePrompt(updated))
+      setMessage('Item recuperado do arquivo.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível recuperar o item.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function regenerateImage() {
+    if (!document || !isImageDocument) return
+    const prompt = imagePrompt.trim()
+    if (prompt.length < 20) {
+      setError('Descreva a correção da imagem com pelo menos 20 caracteres.')
+      return
+    }
+
+    setGeneratingImage(true)
+    setError('')
+    setMessage('')
+    try {
+      const result = await generateAiPortfolioImage({
+        generationType: 'portfolio_image',
+        classId: document.class_id,
+        studentId: document.student_id,
+        promptVersion: 'portfolio-image-correction-v1',
+        requestSummary: {
+          studentName,
+          className,
+          extraContext: prompt,
+          blankContext: prompt,
+        },
+      })
+
+      if (result.reportId) {
+        const next = await getReportById(result.reportId)
+        setDocument(next)
+        setDraft(next.body ?? '')
+        setImagePrompt(getImagePrompt(next))
+      }
+      setMessage('Nova imagem gerada e salva no histórico.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível gerar uma nova imagem.')
+    } finally {
+      setGeneratingImage(false)
+    }
   }
 
   async function toggleFinalVersion() {
@@ -152,7 +216,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 </p>
               </div>
 
-              {document.report_type === 'portfolio_image' && document.ai_artifacts?.imageDataUrl && (
+              {isImageDocument && document.ai_artifacts?.imageDataUrl && (
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <img
                     src={document.ai_artifacts.imageDataUrl}
@@ -162,16 +226,39 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 </div>
               )}
 
-              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-                <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                  {document.report_type === 'portfolio_image' ? 'Registro da imagem' : 'Conte\u00fado'}
-                </label>
-                <textarea
-                  className="w-full min-h-[340px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[13px] text-ink outline-none leading-[1.65]"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                />
-              </div>
+              {isImageDocument ? (
+                <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                  <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                    Ajustar prompt e gerar nova imagem
+                  </label>
+                  <p className="text-[12px] text-muted leading-[1.5] mt-2">
+                    Edite a orientação abaixo para corrigir a próxima imagem. A imagem atual permanece salva no histórico.
+                  </p>
+                  <textarea
+                    className="w-full min-h-[170px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-3 text-[13px] text-ink outline-none leading-[1.65]"
+                    value={imagePrompt}
+                    onChange={(event) => setImagePrompt(event.target.value)}
+                  />
+                  <button
+                    onClick={regenerateImage}
+                    disabled={generatingImage}
+                    className="w-full mt-3 py-[13px] rounded-app-sm bg-gm text-white font-bold text-sm border-none disabled:opacity-50"
+                  >
+                    {generatingImage ? 'Gerando nova imagem...' : 'Gerar nova imagem corrigida'}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                  <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                    Conteúdo
+                  </label>
+                  <textarea
+                    className="w-full min-h-[340px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[13px] text-ink outline-none leading-[1.65]"
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                  />
+                </div>
+              )}
 
               {message && (
                 <p className="mb-3 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[12px] text-gd">{message}</p>
@@ -181,13 +268,15 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
               )}
 
               <div className="flex flex-col gap-2 pb-6">
-                <button
-                  onClick={() => save('ready')}
-                  disabled={saving || !hasChanges}
-                  className="w-full py-[13px] rounded-app-sm bg-gd text-white font-bold text-sm border-none disabled:opacity-50"
-                >
-                  {saving ? 'Salvando...' : 'Salvar'}
-                </button>
+                {!isImageDocument && (
+                  <button
+                    onClick={() => save('ready')}
+                    disabled={saving || !hasChanges}
+                    className="w-full py-[13px] rounded-app-sm bg-gd text-white font-bold text-sm border-none disabled:opacity-50"
+                  >
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </button>
+                )}
 
                 {document.report_type === 'development_report' && (
                   <button
@@ -199,13 +288,23 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                   </button>
                 )}
 
-                <button
-                  onClick={archive}
-                  disabled={saving}
-                  className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold"
-                >
-                  Arquivar
-                </button>
+                {document.status === 'archived' ? (
+                  <button
+                    onClick={restore}
+                    disabled={saving}
+                    className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold"
+                  >
+                    Recuperar do arquivo
+                  </button>
+                ) : (
+                  <button
+                    onClick={archive}
+                    disabled={saving}
+                    className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold"
+                  >
+                    Arquivar
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -235,4 +334,19 @@ function formatStatus(status: ReportStatus) {
     case 'archived': return 'Arquivado'
     default: return status
   }
+}
+
+function getImagePrompt(document: GeneratedDocument) {
+  if (typeof document.ai_artifacts?.prompt === 'string' && document.ai_artifacts.prompt.trim()) {
+    return document.ai_artifacts.prompt.trim()
+  }
+
+  const body = document.body ?? ''
+  const marker = 'Prompt usado:'
+  const markerIndex = body.indexOf(marker)
+  if (markerIndex >= 0) {
+    return body.slice(markerIndex + marker.length).trim()
+  }
+
+  return body.trim()
 }

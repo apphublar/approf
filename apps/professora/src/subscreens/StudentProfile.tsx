@@ -144,20 +144,27 @@ export default function StudentProfileSubscreen() {
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
           <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Gerados da crianca</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => openSubscreen('generated-documents', { studentId: student.id })}
+              onClick={() => openSubscreen('generated-documents', { studentId: student.id, kind: 'all' })}
               className="rounded-app-sm border border-gp bg-gbg px-3 py-3 text-left text-gd"
             >
               <span className="block text-[13px] font-bold">Tudo</span>
               <span className="block text-[11px] mt-1">Mes e historico geral</span>
             </button>
             <button
-              onClick={() => openSubscreen('generated-documents', { reportType: 'development_report', studentId: student.id })}
+              onClick={() => openSubscreen('generated-documents', { studentId: student.id, kind: 'documents' })}
               className="rounded-app-sm border border-border bg-cream px-3 py-3 text-left text-muted"
             >
-              <span className="block text-[13px] font-bold">Relatorios</span>
-              <span className="block text-[11px] mt-1">Versoes vinculadas</span>
+              <span className="block text-[13px] font-bold">Docs</span>
+              <span className="block text-[11px] mt-1">Relatorios e textos</span>
+            </button>
+            <button
+              onClick={() => openSubscreen('generated-documents', { studentId: student.id, kind: 'images' })}
+              className="rounded-app-sm border border-border bg-cream px-3 py-3 text-left text-muted"
+            >
+              <span className="block text-[13px] font-bold">Imagens</span>
+              <span className="block text-[11px] mt-1">Portfolios visuais</span>
             </button>
           </div>
         </div>
