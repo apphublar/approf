@@ -28,7 +28,7 @@ export default function HomeScreen() {
   const firstName = getDisplayFirstName(userName)
   const recentNotes = annotations.slice(0, 3)
   const pendingCount = getPendingCount(annotations, classes)
-  const giztokensRemaining = aiUsage?.wallet.giztokensRemaining ?? 1000
+  const giztokensRemaining = aiUsage?.wallet.giztokensRemaining ?? 6000
   const docsGenerated = aiUsage?.generatedThisMonth ?? 0
 
   const allSlides: ({ isMain: true } | { isMain: false; note: BoardNote })[] = [
@@ -123,9 +123,9 @@ export default function HomeScreen() {
                   giztokens={giztokensRemaining}
                   documents={docsGenerated}
                   pending={pendingCount}
-                  onOpenAi={() => openSubscreen('ai')}
+                  onOpenGizTokens={() => openSubscreen('giztokens')}
                   onOpenAnnotations={() => setTab('annotations')}
-                  onOpenDocuments={() => openSubscreen('ai')}
+                  onOpenDocuments={() => openSubscreen('generated-documents')}
                   onOpenPending={() => openSubscreen('pending')}
                 />
               ) : (
@@ -341,7 +341,7 @@ function MainSlide({
   giztokens,
   documents,
   pending,
-  onOpenAi,
+  onOpenGizTokens,
   onOpenAnnotations,
   onOpenDocuments,
   onOpenPending,
@@ -351,7 +351,7 @@ function MainSlide({
   giztokens: number
   documents: number
   pending: number
-  onOpenAi: () => void
+  onOpenGizTokens: () => void
   onOpenAnnotations: () => void
   onOpenDocuments: () => void
   onOpenPending: () => void
@@ -359,7 +359,7 @@ function MainSlide({
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
   const stats = [
-    { n: formatCompactNumber(giztokens), l: 'GizTokens', onClick: onOpenAi },
+    { n: formatFullNumber(giztokens), l: 'GizTokens', onClick: onOpenGizTokens },
     { n: formatCompactNumber(annotations), l: 'Anotações', onClick: onOpenAnnotations },
     { n: formatCompactNumber(documents), l: 'Gerados', onClick: onOpenDocuments },
     { n: formatCompactNumber(pending), l: 'Pendências', onClick: onOpenPending },
@@ -611,4 +611,8 @@ function getPendingCount(
 function formatCompactNumber(value: number) {
   if (value >= 1000) return `${Math.floor(value / 100) / 10}k`
   return String(value)
+}
+
+function formatFullNumber(value: number) {
+  return String(Math.round(value))
 }

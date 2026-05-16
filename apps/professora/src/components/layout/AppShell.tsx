@@ -23,6 +23,8 @@ import PedagogicalGeneratorSubscreen from '@/subscreens/PedagogicalGenerator'
 import DocumentsSubscreen from '@/subscreens/Documents'
 import DocumentDetailSubscreen from '@/subscreens/DocumentDetail'
 import PendingSubscreen from '@/subscreens/Pending'
+import GizTokensSubscreen from '@/subscreens/GizTokens'
+import GeneratedDocumentsSubscreen from '@/subscreens/GeneratedDocuments'
 
 export default function AppShell() {
   const { activeTab, subscreens } = useNavStore()
@@ -96,6 +98,7 @@ function renderSubscreen(screen: string, data?: unknown) {
     case 'student-profile': return <StudentProfileSubscreen />
     case 'report':          return <ReportSubscreen data={data} />
     case 'ai':              return <AiPedagogicaSubscreen />
+    case 'giztokens':       return <GizTokensSubscreen />
     case 'calendar':        return <CalendarSubscreen />
     case 'community':       return <CommunitySubscreen />
     case 'new-class':       return <NewClassSubscreen />
@@ -107,6 +110,7 @@ function renderSubscreen(screen: string, data?: unknown) {
     case 'new-timeline-event': return <NewTimelineEventSubscreen />
     case 'pedagogical-generator': return <PedagogicalGeneratorSubscreen data={data} />
     case 'documents':       return <DocumentsSubscreen data={data} />
+    case 'generated-documents': return <GeneratedDocumentsSubscreen />
     case 'document-detail': return <DocumentDetailSubscreen data={data} />
     case 'pending':         return <PendingSubscreen />
     default:                return null

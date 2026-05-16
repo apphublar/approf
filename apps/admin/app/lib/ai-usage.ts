@@ -35,9 +35,11 @@ interface WalletSummary {
   giztokensIncluded: number
   giztokensUsed: number
   giztokensRemaining: number
+  giztokensOverageLimit: number
   includedCostLimitCents: number
   includedCostUsedCents: number
   includedCostRemainingCents: number
+  includedCostAlertCents: number
 }
 
 interface EntitlementSummary {
@@ -58,8 +60,11 @@ interface ReserveAiUsageResult {
   entitlement?: EntitlementSummary
 }
 
-const MONTHLY_GIZTOKENS_DEFAULT = 1000
-const INCLUDED_COST_LIMIT_CENTS = 10000
+const GIZTOKENS_PER_COST_CENT = 10
+const MONTHLY_INCLUDED_COST_CENTS = 600
+const MONTHLY_COST_LIMIT_CENTS = 800
+const MONTHLY_GIZTOKENS_DEFAULT = MONTHLY_INCLUDED_COST_CENTS * GIZTOKENS_PER_COST_CENT
+const MONTHLY_GIZTOKEN_OVERAGE_LIMIT = (MONTHLY_COST_LIMIT_CENTS - MONTHLY_INCLUDED_COST_CENTS) * GIZTOKENS_PER_COST_CENT
 
 /**
  * Estimativas de reserva para geração textual via pipeline Claude em 3 etapas (rascunho → BNCC/segurança → refinamento).
@@ -70,7 +75,7 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   development_report: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
-    giztokens: 115,
+    giztokens: toGizTokens(140),
     estimatedCostCents: 140,
     inputTokens: 10500,
     outputTokens: 5800,
@@ -79,7 +84,7 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   general_report: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
-    giztokens: 155,
+    giztokens: toGizTokens(175),
     estimatedCostCents: 175,
     inputTokens: 12800,
     outputTokens: 7200,
@@ -88,7 +93,7 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   planning: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
-    giztokens: 145,
+    giztokens: toGizTokens(155),
     estimatedCostCents: 155,
     inputTokens: 11200,
     outputTokens: 6800,
@@ -97,7 +102,7 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   portfolio_text: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
-    giztokens: 185,
+    giztokens: toGizTokens(210),
     estimatedCostCents: 210,
     inputTokens: 13800,
     outputTokens: 8200,
@@ -105,9 +110,9 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   },
   portfolio_image: {
     provider: 'openai',
-    model: 'chatgpt-image',
-    giztokens: 220,
-    estimatedCostCents: 100,
+    model: 'gpt-image-1',
+    giztokens: toGizTokens(35),
+    estimatedCostCents: 35,
     inputTokens: 1200,
     outputTokens: 0,
     imageCount: 1,
@@ -115,7 +120,7 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   specialist_report: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
-    giztokens: 205,
+    giztokens: toGizTokens(245),
     estimatedCostCents: 245,
     inputTokens: 15500,
     outputTokens: 8800,
@@ -124,7 +129,7 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   other: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
-    giztokens: 130,
+    giztokens: toGizTokens(145),
     estimatedCostCents: 145,
     inputTokens: 10000,
     outputTokens: 5600,
@@ -138,8 +143,8 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
   const { start: monthStart, end: monthEnd } = getMonthPeriod(new Date())
   const entitlementType = getEntitlementType(input.generationType)
 
-  const semester = getSemesterPeriod(new Date())
-  const semesterIncludedQuantity = entitlementType === 'development_report' ? 2 : 1
+  const entitlementCycle = getEntitlementCycle(input.generationType, new Date())
+  const entitlementIncludedQuantity = getIncludedEntitlementQuantity(input.generationType)
 
   const { data, error } = await supabase.rpc('reserve_ai_usage_atomic', {
     p_owner_id: input.ownerId,
@@ -159,11 +164,11 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
     p_month_period_start: monthStart,
     p_month_period_end: monthEnd,
     p_monthly_giztokens_included: MONTHLY_GIZTOKENS_DEFAULT,
-    p_included_cost_limit_cents: INCLUDED_COST_LIMIT_CENTS,
-    p_semester_cycle_label: semester.label,
-    p_semester_cycle_start: semester.start,
-    p_semester_cycle_end: semester.end,
-    p_semester_included_quantity: semesterIncludedQuantity,
+    p_included_cost_limit_cents: MONTHLY_COST_LIMIT_CENTS,
+    p_semester_cycle_label: entitlementCycle?.label ?? null,
+    p_semester_cycle_start: entitlementCycle?.start ?? null,
+    p_semester_cycle_end: entitlementCycle?.end ?? null,
+    p_semester_included_quantity: entitlementIncludedQuantity,
   })
 
   if (error) {
@@ -178,22 +183,22 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
   const walletSummary: WalletSummary | undefined = result.wallet_id ? {
     giztokensIncluded: result.wallet_giztokens_included ?? 0,
     giztokensUsed: result.wallet_giztokens_used ?? 0,
-    giztokensRemaining: Math.max(0, (result.wallet_giztokens_included ?? 0) - (result.wallet_giztokens_used ?? 0)),
+    giztokensRemaining: (result.wallet_giztokens_included ?? 0) - (result.wallet_giztokens_used ?? 0),
+    giztokensOverageLimit: MONTHLY_GIZTOKEN_OVERAGE_LIMIT,
     includedCostLimitCents: result.wallet_included_cost_limit_cents ?? 0,
     includedCostUsedCents: result.wallet_included_cost_used_cents ?? 0,
-    includedCostRemainingCents: Math.max(
-      0,
+    includedCostRemainingCents:
       (result.wallet_included_cost_limit_cents ?? 0) - (result.wallet_included_cost_used_cents ?? 0),
-    ),
+    includedCostAlertCents: MONTHLY_INCLUDED_COST_CENTS,
   } : undefined
 
   const entitlementSummary: EntitlementSummary | undefined = result.entitlement_id ? {
-    cycleLabel: result.entitlement_cycle_label ?? semester.label,
-    includedQuantity: result.entitlement_included_quantity ?? semesterIncludedQuantity,
+    cycleLabel: result.entitlement_cycle_label ?? entitlementCycle?.label ?? '',
+    includedQuantity: result.entitlement_included_quantity ?? entitlementIncludedQuantity,
     usedQuantity: result.entitlement_used_quantity ?? 0,
     remainingQuantity: Math.max(
       0,
-      (result.entitlement_included_quantity ?? semesterIncludedQuantity) - (result.entitlement_used_quantity ?? 0),
+      (result.entitlement_included_quantity ?? entitlementIncludedQuantity) - (result.entitlement_used_quantity ?? 0),
     ),
   } : undefined
 
@@ -266,16 +271,32 @@ function getMonthPeriod(date: Date) {
   return { start: formatDate(start), end: formatDate(end) }
 }
 
-function getSemesterPeriod(date: Date) {
-  const firstSemester = date.getMonth() < 6
+function getEntitlementCycle(generationType: AiGenerationType, date: Date) {
+  if (generationType === 'development_report') return getYearPeriod(date)
+  if (generationType === 'portfolio_image') return getMonthPeriodWithLabel(date)
+  return null
+}
+
+function getIncludedEntitlementQuantity(generationType: AiGenerationType) {
+  if (generationType === 'development_report') return 2
+  if (generationType === 'portfolio_image') return 2
+  return 0
+}
+
+function getYearPeriod(date: Date) {
   const year = date.getFullYear()
-  const start = new Date(year, firstSemester ? 0 : 6, 1)
-  const end = new Date(year, firstSemester ? 5 : 11, firstSemester ? 30 : 31)
+  const start = new Date(year, 0, 1)
+  const end = new Date(year, 11, 31)
   return {
     start: formatDate(start),
     end: formatDate(end),
-    label: `${year}.${firstSemester ? '1' : '2'}`,
+    label: `${year}`,
   }
+}
+
+function getMonthPeriodWithLabel(date: Date) {
+  const { start, end } = getMonthPeriod(date)
+  return { start, end, label: start.slice(0, 7) }
 }
 
 function formatDate(date: Date) {
@@ -298,4 +319,8 @@ function toError(error: unknown, fallbackMessage: string) {
 function clampNonNegativeInt(value: number) {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.round(value))
+}
+
+function toGizTokens(costCents: number) {
+  return clampNonNegativeInt(costCents * GIZTOKENS_PER_COST_CENT)
 }

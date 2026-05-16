@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
-import { formatAiUsageMessage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
+import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
 import { updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import type { Annotation } from '@/types'
@@ -55,6 +55,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [generated, setGenerated] = useState(false)
   const [savedContent, setSavedContent] = useState('')
   const [editableContent, setEditableContent] = useState('')
+  const [generatedImageUrl, setGeneratedImageUrl] = useState('')
   const [reportId, setReportId] = useState('')
   const [editingDocument, setEditingDocument] = useState(false)
   const [savingDocument, setSavingDocument] = useState(false)
@@ -72,6 +73,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setGenerated(false)
     setSavedContent('')
     setEditableContent('')
+    setGeneratedImageUrl('')
     setReportId('')
     setEditingDocument(false)
     setUsageMessage('')
@@ -153,6 +155,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setGenerating(true)
     setSavedContent('')
     setEditableContent('')
+    setGeneratedImageUrl('')
     setReportId('')
     setEditingDocument(false)
 
@@ -178,13 +181,22 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         })),
       }
 
-      const result = await generateAiTextDocument({
-        generationType: getReportGenerationType(reportKind, portfolioOutput),
-        classId: selectedStudent?.classId ?? null,
-        studentId: selectedStudent?.id ?? null,
-        promptVersion: 'professora-report-v1',
-        requestSummary,
-      })
+      const generationType = getReportGenerationType(reportKind, portfolioOutput)
+      const result = generationType === 'portfolio_image'
+        ? await generateAiPortfolioImage({
+            generationType,
+            classId: selectedStudent?.classId ?? null,
+            studentId: selectedStudent?.id ?? null,
+            promptVersion: 'portfolio-image-v1',
+            requestSummary,
+          })
+        : await generateAiTextDocument({
+            generationType,
+            classId: selectedStudent?.classId ?? null,
+            studentId: selectedStudent?.id ?? null,
+            promptVersion: 'professora-report-v1',
+            requestSummary,
+          })
 
       if (!result.allowed) {
         setUsageError(result.message || 'Esta geracao precisa de pacote extra.')
@@ -193,9 +205,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       }
 
       setUsageMessage(formatAiUsageMessage(result))
-      const generatedBody = result.generatedText || mockReport
+      const generatedBody = 'generatedText' in result && result.generatedText
+        ? result.generatedText
+        : 'prompt' in result && result.prompt
+          ? `Imagem de portfolio gerada com ChatGPT.\n\nPrompt usado:\n\n${result.prompt}`
+          : mockReport
       setSavedContent(generatedBody)
       setEditableContent(generatedBody)
+      setGeneratedImageUrl('imageDataUrl' in result && result.imageDataUrl ? result.imageDataUrl : '')
       setReportId(result.reportId ?? '')
       window.setTimeout(() => {
         celebrateAiGeneration()
@@ -495,7 +512,18 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </p>
             )}
             <div className="bg-white rounded-app p-5 border border-border shadow-card mb-4">
-              {editingDocument ? (
+              {generatedImageUrl && !editingDocument ? (
+                <div className="flex flex-col gap-3">
+                  <img
+                    src={generatedImageUrl}
+                    alt="Portfolio pedagogico gerado com IA"
+                    className="w-full rounded-app-sm border border-border bg-cream"
+                  />
+                  <p className="text-[11px] text-muted leading-[1.5]">
+                    A imagem foi gerada com base nas anotacoes e orientacoes selecionadas. O prompt usado foi salvo no documento.
+                  </p>
+                </div>
+              ) : editingDocument ? (
                 <textarea
                   className="w-full min-h-[320px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 text-[13px] text-ink outline-none leading-[1.65]"
                   value={editableContent}

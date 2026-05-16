@@ -7,8 +7,11 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
 
-const MONTHLY_GIZTOKENS_DEFAULT = 1000
-const INCLUDED_COST_LIMIT_CENTS = 10000
+const GIZTOKENS_PER_COST_CENT = 10
+const INCLUDED_COST_ALERT_CENTS = 600
+const INCLUDED_COST_LIMIT_CENTS = 800
+const MONTHLY_GIZTOKENS_DEFAULT = INCLUDED_COST_ALERT_CENTS * GIZTOKENS_PER_COST_CENT
+const MONTHLY_GIZTOKEN_OVERAGE_LIMIT = (INCLUDED_COST_LIMIT_CENTS - INCLUDED_COST_ALERT_CENTS) * GIZTOKENS_PER_COST_CENT
 
 export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
@@ -50,6 +53,15 @@ export async function GET(request: Request) {
 
     if (countError) throw countError
 
+    const { data: recentLogs, error: recentLogsError } = await supabase
+      .from('ai_generation_logs')
+      .select('id,generation_type,status,provider,model,charge_source,giztokens_charged,estimated_cost_cents,actual_cost_cents,created_at')
+      .eq('owner_id', ownerId)
+      .order('created_at', { ascending: false })
+      .limit(12)
+
+    if (recentLogsError) throw recentLogsError
+
     const giztokensIncluded = wallet?.giztokens_included ?? MONTHLY_GIZTOKENS_DEFAULT
     const giztokensUsed = wallet?.giztokens_used ?? 0
     const costLimit = wallet?.included_cost_limit_cents ?? INCLUDED_COST_LIMIT_CENTS
@@ -60,10 +72,12 @@ export async function GET(request: Request) {
         wallet: {
           giztokensIncluded,
           giztokensUsed,
-          giztokensRemaining: Math.max(0, giztokensIncluded - giztokensUsed),
+          giztokensRemaining: giztokensIncluded - giztokensUsed,
+          giztokensOverageLimit: MONTHLY_GIZTOKEN_OVERAGE_LIMIT,
           includedCostLimitCents: costLimit,
           includedCostUsedCents: costUsed,
-          includedCostRemainingCents: Math.max(0, costLimit - costUsed),
+          includedCostRemainingCents: costLimit - costUsed,
+          includedCostAlertCents: INCLUDED_COST_ALERT_CENTS,
           periodStart: wallet?.period_start ?? start,
           periodEnd: wallet?.period_end ?? end,
         },
@@ -75,6 +89,18 @@ export async function GET(request: Request) {
           remainingQuantity: Math.max(0, (item.included_quantity ?? 0) - (item.used_quantity ?? 0)),
         })),
         generatedThisMonth: count ?? 0,
+        recentUsage: (recentLogs ?? []).map((item) => ({
+          id: item.id,
+          generationType: item.generation_type,
+          status: item.status,
+          provider: item.provider,
+          model: item.model,
+          chargeSource: item.charge_source,
+          giztokensCharged: item.giztokens_charged ?? 0,
+          estimatedCostCents: item.estimated_cost_cents ?? 0,
+          actualCostCents: item.actual_cost_cents ?? 0,
+          createdAt: item.created_at,
+        })),
       },
       { status: 200, headers: CORS_HEADERS },
     )
