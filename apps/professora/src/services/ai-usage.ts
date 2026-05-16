@@ -74,6 +74,8 @@ export interface AiUsageSummary {
   entitlements: Array<{
     entitlementType: string
     cycleLabel: string
+    studentId: string | null
+    classId: string | null
     includedQuantity: number
     usedQuantity: number
     remainingQuantity: number
@@ -86,6 +88,9 @@ export interface AiUsageSummary {
     provider: string
     model: string
     chargeSource: 'giztokens' | 'semester_entitlement' | 'paid_extra'
+    studentId: string | null
+    classId: string | null
+    reportId: string | null
     giztokensCharged: number
     estimatedCostCents: number
     actualCostCents: number

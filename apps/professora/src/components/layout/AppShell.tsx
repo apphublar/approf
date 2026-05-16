@@ -110,7 +110,7 @@ function renderSubscreen(screen: string, data?: unknown) {
     case 'new-timeline-event': return <NewTimelineEventSubscreen />
     case 'pedagogical-generator': return <PedagogicalGeneratorSubscreen data={data} />
     case 'documents':       return <DocumentsSubscreen data={data} />
-    case 'generated-documents': return <GeneratedDocumentsSubscreen />
+    case 'generated-documents': return <GeneratedDocumentsSubscreen data={data} />
     case 'document-detail': return <DocumentDetailSubscreen data={data} />
     case 'pending':         return <PendingSubscreen />
     default:                return null

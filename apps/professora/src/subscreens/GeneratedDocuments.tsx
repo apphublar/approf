@@ -1,24 +1,41 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, FileText, Search } from 'lucide-react'
+import { ChevronLeft, FileText, Image as ImageIcon, Search } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { listReports } from '@/services/reports'
 import type { GeneratedDocument } from '@/types'
 
-export default function GeneratedDocumentsSubscreen() {
+interface GeneratedDocumentsData {
+  reportType?: string
+  studentId?: string
+  classId?: string
+  focusReportId?: string
+}
+
+type PeriodFilter = 'month' | 'all'
+
+export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const { classes } = useAppStore()
+  const filters = parseGeneratedDocumentsData(data)
   const [documents, setDocuments] = useState<GeneratedDocument[]>([])
   const [query, setQuery] = useState('')
+  const [period, setPeriod] = useState<PeriodFilter>('month')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let active = true
     setLoading(true)
-    listReports({ limit: 50 })
+    listReports({
+      limit: 120,
+      reportType: filters.reportType,
+      studentId: filters.studentId,
+      classId: filters.classId,
+    })
       .then((items) => {
         if (active) {
-          setDocuments(items.filter((item) => item.status !== 'archived'))
+          const activeItems = items.filter((item) => item.status !== 'archived')
+          setDocuments(sortFocusedFirst(activeItems, filters.focusReportId))
           setError('')
         }
       })
@@ -32,12 +49,13 @@ export default function GeneratedDocumentsSubscreen() {
     return () => {
       active = false
     }
-  }, [])
+  }, [filters.classId, filters.focusReportId, filters.reportType, filters.studentId])
 
   const visibleDocuments = useMemo(() => {
     const normalizedQuery = normalizeText(query)
-    if (!normalizedQuery) return documents
-    return documents.filter((doc) =>
+    const periodDocuments = period === 'month' ? documents.filter(isFromCurrentMonth) : documents
+    if (!normalizedQuery) return periodDocuments
+    return periodDocuments.filter((doc) =>
       normalizeText([
         formatReportType(doc.report_type),
         findStudentName(doc.student_id, classes),
@@ -45,7 +63,10 @@ export default function GeneratedDocumentsSubscreen() {
         doc.body ?? '',
       ].join(' ')).includes(normalizedQuery),
     )
-  }, [documents, query, classes])
+  }, [documents, period, query, classes])
+
+  const title = getTitle(filters)
+  const subtitle = getSubtitle(filters, classes)
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
@@ -53,15 +74,31 @@ export default function GeneratedDocumentsSubscreen() {
         <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">Gerados</span>
+        <span className="font-serif text-[18px] text-gd flex-1">{title}</span>
       </div>
 
       <div className="scroll-area px-[18px] py-5">
         <div className="bg-gbg border border-gp rounded-app p-4 mb-4">
-          <p className="text-[13px] font-bold text-gd mb-2">Documentos gerados com IA</p>
+          <p className="text-[13px] font-bold text-gd mb-2">{subtitle.heading}</p>
           <p className="text-[12px] text-muted leading-[1.6]">
-            Relatorios, planejamentos e portfolios salvos ficam aqui para visualizar, editar, arquivar ou marcar versao final.
+            {subtitle.body}
           </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {(['month', 'all'] as const).map((option) => (
+            <button
+              key={option}
+              onClick={() => setPeriod(option)}
+              className={`rounded-app-sm border px-3 py-2 text-[12px] font-bold transition-colors ${
+                period === option
+                  ? 'bg-gd text-white border-gd'
+                  : 'bg-white text-muted border-border'
+              }`}
+            >
+              {option === 'month' ? 'Este mes' : 'Todos'}
+            </button>
+          ))}
         </div>
 
         <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
@@ -89,7 +126,7 @@ export default function GeneratedDocumentsSubscreen() {
             <FileText size={24} className="text-gm mx-auto mb-2" />
             <p className="text-[13px] font-bold text-ink">Nenhum documento gerado</p>
             <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-              Quando voce gerar com IA, o documento salvo aparece aqui.
+              Quando voce gerar com IA, o item salvo aparece aqui.
             </p>
           </div>
         ) : (
@@ -101,7 +138,7 @@ export default function GeneratedDocumentsSubscreen() {
                 className="w-full bg-white rounded-app p-4 border border-border shadow-card flex items-start gap-3 text-left active:scale-[.98] transition-transform"
               >
                 <div className="w-10 h-10 rounded-[12px] bg-gbg text-gm flex items-center justify-center flex-shrink-0">
-                  <FileText size={18} />
+                  {doc.report_type === 'portfolio_image' ? <ImageIcon size={18} /> : <FileText size={18} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
@@ -115,8 +152,17 @@ export default function GeneratedDocumentsSubscreen() {
                   <p className="text-[11px] text-muted mt-1">
                     {findStudentName(doc.student_id, classes) ?? 'Sem crianca'} - {formatDate(doc.created_at)}
                   </p>
+                  {doc.report_type === 'portfolio_image' && doc.ai_artifacts?.imageDataUrl && (
+                    <img
+                      src={doc.ai_artifacts.imageDataUrl}
+                      alt="Imagem de portfolio gerada"
+                      className="w-full max-h-[120px] object-cover rounded-app-sm border border-border mt-3"
+                    />
+                  )}
                   <p className="text-[11px] text-muted mt-1 line-clamp-2">
-                    {(doc.body ?? '').slice(0, 150) || formatStatus(doc.status)}
+                    {doc.report_type === 'portfolio_image'
+                      ? 'Imagem gerada com IA. Toque para visualizar.'
+                      : (doc.body ?? '').slice(0, 150) || formatStatus(doc.status)}
                   </p>
                 </div>
               </button>
@@ -147,10 +193,58 @@ function formatReportType(type: string) {
     development_report: 'Relatorio de desenvolvimento',
     planning: 'Planejamento',
     portfolio_text: 'Portfolio pedagogico',
+    portfolio_image: 'Imagem de portfolio',
     specialist_report: 'Encaminhamento',
     general_report: 'Relatorio pedagogico',
   }
   return labels[type] ?? 'Documento'
+}
+
+function parseGeneratedDocumentsData(data: unknown): GeneratedDocumentsData {
+  if (!data || typeof data !== 'object') return {}
+  const record = data as Record<string, unknown>
+  return {
+    reportType: typeof record.reportType === 'string' ? record.reportType : undefined,
+    studentId: typeof record.studentId === 'string' ? record.studentId : undefined,
+    classId: typeof record.classId === 'string' ? record.classId : undefined,
+    focusReportId: typeof record.focusReportId === 'string' ? record.focusReportId : undefined,
+  }
+}
+
+function sortFocusedFirst(items: GeneratedDocument[], focusReportId?: string) {
+  if (!focusReportId) return items
+  return [...items].sort((a, b) => {
+    if (a.id === focusReportId) return -1
+    if (b.id === focusReportId) return 1
+    return 0
+  })
+}
+
+function isFromCurrentMonth(doc: GeneratedDocument) {
+  const date = new Date(doc.created_at)
+  const now = new Date()
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+}
+
+function getTitle(filters: GeneratedDocumentsData) {
+  if (filters.reportType === 'portfolio_image') return 'Portfolios'
+  if (filters.reportType === 'development_report') return 'Relatorios'
+  if (filters.reportType === 'planning') return 'Planejamentos'
+  return 'Gerados'
+}
+
+function getSubtitle(filters: GeneratedDocumentsData, classes: ReturnType<typeof useAppStore.getState>['classes']) {
+  const studentName = filters.studentId ? findStudentName(filters.studentId, classes) : null
+  if (studentName) {
+    return {
+      heading: `Historico de ${studentName}`,
+      body: 'Tudo que foi gerado por IA para esta crianca fica aqui, separado entre este mes e o historico geral.',
+    }
+  }
+  return {
+    heading: 'Historico gerado com IA',
+    body: 'Documentos, planejamentos, relatorios e imagens salvos ficam aqui para visualizar, editar, arquivar ou marcar versao final.',
+  }
 }
 
 function formatStatus(status: string) {

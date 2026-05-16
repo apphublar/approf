@@ -119,6 +119,20 @@ export default function AiPedagogicaSubscreen() {
               </div>
             </div>
 
+            <button
+              onClick={() => openSubscreen('generated-documents', { reportType: 'planning' })}
+              className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
+            >
+              <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
+                <FileText size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold text-ink leading-tight">Historico de planejamentos</p>
+                <p className="text-[11px] text-muted leading-snug mt-1">Veja, edite e acompanhe planejamentos ja gerados.</p>
+              </div>
+              <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
+            </button>
+
             <div className="flex flex-col gap-[11px]">
               {PLANNING_PERIODS.map((period) => (
                 <button
@@ -147,6 +161,20 @@ export default function AiPedagogicaSubscreen() {
                 {totalDocuments} modelos para relatorios, planejamentos, especialistas e documentacao da educacao infantil.
               </p>
             </div>
+
+            <button
+              onClick={() => openSubscreen('generated-documents')}
+              className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
+            >
+              <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
+                <FileText size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold text-ink leading-tight">Ver gerados</p>
+                <p className="text-[11px] text-muted leading-snug mt-1">Historico do mes e geral de tudo que foi criado por IA.</p>
+              </div>
+              <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
+            </button>
 
             <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
               <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">

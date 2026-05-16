@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, ChevronLeft, Coins, Gift, History, ShieldCheck } from 'lucide-react'
-import { useNavStore } from '@/store'
+import { useAppStore, useNavStore } from '@/store'
 import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
 
 export default function GizTokensSubscreen() {
-  const { closeSubscreen } = useNavStore()
+  const { closeSubscreen, openSubscreen } = useNavStore()
+  const { classes } = useAppStore()
   const [summary, setSummary] = useState<AiUsageSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -116,8 +117,8 @@ export default function GizTokensSubscreen() {
           </div>
           <div className="flex flex-col gap-2">
             {(summary?.entitlements ?? []).slice(0, 4).map((item) => (
-              <div key={`${item.entitlementType}-${item.cycleLabel}`} className="rounded-app-sm border border-border px-3 py-2">
-                <p className="text-[12px] font-bold text-ink">{formatEntitlement(item.entitlementType)}</p>
+              <div key={`${item.entitlementType}-${item.studentId ?? 'teacher'}-${item.cycleLabel}`} className="rounded-app-sm border border-border px-3 py-2">
+                <p className="text-[12px] font-bold text-ink">{formatEntitlement(item.entitlementType, item.studentId, classes)}</p>
                 <p className="text-[11px] text-muted mt-1">
                   {item.usedQuantity}/{item.includedQuantity} usados em {item.cycleLabel}
                 </p>
@@ -139,18 +140,25 @@ export default function GizTokensSubscreen() {
           </div>
           <div className="flex flex-col gap-[9px]">
             {(summary?.recentUsage ?? []).map((item) => (
-              <div key={item.id} className="bg-white rounded-app p-4 border border-border shadow-card">
+              <button
+                key={item.id}
+                onClick={() => item.reportId && openSubscreen('document-detail', { reportId: item.reportId })}
+                disabled={!item.reportId}
+                className="w-full bg-white rounded-app p-4 border border-border shadow-card text-left disabled:opacity-100 active:scale-[.98] transition-transform"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[13px] font-bold text-ink">{formatGenerationType(item.generationType)}</p>
-                    <p className="text-[11px] text-muted mt-1">{formatDateTime(item.createdAt)} - {formatChargeSource(item.chargeSource)}</p>
+                    <p className="text-[11px] text-muted mt-1">
+                      {formatDateTime(item.createdAt)} - {findStudentName(item.studentId, classes) ?? formatChargeSource(item.chargeSource)}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-[13px] font-bold text-ink">{formatNumber(item.giztokensCharged)} Giz</p>
                     <p className="text-[11px] text-muted">{item.chargeSource === 'semester_entitlement' ? 'cota inclusa' : formatStatus(item.status)}</p>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
 
             {(summary?.recentUsage ?? []).length === 0 && (
@@ -189,9 +197,14 @@ function formatGenerationType(value: string) {
   return labels[value] ?? 'Documento'
 }
 
-function formatEntitlement(value: string) {
-  if (value === 'development_report') return 'Relatorios de desenvolvimento'
-  if (value === 'portfolio_image') return 'Imagens de portfolio'
+function formatEntitlement(
+  value: string,
+  studentId: string | null,
+  classes: ReturnType<typeof useAppStore.getState>['classes'],
+) {
+  const studentName = findStudentName(studentId, classes)
+  if (value === 'development_report') return studentName ? `${studentName} - relatorios` : 'Relatorios de desenvolvimento'
+  if (value === 'portfolio_image') return 'Imagens de portfolio do mes'
   return 'Cota inclusa'
 }
 
@@ -208,4 +221,13 @@ function formatStatus(value: string) {
   if (value === 'failed') return 'falhou'
   if (value === 'refunded') return 'estornado'
   return value
+}
+
+function findStudentName(studentId: string | null, classes: ReturnType<typeof useAppStore.getState>['classes']) {
+  if (!studentId) return null
+  for (const classItem of classes) {
+    const student = classItem.students.find((item) => item.id === studentId)
+    if (student) return student.name
+  }
+  return null
 }

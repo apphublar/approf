@@ -17,7 +17,7 @@ export async function listOwnerReports(ownerId: string, filters: ReportListFilte
   let query = supabase
     .from('reports')
     .select(
-      'id, owner_id, student_id, class_id, status, report_type, prompt_version, is_final_version, created_at, updated_at',
+      'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at',
     )
     .eq('owner_id', ownerId)
     .order('created_at', { ascending: false })
@@ -37,7 +37,7 @@ export async function getOwnerReportById(ownerId: string, reportId: string) {
   const supabase = createSupabaseServiceClient()
   const { data, error } = await supabase
     .from('reports')
-    .select('id, owner_id, student_id, class_id, status, report_type, prompt_version, body, is_final_version, created_at, updated_at')
+    .select('id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at')
     .eq('id', reportId)
     .eq('owner_id', ownerId)
     .maybeSingle()
@@ -73,7 +73,7 @@ export async function updateOwnerReport(input: {
     .update(patch)
     .eq('id', input.reportId)
     .eq('owner_id', input.ownerId)
-    .select('id, owner_id, student_id, class_id, status, report_type, prompt_version, body, is_final_version, created_at, updated_at')
+    .select('id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at')
     .single()
 
   if (error) throw toError(error, 'Nao foi possivel salvar documento.')

@@ -193,6 +193,10 @@ export interface GeneratedDocument {
   report_type: string
   prompt_version: string | null
   body: string | null
+  ai_artifacts?: {
+    kind?: string
+    imageDataUrl?: string
+  } | null
   is_final_version: boolean
   created_at: string
   updated_at: string

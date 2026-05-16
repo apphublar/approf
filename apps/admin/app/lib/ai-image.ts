@@ -52,10 +52,9 @@ export async function generatePortfolioImage(
     model,
     size,
     quality,
-    actualCostCents,
   })
 
-  const reportId = await persistGeneratedReport(input, body)
+  const reportId = await persistGeneratedReport(input, body, `data:image/png;base64,${generated.b64Json}`)
   await persistUsage(
     reportId,
     input.ownerId,
@@ -189,21 +188,19 @@ function buildPersistedImageBody(input: {
   model: string
   size: string
   quality: string
-  actualCostCents: number
 }) {
   return `Imagem de portfolio pedagogico gerada com OpenAI.
 
 Modelo: ${input.model}
 Tamanho: ${input.size}
 Qualidade: ${input.quality}
-Custo estimado registrado: ${input.actualCostCents} centavos
 
 Prompt usado:
 
 ${input.prompt}`
 }
 
-async function persistGeneratedReport(input: GeneratePortfolioImageInput, body: string) {
+async function persistGeneratedReport(input: GeneratePortfolioImageInput, body: string, imageDataUrl: string) {
   const supabase = createSupabaseServiceClient()
   const { data, error } = await supabase
     .from('reports')
@@ -215,6 +212,10 @@ async function persistGeneratedReport(input: GeneratePortfolioImageInput, body: 
       report_type: input.generationType,
       prompt_version: input.promptVersion,
       body,
+      ai_artifacts: {
+        kind: 'portfolio_image',
+        imageDataUrl,
+      },
     })
     .select('id')
     .single()

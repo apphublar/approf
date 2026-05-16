@@ -152,8 +152,20 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 </p>
               </div>
 
+              {document.report_type === 'portfolio_image' && document.ai_artifacts?.imageDataUrl && (
+                <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                  <img
+                    src={document.ai_artifacts.imageDataUrl}
+                    alt="Imagem de portfolio gerada com IA"
+                    className="w-full rounded-app-sm border border-border bg-cream"
+                  />
+                </div>
+              )}
+
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-                <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Conte\u00fado</label>
+                <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                  {document.report_type === 'portfolio_image' ? 'Registro da imagem' : 'Conte\u00fado'}
+                </label>
                 <textarea
                   className="w-full min-h-[340px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[13px] text-ink outline-none leading-[1.65]"
                   value={draft}

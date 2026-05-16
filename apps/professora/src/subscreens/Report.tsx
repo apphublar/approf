@@ -535,10 +535,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
 
             <button
-              onClick={() => openSubscreen('documents', { focusReportId: reportId })}
+              onClick={() => openSubscreen('generated-documents', { focusReportId: reportId })}
               className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2"
             >
-              Meus documentos
+              Historico de gerados
             </button>
 
             {editingDocument ? (
@@ -564,7 +564,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
             {reportKind === 'Relatorio de desenvolvimento' && selectedStudent?.id && (
               <button
-                onClick={() => openSubscreen('documents', { reportType: 'development_report', studentId: selectedStudent.id })}
+                onClick={() => openSubscreen('generated-documents', { reportType: 'development_report', studentId: selectedStudent.id })}
                 className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2"
               >
                 Ver versoes desta crianca

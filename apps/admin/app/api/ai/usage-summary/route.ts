@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
     const { data: entitlements, error: entitlementsError } = await supabase
       .from('ai_semester_entitlements')
-      .select('entitlement_type,cycle_label,included_quantity,used_quantity')
+      .select('entitlement_type,cycle_label,student_id,class_id,included_quantity,used_quantity')
       .eq('owner_id', ownerId)
       .order('cycle_start', { ascending: false })
       .limit(12)
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 
     const { data: recentLogs, error: recentLogsError } = await supabase
       .from('ai_generation_logs')
-      .select('id,generation_type,status,provider,model,charge_source,giztokens_charged,estimated_cost_cents,actual_cost_cents,created_at')
+      .select('id,generation_type,status,provider,model,charge_source,giztokens_charged,estimated_cost_cents,actual_cost_cents,result_summary,student_id,class_id,created_at')
       .eq('owner_id', ownerId)
       .order('created_at', { ascending: false })
       .limit(12)
@@ -88,6 +88,8 @@ export async function GET(request: Request) {
         entitlements: (entitlements ?? []).map((item) => ({
           entitlementType: item.entitlement_type,
           cycleLabel: item.cycle_label,
+          studentId: item.student_id,
+          classId: item.class_id,
           includedQuantity: item.included_quantity ?? 0,
           usedQuantity: item.used_quantity ?? 0,
           remainingQuantity: Math.max(0, (item.included_quantity ?? 0) - (item.used_quantity ?? 0)),
@@ -100,6 +102,9 @@ export async function GET(request: Request) {
           provider: item.provider,
           model: item.model,
           chargeSource: item.charge_source,
+          studentId: item.student_id,
+          classId: item.class_id,
+          reportId: getReportIdFromSummary(item.result_summary),
           giztokensCharged: item.giztokens_charged ?? 0,
           estimatedCostCents: item.estimated_cost_cents ?? 0,
           actualCostCents: item.actual_cost_cents ?? 0,
@@ -119,6 +124,12 @@ export async function GET(request: Request) {
       { status: 500, headers: CORS_HEADERS },
     )
   }
+}
+
+function getReportIdFromSummary(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const reportId = (value as { reportId?: unknown }).reportId
+  return typeof reportId === 'string' ? reportId : null
 }
 
 function getMonthPeriod(date: Date) {
