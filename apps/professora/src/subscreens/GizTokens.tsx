@@ -29,12 +29,11 @@ export default function GizTokensSubscreen() {
   const wallet = summary?.wallet
   const remaining = wallet?.giztokensRemaining ?? 6000
   const included = wallet?.giztokensIncluded ?? 6000
-  const alertCents = wallet?.includedCostAlertCents ?? 600
-  const limitCents = wallet?.includedCostLimitCents ?? 800
   const overageLimit = wallet?.giztokensOverageLimit ?? 2000
-  const costUsed = wallet?.includedCostUsedCents ?? 0
-  const percent = Math.min(100, Math.max(0, (costUsed / Math.max(1, limitCents)) * 100))
-  const isAlert = costUsed >= alertCents
+  const used = wallet?.giztokensUsed ?? 0
+  const hardLimit = included + overageLimit
+  const percent = Math.min(100, Math.max(0, (used / Math.max(1, hardLimit)) * 100))
+  const isAlert = remaining <= 0
   const isNegative = remaining < 0
 
   return (
@@ -53,7 +52,7 @@ export default function GizTokensSubscreen() {
               <p className="text-[12px] opacity-75 mb-1">Saldo deste mes</p>
               <p className="text-[34px] font-bold leading-none">{formatNumber(remaining)}</p>
               <p className="text-[12px] opacity-80 mt-2">
-                {formatCurrency(costUsed)} usados de {formatCurrency(limitCents)} de limite real.
+                {formatNumber(used)} GizTokens usados neste ciclo.
               </p>
             </div>
             <div className="w-12 h-12 rounded-[15px] bg-white/15 flex items-center justify-center">
@@ -74,7 +73,7 @@ export default function GizTokensSubscreen() {
                 {isNegative ? 'Margem de seguranca em uso' : 'Alerta de uso mensal'}
               </p>
               <p className="text-[12px] text-[#6B5300] leading-[1.5] mt-1">
-                Ao passar de {formatCurrency(alertCents)}, o saldo pode ficar negativo ate {formatNumber(-overageLimit)}.
+                Ao usar o saldo principal, a margem pode chegar ate {formatNumber(-overageLimit)} GizTokens.
                 Esse extra sera considerado no proximo ciclo.
               </p>
             </div>
@@ -94,13 +93,14 @@ export default function GizTokensSubscreen() {
             </div>
             <div>
               <p className="text-[13px] font-bold text-ink">Como funciona</p>
-              <p className="text-[11px] text-muted">GizToken acompanha custo real de IA.</p>
+              <p className="text-[11px] text-muted">GizToken acompanha o uso de IA no app.</p>
             </div>
           </div>
           <div className="space-y-2 text-[12px] text-muted leading-[1.6]">
-            <p>1 centavo de custo real equivale a 10 GizTokens.</p>
-            <p>{formatNumber(included)} GizTokens representam {formatCurrency(alertCents)} de uso mensal incluso.</p>
-            <p>Existe uma margem tecnica de {formatCurrency(limitCents - alertCents)} para evitar bloqueios bruscos.</p>
+            <p>GizTokens sao creditos internos para usar recursos de IA, como relatorios, planejamentos e portfolios.</p>
+            <p>O saldo principal do ciclo e de {formatNumber(included)} GizTokens.</p>
+            <p>Algumas atividades podem entrar como cota inclusa e aparecer com 0 GizToken descontado.</p>
+            <p>Existe uma margem tecnica de {formatNumber(overageLimit)} GizTokens para evitar bloqueios bruscos.</p>
           </div>
         </section>
 
@@ -146,8 +146,8 @@ export default function GizTokensSubscreen() {
                     <p className="text-[11px] text-muted mt-1">{formatDateTime(item.createdAt)} - {formatChargeSource(item.chargeSource)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[13px] font-bold text-ink">{formatCurrency(item.actualCostCents || item.estimatedCostCents)}</p>
-                    <p className="text-[11px] text-muted">{formatNumber(item.giztokensCharged)} Giz</p>
+                    <p className="text-[13px] font-bold text-ink">{formatNumber(item.giztokensCharged)} Giz</p>
+                    <p className="text-[11px] text-muted">{item.chargeSource === 'semester_entitlement' ? 'cota inclusa' : formatStatus(item.status)}</p>
                   </div>
                 </div>
               </div>
@@ -168,10 +168,6 @@ export default function GizTokensSubscreen() {
 
 function formatNumber(value: number) {
   return String(Math.round(value))
-}
-
-function formatCurrency(cents: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100)
 }
 
 function formatDateTime(value: string) {
@@ -204,4 +200,12 @@ function formatChargeSource(value: string) {
   if (value === 'giztokens') return 'GizTokens'
   if (value === 'paid_extra') return 'pacote extra'
   return 'IA'
+}
+
+function formatStatus(value: string) {
+  if (value === 'completed') return 'concluido'
+  if (value === 'estimated') return 'reservado'
+  if (value === 'failed') return 'falhou'
+  if (value === 'refunded') return 'estornado'
+  return value
 }

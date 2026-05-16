@@ -62,10 +62,14 @@ export async function GET(request: Request) {
 
     if (recentLogsError) throw recentLogsError
 
-    const giztokensIncluded = wallet?.giztokens_included ?? MONTHLY_GIZTOKENS_DEFAULT
-    const giztokensUsed = wallet?.giztokens_used ?? 0
-    const costLimit = wallet?.included_cost_limit_cents ?? INCLUDED_COST_LIMIT_CENTS
-    const costUsed = wallet?.included_cost_used_cents ?? 0
+    const legacyIncluded = wallet?.giztokens_included ?? MONTHLY_GIZTOKENS_DEFAULT
+    const legacyUsed = wallet?.giztokens_used ?? 0
+    const legacyCostUsed = wallet?.included_cost_used_cents ?? 0
+    const normalizedUsage = normalizeMonthlyUsage(recentLogs ?? [], start, end, legacyUsed, legacyCostUsed)
+    const giztokensIncluded = Math.max(legacyIncluded, MONTHLY_GIZTOKENS_DEFAULT)
+    const giztokensUsed = normalizedUsage.giztokensUsed
+    const costLimit = INCLUDED_COST_LIMIT_CENTS
+    const costUsed = normalizedUsage.costUsedCents
 
     return NextResponse.json(
       {
@@ -128,4 +132,48 @@ function formatDate(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function normalizeMonthlyUsage(
+  logs: Array<{
+    status: string
+    charge_source: string
+    giztokens_charged: number | null
+    estimated_cost_cents: number | null
+    actual_cost_cents: number | null
+    created_at: string
+  }>,
+  periodStart: string,
+  periodEnd: string,
+  fallbackGiztokensUsed: number,
+  fallbackCostUsed: number,
+) {
+  const startTime = new Date(`${periodStart}T00:00:00.000Z`).getTime()
+  const endTime = new Date(`${periodEnd}T23:59:59.999Z`).getTime()
+  const monthlyLogs = logs.filter((item) => {
+    const createdAt = new Date(item.created_at).getTime()
+    return Number.isFinite(createdAt)
+      && createdAt >= startTime
+      && createdAt <= endTime
+      && (item.status === 'estimated' || item.status === 'completed')
+  })
+
+  if (!monthlyLogs.length) {
+    return {
+      giztokensUsed: fallbackGiztokensUsed,
+      costUsedCents: fallbackCostUsed,
+    }
+  }
+
+  return monthlyLogs.reduce(
+    (acc, item) => {
+      const costCents = Math.max(0, item.actual_cost_cents || item.estimated_cost_cents || 0)
+      acc.costUsedCents += costCents
+      if (item.charge_source === 'giztokens') {
+        acc.giztokensUsed += Math.max(0, item.giztokens_charged || costCents * GIZTOKENS_PER_COST_CENT)
+      }
+      return acc
+    },
+    { giztokensUsed: 0, costUsedCents: 0 },
+  )
 }
