@@ -227,7 +227,7 @@ function isFromCurrentMonth(doc: GeneratedDocument) {
 }
 
 function getTitle(filters: GeneratedDocumentsData) {
-  if (filters.reportType === 'portfolio_image') return 'Portfolios'
+  if (filters.reportType === 'portfolio_image' || filters.reportType === 'portfolio_text') return 'Portfolios'
   if (filters.reportType === 'development_report') return 'Relatorios'
   if (filters.reportType === 'planning') return 'Planejamentos'
   return 'Gerados'

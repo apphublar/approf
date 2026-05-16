@@ -83,6 +83,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
   const firstName = selectedStudent?.name.split(' ')[0] ?? 'A crianca'
   const isPortfolio = reportKind === 'Portfolio pedagogico'
+  const currentReportType = getReportGenerationType(reportKind, portfolioOutput)
   const canGenerate = mode === 'blank'
     ? blankContext.trim().length >= 20
     : Boolean(selectedStudent)
@@ -356,6 +357,29 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
+            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
+                Historico
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => openSubscreen('generated-documents', { reportType: currentReportType })}
+                  className="rounded-app-sm border border-gp bg-gbg px-3 py-3 text-left text-gd"
+                >
+                  <span className="block text-[13px] font-bold">Este modelo</span>
+                  <span className="block text-[11px] mt-1">Mes e historico geral</span>
+                </button>
+                <button
+                  onClick={() => openSubscreen('generated-documents', { reportType: currentReportType, studentId: selectedStudent?.id })}
+                  disabled={!selectedStudent?.id}
+                  className="rounded-app-sm border border-border bg-cream px-3 py-3 text-left text-muted disabled:opacity-50"
+                >
+                  <span className="block text-[13px] font-bold">Desta crianca</span>
+                  <span className="block text-[11px] mt-1">Tudo vinculado a ela</span>
+                </button>
+              </div>
+            </div>
+
             {mode === 'annotations' ? (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
@@ -535,7 +559,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
 
             <button
-              onClick={() => openSubscreen('generated-documents', { focusReportId: reportId })}
+              onClick={() => openSubscreen('generated-documents', { reportType: currentReportType, studentId: selectedStudent?.id, focusReportId: reportId })}
               className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2"
             >
               Historico de gerados
@@ -562,12 +586,12 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               Arquivar
             </button>
 
-            {reportKind === 'Relatorio de desenvolvimento' && selectedStudent?.id && (
+            {selectedStudent?.id && (
               <button
-                onClick={() => openSubscreen('generated-documents', { reportType: 'development_report', studentId: selectedStudent.id })}
+                onClick={() => openSubscreen('generated-documents', { studentId: selectedStudent.id })}
                 className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2"
               >
-                Ver versoes desta crianca
+                Ver historico desta crianca
               </button>
             )}
 

@@ -3,6 +3,10 @@ import { createSupabaseServiceClient } from './supabase-server'
 export type ReportStatus = 'draft' | 'generating' | 'ready' | 'failed' | 'archived'
 
 const REPORT_STATUSES = new Set<ReportStatus>(['draft', 'generating', 'ready', 'failed', 'archived'])
+const REPORT_SELECT_WITH_ARTIFACTS =
+  'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at'
+const REPORT_SELECT_BASE =
+  'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, is_final_version, created_at, updated_at'
 
 export interface ReportListFilters {
   status?: ReportStatus
@@ -14,21 +18,22 @@ export interface ReportListFilters {
 
 export async function listOwnerReports(ownerId: string, filters: ReportListFilters) {
   const supabase = createSupabaseServiceClient()
-  let query = supabase
-    .from('reports')
-    .select(
-      'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at',
+  const { data, error } = await applyListFilters(
+    supabase.from('reports').select(REPORT_SELECT_WITH_ARTIFACTS),
+    ownerId,
+    filters,
+  )
+
+  if (error && isMissingAiArtifactsColumn(error)) {
+    const fallback = await applyListFilters(
+      supabase.from('reports').select(REPORT_SELECT_BASE),
+      ownerId,
+      filters,
     )
-    .eq('owner_id', ownerId)
-    .order('created_at', { ascending: false })
+    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel listar documentos.')
+    return (fallback.data ?? []).map(withEmptyArtifacts)
+  }
 
-  if (filters.status) query = query.eq('status', filters.status)
-  if (filters.reportType) query = query.eq('report_type', filters.reportType)
-  if (filters.studentId) query = query.eq('student_id', filters.studentId)
-  if (filters.classId) query = query.eq('class_id', filters.classId)
-  if (filters.limit && Number.isFinite(filters.limit)) query = query.limit(Math.max(1, Math.min(filters.limit, 200)))
-
-  const { data, error } = await query
   if (error) throw toError(error, 'Nao foi possivel listar documentos.')
   return data ?? []
 }
@@ -37,10 +42,21 @@ export async function getOwnerReportById(ownerId: string, reportId: string) {
   const supabase = createSupabaseServiceClient()
   const { data, error } = await supabase
     .from('reports')
-    .select('id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at')
+    .select(REPORT_SELECT_WITH_ARTIFACTS)
     .eq('id', reportId)
     .eq('owner_id', ownerId)
     .maybeSingle()
+
+  if (error && isMissingAiArtifactsColumn(error)) {
+    const fallback = await supabase
+      .from('reports')
+      .select(REPORT_SELECT_BASE)
+      .eq('id', reportId)
+      .eq('owner_id', ownerId)
+      .maybeSingle()
+    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel carregar o documento.')
+    return fallback.data ? withEmptyArtifacts(fallback.data) : null
+  }
 
   if (error) throw toError(error, 'Nao foi possivel carregar o documento.')
   return data
@@ -73,8 +89,19 @@ export async function updateOwnerReport(input: {
     .update(patch)
     .eq('id', input.reportId)
     .eq('owner_id', input.ownerId)
-    .select('id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at')
+    .select(REPORT_SELECT_WITH_ARTIFACTS)
     .single()
+
+  if (error && isMissingAiArtifactsColumn(error)) {
+    const fallback = await supabase
+      .from('reports')
+      .select(REPORT_SELECT_BASE)
+      .eq('id', input.reportId)
+      .eq('owner_id', input.ownerId)
+      .single()
+    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel salvar documento.')
+    return withEmptyArtifacts(fallback.data)
+  }
 
   if (error) throw toError(error, 'Nao foi possivel salvar documento.')
 
@@ -83,6 +110,35 @@ export async function updateOwnerReport(input: {
   }
 
   return data
+}
+
+function applyListFilters(
+  query: any,
+  ownerId: string,
+  filters: ReportListFilters,
+) {
+  let scopedQuery = query
+    .eq('owner_id', ownerId)
+    .order('created_at', { ascending: false })
+
+  if (filters.status) scopedQuery = scopedQuery.eq('status', filters.status)
+  if (filters.reportType) scopedQuery = scopedQuery.eq('report_type', filters.reportType)
+  if (filters.studentId) scopedQuery = scopedQuery.eq('student_id', filters.studentId)
+  if (filters.classId) scopedQuery = scopedQuery.eq('class_id', filters.classId)
+  if (filters.limit && Number.isFinite(filters.limit)) scopedQuery = scopedQuery.limit(Math.max(1, Math.min(filters.limit, 200)))
+
+  return scopedQuery
+}
+
+function withEmptyArtifacts<T extends Record<string, unknown>>(report: T) {
+  return { ...report, ai_artifacts: null }
+}
+
+function isMissingAiArtifactsColumn(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const record = error as { message?: string; details?: string; hint?: string; code?: string }
+  const text = `${record.message ?? ''} ${record.details ?? ''} ${record.hint ?? ''}`
+  return text.includes('ai_artifacts')
 }
 
 export async function setOwnerReportFinalVersion(ownerId: string, reportId: string, isFinalVersion: boolean) {

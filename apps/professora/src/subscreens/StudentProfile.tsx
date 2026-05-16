@@ -142,6 +142,26 @@ export default function StudentProfileSubscreen() {
           Gerar relatorio com IA
         </button>
 
+        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
+          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Gerados da crianca</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => openSubscreen('generated-documents', { studentId: student.id })}
+              className="rounded-app-sm border border-gp bg-gbg px-3 py-3 text-left text-gd"
+            >
+              <span className="block text-[13px] font-bold">Tudo</span>
+              <span className="block text-[11px] mt-1">Mes e historico geral</span>
+            </button>
+            <button
+              onClick={() => openSubscreen('generated-documents', { reportType: 'development_report', studentId: student.id })}
+              className="rounded-app-sm border border-border bg-cream px-3 py-3 text-left text-muted"
+            >
+              <span className="block text-[13px] font-bold">Relatorios</span>
+              <span className="block text-[11px] mt-1">Versoes vinculadas</span>
+            </button>
+          </div>
+        </div>
+
         <button
           onClick={() => openSubscreen('transfer-student')}
           className="w-full py-[13px] rounded-app-sm bg-white text-gm font-bold text-[14px] border border-gp flex items-center justify-center gap-2 mb-5 cursor-pointer"
