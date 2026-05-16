@@ -41,6 +41,8 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
   const system = [
     `Voce executa a ETAPA 1 (rascunho pedagogico) do pipeline textual do Approf (${pv}).`,
     'Produza um RASCUNHO em portugues brasileiro para Educacao Infantil (0 a 5 anos), alinhado a BNCC, direitos de aprendizagem e campos de experiencia.',
+    'Use estrutura formal de documento pedagogico: titulo, identificacao quando houver, secoes com subtitulos, paragrafos coesos e encerramento/encaminhamentos.',
+    'Siga padrao ABNT adaptado para uso escolar: linguagem formal, objetiva, sem emojis, sem listas excessivas, sem informalidade, com organizacao clara e hierarquia textual.',
     'Organize o contexto recebido em secoes logicas com titulos claros.',
     'Use linguagem descritiva e acolhedora; evite linguagem julgadora ou rotulos para a crianca.',
     'Nunca compare criancas entre si.',
@@ -65,6 +67,7 @@ export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromSt
     `Voce executa a ETAPA 2 (revisao BNCC e seguranca pedagogica) do pipeline textual do Approf (${pv}).`,
     'Voce recebe um RASCUNHO da etapa anterior. Revise e reescreva o texto completo.',
     'Garanta coerencia com BNCC da Educacao Infantil (0 a 5 anos), campos de experiencia e linguagem nao clinica.',
+    'Verifique se o texto esta em formato formal adequado para documento escolar, com organizacao inspirada na ABNT (titulo, secoes, paragrafos, objetividade e coesao).',
     'Remova ou neutralize qualquer comparacao entre criancas, diagnostico ou conclusao clinica, e linguagem julgadora.',
     'Mantenha apenas observacoes pedagogicas e descritivas.',
     'Preserve fatos e intencoes do rascunho; nao invente novos fatos.',
@@ -97,6 +100,7 @@ export function buildStage3FinalRefinementPrompt(input: BuildPromptInput, textFr
     'Voce recebe um texto ja revisado pedagogicamente. Melhore fluidez, clareza e tom humano e acolhedor.',
     'Personalize levemente quando fizer sentido (sem inventar dados) para leitura pela professora e familias.',
     'Mantenha todas as regras: Educacao Infantil 0-5 anos, BNCC, sem diagnostico clinico, sem comparacao entre criancas, sem linguagem julgadora.',
+    'Entregue em formato de documento final: titulo claro, secoes bem nomeadas, paragrafos formais e texto pronto para exportar em PDF/Word.',
     'A professora podera editar depois: o texto deve estar pronto para uso, mas sem tom robotizado.',
     'Responda APENAS com o texto final (sem prefacio, sem comentarios meta).',
   ].join('\n')
@@ -155,7 +159,9 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     attachments || '- Nenhum anexo enviado.',
     '',
     'INSTRUCOES DE FORMATO DO RASCUNHO:',
+    '- Estruture em formato formal, inspirado na ABNT para documento escolar: titulo, identificacao/contexto, desenvolvimento, encaminhamentos e fechamento quando couber.',
     '- Estruture em secoes com titulos claros.',
+    '- Use paragrafos objetivos, coesos e linguagem formal, evitando emojis, slogans e excesso de topicos.',
     '- Inclua sintese do percurso, pontos de apoio e encaminhamentos pedagogicos quando couber.',
     '- Termine com orientacoes de continuidade entre escola e familia quando fizer sentido.',
   ].join('\n')

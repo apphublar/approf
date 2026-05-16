@@ -35,6 +35,15 @@ export async function updateReport(reportId: string, input: UpdateReportInput) {
   return response.report as GeneratedDocument
 }
 
+export async function createReportShareLink(reportId: string) {
+  const response = await callReportsApi<{ shareUrl: string }>(`/api/reports/${reportId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'create-share-link' }),
+  })
+  return response.shareUrl
+}
+
 function buildQuery(filters: ListReportsFilters) {
   const params = new URLSearchParams()
   if (filters.status) params.set('status', filters.status)

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { AiAuthError, getAuthenticatedUserId } from '@/app/lib/supabase-server'
-import { getOwnerReportById, parseReportStatus, updateOwnerReport } from '@/app/lib/reports'
+import { createReportShareToken, getOwnerReportById, parseReportStatus, updateOwnerReport } from '@/app/lib/reports'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, PATCH, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
 
@@ -72,6 +72,40 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     console.error('[reports/update] erro interno', error)
     return NextResponse.json(
       { error: 'Nao foi possivel salvar o documento agora.' },
+      { status: 500, headers: CORS_HEADERS },
+    )
+  }
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
+    const { id } = await params
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
+    const action = typeof body.action === 'string' ? body.action : ''
+
+    if (action !== 'create-share-link') {
+      return NextResponse.json({ error: 'Acao invalida.' }, { status: 400, headers: CORS_HEADERS })
+    }
+
+    const report = await getOwnerReportById(ownerId, id)
+    if (!report) {
+      return NextResponse.json({ error: 'Documento nao encontrado.' }, { status: 404, headers: CORS_HEADERS })
+    }
+
+    const token = createReportShareToken(id)
+    const origin = process.env.NEXT_PUBLIC_ADMIN_URL?.replace(/\/$/, '') || new URL(request.url).origin
+    const shareUrl = `${origin}/public/reports/${id}?token=${encodeURIComponent(token)}`
+
+    return NextResponse.json({ shareUrl }, { status: 200, headers: CORS_HEADERS })
+  } catch (error) {
+    if (error instanceof AiAuthError) {
+      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+    }
+
+    console.error('[reports/share] erro interno', error)
+    return NextResponse.json(
+      { error: 'Nao foi possivel criar o link de compartilhamento agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }

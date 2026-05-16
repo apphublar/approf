@@ -138,6 +138,30 @@ html, body, #root {
   background: transparent;
 }
 
+.document-editor h2 {
+  color: #1B4332;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 14px 0 8px;
+  text-transform: uppercase;
+}
+
+.document-editor p {
+  margin: 0 0 12px;
+  text-align: left;
+}
+
+.document-editor ul,
+.document-editor ol {
+  margin: 0 0 12px 20px;
+  padding-left: 10px;
+}
+
+.document-editor li {
+  margin-bottom: 6px;
+}
+
 /* Toast */
 @keyframes toastIn {
   from { opacity: 0; transform: translateX(-50%) translateY(8px); }

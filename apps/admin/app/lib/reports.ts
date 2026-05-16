@@ -1,4 +1,5 @@
 import { createSupabaseServiceClient } from './supabase-server'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 export type ReportStatus = 'draft' | 'generating' | 'ready' | 'failed' | 'archived'
 
@@ -60,6 +61,36 @@ export async function getOwnerReportById(ownerId: string, reportId: string) {
 
   if (error) throw toError(error, 'Nao foi possivel carregar o documento.')
   return data
+}
+
+export async function getPublicReportByShareToken(reportId: string, token: string) {
+  if (!isValidShareToken(reportId, token)) return null
+
+  const supabase = createSupabaseServiceClient()
+  const { data, error } = await supabase
+    .from('reports')
+    .select(REPORT_SELECT_WITH_ARTIFACTS)
+    .eq('id', reportId)
+    .neq('status', 'archived')
+    .maybeSingle()
+
+  if (error && isMissingAiArtifactsColumn(error)) {
+    const fallback = await supabase
+      .from('reports')
+      .select(REPORT_SELECT_BASE)
+      .eq('id', reportId)
+      .neq('status', 'archived')
+      .maybeSingle()
+    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel carregar o documento publico.')
+    return fallback.data ? withEmptyArtifacts(fallback.data) : null
+  }
+
+  if (error) throw toError(error, 'Nao foi possivel carregar o documento publico.')
+  return data
+}
+
+export function createReportShareToken(reportId: string) {
+  return signReportId(reportId)
 }
 
 export async function updateOwnerReport(input: {
@@ -160,6 +191,26 @@ export function parseReportStatus(value: unknown): ReportStatus | undefined {
     return value as ReportStatus
   }
   return undefined
+}
+
+function signReportId(reportId: string) {
+  return createHmac('sha256', getShareSecret()).update(reportId).digest('base64url')
+}
+
+function isValidShareToken(reportId: string, token: string) {
+  if (!reportId || !token) return false
+  const expected = signReportId(reportId)
+  const expectedBuffer = Buffer.from(expected)
+  const tokenBuffer = Buffer.from(token)
+  if (expectedBuffer.length !== tokenBuffer.length) return false
+  return timingSafeEqual(expectedBuffer, tokenBuffer)
+}
+
+function getShareSecret() {
+  const secret = process.env.REPORT_SHARE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (secret?.trim()) return secret.trim()
+  // Local development fallback only. Production must define REPORT_SHARE_SECRET or SUPABASE_SERVICE_ROLE_KEY.
+  return 'approf-local-report-share-secret'
 }
 
 function toError(error: unknown, fallback: string) {
