@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
-import { ChevronLeft, Check, Paperclip } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, Check, Mic, Paperclip, Square } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { getAppDataMode } from '@/services/app-data'
+import { formatAiUsageMessage, transcribeAnnotationAudio } from '@/services/ai-usage'
 import { createSupabaseAnnotation } from '@/services/supabase/annotations'
 import { isSupabaseConfigured } from '@/services/supabase/config'
 import type { AnnotationCategory, AnnotationPersistence } from '@/types'
@@ -62,10 +63,15 @@ const TAGS = [
   'Evolucao positiva',
 ]
 
+const MAX_AUDIO_SECONDS = 30
+
 export default function NewAnnotationSubscreen() {
   const { closeSubscreen } = useNavStore()
   const { addAnnotation, classes, activeClassId, activeStudentId } = useAppStore()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
 
   const activeClass = classes.find((item) => item.id === activeClassId) ?? classes[0]
   const activeStudent = activeClass?.students.find((item) => item.id === activeStudentId)
@@ -79,6 +85,11 @@ export default function NewAnnotationSubscreen() {
   const [tags, setTags] = useState<string[]>([])
   const [attachmentName, setAttachmentName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [transcribing, setTranscribing] = useState(false)
+  const [usageMessage, setUsageMessage] = useState('')
   const [error, setError] = useState('')
 
   const modelOptions = getModelOptions(workKind)
@@ -94,6 +105,25 @@ export default function NewAnnotationSubscreen() {
     Boolean(workKind && selectedModel) &&
     (!needsClass || Boolean(classId)) &&
     (!needsStudent || Boolean(studentId))
+
+  useEffect(() => {
+    if (!recording) return
+
+    const startedAt = Date.now()
+    const interval = window.setInterval(() => {
+      const elapsed = Math.min(MAX_AUDIO_SECONDS, Math.floor((Date.now() - startedAt) / 1000))
+      setRecordingSeconds(elapsed)
+      if (elapsed >= MAX_AUDIO_SECONDS) {
+        stopRecording()
+      }
+    }, 250)
+
+    return () => window.clearInterval(interval)
+  }, [recording])
+
+  useEffect(() => () => {
+    stopMediaStream()
+  }, [])
 
   function chooseWorkKind(value: WorkKind) {
     setWorkKind(value)
@@ -137,6 +167,97 @@ export default function NewAnnotationSubscreen() {
     const file = files?.[0]
     if (!file) return
     setAttachmentName(file.name)
+  }
+
+  async function startRecording() {
+    setError('')
+    setUsageMessage('')
+    setAudioBlob(null)
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setError('Este navegador nao permite gravar audio aqui.')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      mediaStreamRef.current = stream
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data)
+      }
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        setAudioBlob(blob)
+        stopMediaStream()
+      }
+
+      setRecordingSeconds(0)
+      setRecording(true)
+      recorder.start()
+    } catch {
+      setError('Nao foi possivel acessar o microfone. Verifique a permissao do navegador.')
+      stopMediaStream()
+    }
+  }
+
+  function stopRecording() {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop()
+    }
+    setRecording(false)
+  }
+
+  function stopMediaStream() {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+    mediaRecorderRef.current = null
+  }
+
+  async function transcribeAudio() {
+    if (!audioBlob) {
+      setError('Grave um audio antes de transcrever.')
+      return
+    }
+
+    setTranscribing(true)
+    setError('')
+    setUsageMessage('')
+
+    try {
+      const result = await transcribeAnnotationAudio({
+        audio: audioBlob,
+        durationSeconds: Math.max(1, recordingSeconds),
+        classId: classId || null,
+        studentId: studentId || null,
+        requestSummary: {
+          source: 'new_annotation',
+          workKind,
+          modelId,
+          durationSeconds: Math.max(1, recordingSeconds),
+        },
+      })
+
+      if (!result.allowed) {
+        setError(result.message || 'Nao foi possivel usar IA para transcrever agora.')
+        return
+      }
+
+      const transcript = result.transcript?.trim()
+      if (transcript) {
+        setText((current) => current.trim() ? `${current.trim()}\n\n${transcript}` : transcript)
+        setTags((current) => current.includes('Transcricao de audio') ? current : ['Transcricao de audio', ...current])
+      }
+      setUsageMessage(formatAiUsageMessage(result))
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Nao foi possivel transcrever o audio.')
+    } finally {
+      setTranscribing(false)
+    }
   }
 
   async function save() {
@@ -220,6 +341,55 @@ export default function NewAnnotationSubscreen() {
             onChange={(event) => setText(event.target.value)}
           />
           <p className="text-[10px] text-muted text-right">{text.length}</p>
+
+          <div className="mt-3 rounded-app-sm border border-border bg-cream p-3">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div>
+                <p className="text-[12px] font-bold text-ink">Audio para transcricao</p>
+                <p className="text-[11px] text-muted">Grave ate 30 segundos. A transcricao consome GizTokens.</p>
+              </div>
+              <span className="text-[12px] font-bold text-gd">{recordingSeconds}s</span>
+            </div>
+
+            <div className="h-3 rounded-full bg-white border border-border overflow-hidden mb-3">
+              <div
+                className="h-full rounded-full transition-all duration-200"
+                style={{
+                  width: `${Math.min(100, (recordingSeconds / MAX_AUDIO_SECONDS) * 100)}%`,
+                  background: getRecordingBarColor(recordingSeconds),
+                }}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={recording ? stopRecording : startRecording}
+                disabled={transcribing}
+                className={`rounded-app-sm py-3 text-[12px] font-bold flex items-center justify-center gap-2 ${
+                  recording ? 'bg-[#C1440E] text-white' : 'bg-gm text-white'
+                } disabled:opacity-50`}
+              >
+                {recording ? <Square size={14} /> : <Mic size={14} />}
+                {recording ? 'Parar' : 'Gravar audio'}
+              </button>
+              <button
+                type="button"
+                onClick={transcribeAudio}
+                disabled={!audioBlob || recording || transcribing}
+                className="rounded-app-sm py-3 border border-gp bg-white text-gm text-[12px] font-bold disabled:opacity-50"
+              >
+                {transcribing ? 'Transcrevendo...' : 'Transcrever'}
+              </button>
+            </div>
+
+            {audioBlob && !recording && (
+              <p className="text-[11px] text-muted mt-2">Audio pronto para transcricao ({recordingSeconds}s).</p>
+            )}
+            {usageMessage && (
+              <p className="text-[11px] text-gd mt-2 leading-[1.4]">{usageMessage}</p>
+            )}
+          </div>
         </section>
 
         <StepTitle number="1" title="O que esta anotacao vai ajudar a fazer?" />
@@ -327,6 +497,29 @@ export default function NewAnnotationSubscreen() {
       </div>
     </div>
   )
+}
+
+function getRecordingBarColor(seconds: number) {
+  if (seconds <= 10) return '#4F8341'
+  if (seconds <= 20) return interpolateColor('#4F8341', '#E0A800', (seconds - 10) / 10)
+  return interpolateColor('#E0A800', '#C1440E', (seconds - 20) / 10)
+}
+
+function interpolateColor(from: string, to: string, ratio: number) {
+  const start = hexToRgb(from)
+  const end = hexToRgb(to)
+  const clamped = Math.max(0, Math.min(1, ratio))
+  const rgb = start.map((channel, index) => Math.round(channel + (end[index] - channel) * clamped))
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
+}
+
+function hexToRgb(hex: string) {
+  const clean = hex.replace('#', '')
+  return [
+    parseInt(clean.slice(0, 2), 16),
+    parseInt(clean.slice(2, 4), 16),
+    parseInt(clean.slice(4, 6), 16),
+  ]
 }
 
 function getModelOptions(workKind: WorkKind) {

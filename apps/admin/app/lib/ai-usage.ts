@@ -6,6 +6,7 @@ export type AiGenerationType =
   | 'planning'
   | 'portfolio_text'
   | 'portfolio_image'
+  | 'audio_transcription'
   | 'specialist_report'
   | 'other'
 
@@ -116,6 +117,15 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     inputTokens: 1200,
     outputTokens: 0,
     imageCount: 1,
+  },
+  audio_transcription: {
+    provider: 'openai',
+    model: 'gpt-4o-mini-transcribe',
+    giztokens: toGizTokens(2),
+    estimatedCostCents: 2,
+    inputTokens: 0,
+    outputTokens: 0,
+    imageCount: 0,
   },
   specialist_report: {
     provider: 'anthropic',

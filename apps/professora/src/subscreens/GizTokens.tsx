@@ -191,6 +191,7 @@ function formatGenerationType(value: string) {
     planning: 'Planejamento',
     portfolio_text: 'Portfolio em texto',
     portfolio_image: 'Imagem de portfolio',
+    audio_transcription: 'Transcricao de audio',
     specialist_report: 'Encaminhamento',
     other: 'Documento',
   }

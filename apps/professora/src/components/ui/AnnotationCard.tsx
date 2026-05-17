@@ -19,6 +19,7 @@ export default function AnnotationCard({
 }) {
   const badgeStyle = BADGE_STYLES[annotation.category] ?? BADGE_STYLES['evolucao']
   const scopeLabel = annotation.scope === 'personal' ? 'Pessoal' : null
+  const transcribed = annotation.tags?.includes('Transcricao de audio')
   return (
     <div
       onClick={onClick}
@@ -36,6 +37,11 @@ export default function AnnotationCard({
         )}
       </div>
       <p className="text-[13px] text-soft leading-[1.5]">{annotation.text}</p>
+      {transcribed && (
+        <span className="inline-block text-[10px] font-bold px-2 py-[3px] rounded-full bg-gbg text-gm mt-2">
+          Transcricao de audio
+        </span>
+      )}
       <p className="text-[11px] text-muted mt-[5px]">{annotation.date}</p>
     </div>
   )

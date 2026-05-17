@@ -14,6 +14,7 @@ const GENERATION_TYPES = new Set<AiGenerationType>([
   'planning',
   'portfolio_text',
   'portfolio_image',
+  'audio_transcription',
   'specialist_report',
   'other',
 ])

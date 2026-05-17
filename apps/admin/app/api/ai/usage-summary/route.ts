@@ -64,7 +64,9 @@ export async function GET(request: Request) {
     if (monthlyTypesError) throw monthlyTypesError
 
     const generatedImagesThisMonth = (monthlyTypeRows ?? []).filter((item) => item.generation_type === 'portfolio_image').length
-    const generatedDocumentsThisMonth = Math.max(0, (monthlyTypeRows ?? []).length - generatedImagesThisMonth)
+    const generatedDocumentsThisMonth = (monthlyTypeRows ?? []).filter((item) =>
+      item.generation_type !== 'portfolio_image' && item.generation_type !== 'audio_transcription'
+    ).length
 
     const { data: recentLogs, error: recentLogsError } = await supabase
       .from('ai_generation_logs')

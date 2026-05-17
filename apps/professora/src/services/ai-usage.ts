@@ -6,6 +6,7 @@ export type AiGenerationType =
   | 'planning'
   | 'portfolio_text'
   | 'portfolio_image'
+  | 'audio_transcription'
   | 'specialist_report'
   | 'other'
 
@@ -53,6 +54,14 @@ export interface AiImageGenerationResult extends AiUsageReservationResult {
   imageDataUrl?: string
   prompt?: string
   reportId?: string
+  promptVersion?: string
+  provider?: string
+  model?: string
+}
+
+export interface AiAudioTranscriptionResult extends AiUsageReservationResult {
+  transcript?: string
+  durationSeconds?: number
   promptVersion?: string
   provider?: string
   model?: string
@@ -298,6 +307,73 @@ export async function generateAiPortfolioImage(input: AiImageGenerationInput): P
     imageDataUrl: typeof result.imageDataUrl === 'string' ? result.imageDataUrl : undefined,
     prompt: typeof result.prompt === 'string' ? result.prompt : undefined,
     reportId: typeof result.reportId === 'string' ? result.reportId : undefined,
+    promptVersion: typeof result.promptVersion === 'string' ? result.promptVersion : undefined,
+    provider: typeof result.provider === 'string' ? result.provider : undefined,
+    model: typeof result.model === 'string' ? result.model : undefined,
+  }
+}
+
+export async function transcribeAnnotationAudio(input: {
+  audio: Blob
+  durationSeconds: number
+  classId?: string | null
+  studentId?: string | null
+  requestSummary?: Record<string, unknown>
+}): Promise<AiAudioTranscriptionResult> {
+  const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
+  if (!apiBaseUrl) {
+    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase nao configurado para registrar uso de IA.')
+  }
+
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+
+  const token = data.session?.access_token
+  if (!token) {
+    throw new Error('Sessao expirada. Entre novamente para transcrever o audio.')
+  }
+
+  const form = new FormData()
+  form.append('audio', input.audio, 'anotacao.webm')
+  form.append('durationSeconds', String(input.durationSeconds))
+  if (input.classId) form.append('classId', input.classId)
+  if (input.studentId) form.append('studentId', input.studentId)
+  form.append('requestSummary', JSON.stringify(input.requestSummary ?? {}))
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/transcribe-audio`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  })
+
+  const result = await response.json().catch(() => null) as Partial<AiAudioTranscriptionResult> | { error?: string } | null
+
+  if (!response.ok && response.status !== 402) {
+    const message = result && 'error' in result && typeof result.error === 'string'
+      ? result.error
+      : 'Nao foi possivel transcrever o audio.'
+    throw new Error(message)
+  }
+
+  if (!result || !('allowed' in result)) {
+    throw new Error('Resposta invalida do backend de IA.')
+  }
+
+  return {
+    allowed: Boolean(result.allowed),
+    message: typeof result.message === 'string' ? result.message : '',
+    chargeSource: result.chargeSource,
+    wallet: result.wallet,
+    entitlement: result.entitlement,
+    transcript: typeof result.transcript === 'string' ? result.transcript : undefined,
+    durationSeconds: typeof result.durationSeconds === 'number' ? result.durationSeconds : undefined,
     promptVersion: typeof result.promptVersion === 'string' ? result.promptVersion : undefined,
     provider: typeof result.provider === 'string' ? result.provider : undefined,
     model: typeof result.model === 'string' ? result.model : undefined,
