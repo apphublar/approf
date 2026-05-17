@@ -72,6 +72,7 @@ export default function NewAnnotationSubscreen() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const recordingStartedAtRef = useRef(0)
 
   const activeClass = classes.find((item) => item.id === activeClassId) ?? classes[0]
   const activeStudent = activeClass?.students.find((item) => item.id === activeStudentId)
@@ -87,9 +88,11 @@ export default function NewAnnotationSubscreen() {
   const [saving, setSaving] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [recordedSeconds, setRecordedSeconds] = useState(0)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [transcribing, setTranscribing] = useState(false)
   const [usageMessage, setUsageMessage] = useState('')
+  const [audioMessage, setAudioMessage] = useState('')
   const [error, setError] = useState('')
 
   const modelOptions = getModelOptions(workKind)
@@ -109,9 +112,8 @@ export default function NewAnnotationSubscreen() {
   useEffect(() => {
     if (!recording) return
 
-    const startedAt = Date.now()
     const interval = window.setInterval(() => {
-      const elapsed = Math.min(MAX_AUDIO_SECONDS, Math.floor((Date.now() - startedAt) / 1000))
+      const elapsed = Math.min(MAX_AUDIO_SECONDS, Math.floor((Date.now() - recordingStartedAtRef.current) / 1000))
       setRecordingSeconds(elapsed)
       if (elapsed >= MAX_AUDIO_SECONDS) {
         stopRecording()
@@ -172,26 +174,38 @@ export default function NewAnnotationSubscreen() {
   async function startRecording() {
     setError('')
     setUsageMessage('')
+    setAudioMessage('')
     setAudioBlob(null)
+    setRecordedSeconds(0)
 
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setError('Este navegador nao permite gravar audio aqui.')
+      setAudioMessage('Este navegador nao permite gravar audio aqui.')
       return
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
+      const recorder = new MediaRecorder(stream, getSupportedAudioRecorderOptions())
       audioChunksRef.current = []
       mediaStreamRef.current = stream
       mediaRecorderRef.current = recorder
+      recordingStartedAtRef.current = Date.now()
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data)
       }
       recorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        const finalSeconds = Math.min(MAX_AUDIO_SECONDS, Math.max(1, Math.ceil((Date.now() - recordingStartedAtRef.current) / 1000)))
+        setRecordedSeconds(finalSeconds)
+        setRecordingSeconds(finalSeconds)
+        if (blob.size === 0) {
+          setAudioMessage('Nao foi possivel capturar o audio. Grave novamente.')
+          stopMediaStream()
+          return
+        }
         setAudioBlob(blob)
+        setAudioMessage('Audio pronto. Clique em Transcrever para usar a IA.')
         stopMediaStream()
       }
 
@@ -199,7 +213,7 @@ export default function NewAnnotationSubscreen() {
       setRecording(true)
       recorder.start()
     } catch {
-      setError('Nao foi possivel acessar o microfone. Verifique a permissao do navegador.')
+      setAudioMessage('Nao foi possivel acessar o microfone. Verifique a permissao do navegador.')
       stopMediaStream()
     }
   }
@@ -210,6 +224,7 @@ export default function NewAnnotationSubscreen() {
       recorder.stop()
     }
     setRecording(false)
+    setAudioMessage('Preparando audio...')
   }
 
   function stopMediaStream() {
@@ -220,25 +235,27 @@ export default function NewAnnotationSubscreen() {
 
   async function transcribeAudio() {
     if (!audioBlob) {
-      setError('Grave um audio antes de transcrever.')
+      setAudioMessage('Grave e pare o audio antes de transcrever.')
       return
     }
 
     setTranscribing(true)
     setError('')
     setUsageMessage('')
+    setAudioMessage('Enviando audio para transcricao...')
 
     try {
+      const durationSeconds = recordedSeconds || Math.max(1, recordingSeconds)
       const result = await transcribeAnnotationAudio({
         audio: audioBlob,
-        durationSeconds: Math.max(1, recordingSeconds),
+        durationSeconds,
         classId: classId || null,
         studentId: studentId || null,
         requestSummary: {
           source: 'new_annotation',
           workKind,
           modelId,
-          durationSeconds: Math.max(1, recordingSeconds),
+          durationSeconds,
         },
       })
 
@@ -252,9 +269,10 @@ export default function NewAnnotationSubscreen() {
         setText((current) => current.trim() ? `${current.trim()}\n\n${transcript}` : transcript)
         setTags((current) => current.includes('Transcricao de audio') ? current : ['Transcricao de audio', ...current])
       }
+      setAudioMessage('Transcricao adicionada na anotacao.')
       setUsageMessage(formatAiUsageMessage(result))
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Nao foi possivel transcrever o audio.')
+      setAudioMessage(error instanceof Error ? error.message : 'Nao foi possivel transcrever o audio.')
     } finally {
       setTranscribing(false)
     }
@@ -348,7 +366,7 @@ export default function NewAnnotationSubscreen() {
                 <p className="text-[12px] font-bold text-ink">Audio para transcricao</p>
                 <p className="text-[11px] text-muted">Grave ate 30 segundos. A transcricao consome GizTokens.</p>
               </div>
-              <span className="text-[12px] font-bold text-gd">{recordingSeconds}s</span>
+              <span className="text-[12px] font-bold text-gd">{recording ? recordingSeconds : recordedSeconds || recordingSeconds}s</span>
             </div>
 
             <div className="h-3 rounded-full bg-white border border-border overflow-hidden mb-3">
@@ -376,7 +394,7 @@ export default function NewAnnotationSubscreen() {
               <button
                 type="button"
                 onClick={transcribeAudio}
-                disabled={!audioBlob || recording || transcribing}
+                disabled={recording || transcribing}
                 className="rounded-app-sm py-3 border border-gp bg-white text-gm text-[12px] font-bold disabled:opacity-50"
               >
                 {transcribing ? 'Transcrevendo...' : 'Transcrever'}
@@ -384,7 +402,10 @@ export default function NewAnnotationSubscreen() {
             </div>
 
             {audioBlob && !recording && (
-              <p className="text-[11px] text-muted mt-2">Audio pronto para transcricao ({recordingSeconds}s).</p>
+              <p className="text-[11px] text-muted mt-2">Audio pronto para transcricao ({recordedSeconds || recordingSeconds}s).</p>
+            )}
+            {audioMessage && (
+              <p className="text-[11px] text-muted mt-2 leading-[1.4]">{audioMessage}</p>
             )}
             {usageMessage && (
               <p className="text-[11px] text-gd mt-2 leading-[1.4]">{usageMessage}</p>
@@ -503,6 +524,12 @@ function getRecordingBarColor(seconds: number) {
   if (seconds <= 10) return '#4F8341'
   if (seconds <= 20) return interpolateColor('#4F8341', '#E0A800', (seconds - 10) / 10)
   return interpolateColor('#E0A800', '#C1440E', (seconds - 20) / 10)
+}
+
+function getSupportedAudioRecorderOptions(): MediaRecorderOptions | undefined {
+  const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+  const mimeType = preferredTypes.find((type) => MediaRecorder.isTypeSupported(type))
+  return mimeType ? { mimeType } : undefined
 }
 
 function interpolateColor(from: string, to: string, ratio: number) {
