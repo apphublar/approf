@@ -79,12 +79,6 @@ export default function AnnotationsScreen() {
         )}
       </div>
 
-      <button
-        onClick={() => openSubscreen('new-annotation')}
-        className="absolute bottom-[76px] right-[18px] z-[99] w-[52px] h-[52px] rounded-full bg-gm text-white shadow-fab flex items-center justify-center"
-      >
-        <Plus size={24} strokeWidth={2} />
-      </button>
     </div>
   )
 }

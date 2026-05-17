@@ -50,40 +50,82 @@ const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
 ]
 
 export default function BottomNav() {
-  const { activeTab, setTab } = useNavStore()
+  const { activeTab, setTab, openSubscreen } = useNavStore()
   const { annotations } = useAppStore()
+  const leftTabs = TABS.slice(0, 2)
+  const rightTabs = TABS.slice(2)
 
   return (
     <nav
-      className="absolute bottom-0 left-0 right-0 bg-white border-t border-border flex z-[100]"
+      className="absolute bottom-0 left-0 right-0 bg-white border-t border-border flex items-stretch z-[100]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
-      {TABS.map((tab) => {
-        const active = activeTab === tab.id
-        const badge = tab.id === 'annotations' ? annotations.length : null
-        return (
-          <button
-            key={tab.id}
-            onClick={() => setTab(tab.id)}
-            className={`flex-1 flex flex-col items-center gap-[3px] py-[9px] pb-[11px] border-none bg-transparent cursor-pointer transition-colors ${
-              active ? 'text-gm' : 'text-muted'
-            }`}
-            style={{ fontFamily: '"DM Sans", sans-serif', fontSize: 9, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase' }}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-            {/* active dot */}
-            <span
-              className="w-1 h-1 rounded-full bg-gl -mt-[1px]"
-              style={{ opacity: active ? 1 : 0, transition: 'opacity 0.2s' }}
-            />
-            {/* annotation count badge (hidden on active tab) */}
-            {badge !== null && !active && (
-              <span className="sr-only">{badge} anotações</span>
-            )}
-          </button>
-        )
-      })}
+      <div className="flex flex-1">
+        {leftTabs.map((tab) => {
+          const active = activeTab === tab.id
+          const badge = tab.id === 'annotations' ? annotations.length : null
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setTab(tab.id)}
+              className={`flex-1 flex flex-col items-center gap-[3px] py-[9px] pb-[11px] border-none bg-transparent cursor-pointer transition-colors ${
+                active ? 'text-gm' : 'text-muted'
+              }`}
+              style={{ fontFamily: '"DM Sans", sans-serif', fontSize: 9, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase' }}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+              <span
+                className="w-1 h-1 rounded-full bg-gl -mt-[1px]"
+                style={{ opacity: active ? 1 : 0, transition: 'opacity 0.2s' }}
+              />
+              {badge !== null && !active && (
+                <span className="sr-only">{badge} anotações</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="px-2 flex items-center justify-center">
+        <button
+          onClick={() => openSubscreen('new-annotation')}
+          className="w-[52px] h-[52px] rounded-full bg-gm text-white border-none shadow-fab flex items-center justify-center -mt-5"
+          aria-label="Nova anotacao"
+        >
+          <svg viewBox="0 0 24 24" className="w-6 h-6" stroke="currentColor" fill="none" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex flex-1">
+        {rightTabs.map((tab) => {
+          const active = activeTab === tab.id
+          const badge = tab.id === 'annotations' ? annotations.length : null
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setTab(tab.id)}
+              className={`flex-1 flex flex-col items-center gap-[3px] py-[9px] pb-[11px] border-none bg-transparent cursor-pointer transition-colors ${
+                active ? 'text-gm' : 'text-muted'
+              }`}
+              style={{ fontFamily: '"DM Sans", sans-serif', fontSize: 9, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase' }}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+              <span
+                className="w-1 h-1 rounded-full bg-gl -mt-[1px]"
+                style={{ opacity: active ? 1 : 0, transition: 'opacity 0.2s' }}
+              />
+              {badge !== null && !active && (
+                <span className="sr-only">{badge} anotações</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
     </nav>
   )
 }

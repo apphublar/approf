@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, MoreVertical, Pencil, Trash2, PenLine, Sparkles, CalendarDays } from 'lucide-react'
+import { MoreVertical, Pencil, Trash2, PenLine, Sparkles, CalendarDays } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { toTitleCaseName } from '@/utils/text'
 import type { BoardNote } from '@/types'
@@ -18,7 +18,7 @@ const QUICK_ACCESS = [
 
 export default function HomeScreen() {
   const { userName, annotations, boardNotes } = useAppStore()
-  const { setTab, openSubscreen } = useNavStore()
+  const { setTab, openSubscreen, activeTab, subscreens } = useNavStore()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [modalNote, setModalNote] = useState<BoardNote | null | 'new'>('new')
   const [modalOpen, setModalOpen] = useState(false)
@@ -45,6 +45,8 @@ export default function HomeScreen() {
   }, [safeSlide, currentSlide])
 
   useEffect(() => {
+    if (activeTab !== 'home') return
+
     let active = true
     getAiUsageSummary()
       .then((summary) => {
@@ -56,7 +58,7 @@ export default function HomeScreen() {
     return () => {
       active = false
     }
-  }, [])
+  }, [activeTab, subscreens.length])
 
   function handleQuickAccess(tab: typeof QUICK_ACCESS[number]['tab'], sub: typeof QUICK_ACCESS[number]['sub']) {
     if (tab) setTab(tab)
@@ -314,14 +316,6 @@ export default function HomeScreen() {
           ))}
         </div>
       </div>
-
-      {/* FAB */}
-      <button
-        onClick={() => openSubscreen('new-annotation')}
-        className="absolute bottom-[76px] right-[18px] z-[99] w-[52px] h-[52px] rounded-full bg-gm text-white border-none shadow-fab flex items-center justify-center"
-      >
-        <Plus size={24} strokeWidth={2} />
-      </button>
 
       {/* Board note modal */}
       {modalOpen && (
