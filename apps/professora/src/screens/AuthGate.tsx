@@ -53,8 +53,19 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (loadingSession || loadingWorkspace) {
     return (
-      <div className="absolute inset-0 chalk-bg flex items-center justify-center text-white">
-        <Loader2 className="animate-spin" size={28} />
+      <div className="absolute inset-0 chalk-bg flex items-center justify-center px-6">
+        <div className="auth-loading-wrap">
+          <img
+            src="/branding/logo-approf.png"
+            alt="Approf"
+            className="auth-loading-logo"
+          />
+          <div className="auth-loading-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
       </div>
     )
   }

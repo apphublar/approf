@@ -5,7 +5,12 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Approf Admin',
   description: 'Painel interno de operacao e privacidade do Approf',
-      robots: {
+  icons: {
+    icon: '/icon.png',
+    apple: '/apple-icon.png',
+    shortcut: '/icon.png',
+  },
+  robots: {
     index: false,
     follow: false,
   },

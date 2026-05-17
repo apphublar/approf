@@ -5,6 +5,11 @@ export const metadata: Metadata = {
   title: 'Approf — O app da prof',
   description:
     'O app para professoras da Educação Infantil. Anote seus alunos, gere relatórios com IA e acesse material pedagógico pronto — tudo no celular, sem instalar nada.',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/apple-icon.png',
+    shortcut: '/favicon.png',
+  },
   keywords: [
     'app professora',
     'educação infantil',
