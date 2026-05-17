@@ -14,7 +14,8 @@ interface TranscribeAudioResult {
 }
 
 const DEFAULT_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
-const DEFAULT_TRANSCRIPTION_COST_CENTS = 2
+const DEFAULT_TRANSCRIPTION_COST_CENTS_30S = 2
+const DEFAULT_TRANSCRIPTION_USD_PER_MINUTE = 0.003
 const MAX_AUDIO_SECONDS = 30
 const MAX_AUDIO_BYTES = 6 * 1024 * 1024
 
@@ -69,7 +70,7 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<Tran
     provider: 'openai',
     model,
     durationSeconds: Math.min(MAX_AUDIO_SECONDS, Math.max(0, Math.round(input.durationSeconds))),
-    actualCostCents: resolveTranscriptionCostCents(),
+    actualCostCents: estimateTranscriptionCostCents(input.durationSeconds),
   }
 }
 
@@ -112,8 +113,41 @@ function getPublicOpenAiErrorMessage(status: number, message?: string) {
   return 'Nao foi possivel transcrever o audio agora. Tente novamente em instantes.'
 }
 
-function resolveTranscriptionCostCents() {
-  const fromEnv = Number(process.env.OPENAI_TRANSCRIPTION_COST_CENTS)
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
-  return DEFAULT_TRANSCRIPTION_COST_CENTS
+export function estimateTranscriptionCostCents(durationSeconds: number) {
+  const normalizedDurationSeconds = Math.min(MAX_AUDIO_SECONDS, Math.max(1, Math.round(durationSeconds)))
+  const usdPerMinute = resolveTranscriptionUsdPerMinute()
+  const usd = (normalizedDurationSeconds / 60) * usdPerMinute
+  const brl = usd * resolveUsdToBrlRate()
+  const byApiRate = Math.round(brl * 100)
+
+  if (byApiRate > 0) {
+    return byApiRate
+  }
+
+  const centsFor30Seconds = resolveTranscriptionCostCentsFor30Seconds()
+  const proportional = Math.round((normalizedDurationSeconds / MAX_AUDIO_SECONDS) * centsFor30Seconds)
+  return Math.max(1, proportional)
+}
+
+function resolveTranscriptionCostCentsFor30Seconds() {
+  const fromNewEnv = Number(process.env.OPENAI_TRANSCRIPTION_COST_CENTS_30S)
+  if (Number.isFinite(fromNewEnv) && fromNewEnv > 0) return Math.round(fromNewEnv)
+
+  // Backward compatibility with previously deployed env key.
+  const fromLegacyEnv = Number(process.env.OPENAI_TRANSCRIPTION_COST_CENTS)
+  if (Number.isFinite(fromLegacyEnv) && fromLegacyEnv > 0) return Math.round(fromLegacyEnv)
+
+  return DEFAULT_TRANSCRIPTION_COST_CENTS_30S
+}
+
+function resolveTranscriptionUsdPerMinute() {
+  const fromEnv = Number(process.env.OPENAI_TRANSCRIPTION_USD_PER_MINUTE)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return DEFAULT_TRANSCRIPTION_USD_PER_MINUTE
+}
+
+function resolveUsdToBrlRate() {
+  const fromEnv = Number(process.env.AI_USD_TO_BRL)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 5.5
 }

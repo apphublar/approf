@@ -366,8 +366,14 @@ function estimateClaudeCostCents(model: string, inputTokens: number, outputToken
     outputCostPerMillion = 15
   }
   const usd = (inputTokens / 1_000_000) * inputCostPerMillion + (outputTokens / 1_000_000) * outputCostPerMillion
-  const brlApprox = usd * 5.5
+  const brlApprox = usd * resolveUsdToBrlRate()
   return Math.max(1, Math.round(brlApprox * 100))
+}
+
+function resolveUsdToBrlRate() {
+  const fromEnv = Number(process.env.AI_USD_TO_BRL)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 5.5
 }
 
 function asString(value: unknown) {

@@ -171,6 +171,7 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
       : baseEstimate.imageCount,
   }
   const { start: monthStart, end: monthEnd } = getMonthPeriod(new Date())
+  const walletTargets = await resolveMonthlyWalletTargets(input.ownerId, monthStart, monthEnd)
   const entitlementType = getEntitlementType(input.generationType)
 
   const entitlementCycle = getEntitlementCycle(input.generationType, new Date())
@@ -193,8 +194,8 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
     p_entitlement_type: entitlementType,
     p_month_period_start: monthStart,
     p_month_period_end: monthEnd,
-    p_monthly_giztokens_included: MONTHLY_GIZTOKENS_DEFAULT,
-    p_included_cost_limit_cents: MONTHLY_COST_LIMIT_CENTS,
+    p_monthly_giztokens_included: walletTargets.giztokensIncluded,
+    p_included_cost_limit_cents: walletTargets.includedCostLimitCents,
     p_semester_cycle_label: entitlementCycle?.label ?? null,
     p_semester_cycle_start: entitlementCycle?.start ?? null,
     p_semester_cycle_end: entitlementCycle?.end ?? null,
@@ -214,12 +215,15 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
     giztokensIncluded: result.wallet_giztokens_included ?? 0,
     giztokensUsed: result.wallet_giztokens_used ?? 0,
     giztokensRemaining: (result.wallet_giztokens_included ?? 0) - (result.wallet_giztokens_used ?? 0),
-    giztokensOverageLimit: MONTHLY_GIZTOKEN_OVERAGE_LIMIT,
+    giztokensOverageLimit: Math.max(
+      0,
+      (result.wallet_included_cost_limit_cents ?? 0) * GIZTOKENS_PER_COST_CENT - (result.wallet_giztokens_included ?? 0),
+    ),
     includedCostLimitCents: result.wallet_included_cost_limit_cents ?? 0,
     includedCostUsedCents: result.wallet_included_cost_used_cents ?? 0,
     includedCostRemainingCents:
       (result.wallet_included_cost_limit_cents ?? 0) - (result.wallet_included_cost_used_cents ?? 0),
-    includedCostAlertCents: MONTHLY_INCLUDED_COST_CENTS,
+    includedCostAlertCents: Math.round((result.wallet_giztokens_included ?? 0) / GIZTOKENS_PER_COST_CENT),
   } : undefined
 
   const entitlementSummary: EntitlementSummary | undefined = result.entitlement_id ? {
@@ -353,4 +357,62 @@ function clampNonNegativeInt(value: number) {
 
 function toGizTokens(costCents: number) {
   return clampNonNegativeInt(costCents * GIZTOKENS_PER_COST_CENT)
+}
+
+async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, monthEnd: string) {
+  const supabase = createSupabaseServiceClient()
+  const { data: currentWallet, error: currentWalletError } = await supabase
+    .from('ai_usage_wallets')
+    .select('giztokens_included, included_cost_limit_cents')
+    .eq('owner_id', ownerId)
+    .eq('period_type', 'monthly')
+    .eq('period_start', monthStart)
+    .eq('period_end', monthEnd)
+    .maybeSingle()
+
+  if (currentWalletError) {
+    throw toError(currentWalletError, 'Nao foi possivel ler a carteira mensal atual de IA.')
+  }
+
+  if (currentWallet) {
+    return {
+      giztokensIncluded: clampNonNegativeInt(currentWallet.giztokens_included ?? MONTHLY_GIZTOKENS_DEFAULT),
+      includedCostLimitCents: clampNonNegativeInt(currentWallet.included_cost_limit_cents ?? MONTHLY_COST_LIMIT_CENTS),
+    }
+  }
+
+  const { data: previousWalletRows, error: previousWalletError } = await supabase
+    .from('ai_usage_wallets')
+    .select('giztokens_included, included_cost_used_cents, period_end')
+    .eq('owner_id', ownerId)
+    .eq('period_type', 'monthly')
+    .lt('period_end', monthStart)
+    .order('period_end', { ascending: false })
+    .limit(1)
+
+  if (previousWalletError) {
+    throw toError(previousWalletError, 'Nao foi possivel ler a carteira mensal anterior de IA.')
+  }
+
+  const previousWallet = previousWalletRows?.[0]
+  if (!previousWallet) {
+    return {
+      giztokensIncluded: MONTHLY_GIZTOKENS_DEFAULT,
+      includedCostLimitCents: MONTHLY_COST_LIMIT_CENTS,
+    }
+  }
+
+  const previousIncludedCostCents = Math.max(
+    0,
+    Math.round((previousWallet.giztokens_included ?? MONTHLY_GIZTOKENS_DEFAULT) / GIZTOKENS_PER_COST_CENT),
+  )
+  const previousUsedCostCents = clampNonNegativeInt(previousWallet.included_cost_used_cents ?? 0)
+  const previousNegativeCostCents = Math.max(0, previousUsedCostCents - previousIncludedCostCents)
+  const maxOverageCostCents = Math.max(0, MONTHLY_COST_LIMIT_CENTS - MONTHLY_INCLUDED_COST_CENTS)
+  const carryoverCostCents = Math.min(previousNegativeCostCents, maxOverageCostCents)
+
+  return {
+    giztokensIncluded: toGizTokens(Math.max(0, MONTHLY_INCLUDED_COST_CENTS - carryoverCostCents)),
+    includedCostLimitCents: Math.max(0, MONTHLY_COST_LIMIT_CENTS - carryoverCostCents),
+  }
 }

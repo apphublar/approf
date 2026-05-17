@@ -29,6 +29,8 @@ const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2'
 const DEFAULT_OPENAI_IMAGE_SIZE = '1024x1536'
 const DEFAULT_OPENAI_IMAGE_QUALITY = 'high'
 const DEFAULT_OPENAI_IMAGE_COST_CENTS = 120
+const DEFAULT_OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD = 8
+const DEFAULT_OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD = 30
 
 export async function generatePortfolioImage(
   input: GeneratePortfolioImageInput,
@@ -46,7 +48,7 @@ export async function generatePortfolioImage(
     user: input.ownerId,
   })
 
-  const actualCostCents = resolveOpenAiImageCostCents()
+  const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens)
   const body = buildPersistedImageBody({
     prompt,
     model,
@@ -273,6 +275,37 @@ function resolveOpenAiImageCostCents() {
   const fromEnv = Number(process.env.OPENAI_IMAGE_COST_CENTS)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
   return DEFAULT_OPENAI_IMAGE_COST_CENTS
+}
+
+function estimateOpenAiImageCostCents(inputTokens: number, outputTokens: number) {
+  const normalizedInputTokens = Math.max(0, inputTokens)
+  const normalizedOutputTokens = Math.max(0, outputTokens)
+  if (normalizedInputTokens <= 0 && normalizedOutputTokens <= 0) {
+    return resolveOpenAiImageCostCents()
+  }
+
+  const inputUsd = (normalizedInputTokens / 1_000_000) * resolveOpenAiImageInputUsdPerMillion()
+  const outputUsd = (normalizedOutputTokens / 1_000_000) * resolveOpenAiImageOutputUsdPerMillion()
+  const brl = (inputUsd + outputUsd) * resolveUsdToBrlRate()
+  return Math.max(1, Math.round(brl * 100))
+}
+
+function resolveOpenAiImageInputUsdPerMillion() {
+  const fromEnv = Number(process.env.OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return DEFAULT_OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD
+}
+
+function resolveOpenAiImageOutputUsdPerMillion() {
+  const fromEnv = Number(process.env.OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return DEFAULT_OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD
+}
+
+function resolveUsdToBrlRate() {
+  const fromEnv = Number(process.env.AI_USD_TO_BRL)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 5.5
 }
 
 function asString(value: unknown) {

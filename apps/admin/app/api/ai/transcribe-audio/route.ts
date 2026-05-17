@@ -6,7 +6,7 @@ import {
   reserveAiUsage,
 } from '@/app/lib/ai-usage'
 import { PublicAiGenerationError } from '@/app/lib/ai-generation'
-import { transcribeAudio } from '@/app/lib/ai-transcription'
+import { estimateTranscriptionCostCents, transcribeAudio } from '@/app/lib/ai-transcription'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
@@ -164,6 +164,8 @@ async function reserveTranscriptionUsage(input: {
     ...input.requestSummary,
     durationSeconds: input.durationSeconds,
   }
+  const estimatedCostCents = estimateTranscriptionCostCents(input.durationSeconds)
+  const estimatedGiztokens = estimatedCostCents * 10
 
   try {
     return await reserveAiUsage({
@@ -172,6 +174,15 @@ async function reserveTranscriptionUsage(input: {
       classId: input.classId,
       studentId: input.studentId,
       promptVersion: input.promptVersion,
+      pricingOverride: {
+        provider: 'openai',
+        model: process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || 'gpt-4o-mini-transcribe',
+        giztokens: estimatedGiztokens,
+        estimatedCostCents,
+        inputTokens: 0,
+        outputTokens: 0,
+        imageCount: 0,
+      },
       requestSummary: summary,
     })
   } catch (error) {
@@ -190,8 +201,8 @@ async function reserveTranscriptionUsage(input: {
       pricingOverride: {
         provider: 'openai',
         model: process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || 'gpt-4o-mini-transcribe',
-        giztokens: 20,
-        estimatedCostCents: 2,
+        giztokens: estimatedGiztokens,
+        estimatedCostCents,
         inputTokens: 0,
         outputTokens: 0,
         imageCount: 0,
