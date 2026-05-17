@@ -93,6 +93,7 @@ interface AppStore {
   setUserName: (name: string) => void
   setSchoolName: (name: string) => void
   addAnnotation: (ann: Annotation) => void
+  updateAnnotation: (ann: Annotation) => void
   saveAttendanceRecord: (record: Omit<AttendanceRecord, 'id' | 'createdAt' | 'updatedAt'>) => void
   upsertAttendanceRecord: (record: AttendanceRecord) => void
   addBoardNote: (note: BoardNote) => void
@@ -171,6 +172,10 @@ export const useAppStore = create<AppStore>()(
       setSchoolName: (name: string) => set({ schoolName: name }),
       addAnnotation: (ann: Annotation) =>
         set((state) => ({ annotations: [ann, ...state.annotations] })),
+      updateAnnotation: (ann: Annotation) =>
+        set((state) => ({
+          annotations: state.annotations.map((item) => (item.id === ann.id ? ann : item)),
+        })),
       saveAttendanceRecord: (record) =>
         set((state) => {
           const existing = state.attendanceRecords.find(

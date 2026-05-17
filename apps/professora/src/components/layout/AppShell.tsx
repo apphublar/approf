@@ -93,7 +93,7 @@ function SubscreenWrapper({
 
 function renderSubscreen(screen: string, data?: unknown) {
   switch (screen) {
-    case 'new-annotation':  return <NewAnnotationSubscreen />
+    case 'new-annotation':  return <NewAnnotationSubscreen data={data} />
     case 'class-students':  return <ClassStudentsSubscreen />
     case 'student-profile': return <StudentProfileSubscreen />
     case 'report':          return <ReportSubscreen data={data} />

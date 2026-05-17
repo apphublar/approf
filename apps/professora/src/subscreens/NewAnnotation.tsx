@@ -3,9 +3,9 @@ import { ChevronLeft, Check, Mic, Paperclip, Square } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { getAppDataMode } from '@/services/app-data'
 import { formatAiUsageMessage, transcribeAnnotationAudio } from '@/services/ai-usage'
-import { createSupabaseAnnotation } from '@/services/supabase/annotations'
+import { createSupabaseAnnotation, updateSupabaseAnnotation } from '@/services/supabase/annotations'
 import { isSupabaseConfigured } from '@/services/supabase/config'
-import type { AnnotationCategory, AnnotationPersistence } from '@/types'
+import type { Annotation, AnnotationCategory, AnnotationPersistence } from '@/types'
 
 type WorkKind = '' | 'report' | 'planning' | 'memory' | 'personal'
 type Scope = 'child' | 'class' | 'optional-class' | 'teacher'
@@ -65,9 +65,9 @@ const TAGS = [
 
 const MAX_AUDIO_SECONDS = 30
 
-export default function NewAnnotationSubscreen() {
+export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
-  const { addAnnotation, classes, activeClassId, activeStudentId } = useAppStore()
+  const { addAnnotation, updateAnnotation, annotations, classes, activeClassId, activeStudentId } = useAppStore()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
@@ -94,6 +94,16 @@ export default function NewAnnotationSubscreen() {
   const [usageMessage, setUsageMessage] = useState('')
   const [audioMessage, setAudioMessage] = useState('')
   const [error, setError] = useState('')
+
+  const editAnnotation = useMemo(() => {
+    const data = props?.data
+    if (!data || typeof data !== 'object') return null
+    const annotationId = (data as { annotationId?: unknown }).annotationId
+    if (typeof annotationId !== 'string') return null
+    return annotations.find((item) => item.id === annotationId) ?? null
+  }, [annotations, props?.data])
+  const editConfig = useMemo(() => (editAnnotation ? inferAnnotationEditorConfig(editAnnotation) : null), [editAnnotation])
+  const isEditing = Boolean(editAnnotation)
 
   const modelOptions = getModelOptions(workKind)
   const selectedModel = modelOptions.find((item) => item.id === modelId)
@@ -126,6 +136,20 @@ export default function NewAnnotationSubscreen() {
   useEffect(() => () => {
     stopMediaStream()
   }, [])
+
+  useEffect(() => {
+    if (!editAnnotation || !editConfig) return
+    setText(editAnnotation.text ?? '')
+    setWorkKind(editConfig.workKind)
+    setModelId(editConfig.modelId)
+    setClassId(editConfig.classId)
+    setStudentId(editConfig.studentId)
+    setTags(editConfig.tags)
+    setAttachmentName(editAnnotation.attachmentName ?? '')
+    setError('')
+    setAudioMessage('')
+    setUsageMessage('')
+  }, [editAnnotation, editConfig])
 
   function chooseWorkKind(value: WorkKind) {
     setWorkKind(value)
@@ -319,10 +343,26 @@ export default function NewAnnotationSubscreen() {
 
     try {
       if (getAppDataMode() === 'supabase' && isSupabaseConfigured()) {
-        const savedAnnotation = await createSupabaseAnnotation(annotationInput)
-        addAnnotation({ ...savedAnnotation, studentName: targetStudentName ?? savedAnnotation.studentName })
+        if (editAnnotation) {
+          const savedAnnotation = await updateSupabaseAnnotation({
+            annotationId: editAnnotation.id,
+            ...annotationInput,
+          })
+          updateAnnotation({ ...savedAnnotation, studentName: targetStudentName ?? savedAnnotation.studentName })
+        } else {
+          const savedAnnotation = await createSupabaseAnnotation(annotationInput)
+          addAnnotation({ ...savedAnnotation, studentName: targetStudentName ?? savedAnnotation.studentName })
+        }
       } else {
-        addAnnotation(localAnnotation)
+        if (editAnnotation) {
+          updateAnnotation({
+            ...localAnnotation,
+            id: editAnnotation.id,
+            date: 'Agora',
+          })
+        } else {
+          addAnnotation(localAnnotation)
+        }
       }
 
       closeSubscreen()
@@ -339,13 +379,15 @@ export default function NewAnnotationSubscreen() {
         <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">Nova anotacao</span>
+        <span className="font-serif text-[18px] text-gd flex-1">
+          {isEditing ? 'Editar anotacao' : 'Nova anotacao'}
+        </span>
         <button
           onClick={save}
           disabled={saving || !canSave}
           className="bg-gm text-white border-none rounded-full px-[16px] py-[7px] text-[13px] font-bold cursor-pointer flex items-center gap-1 disabled:opacity-50"
         >
-          {saving ? '...' : <><Check size={13} /> Salvar</>}
+          {saving ? '...' : <><Check size={13} /> {isEditing ? 'Atualizar' : 'Salvar'}</>}
         </button>
       </div>
 
@@ -608,4 +650,49 @@ function resolveAnnotation(workKind: WorkKind, model: ModelOption): {
   }
 
   return { category: 'evolucao', label: model.label, persistence: ['relatorio-atual', 'observacao-continua'] }
+}
+
+function inferAnnotationEditorConfig(annotation: Annotation) {
+  const modelMatch = findModelByLabel(annotation.label)
+  const workKind = modelMatch?.workKind ?? inferWorkKindFromAnnotation(annotation)
+
+  return {
+    workKind,
+    modelId: modelMatch?.model.id ?? '',
+    classId: annotation.classId ?? '',
+    studentId: annotation.studentId ?? '',
+    tags: (annotation.tags ?? []).filter((tag) => tag !== annotation.label),
+  }
+}
+
+function findModelByLabel(label: string) {
+  const normalized = normalizeText(label)
+  const groups: Array<{ workKind: WorkKind; models: ModelOption[] }> = [
+    { workKind: 'report', models: REPORT_MODELS },
+    { workKind: 'planning', models: PLANNING_MODELS },
+    { workKind: 'memory', models: MEMORY_MODELS },
+    { workKind: 'personal', models: PERSONAL_MODELS },
+  ]
+
+  for (const group of groups) {
+    const model = group.models.find((item) => normalizeText(item.label) === normalized)
+    if (model) return { workKind: group.workKind, model }
+  }
+
+  return null
+}
+
+function inferWorkKindFromAnnotation(annotation: Annotation): WorkKind {
+  if (annotation.scope === 'personal') return 'personal'
+  if (annotation.category === 'plano' || annotation.category === 'projeto') return 'planning'
+  if (annotation.category === 'portfolio' || annotation.category === 'atipico') return 'report'
+  return 'memory'
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }

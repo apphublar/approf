@@ -31,6 +31,10 @@ export interface AnnotationInput {
   attachmentName?: string | null
 }
 
+export interface AnnotationUpdateInput extends AnnotationInput {
+  annotationId: string
+}
+
 export async function loadSupabaseAnnotations(ownerId: string, classes: ClassData[]) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase nao esta configurado.')
@@ -94,6 +98,54 @@ export async function createSupabaseAnnotation(input: AnnotationInput) {
     const { error: targetError } = await supabase.from('annotation_targets').insert(targets)
     if (targetError) {
       await supabase.from('annotations').delete().eq('id', data.id).eq('owner_id', ownerId)
+      throw toError(targetError, 'Nao foi possivel vincular a anotacao ao destino selecionado.')
+    }
+  }
+
+  const studentById = new Map<string, string>()
+  return mapAnnotation(data, targets, studentById, input)
+}
+
+export async function updateSupabaseAnnotation(input: AnnotationUpdateInput) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase nao esta configurado.')
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError) throw userError
+  const ownerId = userData.user?.id
+  if (!ownerId) throw new Error('Sessao nao encontrada.')
+
+  const tags = [input.label, ...input.tags.filter((tag) => tag !== input.label)]
+  const { data, error } = await supabase
+    .from('annotations')
+    .update({
+      category: input.category,
+      body: input.text,
+      tags,
+      persistence: input.persistence,
+      attachment_path: null,
+    })
+    .eq('id', input.annotationId)
+    .eq('owner_id', ownerId)
+    .select('id, category, body, tags, persistence, attachment_path, occurred_at')
+    .single()
+
+  if (error) throw toError(error, 'Nao foi possivel atualizar a anotacao no Supabase.')
+  if (!data) throw new Error('Nao foi possivel atualizar a anotacao no Supabase.')
+
+  const { error: deleteTargetError } = await supabase
+    .from('annotation_targets')
+    .delete()
+    .eq('annotation_id', input.annotationId)
+    .eq('owner_id', ownerId)
+  if (deleteTargetError) {
+    throw toError(deleteTargetError, 'Nao foi possivel atualizar o destino da anotacao.')
+  }
+
+  const targets = buildTargets(data.id, ownerId, input)
+  if (targets.length > 0) {
+    const { error: targetError } = await supabase.from('annotation_targets').insert(targets)
+    if (targetError) {
       throw toError(targetError, 'Nao foi possivel vincular a anotacao ao destino selecionado.')
     }
   }

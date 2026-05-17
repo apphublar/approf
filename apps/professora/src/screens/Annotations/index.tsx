@@ -19,7 +19,7 @@ const CHIPS: { id: AnnotationFilter; label: string }[] = [
 ]
 
 export default function AnnotationsScreen() {
-  const { annotations, setActiveClass, setActiveStudent } = useAppStore()
+  const { annotations } = useAppStore()
   const { openSubscreen } = useNavStore()
   const [active, setActive] = useState<AnnotationFilter>('todas')
 
@@ -30,11 +30,7 @@ export default function AnnotationsScreen() {
       : annotations.filter((annotation) => annotation.category === active)
 
   function openAnnotation(annotation: (typeof annotations)[number]) {
-    if (annotation.classId) setActiveClass(annotation.classId)
-    if (annotation.studentId) {
-      setActiveStudent(annotation.studentId)
-      openSubscreen('student-profile')
-    }
+    openSubscreen('new-annotation', { annotationId: annotation.id })
   }
 
   return (
