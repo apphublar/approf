@@ -339,7 +339,7 @@ export async function transcribeAnnotationAudio(input: {
   }
 
   const form = new FormData()
-  form.append('audio', input.audio, 'anotacao.webm')
+  form.append('audio', input.audio, getAudioFilename(input.audio.type))
   form.append('durationSeconds', String(input.durationSeconds))
   if (input.classId) form.append('classId', input.classId)
   if (input.studentId) form.append('studentId', input.studentId)
@@ -378,6 +378,14 @@ export async function transcribeAnnotationAudio(input: {
     provider: typeof result.provider === 'string' ? result.provider : undefined,
     model: typeof result.model === 'string' ? result.model : undefined,
   }
+}
+
+function getAudioFilename(mimeType: string) {
+  if (mimeType.includes('mp4')) return 'anotacao.mp4'
+  if (mimeType.includes('mpeg')) return 'anotacao.mp3'
+  if (mimeType.includes('wav')) return 'anotacao.wav'
+  if (mimeType.includes('ogg')) return 'anotacao.ogg'
+  return 'anotacao.webm'
 }
 
 export function formatAiUsageMessage(result: AiUsageReservationResult) {

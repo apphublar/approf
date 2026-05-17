@@ -33,8 +33,9 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<Tran
   }
 
   const model = process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || DEFAULT_TRANSCRIPTION_MODEL
+  const audioFile = normalizeAudioFile(input.audio)
   const form = new FormData()
-  form.append('file', input.audio, input.audio.name || 'anotacao.webm')
+  form.append('file', audioFile, audioFile.name)
   form.append('model', model)
   form.append('language', 'pt')
   form.append('response_format', 'json')
@@ -53,8 +54,9 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<Tran
   } | null
 
   if (!response.ok) {
-    console.error('[ai-transcription] OpenAI HTTP', response.status, payload?.error?.message)
-    throw new PublicAiGenerationError('Nao foi possivel transcrever o audio agora. Tente novamente em instantes.')
+    const openAiMessage = payload?.error?.message
+    console.error('[ai-transcription] OpenAI HTTP', response.status, openAiMessage)
+    throw new PublicAiGenerationError(getPublicOpenAiErrorMessage(response.status, openAiMessage))
   }
 
   const transcript = payload?.text?.trim()
@@ -69,6 +71,45 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<Tran
     durationSeconds: Math.min(MAX_AUDIO_SECONDS, Math.max(0, Math.round(input.durationSeconds))),
     actualCostCents: resolveTranscriptionCostCents(),
   }
+}
+
+function normalizeAudioFile(audio: File) {
+  const mimeType = audio.type || 'audio/webm'
+  const name = audio.name && hasSupportedAudioExtension(audio.name)
+    ? audio.name
+    : getAudioFilename(mimeType)
+
+  if (audio.name === name && audio.type) return audio
+  return new File([audio], name, { type: mimeType })
+}
+
+function hasSupportedAudioExtension(name: string) {
+  return /\.(flac|m4a|mp3|mp4|mpeg|mpga|oga|ogg|wav|webm)$/i.test(name)
+}
+
+function getAudioFilename(mimeType: string) {
+  if (mimeType.includes('mp4')) return 'anotacao.mp4'
+  if (mimeType.includes('mpeg')) return 'anotacao.mp3'
+  if (mimeType.includes('wav')) return 'anotacao.wav'
+  if (mimeType.includes('ogg')) return 'anotacao.ogg'
+  return 'anotacao.webm'
+}
+
+function getPublicOpenAiErrorMessage(status: number, message?: string) {
+  const normalized = message?.toLowerCase() ?? ''
+  if (status === 401 || status === 403) {
+    return 'A chave da OpenAI no servidor nao autorizou a transcricao. Verifique a OPENAI_API_KEY na Vercel.'
+  }
+  if (status === 404 || normalized.includes('model')) {
+    return 'O modelo de transcricao configurado nao esta disponivel nesta conta da OpenAI. Verifique OPENAI_TRANSCRIPTION_MODEL.'
+  }
+  if (normalized.includes('format') || normalized.includes('file') || normalized.includes('audio')) {
+    return 'A OpenAI nao aceitou o formato do audio. Grave novamente e tente transcrever outra vez.'
+  }
+  if (status === 429) {
+    return 'A OpenAI recusou a transcricao por limite de uso. Tente novamente em instantes.'
+  }
+  return 'Nao foi possivel transcrever o audio agora. Tente novamente em instantes.'
 }
 
 function resolveTranscriptionCostCents() {
