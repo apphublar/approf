@@ -37,16 +37,13 @@ export async function POST(request: Request) {
     const requestSummary = parseRequestSummary(form.get('requestSummary'))
     const promptVersion = 'audio-transcription-v1'
 
-    const reservation = await reserveAiUsage({
+    const reservation = await reserveTranscriptionUsage({
       ownerId,
-      generationType: 'audio_transcription',
       classId,
       studentId,
       promptVersion,
-      requestSummary: {
-        ...requestSummary,
-        durationSeconds,
-      },
+      requestSummary,
+      durationSeconds,
     })
 
     const reservedLogId = reservation.logId
@@ -116,6 +113,14 @@ export async function POST(request: Request) {
       )
     }
 
+    const message = error instanceof Error ? error.message : ''
+    if (isMissingAudioGenerationTypeError(message)) {
+      return NextResponse.json(
+        { error: 'A base de dados ainda nao foi atualizada para transcricao de audio. Aplique a migration 0014 e tente novamente.' },
+        { status: 500, headers: CORS_HEADERS },
+      )
+    }
+
     console.error('[ai/transcribe-audio] erro interno', error)
 
     return NextResponse.json(
@@ -145,4 +150,63 @@ function parseRequestSummary(value: FormDataEntryValue | null) {
   } catch {
     return {}
   }
+}
+
+async function reserveTranscriptionUsage(input: {
+  ownerId: string
+  classId: string | null
+  studentId: string | null
+  promptVersion: string
+  requestSummary: Record<string, unknown>
+  durationSeconds: number
+}) {
+  const summary = {
+    ...input.requestSummary,
+    durationSeconds: input.durationSeconds,
+  }
+
+  try {
+    return await reserveAiUsage({
+      ownerId: input.ownerId,
+      generationType: 'audio_transcription',
+      classId: input.classId,
+      studentId: input.studentId,
+      promptVersion: input.promptVersion,
+      requestSummary: summary,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (!isMissingAudioGenerationTypeError(message)) {
+      throw error
+    }
+
+    // Backward-compatible fallback for environments where enum migration was not applied yet.
+    return await reserveAiUsage({
+      ownerId: input.ownerId,
+      generationType: 'other',
+      classId: input.classId,
+      studentId: input.studentId,
+      promptVersion: input.promptVersion,
+      pricingOverride: {
+        provider: 'openai',
+        model: process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || 'gpt-4o-mini-transcribe',
+        giztokens: 20,
+        estimatedCostCents: 2,
+        inputTokens: 0,
+        outputTokens: 0,
+        imageCount: 0,
+      },
+      requestSummary: {
+        ...summary,
+        generationSubtype: 'audio_transcription',
+        migrationFallback: true,
+      },
+    })
+  }
+}
+
+function isMissingAudioGenerationTypeError(message: string) {
+  const normalized = message.toLowerCase()
+  return normalized.includes('audio_transcription')
+    && (normalized.includes('enum') || normalized.includes('invalid input value'))
 }

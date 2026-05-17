@@ -20,6 +20,7 @@ interface AiUsageRequest {
   studentId?: string | null
   promptVersion?: string
   requestSummary?: Record<string, unknown>
+  pricingOverride?: Partial<PricingEstimate>
 }
 
 interface PricingEstimate {
@@ -149,7 +150,26 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
 
 export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUsageResult> {
   const supabase = createSupabaseServiceClient()
-  const estimate = PRICING[input.generationType] ?? PRICING.other
+  const baseEstimate = PRICING[input.generationType] ?? PRICING.other
+  const estimate: PricingEstimate = {
+    ...baseEstimate,
+    ...input.pricingOverride,
+    giztokens: typeof input.pricingOverride?.giztokens === 'number'
+      ? clampNonNegativeInt(input.pricingOverride.giztokens)
+      : baseEstimate.giztokens,
+    estimatedCostCents: typeof input.pricingOverride?.estimatedCostCents === 'number'
+      ? clampNonNegativeInt(input.pricingOverride.estimatedCostCents)
+      : baseEstimate.estimatedCostCents,
+    inputTokens: typeof input.pricingOverride?.inputTokens === 'number'
+      ? clampNonNegativeInt(input.pricingOverride.inputTokens)
+      : baseEstimate.inputTokens,
+    outputTokens: typeof input.pricingOverride?.outputTokens === 'number'
+      ? clampNonNegativeInt(input.pricingOverride.outputTokens)
+      : baseEstimate.outputTokens,
+    imageCount: typeof input.pricingOverride?.imageCount === 'number'
+      ? clampNonNegativeInt(input.pricingOverride.imageCount)
+      : baseEstimate.imageCount,
+  }
   const { start: monthStart, end: monthEnd } = getMonthPeriod(new Date())
   const entitlementType = getEntitlementType(input.generationType)
 
