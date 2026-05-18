@@ -7,6 +7,10 @@ import { getSupabaseClient } from '@/services/supabase/client'
 import { useAppStore } from '@/store'
 
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -111,6 +115,30 @@ function AuthScreen({
   const [confirmPassword, setConfirmPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
+  const [showIosInstallHelp, setShowIosInstallHelp] = useState(false)
+  const [installMessage, setInstallMessage] = useState('')
+
+  const isIos = isIosDevice()
+  const isStandalone = isRunningStandalone()
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault()
+      setInstallPrompt(event as InstallPromptEvent)
+    }
+    const handleInstalled = () => {
+      setInstallPrompt(null)
+      setInstallMessage('App instalado com sucesso.')
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleInstalled)
+    }
+  }, [])
 
   async function submit() {
     setMessage('')
@@ -169,6 +197,31 @@ function AuthScreen({
     }
   }
 
+  async function installApp() {
+    setInstallMessage('')
+    try {
+      if (isStandalone) {
+        setInstallMessage('O app já está instalado neste dispositivo.')
+        return
+      }
+      if (installPrompt) {
+        await installPrompt.prompt()
+        const choice = await installPrompt.userChoice
+        if (choice.outcome === 'accepted') {
+          setInstallMessage('Instalação iniciada.')
+        }
+        return
+      }
+      if (isIos) {
+        setShowIosInstallHelp((current) => !current)
+        return
+      }
+      setInstallMessage('Use o menu do navegador e selecione "Instalar app".')
+    } catch {
+      setInstallMessage('Não foi possível iniciar a instalação agora.')
+    }
+  }
+
   return (
     <div className="absolute inset-0 chalk-bg flex flex-col overflow-hidden">
       <div className="px-5 pt-14 pb-4">
@@ -183,13 +236,41 @@ function AuthScreen({
 
       <div className="px-5 pb-8 overflow-y-auto">
         <div className="bg-white rounded-app p-5 shadow-xl">
-          {mode === 'signup' && (
-            <button
-              onClick={() => setMode('signin')}
-              className="mb-4 w-full py-2 rounded-app-sm text-sm font-bold border bg-white border-border text-muted"
-            >
-              Já tenho conta
-            </button>
+          {(mode === 'signin' || mode === 'signup') && (
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <button
+                onClick={() => setMode('signin')}
+                className={`py-2 rounded-app-sm text-sm font-bold border ${mode === 'signin' ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'}`}
+              >
+                Entrar
+              </button>
+              <button
+                onClick={() => setMode('signup')}
+                className={`py-2 rounded-app-sm text-sm font-bold border ${mode === 'signup' ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'}`}
+              >
+                Criar conta
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => void installApp()}
+            className="mb-4 w-full py-3 rounded-app-sm text-sm font-bold border border-gp bg-gbg text-gd"
+          >
+            Baixar app
+          </button>
+
+          {installMessage && (
+            <p className="mb-4 text-xs text-gd bg-gbg border border-gp rounded-app-sm p-3">{installMessage}</p>
+          )}
+
+          {showIosInstallHelp && isIos && (
+            <div className="mb-4 rounded-app-sm border border-border bg-cream p-3 text-xs text-muted leading-relaxed">
+              <p className="font-bold text-ink mb-1">Instalar no iPhone</p>
+              <p>1. Toque no botão compartilhar do Safari.</p>
+              <p>2. Toque em "Adicionar à Tela de Início".</p>
+              <p>3. Confirme em "Adicionar".</p>
+            </div>
           )}
 
           {mode === 'signup' && (
@@ -289,6 +370,16 @@ function AuthScreen({
       </div>
     </div>
   )
+}
+
+function isIosDevice() {
+  const userAgent = window.navigator.userAgent.toLowerCase()
+  return /iphone|ipad|ipod/.test(userAgent)
+}
+
+function isRunningStandalone() {
+  const standalone = (window.navigator as Navigator & { standalone?: boolean }).standalone
+  return standalone === true || window.matchMedia('(display-mode: standalone)').matches
 }
 
 function hasPasswordRecoveryUrl() {
