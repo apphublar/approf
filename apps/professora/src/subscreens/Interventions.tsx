@@ -85,6 +85,10 @@ export default function InterventionsSubscreen() {
       }
 
       const parsedSuggestions = parseInterventionSuggestions(result.generatedText)
+      if (parsedSuggestions.length < 3) {
+        setError('Nao foi possivel estruturar sugestoes suficientes agora. Tente novamente.')
+        return
+      }
       setSuggestions(parsedSuggestions)
       setUsageMessage(formatAiUsageMessage(result))
       setStep('suggestions')
@@ -232,7 +236,7 @@ export default function InterventionsSubscreen() {
           <>
             <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
               <p className="text-[13px] text-soft leading-[1.6]">
-                Registre uma observacao sobre a crianca e receba sugestoes pedagogicas personalizadas.
+                Registre uma observacao sobre a crianca e receba sugestoes pedagogicas alinhadas a BNCC para apoiar o desenvolvimento infantil.
               </p>
             </div>
 
@@ -260,14 +264,14 @@ export default function InterventionsSubscreen() {
               disabled={!selectedStudent || generating || observation.trim().length < 12}
               className="w-full mt-4 py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando...</> : <><Sparkles size={17} /> Gerar sugestoes</>}
+              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando sugestoes...</> : <><Sparkles size={17} /> Gerar sugestoes</>}
             </button>
           </>
         )}
 
         {step === 'suggestions' && (
           <>
-            <p className="text-[13px] text-muted mb-3">Selecione uma estrategia para aplicar com a crianca.</p>
+            <p className="text-[13px] text-muted mb-3">Selecione uma estrategia pedagogica para aplicar com a crianca.</p>
             <div className="flex flex-col gap-3">
               {suggestions.map((suggestion) => (
                 <div key={suggestion.id} className="bg-white rounded-app border border-border shadow-card p-4">
@@ -356,6 +360,11 @@ export default function InterventionsSubscreen() {
             {returnChoice === 'houve_avanco' && (
               <p className="mt-3 text-[12px] font-bold text-gd">Evolucao registrada com sucesso.</p>
             )}
+            {returnChoice !== 'houve_avanco' && (
+              <p className="mt-3 text-[12px] text-muted leading-[1.5]">
+                Recomenda-se continuidade do acompanhamento pedagogico com intencionalidade e registro sistematico.
+              </p>
+            )}
 
             {followupSuggestions.length > 0 && (
               <div className="mt-4">
@@ -430,16 +439,7 @@ function parseInterventionSuggestions(rawText: string) {
   if (fromJson && fromJson.length >= 3) {
     return fromJson.slice(0, 5)
   }
-
-  return [0, 1, 2].map((index) => ({
-    id: `sg-fallback-${index}`,
-    title: `Intervencao pedagogica ${index + 1}`,
-    summary: 'Sugere-se uma estrategia gradual com acolhimento, rotina previsivel e mediacao docente.',
-    objective: 'Apoiar o desenvolvimento da crianca com intencionalidade pedagogica.',
-    howToApply: 'Aplicar em pequenos momentos da rotina, com orientacoes claras e reforco positivo.',
-    whatToObserve: 'Participacao, interacoes, autonomia e resposta emocional da crianca.',
-    recordText: 'Observou-se participacao progressiva com necessidade de continuidade do acompanhamento.',
-  }))
+  return []
 }
 
 function parseInterventionFeedback(rawText: string) {
@@ -454,31 +454,10 @@ function parseInterventionFeedback(rawText: string) {
     .map((item, index) => mapSuggestion(item, index))
     .filter(Boolean) as InterventionSuggestion[]
 
-  const fallbackSuggestions: InterventionSuggestion[] = [
-    {
-      id: `sg-feedback-${Date.now()}-0`,
-      title: 'Ajuste de mediacao na rotina',
-      summary: 'Recomenda-se ajustar a mediacao com orientacoes curtas e previsiveis.',
-      objective: 'Favorecer maior participacao e seguranca da crianca nas propostas.',
-      howToApply: 'Retomar a atividade em etapas pequenas, com modelagem e tempo de resposta.',
-      whatToObserve: 'Engajamento progressivo, autonomia e interacao com colegas.',
-      recordText: 'Observou-se necessidade de continuidade com ajuste de mediacao pedagogica.',
-    },
-    {
-      id: `sg-feedback-${Date.now()}-1`,
-      title: 'Continuidade com variacao de estrategia',
-      summary: 'Sugere-se manter a intencao pedagogica variando materiais e organizacao.',
-      objective: 'Ampliar oportunidades de resposta positiva da crianca.',
-      howToApply: 'Alternar recursos concretos, duplas e momentos de acolhimento breve.',
-      whatToObserve: 'Resposta emocional, participacao e comunicacao durante a atividade.',
-      recordText: 'Recomenda-se continuidade do acompanhamento pedagogico com variacao de estrategia.',
-    },
-  ]
-
   return {
     analysisText: parsed?.analysisText?.trim() || rawText.trim(),
     evolutionRecord: parsed?.evolutionRecord?.trim() || '',
-    recommendedSuggestions: recommendedSuggestions.length > 0 ? recommendedSuggestions : fallbackSuggestions,
+    recommendedSuggestions,
   }
 }
 

@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     ownerIdForRollback = ownerId
     const body = await request.json()
     const generationType = parseGenerationType(body.generationType)
+    const requestSummary = isObjectRecord(body.requestSummary) ? body.requestSummary : {}
     const promptVersion = typeof body.promptVersion === 'string' && body.promptVersion.trim()
       ? body.promptVersion.trim()
       : 'bncc-v1'
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
       classId: typeof body.classId === 'string' ? body.classId : null,
       studentId: typeof body.studentId === 'string' ? body.studentId : null,
       promptVersion,
-      requestSummary: isObjectRecord(body.requestSummary) ? body.requestSummary : {},
+      requestSummary,
+      pricingOverride: resolveInterventionPricingOverride(requestSummary),
     })
 
     const reservedLogId = reservation.logId
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
       classId: typeof body.classId === 'string' ? body.classId : null,
       studentId: typeof body.studentId === 'string' ? body.studentId : null,
       promptVersion,
-      requestSummary: isObjectRecord(body.requestSummary) ? body.requestSummary : {},
+      requestSummary,
       logId: reservedLogId,
     })
     generatedReportId = generated.reportId
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
         reportId: generated.reportId,
         provider: generated.provider,
         model: generated.model,
-        pipeline: 'claude-text-3-stage',
+        pipeline: generated.pipeline,
         stages: generated.pipelineStages,
       },
     })
@@ -159,4 +161,17 @@ function parseGenerationType(value: unknown): AiGenerationType {
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+function resolveInterventionPricingOverride(summary: Record<string, unknown>) {
+  const mode = summary.interventionMode
+  if (mode !== 'suggestions' && mode !== 'feedback_analysis') return undefined
+  return {
+    provider: 'openai',
+    model: process.env.OPENAI_INTERVENTIONS_MODEL?.trim() || 'gpt-4o-mini',
+    estimatedCostCents: mode === 'suggestions' ? 35 : 28,
+    giztokens: mode === 'suggestions' ? 350 : 280,
+    inputTokens: mode === 'suggestions' ? 2200 : 2000,
+    outputTokens: mode === 'suggestions' ? 1300 : 1100,
+  }
 }

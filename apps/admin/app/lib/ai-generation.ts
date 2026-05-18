@@ -37,6 +37,7 @@ interface GeneratePedagogicalTextResult {
   text: string
   provider: string
   model: string
+  pipeline: string
   promptVersion: string
   inputTokens: number
   outputTokens: number
@@ -48,6 +49,7 @@ interface GeneratePedagogicalTextResult {
 export class PublicAiGenerationError extends Error {}
 
 const DEFAULT_ANTHROPIC_TEXT_MODEL = 'claude-sonnet-4-20250514'
+const DEFAULT_OPENAI_INTERVENTIONS_MODEL = 'gpt-4o-mini'
 
 function resolveAnthropicTextModelFallback(): string {
   const fromEnv = process.env.ANTHROPIC_TEXT_MODEL?.trim()
@@ -74,6 +76,10 @@ export async function generatePedagogicalText(
 ): Promise<GeneratePedagogicalTextResult> {
   const summary = input.requestSummary ?? {}
   const promptInput = buildPromptInputFromSummary(input, summary)
+
+  if (isInterventionMode(promptInput.interventionMode)) {
+    return generateInterventionWithOpenAi(input, promptInput)
+  }
 
   const modelDraft = resolveDraftModelId()
   const modelReview = resolveReviewModelId()
@@ -140,6 +146,7 @@ export async function generatePedagogicalText(
       text: s3.text,
       provider: 'anthropic',
       model: s3.model,
+      pipeline: 'claude-text-3-stage',
       promptVersion: input.promptVersion,
       inputTokens,
       outputTokens,
@@ -152,6 +159,57 @@ export async function generatePedagogicalText(
       await rollbackGeneratedArtifacts({ reportId, ownerId: input.ownerId })
     }
     throw error
+  }
+}
+
+async function generateInterventionWithOpenAi(
+  input: GeneratePedagogicalTextInput,
+  promptInput: BuildPromptInput,
+): Promise<GeneratePedagogicalTextResult> {
+  const prompt = buildStage1DraftPrompt(promptInput)
+  const openAi = await requestOpenAiInterventionText({
+    mode: promptInput.interventionMode as 'suggestions' | 'feedback_analysis',
+    system: prompt.system,
+    user: prompt.user,
+    model: resolveOpenAiInterventionsModel(),
+  })
+
+  const pipelineStages: PipelineStageMetadata[] = [
+    {
+      stage: 1,
+      etapa: 'rascunho_pedagogico',
+      provider: 'openai',
+      model: openAi.model,
+      promptVersion: pipelineStagePromptVersion(input.promptVersion, 1),
+      inputTokens: openAi.inputTokens,
+      outputTokens: openAi.outputTokens,
+      estimatedCostCents: openAi.actualCostCents,
+      actualCostCents: openAi.actualCostCents,
+    },
+  ]
+
+  const reportId = await persistGeneratedReport(input, openAi.text)
+  await persistUsage(
+    reportId,
+    input.ownerId,
+    'openai',
+    openAi.model,
+    openAi.inputTokens,
+    openAi.outputTokens,
+    openAi.actualCostCents,
+  )
+
+  return {
+    text: openAi.text,
+    provider: 'openai',
+    model: openAi.model,
+    pipeline: 'gpt-interventions',
+    promptVersion: input.promptVersion,
+    inputTokens: openAi.inputTokens,
+    outputTokens: openAi.outputTokens,
+    actualCostCents: openAi.actualCostCents,
+    reportId,
+    pipelineStages,
   }
 }
 
@@ -309,6 +367,13 @@ interface RequestClaudeOptions {
   temperature?: number
 }
 
+interface RequestOpenAiInterventionOptions {
+  mode: 'suggestions' | 'feedback_analysis'
+  system: string
+  user: string
+  model: string
+}
+
 async function requestClaudeText(system: string, user: string, options: RequestClaudeOptions) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -365,6 +430,66 @@ async function requestClaudeText(system: string, user: string, options: RequestC
     outputTokens,
     estimatedCostCents,
     actualCostCents: estimatedCostCents,
+  }
+}
+
+async function requestOpenAiInterventionText(options: RequestOpenAiInterventionOptions) {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new PublicAiGenerationError('Servico de IA indisponivel no momento. Tente novamente em instantes.')
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: options.model,
+      temperature: 0.35,
+      messages: [
+        { role: 'system', content: options.system },
+        { role: 'user', content: options.user },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: options.mode === 'suggestions' ? 'intervention_suggestions' : 'intervention_feedback',
+          strict: true,
+          schema: options.mode === 'suggestions'
+            ? interventionSuggestionsSchema()
+            : interventionFeedbackSchema(),
+        },
+      },
+    }),
+  })
+
+  const payload = (await response.json().catch(() => null)) as {
+    choices?: Array<{ message?: { content?: string | null } }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
+    error?: { message?: string }
+    model?: string
+  } | null
+
+  if (!response.ok) {
+    console.error('[ai-generation] OpenAI HTTP', response.status, payload?.error?.message)
+    throw new PublicAiGenerationError('Nao foi possivel gerar sugestoes agora. Tente novamente em instantes.')
+  }
+
+  const text = payload?.choices?.[0]?.message?.content?.trim()
+  if (!text) {
+    throw new PublicAiGenerationError('A IA nao retornou conteudo suficiente para intervencoes.')
+  }
+
+  const inputTokens = payload?.usage?.prompt_tokens ?? 0
+  const outputTokens = payload?.usage?.completion_tokens ?? 0
+  return {
+    text,
+    model: payload?.model ?? options.model,
+    inputTokens,
+    outputTokens,
+    actualCostCents: estimateOpenAiInterventionCostCents(inputTokens, outputTokens),
   }
 }
 
@@ -494,10 +619,35 @@ function estimateClaudeCostCents(model: string, inputTokens: number, outputToken
   return Math.max(1, Math.round(brlApprox * 100))
 }
 
+function estimateOpenAiInterventionCostCents(inputTokens: number, outputTokens: number) {
+  const inputUsdPerMillion = resolveOpenAiTextInputUsdPerMillion()
+  const outputUsdPerMillion = resolveOpenAiTextOutputUsdPerMillion()
+  const usd = (inputTokens / 1_000_000) * inputUsdPerMillion + (outputTokens / 1_000_000) * outputUsdPerMillion
+  const brlApprox = usd * resolveUsdToBrlRate()
+  return Math.max(1, Math.round(brlApprox * 100))
+}
+
 function resolveUsdToBrlRate() {
   const fromEnv = Number(process.env.AI_USD_TO_BRL)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
   return 5.5
+}
+
+function resolveOpenAiInterventionsModel() {
+  const fromEnv = process.env.OPENAI_INTERVENTIONS_MODEL?.trim()
+  return fromEnv || DEFAULT_OPENAI_INTERVENTIONS_MODEL
+}
+
+function resolveOpenAiTextInputUsdPerMillion() {
+  const fromEnv = Number(process.env.OPENAI_TEXT_INPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 0.15
+}
+
+function resolveOpenAiTextOutputUsdPerMillion() {
+  const fromEnv = Number(process.env.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 0.6
 }
 
 function asString(value: unknown) {
@@ -527,6 +677,68 @@ function asObject(value: unknown): Record<string, unknown> | undefined {
 
 function asInterventionMode(value: unknown): BuildPromptInput['interventionMode'] {
   return value === 'suggestions' || value === 'feedback_analysis' ? value : undefined
+}
+
+function isInterventionMode(mode: BuildPromptInput['interventionMode']): mode is 'suggestions' | 'feedback_analysis' {
+  return mode === 'suggestions' || mode === 'feedback_analysis'
+}
+
+function interventionSuggestionsSchema() {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      suggestions: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 5,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            title: { type: 'string' },
+            summary: { type: 'string' },
+            objective: { type: 'string' },
+            howToApply: { type: 'string' },
+            whatToObserve: { type: 'string' },
+            recordText: { type: 'string' },
+          },
+          required: ['title', 'summary', 'objective', 'howToApply', 'whatToObserve', 'recordText'],
+        },
+      },
+    },
+    required: ['suggestions'],
+  }
+}
+
+function interventionFeedbackSchema() {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      analysisText: { type: 'string' },
+      evolutionRecord: { type: 'string' },
+      recommendedSuggestions: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 4,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            title: { type: 'string' },
+            summary: { type: 'string' },
+            objective: { type: 'string' },
+            howToApply: { type: 'string' },
+            whatToObserve: { type: 'string' },
+            recordText: { type: 'string' },
+          },
+          required: ['title', 'summary', 'objective', 'howToApply', 'whatToObserve', 'recordText'],
+        },
+      },
+    },
+    required: ['analysisText', 'evolutionRecord', 'recommendedSuggestions'],
+  }
 }
 
 function toError(error: unknown, fallback: string) {
