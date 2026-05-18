@@ -19,6 +19,12 @@ export interface BuildPromptInput {
   bnccFields?: string[]
   useAnnotations?: boolean
   attachments?: Array<{ name?: string; type?: string; size?: number }>
+  interventionMode?: 'suggestions' | 'feedback_analysis'
+  observation?: string
+  studentAge?: string
+  interventionChosen?: Record<string, unknown>
+  teacherReturn?: string
+  returnChoice?: string
 }
 
 export interface PedagogicalPrompt {
@@ -38,6 +44,12 @@ export function pipelineStagePromptVersion(baseVersion: string, stage: 1 | 2 | 3
 export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalPrompt {
   const kind = input.reportKind || input.docKind || mapGenerationType(input.generationType)
   const pv = pipelineStagePromptVersion(input.promptVersion, 1)
+  if (isInterventionMode(input, 'suggestions')) {
+    return buildInterventionSuggestionsPrompt(input, pv, 1)
+  }
+  if (isInterventionMode(input, 'feedback_analysis')) {
+    return buildInterventionFeedbackPrompt(input, pv, 1)
+  }
 
   const system = [
     `Voce executa a ETAPA 1 (rascunho pedagogico) do pipeline textual do Approf (${pv}).`,
@@ -63,6 +75,12 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
 export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromStage1: string): PedagogicalPrompt {
   const kind = input.reportKind || input.docKind || mapGenerationType(input.generationType)
   const pv = pipelineStagePromptVersion(input.promptVersion, 2)
+  if (isInterventionMode(input, 'suggestions')) {
+    return buildInterventionSuggestionsPrompt(input, pv, 2, draftFromStage1)
+  }
+  if (isInterventionMode(input, 'feedback_analysis')) {
+    return buildInterventionFeedbackPrompt(input, pv, 2, draftFromStage1)
+  }
 
   const system = [
     `Voce executa a ETAPA 2 (revisao BNCC e seguranca pedagogica) do pipeline textual do Approf (${pv}).`,
@@ -95,6 +113,12 @@ export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromSt
 export function buildStage3FinalRefinementPrompt(input: BuildPromptInput, textFromStage2: string): PedagogicalPrompt {
   const kind = input.reportKind || input.docKind || mapGenerationType(input.generationType)
   const pv = pipelineStagePromptVersion(input.promptVersion, 3)
+  if (isInterventionMode(input, 'suggestions')) {
+    return buildInterventionSuggestionsPrompt(input, pv, 3, textFromStage2)
+  }
+  if (isInterventionMode(input, 'feedback_analysis')) {
+    return buildInterventionFeedbackPrompt(input, pv, 3, textFromStage2)
+  }
 
   const system = [
     `Voce executa a ETAPA 3 (refinamento final e humanizacao) do pipeline textual do Approf (${pv}).`,
@@ -245,4 +269,150 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
   }
 
   return []
+}
+
+function isInterventionMode(input: BuildPromptInput, mode: BuildPromptInput['interventionMode']) {
+  return input.generationType === 'other' && input.interventionMode === mode
+}
+
+function buildInterventionSuggestionsPrompt(
+  input: BuildPromptInput,
+  promptVersion: string,
+  stage: 1 | 2 | 3,
+  previous?: string,
+): PedagogicalPrompt {
+  const baseSystem = [
+    `Voce executa a etapa ${stage} do fluxo de Intervencoes do Approf (${promptVersion}).`,
+    'Voce e um assistente pedagogico especializado em educacao infantil.',
+    'Voce NAO pode diagnosticar, citar transtornos, usar linguagem clinica ou emitir laudos.',
+    'Use linguagem acolhedora, pratica, pedagogica, simples e profissional.',
+    'Nunca use termos: problema, transtorno, diagnostico, falhou, deficit.',
+    'Use termos: observou-se, recomenda-se, sugere-se, houve avanco, continuidade do acompanhamento.',
+    'Responda APENAS em JSON valido.',
+    'Formato JSON obrigatorio: {"suggestions":[{"title":"...","summary":"...","objective":"...","howToApply":"...","whatToObserve":"...","recordText":"..."}]}',
+    'Gere entre 3 e 5 alternativas pedagogicas.',
+  ].join('\n')
+
+  const initialUser = [
+    'Você é um assistente pedagógico especializado em educação infantil.',
+    '',
+    'Sua função é ajudar professoras a pensarem em intervenções pedagógicas a partir de observações feitas sobre crianças durante a rotina escolar.',
+    '',
+    'Você NÃO pode:',
+    '- fazer diagnósticos',
+    '- citar transtornos',
+    '- usar linguagem clínica',
+    '- emitir laudos',
+    '',
+    'Sua resposta deve ser:',
+    '- acolhedora',
+    '- prática',
+    '- pedagógica',
+    '- simples',
+    '- profissional',
+    '',
+    `Dados:`,
+    `Aluno: ${input.studentName ?? 'Nao informado'}`,
+    `Idade: ${input.studentAge ?? 'Nao informado'}`,
+    'Observação da professora:',
+    input.observation?.trim() || 'Nao informado',
+    '',
+    'Gere de 3 a 5 alternativas de intervenção pedagógica.',
+    '',
+    'Para cada alternativa inclua:',
+    '1. Título da intervenção',
+    '2. Objetivo pedagógico',
+    '3. Como aplicar',
+    '4. O que observar na resposta da criança',
+    '5. Texto curto para registro pedagógico.',
+  ].join('\n')
+
+  if (!previous) return { system: baseSystem, user: initialUser }
+
+  return {
+    system: baseSystem,
+    user: [
+      'Revise e refine a proposta anterior mantendo todas as regras.',
+      'Retorne apenas JSON valido no formato solicitado.',
+      '',
+      previous.trim(),
+    ].join('\n'),
+  }
+}
+
+function buildInterventionFeedbackPrompt(
+  input: BuildPromptInput,
+  promptVersion: string,
+  stage: 1 | 2 | 3,
+  previous?: string,
+): PedagogicalPrompt {
+  const baseSystem = [
+    `Voce executa a etapa ${stage} do fluxo de Analise de Retorno de Intervencoes (${promptVersion}).`,
+    'Voce e um assistente pedagogico especializado em educacao infantil.',
+    'Voce NAO pode diagnosticar, sugerir transtornos, usar linguagem medica ou emitir parecer clinico.',
+    'Use linguagem pratica, pedagogica, acolhedora, profissional e simples.',
+    'Responda APENAS em JSON valido.',
+    'Formato JSON obrigatorio:',
+    '{"analysisText":"...","evolutionRecord":"...","recommendedSuggestions":[{"title":"...","summary":"...","objective":"...","howToApply":"...","whatToObserve":"...","recordText":"..."}]}',
+    'Quando houver avanco, recommendedSuggestions pode ser vazio.',
+    'Quando nao houver avanco completo, gere de 2 a 4 alternativas em recommendedSuggestions.',
+  ].join('\n')
+
+  const initialUser = [
+    'Você é um assistente pedagógico especializado em educação infantil.',
+    '',
+    'Analise o retorno da professora após uma intervenção pedagógica aplicada.',
+    '',
+    'Você NÃO pode:',
+    '- diagnosticar',
+    '- sugerir transtornos',
+    '- usar linguagem médica',
+    '- emitir parecer clínico',
+    '',
+    `Dados:`,
+    `Aluno: ${input.studentName ?? 'Nao informado'}`,
+    'Observação inicial:',
+    input.observation?.trim() || 'Nao informado',
+    '',
+    'Intervenção aplicada:',
+    JSON.stringify(input.interventionChosen ?? {}, null, 2),
+    '',
+    'Retorno da professora:',
+    input.teacherReturn?.trim() || 'Nao informado',
+    '',
+    'Status informado:',
+    input.returnChoice ?? 'nao informado',
+    '',
+    'Se houve avanço:',
+    '- gere um texto de evolução pedagógica',
+    '- sugira continuidade',
+    '',
+    'Se houve avanço parcial:',
+    '- registre a evolução parcial',
+    '- sugira adaptações',
+    '',
+    'Se ainda necessita acompanhamento:',
+    '- sugira novas estratégias pedagógicas',
+    '- mantenha linguagem acolhedora',
+    '- recomende continuidade do acompanhamento pedagógico',
+    '',
+    'A resposta deve ser:',
+    '- prática',
+    '- pedagógica',
+    '- profissional',
+    '- simples',
+    '- pronta para salvar no histórico.',
+  ].join('\n')
+
+  if (!previous) return { system: baseSystem, user: initialUser }
+
+  return {
+    system: baseSystem,
+    user: [
+      'Refine a analise anterior preservando regras e objetividade.',
+      'Retorne apenas JSON valido no formato solicitado.',
+      '',
+      previous.trim(),
+    ].join('\n'),
+  }
 }

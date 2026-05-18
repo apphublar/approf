@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreVertical, Pencil, Trash2, PenLine, Sparkles, CalendarDays } from 'lucide-react'
+import { MoreVertical, Pencil, Trash2, PenLine, Sparkles, CalendarDays, Lightbulb } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { toTitleCaseName } from '@/utils/text'
 import type { BoardNote } from '@/types'
@@ -224,8 +224,25 @@ export default function HomeScreen() {
       <div className="scroll-area">
         <div className="px-[18px]">
           <button
-            onClick={() => openSubscreen('ai')}
+            onClick={() => openSubscreen('interventions')}
             className="w-full rounded-app p-4 mt-[14px] mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
+            style={{ background: 'linear-gradient(135deg,#5A6ACF,#6E89FF)' }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-[12px] bg-white/20 flex items-center justify-center">
+                <Lightbulb size={21} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-[14px] font-bold">Intervencoes</h3>
+                <p className="text-[11px] opacity-90 leading-snug">Receba sugestoes pedagogicas para apoiar o desenvolvimento da crianca</p>
+              </div>
+              <span className="text-white/80 text-[18px]">›</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => openSubscreen('ai')}
+            className="w-full rounded-app p-4 mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
             style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}
           >
             <div className="flex items-center gap-3">

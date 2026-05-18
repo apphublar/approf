@@ -25,6 +25,7 @@ export type Subscreen =
   | 'pedagogical-generator'
   | 'document-detail'
   | 'pending'
+  | 'interventions'
 
 export type FeatureKey = 'community'
 
@@ -214,4 +215,34 @@ export interface TeacherPersonalDocument {
   size: number
   dataUrl: string
   uploadedAt: string
+}
+
+export type InterventionProgressStatus = 'pendente' | 'em_acompanhamento' | 'concluida'
+export type InterventionReturnChoice = 'houve_avanco' | 'houve_avanco_parcial' | 'necessita_acompanhamento'
+
+export interface InterventionSuggestion {
+  id: string
+  title: string
+  summary: string
+  objective: string
+  howToApply: string
+  whatToObserve: string
+  recordText: string
+}
+
+export interface InterventionHistoryItem {
+  id: string
+  studentId: string
+  studentName: string
+  classId: string
+  className: string
+  createdAt: string
+  observationInitial: string
+  suggestions: InterventionSuggestion[]
+  chosenIntervention?: InterventionSuggestion
+  teacherReturn?: string
+  returnChoice?: InterventionReturnChoice
+  aiAnalysis?: string
+  evolutionRecord?: string
+  status: InterventionProgressStatus
 }

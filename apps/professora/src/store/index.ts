@@ -8,6 +8,7 @@ import type {
   ClassData,
   CommunityPost,
   FeatureAccess,
+  InterventionHistoryItem,
   OnboardingData,
   Subscreen,
   Tab,
@@ -78,6 +79,7 @@ interface AppStore {
   calendarEvents: CalendarEvent[]
   communityAccess: FeatureAccess
   communityPosts: CommunityPost[]
+  interventions: InterventionHistoryItem[]
   personalDocuments: TeacherPersonalDocument[]
   activeClassId: string | null
   activeStudentId: string | null
@@ -101,6 +103,8 @@ interface AppStore {
   setCalendarEvents: (events: CalendarEvent[]) => void
   addCalendarEvent: (event: CalendarEvent) => void
   addCommunityPost: (post: CommunityPost) => void
+  addIntervention: (item: InterventionHistoryItem) => void
+  updateIntervention: (item: InterventionHistoryItem) => void
   addPersonalDocument: (doc: TeacherPersonalDocument) => void
   removePersonalDocument: (id: string) => void
   addClass: (classData: ClassData) => void
@@ -151,6 +155,7 @@ export const useAppStore = create<AppStore>()(
           createdAt: 'Ontem, 17h12',
         },
       ],
+      interventions: [],
       activeClassId: null as string | null,
       activeStudentId: null as string | null,
       isCommunityEnabled: (): boolean => {
@@ -218,6 +223,12 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ calendarEvents: [event, ...state.calendarEvents] })),
       addCommunityPost: (post: CommunityPost) =>
         set((state) => ({ communityPosts: [post, ...state.communityPosts] })),
+      addIntervention: (item) =>
+        set((state) => ({ interventions: [item, ...state.interventions] })),
+      updateIntervention: (item) =>
+        set((state) => ({
+          interventions: state.interventions.map((current) => (current.id === item.id ? item : current)),
+        })),
       addPersonalDocument: (doc: TeacherPersonalDocument) =>
         set((state) => ({ personalDocuments: [doc, ...state.personalDocuments] })),
       removePersonalDocument: (id: string) =>

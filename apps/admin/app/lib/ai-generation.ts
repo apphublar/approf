@@ -391,6 +391,12 @@ function buildPromptInputFromSummary(
     bnccFields: asStringArray(summary.bnccFields),
     useAnnotations: asBoolean(summary.useAnnotations),
     attachments: asObjectArray(summary.attachments) as BuildPromptInput['attachments'],
+    interventionMode: asInterventionMode(summary.interventionMode),
+    observation: asString(summary.observation) ?? asString(summary.observationInitial),
+    studentAge: asString(summary.studentAge),
+    interventionChosen: asObject(summary.interventionChosen),
+    teacherReturn: asString(summary.teacherReturn),
+    returnChoice: asString(summary.returnChoice),
   }
 }
 
@@ -512,6 +518,15 @@ function asObjectArray(value: unknown): Array<Record<string, unknown>> | undefin
   if (!Array.isArray(value)) return undefined
   const filtered = value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object' && !Array.isArray(item)))
   return filtered.length ? filtered : undefined
+}
+
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  return value as Record<string, unknown>
+}
+
+function asInterventionMode(value: unknown): BuildPromptInput['interventionMode'] {
+  return value === 'suggestions' || value === 'feedback_analysis' ? value : undefined
 }
 
 function toError(error: unknown, fallback: string) {
