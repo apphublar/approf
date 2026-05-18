@@ -58,6 +58,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
   const canGenerate = theme.trim().length >= 2 && objective.trim().length >= 5
   const selectedClassData = classes.find((item) => item.name === selectedClass)
+  const generationViewKey = generated ? 'result' : generating ? 'loading' : 'form'
 
   useEffect(() => {
     const draft = loadDraft<{
@@ -249,7 +250,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
         </div>
       </div>
 
-      <div className="scroll-area px-[18px]">
+      <div key={generationViewKey} className="scroll-area px-[18px] stage-fade-in">
         {!generated ? (
           generating ? (
             <GenerationDocumentLoadingScreen variant="planning" />

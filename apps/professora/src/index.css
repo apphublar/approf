@@ -91,6 +91,21 @@ input, textarea, select, button {
   animation: slideUp 0.24s ease;
 }
 
+@keyframes stageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stage-fade-in {
+  animation: stageFadeIn 0.22s ease-out;
+}
+
 /* Spinner */
 @keyframes spin {
   to { transform: rotate(360deg); }

@@ -386,7 +386,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
 
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end">
-          <div className="w-full bg-white rounded-t-[22px] border-t border-border max-h-[85vh] overflow-auto">
+          <div className="w-full bg-white rounded-t-[22px] border-t border-border max-h-[85vh] overflow-auto stage-fade-in">
             {creating ? (
               <div className="p-5 bg-cream">
                 <GenerationImageLoadingScreen />

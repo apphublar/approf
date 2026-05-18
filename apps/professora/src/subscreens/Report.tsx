@@ -122,6 +122,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const hasRequiredObjective = !needsObjective || objective.trim().length >= 10
   const hasRequiredPeriod = !needsEvaluationPeriod || evaluationPeriod.trim().length >= 5
   const canGenerate = hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod
+  const generationViewKey = generated ? 'result' : generating ? 'loading' : 'form'
   const voiceAnnotations = useMemo(
     () => studentAnnotations.filter((annotation) => (annotation.tags ?? []).some((tag) => normalize(tag).includes('transcrição'))),
     [studentAnnotations],
@@ -501,7 +502,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         <span className="font-serif text-[18px] text-gd flex-1">{reportKind}</span>
       </div>
 
-      <div className="scroll-area px-[18px]">
+      <div key={generationViewKey} className="scroll-area px-[18px] stage-fade-in">
         {!generated ? (
           generating ? (
             currentReportType === 'portfolio_image'

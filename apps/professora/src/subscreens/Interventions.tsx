@@ -37,6 +37,7 @@ export default function InterventionsSubscreen() {
   const [activeInterventionId, setActiveInterventionId] = useState('')
   const [draftMessage, setDraftMessage] = useState('')
   const draftKey = `approf:draft:interventions:${userId}`
+  const generationViewKey = (generating || analyzing) ? 'loading' : step
 
   const studentHistory = useMemo(
     () => interventions.filter((item) => item.studentId === selectedStudent?.id),
@@ -263,7 +264,7 @@ export default function InterventionsSubscreen() {
         <span className="font-serif text-[18px] text-gd flex-1">Intervenções</span>
       </div>
 
-      <div className="scroll-area px-[18px] py-4">
+      <div key={generationViewKey} className="scroll-area px-[18px] py-4 stage-fade-in">
         {!selectedStudent && (
           <div className="bg-white rounded-app border border-border shadow-card p-4">
             <p className="text-[13px] font-bold text-ink">Nenhuma criança encontrada</p>

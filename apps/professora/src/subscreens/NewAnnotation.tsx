@@ -106,6 +106,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     [activeChatId, chatConversations],
   )
   const chatMessages = activeChat?.messages ?? []
+  const activeChatViewKey = activeChat?.id ?? 'chat-empty'
 
   const editAnnotation = useMemo(() => {
     const data = props?.data
@@ -832,7 +833,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                   Novo chat
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+              <div key={activeChatViewKey} className="flex-1 overflow-y-auto pr-1 space-y-3 stage-fade-in">
                 {chatMessages.length === 0 && (
                   <p className="text-sm text-muted leading-relaxed">
                     Inicie uma conversa. O chat é livre e responde em texto.
