@@ -25,6 +25,28 @@ interface GeneratePortfolioImageResult {
   reportId: string
 }
 
+interface GenerateStandaloneImageInput {
+  ownerId: string
+  classId?: string | null
+  studentId?: string | null
+  promptVersion: string
+  requestSummary?: Record<string, unknown>
+  logId: string
+}
+
+interface GenerateStandaloneImageResult {
+  imageDataUrl: string
+  prompt: string
+  provider: string
+  model: string
+  size: string
+  quality: string
+  inputTokens: number
+  outputTokens: number
+  actualCostCents: number
+  reportId: string
+}
+
 const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2'
 const DEFAULT_OPENAI_IMAGE_SIZE = '1024x1536'
 const DEFAULT_OPENAI_IMAGE_QUALITY = 'high'
@@ -58,11 +80,78 @@ export async function generatePortfolioImage(
   })
 
   const imageDataUrl = generated.image
-  const reportId = await persistGeneratedReport(input, body, imageDataUrl, {
+  const reportId = await persistGeneratedReport(input, {
+    reportType: input.generationType,
+    artifactKind: 'portfolio_image',
+    body,
+    imageDataUrl,
+    artifact: {
+      prompt,
+      model,
+      size,
+      quality,
+    },
+  })
+  await persistUsage(
+    reportId,
+    input.ownerId,
+    'openai',
+    model,
+    generated.inputTokens,
+    generated.outputTokens,
+    actualCostCents,
+  )
+
+  return {
+    imageDataUrl,
     prompt,
+    provider: 'openai',
     model,
     size,
     quality,
+    inputTokens: generated.inputTokens,
+    outputTokens: generated.outputTokens,
+    actualCostCents,
+    reportId,
+  }
+}
+
+export async function generateStandaloneImage(
+  input: GenerateStandaloneImageInput,
+): Promise<GenerateStandaloneImageResult> {
+  const summary = input.requestSummary ?? {}
+  const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_IMAGE_MODEL
+  const size = resolveStandaloneImageSize(summary)
+  const quality = resolveStandaloneImageQuality(summary)
+  const prompt = buildStandaloneImagePrompt(summary, size)
+
+  const generated = await requestOpenAiImage({
+    model,
+    prompt,
+    size,
+    quality,
+    user: input.ownerId,
+  })
+
+  const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens)
+  const body = buildPersistedStandaloneImageBody({
+    prompt,
+    size,
+    quality,
+  })
+
+  const imageDataUrl = generated.image
+  const reportId = await persistGeneratedReport(input, {
+    reportType: 'generated_image',
+    artifactKind: 'generated_image',
+    body,
+    imageDataUrl,
+    artifact: {
+      prompt,
+      model,
+      size,
+      quality,
+    },
   })
   await persistUsage(
     reportId,
@@ -222,6 +311,46 @@ function resolvePortfolioImageSize(summary: Record<string, unknown>) {
   return fromEnv || DEFAULT_OPENAI_IMAGE_SIZE
 }
 
+function resolveStandaloneImageSize(summary: Record<string, unknown>) {
+  const requested = asString(summary.description)?.toLowerCase() || ''
+  if (requested.includes('horizontal') || requested.includes('paisagem') || requested.includes('landscape')) {
+    return '1536x1024'
+  }
+  if (requested.includes('quadrada') || requested.includes('quadrado') || requested.includes('square')) {
+    return '1024x1024'
+  }
+  if (requested.includes('vertical') || requested.includes('retrato') || requested.includes('portrait')) {
+    return '1024x1536'
+  }
+  const fromEnv = process.env.OPENAI_IMAGE_SIZE?.trim()
+  return fromEnv || DEFAULT_OPENAI_IMAGE_SIZE
+}
+
+function resolveStandaloneImageQuality(summary: Record<string, unknown>) {
+  const requested = asString(summary.imageQuality)?.trim().toLowerCase()
+  if (requested === 'medium' || requested === 'media' || requested === 'média') return 'medium'
+  if (requested === 'high' || requested === 'alta') return 'high'
+  return process.env.OPENAI_IMAGE_QUALITY?.trim() || DEFAULT_OPENAI_IMAGE_QUALITY
+}
+
+function buildStandaloneImagePrompt(summary: Record<string, unknown>, size: string) {
+  const description = asString(summary.description)?.trim()
+  if (!description) {
+    throw new PublicAiGenerationError('Descreva a imagem para continuar.')
+  }
+
+  return `Crie uma imagem de alta qualidade com base na descrição abaixo.
+
+Requisitos:
+- Use português brasileiro quando houver texto visível.
+- Respeite fielmente estilo, cores, cenário, orientação e formato pedidos.
+- Tamanho final: ${size}.
+- Evite elementos ofensivos, diagnósticos médicos, marcas externas ou conteúdo impróprio para ambiente escolar.
+
+Descrição da professora:
+${description}`
+}
+
 function buildPersistedImageBody(input: {
   prompt: string
   model: string
@@ -239,11 +368,30 @@ Prompt usado:
 ${input.prompt}`
 }
 
+function buildPersistedStandaloneImageBody(input: {
+  prompt: string
+  size: string
+  quality: string
+}) {
+  return `Imagem criada com sucesso.
+
+Tamanho: ${input.size}
+Qualidade: ${input.quality}
+
+Descrição usada:
+
+${input.prompt}`
+}
+
 async function persistGeneratedReport(
-  input: GeneratePortfolioImageInput,
-  body: string,
-  imageDataUrl: string,
-  artifact: { prompt: string; model: string; size: string; quality: string },
+  input: GeneratePortfolioImageInput | GenerateStandaloneImageInput,
+  payload: {
+    reportType: string
+    artifactKind: string
+    body: string
+    imageDataUrl: string
+    artifact: { prompt: string; model: string; size: string; quality: string }
+  },
 ) {
   const supabase = createSupabaseServiceClient()
   const { data, error } = await supabase
@@ -253,16 +401,16 @@ async function persistGeneratedReport(
       student_id: input.studentId ?? null,
       class_id: input.classId ?? null,
       status: 'ready',
-      report_type: input.generationType,
+      report_type: payload.reportType,
       prompt_version: input.promptVersion,
-      body,
+      body: payload.body,
       ai_artifacts: {
-        kind: 'portfolio_image',
-        imageDataUrl,
-        prompt: artifact.prompt,
-        model: artifact.model,
-        size: artifact.size,
-        quality: artifact.quality,
+        kind: payload.artifactKind,
+        imageDataUrl: payload.imageDataUrl,
+        prompt: payload.artifact.prompt,
+        model: payload.artifact.model,
+        size: payload.artifact.size,
+        quality: payload.artifact.quality,
       },
     })
     .select('id')

@@ -53,10 +53,18 @@ export interface AiImageGenerationInput extends AiUsageReservationInput {
 export interface AiImageGenerationResult extends AiUsageReservationResult {
   imageDataUrl?: string
   prompt?: string
+  quality?: 'medium' | 'high'
   reportId?: string
   promptVersion?: string
   provider?: string
   model?: string
+}
+
+export interface GeneratedImageInput {
+  description: string
+  quality: 'medium' | 'high'
+  classId?: string | null
+  studentId?: string | null
 }
 
 export interface AiChatGenerationInput {
@@ -337,10 +345,86 @@ export async function generateAiPortfolioImage(input: AiImageGenerationInput): P
     entitlement: result.entitlement,
     imageDataUrl: typeof result.imageDataUrl === 'string' ? result.imageDataUrl : undefined,
     prompt: typeof result.prompt === 'string' ? result.prompt : undefined,
+    quality: result.quality === 'high' ? 'high' : 'medium',
     reportId: typeof result.reportId === 'string' ? result.reportId : undefined,
     promptVersion: typeof result.promptVersion === 'string' ? result.promptVersion : undefined,
     provider: typeof result.provider === 'string' ? result.provider : undefined,
     model: typeof result.model === 'string' ? result.model : undefined,
+  }
+}
+
+export async function generateImage(input: GeneratedImageInput): Promise<AiImageGenerationResult> {
+  const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
+  if (!apiBaseUrl) {
+    throw new Error('Serviço de geração não configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase não configurado para registrar uso.')
+  }
+
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+
+  const token = data.session?.access_token
+  if (!token) {
+    throw new Error('Sessão expirada. Entre novamente para continuar.')
+  }
+
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 120000)
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/api/ai/generate-image`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        quality: input.quality,
+        classId: input.classId ?? null,
+        studentId: input.studentId ?? null,
+        requestSummary: {
+          description: input.description,
+          imageQuality: input.quality,
+        },
+      }),
+      signal: controller.signal,
+    })
+  } catch (requestError) {
+    if (requestError instanceof DOMException && requestError.name === 'AbortError') {
+      throw new Error('A geração da imagem demorou mais do que o esperado. Tente novamente.')
+    }
+    throw requestError
+  } finally {
+    window.clearTimeout(timeout)
+  }
+
+  const result = await response.json().catch(() => null) as Partial<AiImageGenerationResult> | { error?: string } | null
+  if (!response.ok && response.status !== 402) {
+    const message = result && 'error' in result && typeof result.error === 'string'
+      ? result.error
+      : 'Não foi possível criar a imagem. Tente novamente.'
+    throw new Error(message)
+  }
+
+  if (!result || !('allowed' in result)) {
+    throw new Error('Resposta inválida do servidor.')
+  }
+
+  return {
+    allowed: Boolean(result.allowed),
+    message: typeof result.message === 'string' ? result.message : '',
+    chargeSource: result.chargeSource,
+    wallet: result.wallet,
+    entitlement: result.entitlement,
+    imageDataUrl: typeof result.imageDataUrl === 'string' ? result.imageDataUrl : undefined,
+    prompt: typeof result.prompt === 'string' ? result.prompt : undefined,
+    quality: result.quality === 'high' ? 'high' : 'medium',
+    reportId: typeof result.reportId === 'string' ? result.reportId : undefined,
+    promptVersion: typeof result.promptVersion === 'string' ? result.promptVersion : undefined,
   }
 }
 

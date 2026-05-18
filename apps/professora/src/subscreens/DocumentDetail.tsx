@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Bold, ChevronLeft, Download, FileText, Italic, List, Pencil, Printer, Share2, Type } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { createReportShareLink, getReportById, updateReport } from '@/services/reports'
-import { generateAiPortfolioImage } from '@/services/ai-usage'
+import { generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
 import type { GeneratedDocument, ReportStatus } from '@/types'
 
 interface DocumentDetailSubscreenProps {
@@ -70,7 +70,10 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   }, [document?.class_id, classes])
 
   const [imagePrompt, setImagePrompt] = useState('')
-  const isImageDocument = document?.report_type === 'portfolio_image' || document?.ai_artifacts?.kind === 'portfolio_image'
+  const isImageDocument = document?.report_type === 'portfolio_image'
+    || document?.report_type === 'generated_image'
+    || document?.ai_artifacts?.kind === 'portfolio_image'
+    || document?.ai_artifacts?.kind === 'generated_image'
   const hasChanges = document ? draft !== toEditorHtml(document.body ?? '') : false
 
   function goBack() {
@@ -140,18 +143,25 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     setError('')
     setMessage('')
     try {
-      const result = await generateAiPortfolioImage({
-        generationType: 'portfolio_image',
-        classId: document.class_id,
-        studentId: document.student_id,
-        promptVersion: 'portfolio-image-correction-v1',
-        requestSummary: {
-          studentName,
-          className,
-          extraContext: prompt,
-          blankContext: prompt,
-        },
-      })
+      const result = document.report_type === 'generated_image'
+        ? await generateImage({
+          description: prompt,
+          quality: document.ai_artifacts?.quality === 'high' ? 'high' : 'medium',
+          classId: document.class_id,
+          studentId: document.student_id,
+        })
+        : await generateAiPortfolioImage({
+          generationType: 'portfolio_image',
+          classId: document.class_id,
+          studentId: document.student_id,
+          promptVersion: 'portfolio-image-correction-v1',
+          requestSummary: {
+            studentName,
+            className,
+            extraContext: prompt,
+            blankContext: prompt,
+          },
+        })
 
       if (result.reportId) {
         const next = await getReportById(result.reportId)
@@ -160,7 +170,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
         setImagePrompt(getImagePrompt(next))
         setEditingImagePrompt(false)
       }
-      setMessage('Nova imagem gerada e salva no histórico.')
+      setMessage('Imagem criada com sucesso e salva no histórico.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível gerar uma nova imagem.')
     } finally {
@@ -276,7 +286,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <img
                     src={document.ai_artifacts.imageDataUrl}
-                    alt="Imagem de portfólio gerada"
+                    alt="Imagem gerada"
                     className="w-full rounded-app-sm border border-border bg-cream"
                   />
                   <div className="grid grid-cols-2 gap-2 mt-3">
@@ -435,6 +445,7 @@ function formatReportType(type: string) {
     case 'planning': return 'Planejamento'
     case 'portfolio_text': return 'Portf\u00f3lio pedag\u00f3gico'
     case 'portfolio_image': return 'Portf\u00f3lio pedag\u00f3gico'
+    case 'generated_image': return 'Imagem'
     case 'specialist_report': return 'Relat\u00f3rio para especialista'
     case 'general_report': return 'Relat\u00f3rio pedag\u00f3gico'
     default: return type

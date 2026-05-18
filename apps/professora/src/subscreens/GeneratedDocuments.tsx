@@ -1,7 +1,8 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, FileText, Image as ImageIcon, Search } from 'lucide-react'
+import { ChevronLeft, Download, Eye, FileText, Image as ImageIcon, Plus, Search, Share2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { listReports } from '@/services/reports'
+import { generateImage } from '@/services/ai-usage'
 import type { GeneratedDocument } from '@/types'
 
 interface GeneratedDocumentsData {
@@ -26,31 +27,33 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [description, setDescription] = useState('')
+  const [quality, setQuality] = useState<'medium' | 'high'>('medium')
+  const [creating, setCreating] = useState(false)
+  const isImagesMode = filters.kind === 'images'
+
+  async function loadDocuments() {
+    setLoading(true)
+    try {
+      const items = await listReports({
+        limit: 200,
+        studentId: filters.studentId,
+        classId: filters.classId,
+      })
+      setDocuments(sortFocusedFirst(items, filters.focusReportId))
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível carregar documentos.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let active = true
-    setLoading(true)
-    listReports({
-      limit: 200,
-      studentId: filters.studentId,
-      classId: filters.classId,
-    })
-      .then((items) => {
-        if (active) {
-          setDocuments(sortFocusedFirst(items, filters.focusReportId))
-          setError('')
-        }
-      })
-      .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : 'Não foi possível carregar documentos.')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-
-    return () => {
-      active = false
-    }
+    loadDocuments()
+      .catch(() => undefined)
   }, [filters.classId, filters.focusReportId, filters.studentId])
 
   const visibleDocuments = useMemo(() => {
@@ -79,6 +82,72 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   const title = getTitle(filters)
   const subtitle = getSubtitle(filters, classes)
 
+  async function createImage() {
+    const normalized = description.trim()
+    if (normalized.length < 12) {
+      setError('Descreva melhor a imagem para continuar.')
+      return
+    }
+
+    setCreating(true)
+    setError('')
+    setMessage('')
+    try {
+      const result = await generateImage({
+        description: normalized,
+        quality,
+        classId: filters.classId ?? null,
+        studentId: filters.studentId ?? null,
+      })
+
+      if (!result.allowed) {
+        setError('Você não possui GizTokens suficientes para criar esta imagem.')
+        return
+      }
+
+      setMessage('Imagem criada com sucesso.')
+      setIsCreateOpen(false)
+      setDescription('')
+      await loadDocuments()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível criar a imagem. Tente novamente.')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  function downloadImage(doc: GeneratedDocument) {
+    const imageDataUrl = doc.ai_artifacts?.imageDataUrl
+    if (!imageDataUrl) return
+    const anchor = window.document.createElement('a')
+    anchor.href = imageDataUrl
+    anchor.download = `imagem-${new Date(doc.created_at).getTime()}.png`
+    window.document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+  }
+
+  async function shareImage(doc: GeneratedDocument) {
+    const imageDataUrl = doc.ai_artifacts?.imageDataUrl
+    if (!imageDataUrl || !navigator.share) return
+    try {
+      const file = dataUrlToFile(imageDataUrl, `imagem-${new Date(doc.created_at).getTime()}.png`)
+      if ('canShare' in navigator && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: 'Imagem',
+          files: [file],
+        })
+        return
+      }
+      await navigator.share({
+        title: 'Imagem',
+        text: 'Confira esta imagem.',
+      })
+    } catch {
+      // ignora cancelamento
+    }
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
@@ -95,6 +164,26 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
             {subtitle.body}
           </p>
         </div>
+
+        {message && (
+          <div className="mb-4 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[12px] text-gd">
+            {message}
+          </div>
+        )}
+
+        {isImagesMode && (
+          <button
+            onClick={() => {
+              setError('')
+              setMessage('')
+              setIsCreateOpen(true)
+            }}
+            className="w-full mb-4 rounded-app-sm bg-gm text-white font-bold text-sm py-[13px] flex items-center justify-center gap-2"
+          >
+            <Plus size={16} />
+            Nova imagem
+          </button>
+        )}
 
         <div className="grid grid-cols-2 gap-2 mb-4">
           {(['month', 'all'] as const).map((option) => (
@@ -134,7 +223,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar documento..."
+              placeholder={isImagesMode ? 'Buscar imagem...' : 'Buscar documento...'}
               className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
             />
           </div>
@@ -157,8 +246,56 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
             <p className="text-[12px] text-muted mt-1 leading-[1.5]">
               {archiveFilter === 'archived'
                 ? 'Quando você arquivar documentos ou imagens, eles aparecem aqui para consulta e recuperação.'
-                : 'Quando você gerar um documento, o item salvo aparece aqui.'}
+                : isImagesMode
+                  ? 'Quando você criar uma imagem, ela aparece aqui automaticamente.'
+                  : 'Quando você gerar um documento, o item salvo aparece aqui.'}
             </p>
+          </div>
+        ) : isImagesMode ? (
+          <div className="flex flex-col gap-[10px] pb-8">
+            {visibleDocuments.map((doc) => (
+              <div key={doc.id} className="bg-white rounded-app p-4 border border-border shadow-card">
+                {doc.ai_artifacts?.imageDataUrl && (
+                  <img
+                    src={doc.ai_artifacts.imageDataUrl}
+                    alt="Imagem gerada"
+                    className="w-full h-[190px] object-cover rounded-app-sm border border-border"
+                  />
+                )}
+                <p className="text-[11px] text-muted mt-2">{formatDate(doc.created_at)}</p>
+                <p className="text-[12px] text-ink mt-2 leading-[1.5] line-clamp-3">
+                  {extractImageDescription(doc)}
+                </p>
+                <p className="text-[11px] text-muted mt-2">
+                  Qualidade: <span className="font-bold text-ink">{formatQuality(doc.ai_artifacts?.quality)}</span>
+                </p>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  <button
+                    onClick={() => openSubscreen('document-detail', { reportId: doc.id })}
+                    className="rounded-app-sm border border-gp bg-gbg py-2 text-[11px] font-bold text-gd flex items-center justify-center gap-1"
+                  >
+                    <Eye size={13} />
+                    Visualizar
+                  </button>
+                  <button
+                    onClick={() => downloadImage(doc)}
+                    disabled={!doc.ai_artifacts?.imageDataUrl}
+                    className="rounded-app-sm border border-gp bg-gbg py-2 text-[11px] font-bold text-gd flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Download size={13} />
+                    Salvar
+                  </button>
+                  <button
+                    onClick={() => shareImage(doc)}
+                    disabled={!navigator.share || !doc.ai_artifacts?.imageDataUrl}
+                    className="rounded-app-sm border border-gp bg-gbg py-2 text-[11px] font-bold text-gd flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Share2 size={13} />
+                    Compartilhar
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="flex flex-col gap-[9px] pb-8">
@@ -201,6 +338,57 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
           </div>
         )}
       </div>
+
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end">
+          <div className="w-full bg-white rounded-t-[22px] p-5 border-t border-border max-h-[85vh] overflow-auto">
+            <p className="text-[16px] font-serif text-gd">Nova imagem</p>
+            <p className="text-[12px] text-muted mt-1 leading-[1.5]">
+              Descreva exatamente a imagem que deseja criar. Inclua estilo, cores, cenário e também o formato desejado.
+            </p>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Descreva exatamente a imagem que deseja criar. Inclua estilo, cores, cenário e também o formato desejado."
+              className="w-full mt-3 min-h-[180px] resize-none bg-cream border border-border rounded-app-sm px-3 py-3 text-[13px] text-ink outline-none leading-[1.6]"
+            />
+
+            <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Qualidade da imagem</p>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <button
+                onClick={() => setQuality('medium')}
+                className={`rounded-app-sm border px-3 py-3 text-left ${quality === 'medium' ? 'border-gm bg-gbg' : 'border-border bg-white'}`}
+              >
+                <p className="text-[13px] font-bold text-ink">Média</p>
+                <p className="text-[11px] text-muted mt-1">Geração mais econômica (900 GizTokens).</p>
+              </button>
+              <button
+                onClick={() => setQuality('high')}
+                className={`rounded-app-sm border px-3 py-3 text-left ${quality === 'high' ? 'border-gm bg-gbg' : 'border-border bg-white'}`}
+              >
+                <p className="text-[13px] font-bold text-ink">Alta</p>
+                <p className="text-[11px] text-muted mt-1">Maior qualidade e maior consumo (1500 GizTokens).</p>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                onClick={() => setIsCreateOpen(false)}
+                className="rounded-app-sm border border-border py-3 text-[13px] font-bold text-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={createImage}
+                disabled={creating}
+                className="rounded-app-sm bg-gm text-white py-3 text-[13px] font-bold disabled:opacity-50"
+              >
+                {creating ? 'Criando sua imagem...' : 'Criar imagem'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -225,6 +413,7 @@ function formatReportType(type: string) {
     planning: 'Planejamento',
     portfolio_text: 'Portfólio pedagógico',
     portfolio_image: 'Imagem de portfólio',
+    generated_image: 'Imagem',
     specialist_report: 'Encaminhamento',
     general_report: 'Relatório pedagógico',
   }
@@ -271,6 +460,13 @@ function getTitle(filters: GeneratedDocumentsData) {
 }
 
 function getSubtitle(filters: GeneratedDocumentsData, classes: ReturnType<typeof useAppStore.getState>['classes']) {
+  if (filters.kind === 'images') {
+    return {
+      heading: 'Imagens',
+      body: 'Crie imagens e acesse seu histórico.',
+    }
+  }
+
   const studentName = filters.studentId ? findStudentName(filters.studentId, classes) : null
   if (studentName) {
     return {
@@ -279,23 +475,41 @@ function getSubtitle(filters: GeneratedDocumentsData, classes: ReturnType<typeof
     }
   }
   return {
-    heading: filters.kind === 'images' ? 'Histórico de imagens geradas' : filters.kind === 'documents' ? 'Histórico de documentos gerados' : 'Histórico de gerados',
+    heading: filters.kind === 'documents' ? 'Histórico de documentos gerados' : 'Histórico de gerados',
     body: 'Documentos, planejamentos, relatórios e imagens salvos ficam aqui para visualizar, editar, arquivar, recuperar ou marcar versão final.',
   }
 }
 
 function isImageReport(doc: GeneratedDocument) {
-  return doc.report_type === 'portfolio_image' || doc.ai_artifacts?.kind === 'portfolio_image'
+  return doc.report_type === 'portfolio_image'
+    || doc.report_type === 'generated_image'
+    || doc.ai_artifacts?.kind === 'portfolio_image'
+    || doc.ai_artifacts?.kind === 'generated_image'
 }
 
 function filterByKind(doc: GeneratedDocument, kind: 'documents' | 'images' | 'all') {
   if (kind === 'all') return true
-  return kind === 'images' ? isImageReport(doc) : !isImageReport(doc)
+  if (kind === 'images') {
+    return doc.report_type === 'generated_image' || doc.ai_artifacts?.kind === 'generated_image'
+  }
+  return !isImageReport(doc)
 }
 
 function getEmptyTitle(filters: GeneratedDocumentsData) {
   if (filters.kind === 'images') return 'Nenhuma imagem gerada'
   return 'Nenhum documento gerado'
+}
+
+function extractImageDescription(doc: GeneratedDocument) {
+  const prompt = doc.ai_artifacts?.prompt?.trim()
+  if (prompt) return prompt
+  return (doc.body ?? '').replace(/\s+/g, ' ').trim() || 'Sem descrição registrada.'
+}
+
+function formatQuality(value?: string) {
+  if (!value) return 'Média'
+  if (value === 'high' || value.toLowerCase() === 'alta') return 'Alta'
+  return 'Média'
 }
 
 function formatStatus(status: string) {
@@ -323,6 +537,13 @@ function normalizeText(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
+}
+
+function dataUrlToFile(dataUrl: string, filename: string) {
+  const [header, content] = dataUrl.split(',')
+  const mime = header.match(/data:(.*?);base64/)?.[1] ?? 'image/png'
+  const bytes = Uint8Array.from(atob(content ?? ''), (character) => character.charCodeAt(0))
+  return new File([bytes], filename, { type: mime })
 }
 
 

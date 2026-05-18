@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 
     const { data: monthlyTypeRows, error: monthlyTypesError } = await supabase
       .from('ai_generation_logs')
-      .select('generation_type')
+      .select('generation_type,result_summary')
       .eq('owner_id', ownerId)
       .eq('status', 'completed')
       .gte('created_at', `${start}T00:00:00.000Z`)
@@ -63,9 +63,14 @@ export async function GET(request: Request) {
 
     if (monthlyTypesError) throw monthlyTypesError
 
-    const generatedImagesThisMonth = (monthlyTypeRows ?? []).filter((item) => item.generation_type === 'portfolio_image').length
+    const generatedImagesThisMonth = (monthlyTypeRows ?? []).filter((item) =>
+      item.generation_type === 'portfolio_image'
+      || getImageKindFromSummary(item.result_summary) === 'generated_image'
+    ).length
     const generatedDocumentsThisMonth = (monthlyTypeRows ?? []).filter((item) =>
-      item.generation_type !== 'portfolio_image' && item.generation_type !== 'audio_transcription'
+      item.generation_type !== 'portfolio_image'
+      && item.generation_type !== 'audio_transcription'
+      && getImageKindFromSummary(item.result_summary) !== 'generated_image'
     ).length
 
     const { data: recentLogs, error: recentLogsError } = await supabase
@@ -147,6 +152,12 @@ function getReportIdFromSummary(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const reportId = (value as { reportId?: unknown }).reportId
   return typeof reportId === 'string' ? reportId : null
+}
+
+function getImageKindFromSummary(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const imageKind = (value as { imageKind?: unknown }).imageKind
+  return typeof imageKind === 'string' ? imageKind : null
 }
 
 function getMonthPeriod(date: Date) {

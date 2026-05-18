@@ -24,7 +24,10 @@ export default async function PublicReportPage({
   }
 
   const title = formatReportType(report.report_type)
-  const isImage = report.report_type === 'portfolio_image' || report.ai_artifacts?.kind === 'portfolio_image'
+  const isImage = report.report_type === 'portfolio_image'
+    || report.report_type === 'generated_image'
+    || report.ai_artifacts?.kind === 'portfolio_image'
+    || report.ai_artifacts?.kind === 'generated_image'
   const imageDataUrl = typeof report.ai_artifacts?.imageDataUrl === 'string' ? report.ai_artifacts.imageDataUrl : undefined
   const html = isImage ? '' : toDocumentHtml(report.body ?? '')
 
@@ -100,6 +103,7 @@ function formatReportType(type: string) {
     planning: 'Planejamento',
     portfolio_text: 'Portfólio pedagógico',
     portfolio_image: 'Portfólio pedagógico',
+    generated_image: 'Imagem',
     specialist_report: 'Relatório para especialista',
     general_report: 'Relatório pedagógico',
   }
