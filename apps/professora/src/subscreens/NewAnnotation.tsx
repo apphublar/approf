@@ -104,12 +104,37 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   }, [annotations, props?.data])
   const editConfig = useMemo(() => (editAnnotation ? inferAnnotationEditorConfig(editAnnotation) : null), [editAnnotation])
   const isEditing = Boolean(editAnnotation)
+  const prefillData = useMemo(() => {
+    const data = props?.data
+    if (!data || typeof data !== 'object') return null
+    const prefill = (data as { prefill?: unknown }).prefill
+    if (!prefill || typeof prefill !== 'object') return null
+    const input = prefill as Record<string, unknown>
+    return {
+      workKind: isWorkKind(input.workKind) ? input.workKind : null,
+      modelId: typeof input.modelId === 'string' ? input.modelId : null,
+      classId: typeof input.classId === 'string' ? input.classId : null,
+      studentId: typeof input.studentId === 'string' ? input.studentId : null,
+      text: typeof input.text === 'string' ? input.text : null,
+    }
+  }, [props?.data])
 
   const modelOptions = getModelOptions(workKind)
   const selectedModel = modelOptions.find((item) => item.id === modelId)
   const selectedClass = classes.find((item) => item.id === classId) ?? activeClass
   const selectedStudent = selectedClass?.students.find((item) => item.id === studentId)
   const availableStudents = useMemo(() => selectedClass?.students ?? [], [selectedClass])
+  const smartSuggestions = useMemo(
+    () =>
+      buildSmartAnnotationSuggestions({
+        workKind,
+        modelId,
+        modelLabel: selectedModel?.label ?? '',
+        studentName: selectedStudent?.name ?? '',
+        className: selectedClass?.name ?? '',
+      }),
+    [workKind, modelId, selectedModel?.label, selectedStudent?.name, selectedClass?.name],
+  )
 
   const needsClass = selectedModel?.scope === 'class' || selectedModel?.scope === 'child'
   const needsStudent = selectedModel?.scope === 'child'
@@ -150,6 +175,16 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setAudioMessage('')
     setUsageMessage('')
   }, [editAnnotation, editConfig])
+
+  useEffect(() => {
+    if (isEditing || !prefillData) return
+
+    if (prefillData.workKind) setWorkKind(prefillData.workKind)
+    if (prefillData.modelId) setModelId(prefillData.modelId)
+    if (prefillData.classId) setClassId(prefillData.classId)
+    if (prefillData.studentId) setStudentId(prefillData.studentId)
+    if (prefillData.text) setText(prefillData.text)
+  }, [isEditing, prefillData])
 
   function chooseWorkKind(value: WorkKind) {
     setWorkKind(value)
@@ -402,6 +437,26 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           />
           <p className="text-[10px] text-muted text-right">{text.length}</p>
 
+          {smartSuggestions.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
+                Sugestao inteligente de anotacao
+              </p>
+              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+                {smartSuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => applySmartSuggestion(suggestion, setText)}
+                    className="px-3 py-2 rounded-full border border-border bg-white text-[11px] font-bold text-muted whitespace-nowrap"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-3 rounded-app-sm border border-border bg-cream p-3">
             <div className="flex items-center justify-between gap-3 mb-2">
               <div>
@@ -599,6 +654,10 @@ function getModelOptions(workKind: WorkKind) {
   return []
 }
 
+function isWorkKind(value: unknown): value is WorkKind {
+  return value === 'report' || value === 'planning' || value === 'memory' || value === 'personal' || value === ''
+}
+
 function StepTitle({ number, title }: { number: string; title: string }) {
   return (
     <p className="text-[10px] font-bold tracking-[0.07em] uppercase text-muted mt-[16px] mb-[8px]">
@@ -695,4 +754,70 @@ function normalizeText(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
+}
+
+function buildSmartAnnotationSuggestions(input: {
+  workKind: WorkKind
+  modelId: string
+  modelLabel: string
+  studentName: string
+  className: string
+}) {
+  const child = input.studentName || 'a criança'
+  const group = input.className || 'a turma'
+
+  if (input.workKind === 'planning') {
+    return [
+      `Objetivo da semana para ${group}`,
+      `Proposta de atividade principal para ${group}`,
+      'Materiais e organização do espaço',
+      'Como observar participação e engajamento',
+    ]
+  }
+
+  if (input.workKind === 'report') {
+    return [
+      `Avanços observados de ${child}`,
+      `Situação de rotina importante de ${child}`,
+      'Interações com colegas e adultos',
+      'Encaminhamentos para escola e família',
+    ]
+  }
+
+  if (input.workKind === 'memory') {
+    return [
+      `Registro rápido de hoje sobre ${child}`,
+      `Fala marcante de ${child}`,
+      'Comportamento que merece acompanhamento',
+      'Ponto para retomar no próximo dia',
+    ]
+  }
+
+  if (input.workKind === 'personal') {
+    return [
+      'Lembrete pessoal da rotina pedagógica',
+      'Ideia de atividade para testar',
+      'Ponto para conversar com a coordenação',
+      'Organização de materiais e ambiente',
+    ]
+  }
+
+  if (input.modelLabel) {
+    return [
+      `Anotação base para ${input.modelLabel}`,
+      `Observação principal de ${child}`,
+      'Contexto, ação e resultado',
+    ]
+  }
+
+  return []
+}
+
+function applySmartSuggestion(suggestion: string, setText: (value: string | ((current: string) => string)) => void) {
+  setText((current) => {
+    const prefix = current.trim()
+    if (!prefix) return `${suggestion}: `
+    if (prefix.toLowerCase().includes(suggestion.toLowerCase())) return current
+    return `${prefix}\n- ${suggestion}: `
+  })
 }

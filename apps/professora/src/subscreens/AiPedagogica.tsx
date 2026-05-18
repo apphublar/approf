@@ -84,7 +84,10 @@ export default function AiPedagogicaSubscreen() {
     }
 
     if (action.flow === 'report') {
-      openSubscreen('report', { reportKind: action.title })
+      openSubscreen('report', {
+        reportKind: action.title,
+        assistantMode: action.title === 'Registro de reuniao de pais' ? 'parents-meeting' : undefined,
+      })
       return
     }
 

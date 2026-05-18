@@ -97,11 +97,18 @@ export async function generatePedagogicalText(
     })
 
     const stage3Prompt = buildStage3FinalRefinementPrompt(promptInput, s2.text)
-    const s3 = await runPipelineStage(3, stage3Prompt.system, stage3Prompt.user, {
+    const s3Initial = await runPipelineStage(3, stage3Prompt.system, stage3Prompt.user, {
       model: modelRefine,
       maxTokens: 2000,
       temperature: 0.45,
     })
+    const structured = await ensureRequiredStructure({
+      generationType: input.generationType,
+      reportKind: promptInput.reportKind ?? promptInput.docKind,
+      candidate: s3Initial,
+      model: modelRefine,
+    })
+    const s3 = structured.completion
 
     const pipelineStages: PipelineStageMetadata[] = [
       toStageMeta(input.promptVersion, 1, 'rascunho_pedagogico', s1),
@@ -146,6 +153,116 @@ export async function generatePedagogicalText(
     }
     throw error
   }
+}
+
+async function ensureRequiredStructure(input: {
+  generationType: AiGenerationType
+  reportKind?: string
+  candidate: Awaited<ReturnType<typeof requestClaudeText>>
+  model: string
+}) {
+  const validation = validateRequiredStructure(input.generationType, input.reportKind, input.candidate.text)
+  if (validation.ok) {
+    return { completion: input.candidate }
+  }
+
+  const repair = await requestClaudeText(
+    [
+      'Voce e revisor final de qualidade BNCC para Educacao Infantil.',
+      'Reescreva integralmente o documento para cumprir TODAS as secoes obrigatorias, sem inventar fatos novos.',
+      'Mantenha linguagem formal, acolhedora, sem comparacao entre criancas e sem diagnostico clinico.',
+      'Retorne APENAS o documento final completo.',
+    ].join('\n'),
+    [
+      'DOCUMENTO ATUAL:',
+      input.candidate.text.trim(),
+      '',
+      'SECOES OBRIGATORIAS AUSENTES OU INSUFICIENTES:',
+      ...validation.missing.map((item) => `- ${item}`),
+      '',
+      'INSTRUCAO:',
+      'Reorganize o texto e garanta que todas as secoes exigidas aparecam com titulos claros.',
+    ].join('\n'),
+    {
+      model: input.model,
+      maxTokens: 2200,
+      temperature: 0.25,
+    },
+  )
+
+  const merged = {
+    ...repair,
+    inputTokens: input.candidate.inputTokens + repair.inputTokens,
+    outputTokens: input.candidate.outputTokens + repair.outputTokens,
+    estimatedCostCents: input.candidate.estimatedCostCents + repair.estimatedCostCents,
+    actualCostCents: input.candidate.actualCostCents + repair.actualCostCents,
+  }
+
+  const repairedValidation = validateRequiredStructure(input.generationType, input.reportKind, merged.text)
+  if (!repairedValidation.ok) {
+    throw new PublicAiGenerationError('Nao foi possivel estruturar o documento no formato BNCC obrigatorio. Tente ajustar o contexto e gerar novamente.')
+  }
+
+  return { completion: merged }
+}
+
+function validateRequiredStructure(generationType: AiGenerationType, reportKind: string | undefined, text: string) {
+  if (generationType === 'planning') {
+    const missing = [
+      !hasAnyHeading(text, ['identificacao']) && 'Identificacao',
+      !hasAnyHeading(text, ['tema', 'titulo']) && 'Tema/Titulo',
+      !hasAnyHeading(text, ['faixa etaria']) && 'Faixa etaria',
+      !hasAnyHeading(text, ['campos de experiencia']) && 'Campos de experiencia',
+      !hasAnyHeading(text, ['objetivos de aprendizagem', 'objetivos de desenvolvimento', 'objetivo']) && 'Objetivos de aprendizagem/desenvolvimento',
+      !hasAnyHeading(text, ['materiais']) && 'Materiais necessarios',
+      !hasAnyHeading(text, ['desenvolvimento', 'passo a passo']) && 'Desenvolvimento/Passo a passo',
+      !hasAnyHeading(text, ['avaliacao', 'observacao']) && 'Avaliacao/Observacao',
+      !containsAny(text, ['inicio']) && 'Subsecao Inicio',
+      !containsAny(text, ['conclusao', 'fechamento']) && 'Subsecao Conclusao/Fechamento',
+    ].filter(Boolean) as string[]
+    return { ok: missing.length === 0, missing }
+  }
+
+  const isDevelopmentLike = generationType === 'development_report'
+    || generationType === 'general_report'
+    || normalize(reportKind ?? '').includes('desenvolvimento')
+
+  if (isDevelopmentLike) {
+    const missing = [
+      !hasAnyHeading(text, ['informacoes basicas', 'identificacao']) && 'Informacoes basicas',
+      !hasAnyHeading(text, ['descricao geral', 'adaptacao']) && 'Descricao geral e adaptacao',
+      !hasAnyHeading(text, ['campos de experiencia']) && 'Desenvolvimento nos campos de experiencia',
+      !hasAnyHeading(text, ['conquistas']) && 'Conquistas',
+      !hasAnyHeading(text, ['pontos de atencao', 'apoio', 'acompanhamento']) && 'Pontos de atencao',
+      !hasAnyHeading(text, ['observacoes finais', 'observacoes']) && 'Observacoes finais',
+    ].filter(Boolean) as string[]
+    return { ok: missing.length === 0, missing }
+  }
+
+  return { ok: true, missing: [] as string[] }
+}
+
+function hasAnyHeading(text: string, candidates: string[]) {
+  const lines = normalize(text).split('\n').map((line) => line.trim()).filter(Boolean)
+  return lines.some((line) => {
+    const normalizedLine = line
+      .replace(/^[-*]\s*/, '')
+      .replace(/^\d+[\).:-]?\s*/, '')
+      .replace(/^#+\s*/, '')
+    return candidates.some((candidate) => normalizedLine.includes(normalize(candidate)))
+  })
+}
+
+function containsAny(text: string, candidates: string[]) {
+  const normalizedText = normalize(text)
+  return candidates.some((candidate) => normalizedText.includes(normalize(candidate)))
+}
+
+function normalize(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
 }
 
 function toStageMeta(
@@ -263,6 +380,7 @@ function buildPromptInputFromSummary(
     studentName: asString(summary.studentName),
     className: asString(summary.className),
     ageGroup: asString(summary.ageGroup),
+    evaluationPeriod: asString(summary.evaluationPeriod),
     mode: asString(summary.mode),
     selectedAnnotations: asObjectArray(summary.selectedAnnotations) as BuildPromptInput['selectedAnnotations'],
     ignoredNotes: asString(summary.ignoredNotes),

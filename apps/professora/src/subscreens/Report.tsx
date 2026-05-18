@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
-import { updateReport } from '@/services/reports'
+import { listReports, updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import type { Annotation } from '@/types'
 
@@ -11,6 +11,20 @@ const DIRECTION_SUGGESTIONS = [
   'Usar tom mais acolhedor',
   'Trazer encaminhamentos para familia',
   'Destacar adaptacao e rotina',
+]
+
+const AGE_GROUP_OPTIONS = [
+  'Bebes (0 a 1 ano e 6 meses)',
+  'Criancas bem pequenas (1 ano e 7 meses a 3 anos e 11 meses)',
+  'Criancas pequenas (4 anos a 5 anos e 11 meses)',
+]
+
+const BNCC_FIELD_OPTIONS = [
+  'O eu, o outro e o nos',
+  'Corpo, gestos e movimentos',
+  'Tracos, sons, cores e formas',
+  'Escuta, fala, pensamento e imaginacao',
+  'Espacos, tempos, quantidades, relacoes e transformacoes',
 ]
 
 interface ReportSubscreenProps {
@@ -43,6 +57,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const reportKind = typeof data === 'object' && data && 'reportKind' in data
     ? String((data as { reportKind?: string }).reportKind)
     : 'Relatorio de desenvolvimento'
+  const assistantMode = typeof data === 'object' && data && 'assistantMode' in data
+    ? String((data as { assistantMode?: string }).assistantMode)
+    : ''
 
   const [mode, setMode] = useState<ReportMode>('annotations')
   const [selectedAnnotationIds, setSelectedAnnotationIds] = useState<string[]>([])
@@ -61,11 +78,41 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [savingDocument, setSavingDocument] = useState(false)
   const [usageMessage, setUsageMessage] = useState('')
   const [usageError, setUsageError] = useState('')
+  const [ageGroup, setAgeGroup] = useState('')
+  const [bnccFields, setBnccFields] = useState<string[]>([])
+  const [objective, setObjective] = useState('')
+  const [evaluationPeriod, setEvaluationPeriod] = useState('')
+  const [livingReport, setLivingReport] = useState(false)
+  const [latestReportId, setLatestReportId] = useState('')
+  const [latestReportBody, setLatestReportBody] = useState('')
+  const [loadingLatest, setLoadingLatest] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const studentAnnotations = useMemo(
     () => annotations.filter((annotation) => matchesStudent(annotation, selectedStudentId, selectedStudent?.name)),
     [annotations, selectedStudentId, selectedStudent?.name],
+  )
+  const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
+  const firstName = selectedStudent?.name.split(' ')[0] ?? 'A crianca'
+  const isPortfolio = reportKind === 'Portfolio pedagogico'
+  const isPlanning = isPlanningKind(reportKind)
+  const isDevelopmentReport = reportKind === 'Relatorio de desenvolvimento'
+  const isParentsMeeting = reportKind === 'Registro de reuniao de pais'
+  const supportsLivingReport = isDevelopmentReport || isParentsMeeting
+  const needsBnccFields = isPlanning || isDevelopmentReport
+  const needsObjective = isPlanning
+  const needsEvaluationPeriod = isDevelopmentReport
+  const currentReportType = getReportGenerationType(reportKind, portfolioOutput)
+  const hasContentBase = mode === 'blank'
+    ? blankContext.trim().length >= 20
+    : Boolean(selectedStudent)
+  const hasRequiredBnccInput = !needsBnccFields || (ageGroup.trim().length > 0 && bnccFields.length > 0)
+  const hasRequiredObjective = !needsObjective || objective.trim().length >= 10
+  const hasRequiredPeriod = !needsEvaluationPeriod || evaluationPeriod.trim().length >= 5
+  const canGenerate = hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod
+  const voiceAnnotations = useMemo(
+    () => studentAnnotations.filter((annotation) => (annotation.tags ?? []).some((tag) => normalize(tag).includes('transcricao'))),
+    [studentAnnotations],
   )
 
   useEffect(() => {
@@ -78,15 +125,48 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setEditingDocument(false)
     setUsageMessage('')
     setUsageError('')
+    setAgeGroup('')
+    setBnccFields([])
+    setObjective('')
+    setEvaluationPeriod('')
+    setLivingReport(false)
+    setLatestReportId('')
+    setLatestReportBody('')
   }, [selectedStudentId, studentAnnotations])
 
-  const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
-  const firstName = selectedStudent?.name.split(' ')[0] ?? 'A crianca'
-  const isPortfolio = reportKind === 'Portfolio pedagogico'
-  const currentReportType = getReportGenerationType(reportKind, portfolioOutput)
-  const canGenerate = mode === 'blank'
-    ? blankContext.trim().length >= 20
-    : Boolean(selectedStudent)
+  useEffect(() => {
+    if (!supportsLivingReport || !selectedStudent?.id) return
+    let active = true
+    setLoadingLatest(true)
+    listReports({ studentId: selectedStudent.id, limit: 40 })
+      .then((items) => {
+        if (!active) return
+        const latest = items.find((item) => item.report_type === currentReportType && item.status !== 'archived')
+        setLatestReportId(latest?.id ?? '')
+        setLatestReportBody(latest?.body ?? '')
+      })
+      .catch(() => {
+        if (!active) return
+        setLatestReportId('')
+        setLatestReportBody('')
+      })
+      .finally(() => {
+        if (active) setLoadingLatest(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [supportsLivingReport, selectedStudent?.id, currentReportType])
+
+  useEffect(() => {
+    if (assistantMode !== 'parents-meeting') return
+    setMode('annotations')
+    setExtraContext((current) =>
+      current.trim()
+        ? current
+        : 'Organizar a reuniao em pauta, observacoes, combinados e encaminhamentos claros para familia e escola.',
+    )
+  }, [assistantMode])
 
   const mockReport = createReportPreview({
     reportKind,
@@ -167,6 +247,13 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         mode,
         studentName: selectedStudent?.name ?? null,
         className: selectedStudent?.className ?? null,
+        ageGroup: ageGroup || null,
+        bnccFields,
+        objective: objective || null,
+        evaluationPeriod: evaluationPeriod || null,
+        assistantMode: assistantMode || null,
+        livingReport,
+        voiceAnnotationsCount: voiceAnnotations.length,
         selectedAnnotations: selectedAnnotations.map((annotation) => ({
           date: annotation.date,
           label: annotation.label,
@@ -211,10 +298,26 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         : 'prompt' in result && result.prompt
           ? `Imagem de portfolio gerada com ChatGPT.\n\nPrompt usado:\n\n${result.prompt}`
           : mockReport
-      setSavedContent(generatedBody)
-      setEditableContent(generatedBody)
-      setGeneratedImageUrl('imageDataUrl' in result && result.imageDataUrl ? result.imageDataUrl : '')
-      setReportId(result.reportId ?? '')
+      const nextImageUrl = 'imageDataUrl' in result && result.imageDataUrl ? result.imageDataUrl : ''
+      let nextBody = generatedBody
+      let nextReportId = result.reportId ?? ''
+
+      if (
+        livingReport &&
+        latestReportId &&
+        generationType !== 'portfolio_image' &&
+        nextBody.trim().length > 0
+      ) {
+        const mergedBody = mergeLivingReport(latestReportBody, nextBody)
+        const updatedLiving = await updateReport(latestReportId, { body: mergedBody, status: 'ready' })
+        nextBody = updatedLiving.body ?? mergedBody
+        nextReportId = updatedLiving.id
+      }
+
+      setSavedContent(nextBody)
+      setEditableContent(nextBody)
+      setGeneratedImageUrl(nextImageUrl)
+      setReportId(nextReportId)
       window.setTimeout(() => {
         celebrateAiGeneration()
         setGenerating(false)
@@ -302,6 +405,115 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 ))}
               </select>
             </div>
+
+            {(needsBnccFields || needsObjective || needsEvaluationPeriod) && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
+                  Dados BNCC obrigatorios
+                </p>
+
+                {needsBnccFields && (
+                  <>
+                    <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                      Faixa etaria
+                    </label>
+                    <select
+                      className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                      value={ageGroup}
+                      onChange={(event) => setAgeGroup(event.target.value)}
+                    >
+                      <option value="">Selecionar faixa etaria</option>
+                      {AGE_GROUP_OPTIONS.map((item) => (
+                        <option key={item} value={item}>{item}</option>
+                      ))}
+                    </select>
+
+                    <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4 mb-2">
+                      Campos de experiencia BNCC
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {BNCC_FIELD_OPTIONS.map((item) => {
+                        const selected = bnccFields.includes(item)
+                        return (
+                          <button
+                            key={item}
+                            onClick={() => setBnccFields((current) =>
+                              current.includes(item)
+                                ? current.filter((field) => field !== item)
+                                : [...current, item],
+                            )}
+                            className={`px-3 py-2 rounded-full text-[11px] font-bold border ${
+                              selected ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {needsObjective && (
+                  <>
+                    <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                      Objetivo de aprendizagem (BNCC)
+                    </label>
+                    <textarea
+                      className="w-full min-h-[88px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
+                      placeholder="Ex: EI03TS02 - Expressar-se por desenho, pintura e colagem..."
+                      value={objective}
+                      onChange={(event) => setObjective(event.target.value)}
+                    />
+                  </>
+                )}
+
+                {needsEvaluationPeriod && (
+                  <>
+                    <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                      Periodo de avaliacao
+                    </label>
+                    <input
+                      className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none"
+                      placeholder="Ex: 1o semestre de 2026"
+                      value={evaluationPeriod}
+                      onChange={(event) => setEvaluationPeriod(event.target.value)}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+
+            {supportsLivingReport && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
+                  Relatorio vivo
+                </p>
+                <p className="text-[12px] text-muted leading-[1.6] mb-3">
+                  Atualize continuamente o mesmo documento ao inves de criar sempre um novo.
+                </p>
+                <button
+                  onClick={() => setLivingReport((current) => !current)}
+                  disabled={!latestReportId || loadingLatest}
+                  className={`w-full rounded-app-sm border px-3 py-3 text-left ${
+                    livingReport
+                      ? 'bg-gbg border-gp text-gd'
+                      : 'bg-white border-border text-muted'
+                  } disabled:opacity-50`}
+                >
+                  <span className="block text-[13px] font-bold">
+                    {livingReport ? 'Atualizando relatorio existente' : 'Criar novo documento'}
+                  </span>
+                  <span className="block text-[11px] mt-1">
+                    {loadingLatest
+                      ? 'Buscando ultimo documento...'
+                      : latestReportId
+                        ? 'Ultimo documento encontrado para esta crianca.'
+                        : 'Nenhum documento anterior encontrado para este tipo.'}
+                  </span>
+                </button>
+              </div>
+            )}
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
@@ -416,6 +628,31 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                     </p>
                   )}
                 </div>
+
+                {voiceAnnotations.length > 0 && (
+                  <div className="mt-3 rounded-app-sm border border-gp bg-gbg p-3">
+                    <p className="text-[11px] font-bold text-gd">
+                      {voiceAnnotations.length} anotacoes por voz detectadas
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => setSelectedAnnotationIds(voiceAnnotations.map((annotation) => annotation.id))}
+                        className="px-3 py-2 rounded-full text-[11px] font-bold border border-gp bg-white text-gm"
+                      >
+                        Selecionar so voz
+                      </button>
+                      <button
+                        onClick={() => setExtraContext((current) => {
+                          const summary = summarizeVoiceAnnotations(voiceAnnotations)
+                          return current.trim() ? `${current.trim()}\n${summary}` : summary
+                        })}
+                        className="px-3 py-2 rounded-full text-[11px] font-bold border border-gp bg-white text-gm"
+                      >
+                        Inserir resumo de voz
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
                   Desconsiderar algo
@@ -869,6 +1106,16 @@ function isSpecialistReport(reportKind: string) {
   ].includes(reportKind)
 }
 
+function isPlanningKind(reportKind: string) {
+  const normalized = reportKind
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  return normalized.includes('planejamento')
+    || normalized.includes('plano de aula')
+    || normalized.includes('projeto pedagogico')
+}
+
 function getSpecialistSections(reportKind: string) {
   if (reportKind === 'Relatorio para fonoaudiologo') {
     return {
@@ -947,4 +1194,27 @@ function formatFileSize(size: number) {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function mergeLivingReport(existingBody: string, updateBlock: string) {
+  const today = new Date().toLocaleDateString('pt-BR')
+  const normalizedExisting = existingBody.trim()
+  const normalizedUpdate = updateBlock.trim()
+  if (!normalizedExisting) return normalizedUpdate
+  return `${normalizedExisting}\n\nATUALIZACAO CONTINUA (${today})\n\n${normalizedUpdate}`
+}
+
+function summarizeVoiceAnnotations(annotations: Annotation[]) {
+  const items = annotations
+    .slice(0, 4)
+    .map((annotation) => `- ${annotation.date}: ${annotation.text.slice(0, 120)}`)
+  return `Resumo de anotacoes por voz:\n${items.join('\n')}`
+}
+
+function normalize(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }

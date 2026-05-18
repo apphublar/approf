@@ -8,6 +8,7 @@ export interface BuildPromptInput {
   studentName?: string
   className?: string
   ageGroup?: string
+  evaluationPeriod?: string
   mode?: string
   selectedAnnotations?: Array<{ date?: string; label?: string; text?: string }>
   ignoredNotes?: string
@@ -130,6 +131,7 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
   const bncc = input.bnccFields?.length ? input.bnccFields.join(', ') : 'Nao informado'
   const attachments = formatAttachments(input.attachments)
   const selectedAnnotations = formatAnnotations(input.selectedAnnotations)
+  const requiredStructure = buildRequiredStructureInstructions(input)
 
   return [
     `TIPO DE DOCUMENTO: ${kind}`,
@@ -137,6 +139,7 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     `CRIANCA: ${input.studentName ?? 'Nao informado'}`,
     `TURMA: ${input.className ?? 'Nao informado'}`,
     `FAIXA ETARIA: ${input.ageGroup ?? 'Nao informado'}`,
+    `PERIODO DE AVALIACAO: ${input.evaluationPeriod ?? 'Nao informado'}`,
     `MODO: ${input.mode ?? 'Nao informado'}`,
     `CAMPOS BNCC: ${bncc}`,
     `TEMA: ${input.theme?.trim() || 'Nao informado'}`,
@@ -164,6 +167,13 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     '- Use paragrafos objetivos, coesos e linguagem formal, evitando emojis, slogans e excesso de topicos.',
     '- Inclua sintese do percurso, pontos de apoio e encaminhamentos pedagogicos quando couber.',
     '- Termine com orientacoes de continuidade entre escola e familia quando fizer sentido.',
+    ...(requiredStructure.length
+      ? [
+          '',
+          'ESTRUTURA OBRIGATORIA PARA ESTE TIPO DE DOCUMENTO:',
+          ...requiredStructure.map((item) => `- ${item}`),
+        ]
+      : []),
   ].join('\n')
 }
 
@@ -208,4 +218,31 @@ function mapGenerationType(generationType: AiGenerationType) {
     default:
       return 'Documento pedagogico'
   }
+}
+
+function buildRequiredStructureInstructions(input: BuildPromptInput) {
+  if (input.generationType === 'planning') {
+    return [
+      'Identificacao',
+      'Tema/Titulo da atividade',
+      'Faixa etaria alvo (Bebes / Criancas bem pequenas / Criancas pequenas)',
+      'Campos de experiencia trabalhados',
+      'Objetivos de aprendizagem e desenvolvimento alinhados a BNCC (com codigos EI quando possivel)',
+      'Materiais necessarios',
+      'Desenvolvimento/Passo a passo com Inicio, Desenvolvimento e Conclusao',
+      'Avaliacao/Observacao sem notas e sem linguagem classificatoria',
+    ]
+  }
+
+  if (input.generationType === 'development_report' || input.generationType === 'general_report') {
+    return [
+      'Informacoes basicas (crianca, faixa etaria BNCC, turma, periodo)',
+      'Descricao geral e adaptacao',
+      'Desenvolvimento nos Campos de Experiencia da BNCC',
+      'Conquistas e pontos de atencao em linguagem construtiva',
+      'Observacoes finais',
+    ]
+  }
+
+  return []
 }
