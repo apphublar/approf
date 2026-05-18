@@ -25,7 +25,7 @@ export async function loadTeacherWorkspace() {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, full_name, email')
+    .select('id, full_name, email, estimated_student_count')
     .eq('id', user.id)
     .single()
 
@@ -90,6 +90,7 @@ export async function loadTeacherWorkspace() {
     classes,
     annotations,
     attendanceRecords,
+    onboardingCompleted: Number(profile.estimated_student_count ?? 0) > 0 || classes.length > 0,
   }
 }
 

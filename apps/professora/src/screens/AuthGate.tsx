@@ -4,7 +4,7 @@ import { Check, Loader2 } from 'lucide-react'
 import { requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
 import { loadTeacherWorkspace } from '@/services/supabase/classes'
 import { getSupabaseClient } from '@/services/supabase/client'
-import { useAppStore } from '@/store'
+import { useAppStore, useOnboardingStore } from '@/store'
 
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
 type InstallPromptEvent = Event & {
@@ -19,6 +19,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null)
   const hydrateWorkspace = useAppStore((state) => state.hydrateWorkspace)
+  const setOnboardingCompleted = useOnboardingStore((state) => state.setCompleted)
 
   useEffect(() => {
     const supabase = getSupabaseClient()
@@ -59,7 +60,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     setLoadingWorkspace(true)
     loadTeacherWorkspace()
-      .then((workspace) => hydrateWorkspace(workspace))
+      .then((workspace) => {
+        hydrateWorkspace(workspace)
+        setOnboardingCompleted(Boolean(workspace.onboardingCompleted))
+      })
       .catch((error) => {
         console.error('Não foi possível carregar dados do Supabase.', error)
       })
@@ -67,7 +71,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setHydratedUserId(userId)
         setLoadingWorkspace(false)
       })
-  }, [hydrateWorkspace, hydratedUserId, session?.user?.id])
+  }, [hydrateWorkspace, hydratedUserId, session?.user?.id, setOnboardingCompleted])
 
   if (loadingSession || loadingWorkspace) {
     return (

@@ -25,6 +25,7 @@ interface OnboardingStore {
   data: Partial<OnboardingData>
   setStep: (step: 1 | 2 | 3) => void
   setData: (data: Partial<OnboardingData>) => void
+  setCompleted: (completed: boolean) => void
   complete: () => void
 }
 
@@ -36,6 +37,7 @@ export const useOnboardingStore = create<OnboardingStore>()(
       data: {},
       setStep: (step) => set({ step }),
       setData: (data) => set((state) => ({ data: { ...state.data, ...data } })),
+      setCompleted: (completed) => set({ completed }),
       complete: () => set({ completed: true }),
     }),
     { name: 'approf-onboarding' },
