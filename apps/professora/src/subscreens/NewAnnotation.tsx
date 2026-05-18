@@ -732,7 +732,6 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           <div className="h-full flex flex-col gap-3">
             <div className="bg-white rounded-app border border-border shadow-card p-3">
               <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Chat</p>
-              <p className="text-[12px] text-muted mt-1">Assistente ativo: GPT-4o Mini</p>
             </div>
 
             <div className="bg-white rounded-app border border-border shadow-card p-3 flex-1 min-h-[420px] flex flex-col">
