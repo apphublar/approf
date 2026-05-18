@@ -3,6 +3,7 @@ import { ChevronLeft, Download, Eye, FileText, Image as ImageIcon, Plus, Search,
 import { useAppStore, useNavStore } from '@/store'
 import { getReportById, listReports } from '@/services/reports'
 import { generateImage } from '@/services/ai-usage'
+import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument } from '@/types'
 
 interface GeneratedDocumentsData {
@@ -385,41 +386,55 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
 
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end">
-          <div className="w-full bg-white rounded-t-[22px] p-5 border-t border-border max-h-[85vh] overflow-auto">
-            <p className="text-[16px] font-serif text-gd">Nova imagem</p>
-            <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-              Descreva exatamente a imagem que deseja criar. Inclua estilo, cores, cenário e também o formato desejado.
-            </p>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Descreva exatamente a imagem que deseja criar. Inclua estilo, cores, cenário e também o formato desejado."
-              className="w-full mt-3 min-h-[180px] resize-none bg-cream border border-border rounded-app-sm px-3 py-3 text-[13px] text-ink outline-none leading-[1.6]"
-            />
+          <div className="w-full bg-white rounded-t-[22px] border-t border-border max-h-[85vh] overflow-auto">
+            {creating ? (
+              <div className="p-5 bg-cream">
+                <GenerationImageLoadingScreen />
+              </div>
+            ) : (
+              <div className="p-5">
+                <p className="text-[16px] font-serif text-gd">Nova imagem</p>
+                <p className="text-[12px] text-muted mt-1 leading-[1.5]">
+                  Descreva exatamente a imagem que deseja criar. Inclua estilo, cores, cenário e também o formato desejado.
+                </p>
+                <textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Descreva exatamente a imagem que deseja criar. Inclua estilo, cores, cenário e também o formato desejado."
+                  className="w-full mt-3 min-h-[180px] resize-none bg-cream border border-border rounded-app-sm px-3 py-3 text-[13px] text-ink outline-none leading-[1.6]"
+                />
 
-            <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Qualidade da imagem</p>
-            <div className="mt-2 rounded-app-sm border border-gp bg-gbg px-3 py-3">
-              <p className="text-[13px] font-bold text-ink">Padrão otimizada</p>
-              <p className="text-[11px] text-muted mt-1">
-                Qualidade equilibrada para manter bom resultado com custo mais baixo.
-              </p>
-            </div>
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Qualidade da imagem</p>
+                <div className="mt-2 rounded-app-sm border border-gp bg-gbg px-3 py-3">
+                  <p className="text-[13px] font-bold text-ink">Padrão otimizada</p>
+                  <p className="text-[11px] text-muted mt-1">
+                    Qualidade equilibrada para manter bom resultado com custo mais baixo.
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <button
-                onClick={() => setIsCreateOpen(false)}
-                className="rounded-app-sm border border-border py-3 text-[13px] font-bold text-muted"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={createImage}
-                disabled={creating}
-                className="rounded-app-sm bg-gm text-white py-3 text-[13px] font-bold disabled:opacity-50"
-              >
-                {creating ? 'Criando sua imagem...' : 'Criar imagem'}
-              </button>
-            </div>
+                {error && (
+                  <p className="mt-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+                    Não foi possível concluir a criação. Tente novamente.
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <button
+                    onClick={() => setIsCreateOpen(false)}
+                    className="rounded-app-sm border border-border py-3 text-[13px] font-bold text-muted"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={createImage}
+                    disabled={creating}
+                    className="rounded-app-sm bg-gm text-white py-3 text-[13px] font-bold disabled:opacity-50"
+                  >
+                    Criar imagem
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

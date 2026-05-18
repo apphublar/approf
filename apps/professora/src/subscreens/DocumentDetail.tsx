@@ -3,6 +3,7 @@ import { Bold, ChevronLeft, Download, FileText, Italic, List, Pencil, Printer, S
 import { useAppStore, useNavStore } from '@/store'
 import { createReportShareLink, getReportById, updateReport } from '@/services/reports'
 import { generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
+import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument, ReportStatus } from '@/types'
 
 interface DocumentDetailSubscreenProps {
@@ -323,7 +324,11 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
               )}
 
               {isImageDocument ? (
-                editingImagePrompt ? <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                generatingImage ? (
+                  <div className="bg-cream rounded-app p-4 border border-border shadow-card mb-4">
+                    <GenerationImageLoadingScreen />
+                  </div>
+                ) : editingImagePrompt ? <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
                     Ajustar prompt e gerar nova imagem
                   </label>
@@ -340,7 +345,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                     disabled={generatingImage}
                     className="w-full mt-3 py-[13px] rounded-app-sm bg-gm text-white font-bold text-sm border-none disabled:opacity-50"
                   >
-                    {generatingImage ? 'Gerando nova imagem...' : 'Gerar nova imagem corrigida'}
+                    Gerar nova imagem corrigida
                   </button>
                 </div> : null
               ) : (

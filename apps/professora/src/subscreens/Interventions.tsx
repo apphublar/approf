@@ -3,6 +3,7 @@ import { ChevronLeft, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
+import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 import type {
   InterventionHistoryItem,
   InterventionReturnChoice,
@@ -272,6 +273,10 @@ export default function InterventionsSubscreen() {
           </div>
         )}
 
+        {(generating || analyzing) ? (
+          <GenerationDocumentLoadingScreen variant="intervention" />
+        ) : (
+          <>
         {step === 'form' && (
           <>
             <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
@@ -304,7 +309,7 @@ export default function InterventionsSubscreen() {
               disabled={!selectedStudent || generating || observation.trim().length < 12}
               className="w-full mt-4 py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando sugestões...</> : <><Sparkles size={17} /> Gerar sugestões</>}
+              <><Sparkles size={17} /> Gerar sugestões</>
             </button>
           </>
         )}
@@ -388,7 +393,7 @@ export default function InterventionsSubscreen() {
               disabled={!selectedStudent || analyzing || teacherReturn.trim().length < 8}
               className="w-full mt-4 py-3 rounded-app-sm bg-gd text-white text-[13px] font-bold border-none disabled:opacity-50"
             >
-              {analyzing ? 'Analisando...' : 'Analisar retorno'}
+              Analisar retorno
             </button>
           </div>
         )}
@@ -433,8 +438,16 @@ export default function InterventionsSubscreen() {
           <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
             error ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
           }`}>
-            {error || usageMessage}
+            {error ? 'Não foi possível concluir a criação. Tente novamente.' : usageMessage}
           </p>
+        )}
+        {error && (step === 'form' || step === 'feedback') && (
+          <button
+            onClick={step === 'form' ? handleGenerateSuggestions : handleAnalyzeReturn}
+            className="mt-2 w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold"
+          >
+            Tentar novamente
+          </button>
         )}
         {draftMessage && <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>}
 
@@ -455,6 +468,8 @@ export default function InterventionsSubscreen() {
               ))}
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

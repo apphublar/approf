@@ -5,6 +5,7 @@ import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usag
 import { updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
+import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 
 interface PedagogicalGeneratorProps {
   data?: unknown
@@ -250,6 +251,9 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
       <div className="scroll-area px-[18px]">
         {!generated ? (
+          generating ? (
+            <GenerationDocumentLoadingScreen variant="planning" />
+          ) : (
           <div className="py-5">
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-center gap-3">
@@ -406,17 +410,26 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
               disabled={!canGenerate || generating}
               className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando documento...</> : <><Sparkles size={18} /> Gerar documento</>}
+              <><Sparkles size={18} /> Gerar documento</>
             </button>
             {(usageError || usageMessage) && (
               <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
                 usageError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
               }`}>
-                {usageError || usageMessage}
+                {usageError ? 'Não foi possível concluir a criação. Tente novamente.' : usageMessage}
               </p>
+            )}
+            {usageError && (
+              <button
+                onClick={generate}
+                className="mt-2 w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold"
+              >
+                Tentar novamente
+              </button>
             )}
             {draftMessage && <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>}
           </div>
+          )
         ) : (
           <div className="py-4">
             {usageMessage && (

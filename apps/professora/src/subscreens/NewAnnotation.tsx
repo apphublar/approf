@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, Check, Mic, Paperclip, Send, Square } from 'lucide-react'
+import { ChevronLeft, Check, Mic, Paperclip, PlusCircle, Send, Square, Trash2 } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { getAppDataMode } from '@/services/app-data'
 import { formatAiUsageMessage, generateAiChatReply, transcribeAnnotationAudio } from '@/services/ai-usage'
@@ -23,6 +23,13 @@ interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   text: string
+}
+
+interface ChatConversation {
+  id: string
+  title: string
+  updatedAt: number
+  messages: ChatMessage[]
 }
 
 const REPORT_MODELS: ModelOption[] = [
@@ -86,13 +93,19 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [error, setError] = useState('')
   const [viewMode, setViewMode] = useState<AnnotationViewMode>('annotation')
   const [chatInput, setChatInput] = useState('')
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatConversations, setChatConversations] = useState<ChatConversation[]>(() => [buildNewConversation()])
+  const [activeChatId, setActiveChatId] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatUsageMessage, setChatUsageMessage] = useState('')
   const [chatError, setChatError] = useState('')
   const [draftMessage, setDraftMessage] = useState('')
   const chatBottomRef = useRef<HTMLDivElement | null>(null)
   const draftKeyRef = useRef('')
+  const activeChat = useMemo(
+    () => chatConversations.find((conversation) => conversation.id === activeChatId) ?? chatConversations[0] ?? null,
+    [activeChatId, chatConversations],
+  )
+  const chatMessages = activeChat?.messages ?? []
 
   const editAnnotation = useMemo(() => {
     const data = props?.data
@@ -165,6 +178,18 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   }, [draftMessage])
 
   useEffect(() => {
+    if (chatConversations.length === 0) {
+      const initial = buildNewConversation()
+      setChatConversations([initial])
+      setActiveChatId(initial.id)
+      return
+    }
+    if (!activeChatId || !chatConversations.some((item) => item.id === activeChatId)) {
+      setActiveChatId(chatConversations[0].id)
+    }
+  }, [activeChatId, chatConversations])
+
+  useEffect(() => {
     if (!editAnnotation || !editConfig) return
     setText(editAnnotation.text ?? '')
     setWorkKind(editConfig.workKind)
@@ -207,7 +232,9 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       attachmentName: string
       viewMode: AnnotationViewMode
       chatInput: string
-      chatMessages: ChatMessage[]
+      chatMessages?: ChatMessage[]
+      chatConversations?: ChatConversation[]
+      activeChatId?: string
     }>(key)
     if (!draft) return
     setText(draft.text || '')
@@ -219,7 +246,11 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setAttachmentName(draft.attachmentName || '')
     setViewMode(draft.viewMode || 'annotation')
     setChatInput(draft.chatInput || '')
-    setChatMessages(draft.chatMessages || [])
+    const conversations = sanitizeConversations(draft.chatConversations, draft.chatMessages)
+    setChatConversations(conversations)
+    setActiveChatId(draft.activeChatId && conversations.some((item) => item.id === draft.activeChatId)
+      ? draft.activeChatId
+      : conversations[0]?.id ?? '')
     setDraftMessage('Rascunho recuperado')
   }, [isEditing, prefillData, userId])
 
@@ -237,14 +268,16 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         attachmentName,
         viewMode,
         chatInput,
-        chatMessages,
+        chatConversations,
+        activeChatId,
       })
     }, 350)
     return () => window.clearTimeout(timeout)
   }, [
     attachmentName,
+    activeChatId,
     chatInput,
-    chatMessages,
+    chatConversations,
     classId,
     isEditing,
     modelId,
@@ -483,7 +516,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
   async function sendChatMessage() {
     const content = chatInput.trim()
-    if (!content || chatLoading) return
+    if (!content || chatLoading || !activeChat) return
     setChatError('')
     setChatUsageMessage('')
     setChatInput('')
@@ -492,8 +525,9 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       role: 'user',
       text: content,
     }
-    const history = [...chatMessages, userMessage]
-    setChatMessages(history)
+    const history = [...activeChat.messages, userMessage]
+    const targetConversationId = activeChat.id
+    applyConversationUpdate(targetConversationId, history, content)
     setChatLoading(true)
 
     try {
@@ -521,13 +555,69 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         return
       }
 
-      setChatMessages([...history, { id: `assistant-${Date.now()}`, role: 'assistant', text: assistantText }])
+      applyConversationUpdate(targetConversationId, [...history, {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        text: assistantText,
+      }])
       setChatUsageMessage(formatAiUsageMessage(result))
     } catch (err) {
       setChatError(err instanceof Error ? err.message : 'Não foi possível responder no chat agora.')
     } finally {
       setChatLoading(false)
     }
+  }
+
+  function applyConversationUpdate(conversationId: string, messages: ChatMessage[], userInputForTitle?: string) {
+    setChatConversations((current) => {
+      const next = current.map((conversation) => {
+        if (conversation.id !== conversationId) return conversation
+        return {
+          ...conversation,
+          messages,
+          updatedAt: Date.now(),
+          title: conversation.title === 'Nova conversa' && userInputForTitle
+            ? buildConversationTitle(userInputForTitle)
+            : conversation.title,
+        }
+      })
+      return sortConversationsByRecent(next)
+    })
+  }
+
+  function startNewChat() {
+    if (chatLoading) return
+    const conversation = buildNewConversation()
+    setChatConversations((current) => sortConversationsByRecent([conversation, ...current]))
+    setActiveChatId(conversation.id)
+    setChatInput('')
+    setChatError('')
+    setChatUsageMessage('')
+  }
+
+  function openChatConversation(conversationId: string) {
+    if (conversationId === activeChatId) return
+    setActiveChatId(conversationId)
+    setChatError('')
+    setChatUsageMessage('')
+  }
+
+  function deleteChatConversation(conversationId: string) {
+    if (chatLoading) return
+    const confirmed = window.confirm('Deseja excluir esta conversa do histórico?')
+    if (!confirmed) return
+    setChatConversations((current) => {
+      const next = current.filter((conversation) => conversation.id !== conversationId)
+      if (next.length === 0) {
+        const fallback = buildNewConversation()
+        setActiveChatId(fallback.id)
+        return [fallback]
+      }
+      if (conversationId === activeChatId) {
+        setActiveChatId(next[0].id)
+      }
+      return next
+    })
   }
 
   return (
@@ -730,11 +820,18 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           </>
         ) : (
           <div className="h-full flex flex-col gap-3">
-            <div className="bg-white rounded-app border border-border shadow-card p-3">
-              <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Chat</p>
-            </div>
-
             <div className="bg-white rounded-app border border-border shadow-card p-3 flex-1 min-h-[420px] flex flex-col">
+              <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-border">
+                <p className="text-[12px] font-bold text-ink">Conversa</p>
+                <button
+                  onClick={startNewChat}
+                  disabled={chatLoading}
+                  className="px-3 py-2 rounded-app-sm border border-gp bg-gbg text-gd text-[11px] font-bold flex items-center gap-1 disabled:opacity-50"
+                >
+                  <PlusCircle size={13} />
+                  Novo chat
+                </button>
+              </div>
               <div className="flex-1 overflow-y-auto pr-1 space-y-3">
                 {chatMessages.length === 0 && (
                   <p className="text-sm text-muted leading-relaxed">
@@ -788,6 +885,39 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 {draftMessage && <p className="text-[11px] text-gm mt-2">{draftMessage}</p>}
               </div>
             </div>
+
+            <div className="bg-white rounded-app border border-border shadow-card p-3">
+              <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">Histórico de conversas</p>
+              <div className="flex flex-col gap-2 max-h-[190px] overflow-y-auto pr-1">
+                {chatConversations.map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    className={`rounded-app-sm border px-3 py-2 flex items-center gap-2 ${
+                      activeChat?.id === conversation.id ? 'bg-gbg border-gp' : 'bg-cream border-border'
+                    }`}
+                  >
+                    <button
+                      onClick={() => openChatConversation(conversation.id)}
+                      className="flex-1 text-left min-w-0"
+                    >
+                      <p className={`text-[12px] font-bold truncate ${activeChat?.id === conversation.id ? 'text-gd' : 'text-ink'}`}>
+                        {conversation.title}
+                      </p>
+                      <p className="text-[10px] text-muted mt-1">
+                        {conversation.messages.length} mensagens
+                      </p>
+                    </button>
+                    <button
+                      onClick={() => deleteChatConversation(conversation.id)}
+                      className="w-7 h-7 rounded-full bg-white border border-border text-muted flex items-center justify-center"
+                      aria-label="Excluir conversa"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -799,6 +929,52 @@ function getRecordingBarColor(seconds: number) {
   if (seconds <= 10) return '#4F8341'
   if (seconds <= 20) return interpolateColor('#4F8341', '#E0A800', (seconds - 10) / 10)
   return interpolateColor('#E0A800', '#C1440E', (seconds - 20) / 10)
+}
+
+function buildNewConversation(): ChatConversation {
+  return {
+    id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: 'Nova conversa',
+    updatedAt: Date.now(),
+    messages: [],
+  }
+}
+
+function buildConversationTitle(input: string) {
+  const clean = input.trim().replace(/\s+/g, ' ')
+  if (!clean) return 'Nova conversa'
+  return clean.length > 42 ? `${clean.slice(0, 42)}...` : clean
+}
+
+function sortConversationsByRecent(conversations: ChatConversation[]) {
+  return [...conversations].sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+function sanitizeConversations(
+  conversations?: ChatConversation[],
+  fallbackMessages?: ChatMessage[],
+) {
+  const normalized = (conversations ?? [])
+    .filter((conversation) => conversation && typeof conversation.id === 'string')
+    .map((conversation) => ({
+      id: conversation.id,
+      title: typeof conversation.title === 'string' && conversation.title.trim()
+        ? conversation.title
+        : 'Nova conversa',
+      updatedAt: typeof conversation.updatedAt === 'number' ? conversation.updatedAt : Date.now(),
+      messages: Array.isArray(conversation.messages) ? conversation.messages : [],
+    }))
+
+  if (normalized.length > 0) return sortConversationsByRecent(normalized)
+  if (fallbackMessages && fallbackMessages.length > 0) {
+    return [{
+      id: `chat-${Date.now()}`,
+      title: 'Conversa recuperada',
+      updatedAt: Date.now(),
+      messages: fallbackMessages,
+    }]
+  }
+  return [buildNewConversation()]
 }
 
 function getSupportedAudioRecorderOptions(): MediaRecorderOptions | undefined {

@@ -117,8 +117,8 @@ export default function StudentProfileSubscreen() {
                 P
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[22px] font-bold text-ink leading-tight">PRESENÇAS</p>
-                <p className="text-[16px] text-muted mt-1">{totalPresences} presenças · {totalAbsences} faltas</p>
+                <p className="text-[13px] font-bold text-ink tracking-[0.06em] uppercase">Presenças</p>
+                <p className="text-[15px] text-muted mt-1">{totalPresences} presenças · {totalAbsences} faltas</p>
               </div>
               <div className="text-right">
                 <p className="text-[22px] font-bold text-gm leading-tight">{attendanceRate}%</p>
