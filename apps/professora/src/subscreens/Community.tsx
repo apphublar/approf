@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, Heart, MessageCircle, Send } from 'lucide-react'
+import { ChevronLeft, Heart, MessageCircle, Send, Users } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import type { CommunityPost } from '@/types'
 
@@ -45,8 +45,8 @@ export default function CommunitySubscreen() {
       <div className="scroll-area px-[18px]">
         {!enabled ? (
           <div className="flex flex-col items-center justify-center text-center py-16">
-            <div className="w-20 h-20 rounded-[24px] flex items-center justify-center text-4xl mb-5" style={{ background: '#D8F3DC' }}>
-              🌱
+            <div className="w-20 h-20 rounded-[24px] flex items-center justify-center text-gm mb-5" style={{ background: '#D8F3DC' }}>
+              <Users size={40} />
             </div>
             <h2 className="font-serif text-[22px] text-gd mb-2">Comunidade em liberacao gradual</h2>
             <p className="text-[13px] text-muted leading-[1.7] max-w-[300px]">

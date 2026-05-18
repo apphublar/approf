@@ -578,7 +578,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                     {loadingLatest
                       ? 'Buscando último documento...'
                       : latestReportId
-                        ? 'Ãšltimo documento encontrado para esta criança.'
+                        ? 'Último documento encontrado para esta criança.'
                         : 'Nenhum documento anterior encontrado para este tipo.'}
                   </span>
                 </button>
@@ -1018,7 +1018,7 @@ BASE UTILIZADA
 
 ${sourceBlock}
 
-ORIENTAÇÃƒO ADICIONAL DA PROFESSORA
+ORIENTAÇÃO ADICIONAL DA PROFESSORA
 
 ${input.extraContext.trim() || 'Nenhuma orientação adicional foi incluída antes da geração.'}`
 
@@ -1054,7 +1054,7 @@ Documento gerado com auxílio de IA a partir das informações autorizadas pela 
   if (input.reportKind === 'Registro de reunião de pais') {
     return `${header}
 
-REGISTRO DE REUNIÃƒO DE PAIS
+REGISTRO DE REUNIÃO DE PAIS
 
 Pauta:
 - acolhimento da família;

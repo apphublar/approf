@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { BarChart3, CalendarDays, Check, ChevronLeft, ClipboardCheck, Pencil, Search, Users } from 'lucide-react'
+import { BarChart3, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCheck, Pencil, Search, Users } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { saveSupabaseAttendanceRecord } from '@/services/supabase/attendance'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
@@ -264,14 +264,14 @@ export default function ClassStudentsSubscreen() {
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-center justify-between mb-3">
                 <button onClick={() => setMonthDate(addMonths(monthDate, -1))} className="w-9 h-9 rounded-full border border-border text-muted bg-white">
-                  â€¹
+                  <ChevronLeft size={16} className="mx-auto" />
                 </button>
                 <div className="text-center">
                   <p className="font-serif text-[19px] text-gd capitalize">{formatMonthTitle(monthDate)}</p>
                   <p className="text-[11px] text-muted">{classAttendanceRecords.length} chamadas registradas</p>
                 </div>
                 <button onClick={() => setMonthDate(addMonths(monthDate, 1))} className="w-9 h-9 rounded-full border border-border text-muted bg-white">
-                  â€º
+                  <ChevronRight size={16} className="mx-auto" />
                 </button>
               </div>
 
@@ -382,7 +382,7 @@ function StudentRow({ student, rightSlot, onClick }: { student: Student; rightSl
         <p className="text-[11px] text-muted">{student.age} anos {student.tag ? `· ${student.tag}` : ''}</p>
       </div>
       {rightSlot}
-      <span className="text-muted text-[19px] ml-1">â€º</span>
+      <ChevronRight size={19} className="text-muted ml-1" />
     </button>
   )
 }

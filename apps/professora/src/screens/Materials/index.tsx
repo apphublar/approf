@@ -1,19 +1,34 @@
 ﻿import { useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import {
+  BarChart3,
+  BookOpen,
+  ChevronRight,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  Handshake,
+  MessageSquareText,
+  Music2,
+  Palette,
+  Search,
+  Sparkles,
+  Stethoscope,
+  type LucideIcon,
+} from 'lucide-react'
 
 const CATEGORIES = [
-  { label: 'Plano de Aula', emoji: 'ðŸ“‹', count: 6, bg: '#FFF3CD', isNew: true },
-  { label: 'Lista de Chamada', emoji: 'ðŸ“‹', count: 4, bg: '#D0E8FF' },
-  { label: 'Relatórios', emoji: 'ðŸ“„', count: 8, bg: '#D8F3DC', isNew: true },
-  { label: 'Portfólio', emoji: '🗂️', count: 5, bg: '#FFE5D9' },
-  { label: 'Atividades', emoji: 'âœï¸', count: 12, bg: '#E3D5F5' },
-  { label: 'Avaliação', emoji: 'ðŸ“Š', count: 7, bg: '#F0E6FF' },
-  { label: 'Comunicados', emoji: 'ðŸ“¢', count: 5, bg: '#FFE8CC' },
-  { label: 'Aluno Atipico', emoji: 'ðŸ©º', count: 6, bg: '#FFD6D6', isNew: true },
-  { label: 'Musicalizacao', emoji: 'ðŸŽµ', count: 8, bg: '#E0F2FE' },
-  { label: 'Artes Visuais', emoji: 'ðŸŽ¨', count: 10, bg: '#FEF3C7' },
-  { label: 'Reuniao de Pais', emoji: 'ðŸ¤', count: 3, bg: '#D8F3DC' },
-  { label: 'Imagens e Recursos', emoji: 'ðŸ–¼ï¸', count: 7, bg: '#D0E8FF' },
+  { label: 'Plano de aula', icon: FileText, count: 6, bg: '#FFF3CD', isNew: true },
+  { label: 'Lista de chamada', icon: FileSpreadsheet, count: 4, bg: '#D0E8FF' },
+  { label: 'Relatórios', icon: FileText, count: 8, bg: '#D8F3DC', isNew: true },
+  { label: 'Portfólio', icon: BookOpen, count: 5, bg: '#FFE5D9' },
+  { label: 'Atividades', icon: Sparkles, count: 12, bg: '#E3D5F5' },
+  { label: 'Avaliação', icon: BarChart3, count: 7, bg: '#F0E6FF' },
+  { label: 'Comunicados', icon: MessageSquareText, count: 5, bg: '#FFE8CC' },
+  { label: 'Aluno atípico', icon: Stethoscope, count: 6, bg: '#FFD6D6', isNew: true },
+  { label: 'Musicalização', icon: Music2, count: 8, bg: '#E0F2FE' },
+  { label: 'Artes visuais', icon: Palette, count: 10, bg: '#FEF3C7' },
+  { label: 'Reunião de pais', icon: Handshake, count: 3, bg: '#D8F3DC' },
+  { label: 'Imagens e recursos', icon: FileImage, count: 7, bg: '#D0E8FF' },
 ]
 
 export default function MaterialsScreen() {
@@ -49,22 +64,17 @@ export default function MaterialsScreen() {
               key={cat.label}
               className="relative bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform"
             >
+              {renderIcon(cat.icon, cat.bg)}
               {cat.isNew && (
                 <span className="absolute top-3 right-9 text-[9px] font-bold px-2 py-[2px] rounded-full bg-gbg text-gm">
                   Novo
                 </span>
               )}
-              <div
-                className="w-[48px] h-[48px] rounded-[13px] flex items-center justify-center text-[22px] flex-shrink-0"
-                style={{ background: cat.bg }}
-              >
-                {cat.emoji}
-              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[14px] font-bold text-ink leading-tight">{cat.label}</p>
-                <span className="text-[11px] text-muted">{cat.count} modelos</span>
+                <p className="text-[15px] font-bold text-ink leading-tight">{cat.label}</p>
+                <span className="text-[12px] text-muted">{cat.count} modelos</span>
               </div>
-              <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
+              <ChevronRight size={18} className="text-muted flex-shrink-0" />
             </button>
           ))}
         </div>
@@ -73,6 +83,17 @@ export default function MaterialsScreen() {
           <p className="text-[13px] text-muted text-center py-10">Nenhum material encontrado.</p>
         )}
       </div>
+    </div>
+  )
+}
+
+function renderIcon(Icon: LucideIcon, bg: string) {
+  return (
+    <div
+      className="w-[48px] h-[48px] rounded-[13px] flex items-center justify-center text-gm flex-shrink-0"
+      style={{ background: bg }}
+    >
+      <Icon size={21} />
     </div>
   )
 }

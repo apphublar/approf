@@ -236,7 +236,7 @@ export default function InterventionsSubscreen() {
           <>
             <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
               <p className="text-[13px] text-soft leading-[1.6]">
-                Registre uma observação sobre a criança e receba sugestões pedagógicas alinhadas Ã  BNCC para apoiar o desenvolvimento infantil.
+                Registre uma observação sobre a criança e receba sugestões pedagógicas alinhadas à BNCC para apoiar o desenvolvimento infantil.
               </p>
             </div>
 

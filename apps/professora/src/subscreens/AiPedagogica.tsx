@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react'
-import { ChevronLeft, FileText, Search, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, Search, Sparkles } from 'lucide-react'
 import { useNavStore } from '@/store'
 
 const AI_SECTIONS = [
@@ -127,7 +127,7 @@ export default function AiPedagogicaSubscreen() {
                 <p className="text-[13px] font-bold text-ink leading-tight">Histórico de planejamentos</p>
                 <p className="text-[11px] text-muted leading-snug mt-1">Veja, edite e acompanhe planejamentos já gerados.</p>
               </div>
-              <span className="text-muted text-[18px] flex-shrink-0">ââ‚¬º</span>
+                  <ChevronRight size={18} className="text-muted flex-shrink-0" />
             </button>
 
             <div className="flex flex-col gap-[11px]">
@@ -144,7 +144,7 @@ export default function AiPedagogicaSubscreen() {
                     <h3 className="text-[14px] font-bold text-ink leading-tight">{period.title}</h3>
                     <p className="text-[11px] text-muted leading-snug mt-1">{period.desc}</p>
                   </div>
-                  <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
+                  <ChevronRight size={18} className="text-muted flex-shrink-0" />
                 </button>
               ))}
             </div>
@@ -170,7 +170,7 @@ export default function AiPedagogicaSubscreen() {
                 <p className="text-[13px] font-bold text-ink leading-tight">Ver gerados</p>
                 <p className="text-[11px] text-muted leading-snug mt-1">Histórico do mês e geral de tudo que foi criado por IA.</p>
               </div>
-              <span className="text-muted text-[18px] flex-shrink-0">ââ‚¬º</span>
+              <ChevronRight size={18} className="text-muted flex-shrink-0" />
             </button>
 
             <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
@@ -216,7 +216,7 @@ export default function AiPedagogicaSubscreen() {
                         <h3 className="text-[14px] font-bold text-ink leading-tight">{item.title}</h3>
                         <p className="text-[11px] text-muted leading-snug mt-1">{item.desc}</p>
                       </div>
-                      <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
+                      <ChevronRight size={18} className="text-muted flex-shrink-0" />
                     </button>
                   ))}
                 </div>

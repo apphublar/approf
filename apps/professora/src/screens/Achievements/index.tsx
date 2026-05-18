@@ -1,12 +1,14 @@
+import { Award, BookOpenText, Bot, Flame, Lock, NotebookPen, School, Star, UserRoundSearch } from 'lucide-react'
+
 const BADGES = [
-  { id: 'primeira',  label: 'Primeira Anotação', emoji: '✏️', desc: 'Você fez sua primeira anotação!', unlocked: true,  color: '#D8F3DC', fg: '#4F8341' },
-  { id: '10ann',     label: '10 Anotações',      emoji: '📝', desc: 'Anotou 10 vezes — consistência é tudo.', unlocked: true, color: '#D8F3DC', fg: '#4F8341' },
-  { id: 'turma',     label: 'Primeira Turma',    emoji: '👧', desc: 'Cadastrou sua primeira turma.', unlocked: true, color: '#FFF3CD', fg: '#856404' },
-  { id: '50ann',     label: '50 Anotações',      emoji: '🌟', desc: 'Você chegou a 50! Professora dedicada.', unlocked: false, color: '#eee', fg: '#aaa' },
-  { id: '1aluno',    label: 'Perfil Completo',   emoji: '🗂️', desc: 'Cadastrou todos os dados de um aluno.', unlocked: false, color: '#eee', fg: '#aaa' },
-  { id: 'ia',        label: 'Relatório com IA',  emoji: '🤖', desc: 'Gerou seu primeiro relatório com IA.', unlocked: false, color: '#eee', fg: '#aaa' },
-  { id: '100ann',    label: '100 Anotações',     emoji: '🏆', desc: '100 anotações! Incrível.', unlocked: false, color: '#eee', fg: '#aaa' },
-  { id: '30dias',    label: '30 dias ativo',     emoji: '🔥', desc: 'Usou o Approf por 30 dias.', unlocked: false, color: '#eee', fg: '#aaa' },
+  { id: 'primeira', label: 'Primeira Anotação', icon: NotebookPen, desc: 'Você fez sua primeira anotação.', unlocked: true, color: '#D8F3DC', fg: '#4F8341' },
+  { id: '10ann', label: '10 Anotações', icon: BookOpenText, desc: 'Anotou 10 vezes com consistência.', unlocked: true, color: '#D8F3DC', fg: '#4F8341' },
+  { id: 'turma', label: 'Primeira Turma', icon: School, desc: 'Cadastrou sua primeira turma.', unlocked: true, color: '#FFF3CD', fg: '#856404' },
+  { id: '50ann', label: '50 Anotações', icon: Star, desc: 'Você chegou a 50 registros.', unlocked: false, color: '#eee', fg: '#aaa' },
+  { id: '1aluno', label: 'Perfil Completo', icon: UserRoundSearch, desc: 'Completou o perfil de um aluno.', unlocked: false, color: '#eee', fg: '#aaa' },
+  { id: 'ia', label: 'Relatório com IA', icon: Bot, desc: 'Gerou seu primeiro relatório com IA.', unlocked: false, color: '#eee', fg: '#aaa' },
+  { id: '100ann', label: '100 Anotações', icon: Award, desc: '100 anotações registradas.', unlocked: false, color: '#eee', fg: '#aaa' },
+  { id: '30dias', label: '30 dias ativo', icon: Flame, desc: 'Usou o Approf por 30 dias.', unlocked: false, color: '#eee', fg: '#aaa' },
 ]
 
 export default function AchievementsScreen() {
@@ -29,10 +31,10 @@ export default function AchievementsScreen() {
               className={`bg-white rounded-app p-4 border border-border flex flex-col items-center text-center gap-2 ${!b.unlocked ? 'opacity-45' : ''}`}
             >
               <div
-                className="w-14 h-14 rounded-full flex items-center justify-center text-[28px]"
+                className="w-14 h-14 rounded-full flex items-center justify-center"
                 style={{ background: b.color }}
               >
-                {b.unlocked ? b.emoji : '🔒'}
+                {b.unlocked ? <b.icon size={26} color={b.fg} /> : <Lock size={24} color="#888" />}
               </div>
               <div>
                 <p className="text-[12px] font-bold text-ink leading-tight">{b.label}</p>

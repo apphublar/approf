@@ -1,22 +1,22 @@
-import { ChevronLeft } from 'lucide-react'
+import { CalendarDays, ChevronLeft, FolderClosed, Sparkles, Users, type LucideIcon } from 'lucide-react'
 import { useNavStore } from '@/store'
 
-const SCREEN_CONFIG: Record<string, { title: string; emoji: string; desc: string; badge: string }> = {
+const SCREEN_CONFIG: Record<string, { title: string; icon: LucideIcon; desc: string; badge: string }> = {
   calendar: {
     title: 'Calendário',
-    emoji: '📅',
+    icon: CalendarDays,
     desc: 'Visualize eventos, feriados e tarefas pedagógicas do ano letivo. Organize sua rotina de forma visual.',
     badge: 'Calendário pedagógico completo em breve',
   },
   community: {
     title: 'Comunidade',
-    emoji: '🌱',
+    icon: Users,
     desc: 'Troque experiências, ideias e materiais com outras professoras de Educação Infantil de todo o Brasil.',
     badge: 'Feed da comunidade em breve',
   },
   documents: {
     title: 'Documentos',
-    emoji: '📁',
+    icon: FolderClosed,
     desc: 'Seus documentos pessoais armazenados com segurança — atestados, formações, certificados e mais.',
     badge: 'Armazenamento de documentos em breve',
   },
@@ -26,7 +26,7 @@ export default function ComingSoonSubscreen({ screen }: { screen: string }) {
   const { closeSubscreen } = useNavStore()
   const cfg = SCREEN_CONFIG[screen] ?? {
     title: 'Em breve',
-    emoji: '✨',
+    icon: Sparkles,
     desc: 'Esta funcionalidade está sendo preparada.',
     badge: 'Em breve no Approf',
   }
@@ -47,10 +47,10 @@ export default function ComingSoonSubscreen({ screen }: { screen: string }) {
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 pb-20">
         <div
-          className="w-24 h-24 rounded-[28px] flex items-center justify-center text-5xl"
+          className="w-24 h-24 rounded-[28px] flex items-center justify-center text-gm"
           style={{ background: '#D8F3DC' }}
         >
-          {cfg.emoji}
+          <cfg.icon size={44} />
         </div>
         <div className="text-center">
           <h2 className="font-serif text-[22px] text-gd mb-2">{cfg.title}</h2>
@@ -61,7 +61,7 @@ export default function ComingSoonSubscreen({ screen }: { screen: string }) {
           style={{ background: '#F0FAF4' }}
         >
           <p className="text-[12px] font-semibold" style={{ color: '#4F8341' }}>
-            ✦ {cfg.badge}
+            {cfg.badge}
           </p>
         </div>
       </div>

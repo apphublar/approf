@@ -129,7 +129,7 @@ export default function StudentProfileSubscreen() {
           </div>
           {lastAbsences.length > 0 ? (
             <div className="mt-3 rounded-app-sm bg-cream border border-border p-3">
-              <p className="text-[11px] font-bold text-ink mb-2">Ãšltimas faltas</p>
+              <p className="text-[11px] font-bold text-ink mb-2">Últimas faltas</p>
               <div className="flex flex-wrap gap-2">
                 {lastAbsences.map((absence) => (
                   <span key={absence.id} className="text-[11px] text-muted bg-white border border-border rounded-full px-2 py-1">

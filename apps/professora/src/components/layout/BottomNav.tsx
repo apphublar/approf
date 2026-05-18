@@ -71,7 +71,7 @@ export default function BottomNav() {
               className={`flex-1 flex flex-col items-center gap-[3px] py-[9px] pb-[11px] border-none bg-transparent cursor-pointer transition-colors ${
                 active ? 'text-gm' : 'text-muted'
               }`}
-              style={{ fontFamily: '"DM Sans", sans-serif', fontSize: 9, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase' }}
+              style={{ fontFamily: '"DM Sans", sans-serif', fontSize: 11, fontWeight: 700, letterSpacing: '0.01em' }}
             >
               {tab.icon}
               <span>{tab.label}</span>
@@ -111,7 +111,7 @@ export default function BottomNav() {
               className={`flex-1 flex flex-col items-center gap-[3px] py-[9px] pb-[11px] border-none bg-transparent cursor-pointer transition-colors ${
                 active ? 'text-gm' : 'text-muted'
               }`}
-              style={{ fontFamily: '"DM Sans", sans-serif', fontSize: 9, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase' }}
+              style={{ fontFamily: '"DM Sans", sans-serif', fontSize: 11, fontWeight: 700, letterSpacing: '0.01em' }}
             >
               {tab.icon}
               <span>{tab.label}</span>
