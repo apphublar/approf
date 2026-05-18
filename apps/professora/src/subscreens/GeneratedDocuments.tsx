@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, Download, Eye, FileText, Image as ImageIcon, Plus, Search, Share2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
-import { listReports } from '@/services/reports'
+import { getReportById, listReports } from '@/services/reports'
 import { generateImage } from '@/services/ai-usage'
 import type { GeneratedDocument } from '@/types'
 
@@ -30,19 +30,21 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   const [message, setMessage] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [description, setDescription] = useState('')
-  const [quality, setQuality] = useState<'medium' | 'high'>('medium')
   const [creating, setCreating] = useState(false)
+  const [imageDetailsById, setImageDetailsById] = useState<Record<string, { imageDataUrl?: string; prompt?: string; quality?: string }>>({})
   const isImagesMode = filters.kind === 'images'
 
   async function loadDocuments() {
     setLoading(true)
     try {
       const items = await listReports({
-        limit: 200,
+        limit: 80,
         studentId: filters.studentId,
         classId: filters.classId,
+        compact: true,
       })
       setDocuments(sortFocusedFirst(items, filters.focusReportId))
+      setImageDetailsById({})
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível carregar documentos.')
@@ -79,6 +81,45 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
     )
   }, [documents, period, query, classes, filters.reportType, filters.reportTypes, filters.kind, archiveFilter])
 
+  useEffect(() => {
+    if (!isImagesMode) return
+    const imageIds = visibleDocuments
+      .filter((doc) => isImageReport(doc))
+      .map((doc) => doc.id)
+      .filter((id) => !imageDetailsById[id])
+      .slice(0, 12)
+
+    if (!imageIds.length) return
+    let canceled = false
+
+    Promise.all(
+      imageIds.map(async (id) => {
+        try {
+          const report = await getReportById(id)
+          return {
+            id,
+            imageDataUrl: report.ai_artifacts?.imageDataUrl,
+            prompt: report.ai_artifacts?.prompt,
+            quality: report.ai_artifacts?.quality,
+          }
+        } catch {
+          return { id }
+        }
+      }),
+    ).then((items) => {
+      if (canceled) return
+      setImageDetailsById((current) => {
+        const next = { ...current }
+        items.forEach((item) => { next[item.id] = item })
+        return next
+      })
+    })
+
+    return () => {
+      canceled = true
+    }
+  }, [isImagesMode, visibleDocuments, imageDetailsById])
+
   const title = getTitle(filters)
   const subtitle = getSubtitle(filters, classes)
 
@@ -95,7 +136,6 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
     try {
       const result = await generateImage({
         description: normalized,
-        quality,
         classId: filters.classId ?? null,
         studentId: filters.studentId ?? null,
       })
@@ -117,7 +157,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   }
 
   function downloadImage(doc: GeneratedDocument) {
-    const imageDataUrl = doc.ai_artifacts?.imageDataUrl
+    const imageDataUrl = imageDetailsById[doc.id]?.imageDataUrl ?? doc.ai_artifacts?.imageDataUrl
     if (!imageDataUrl) return
     const anchor = window.document.createElement('a')
     anchor.href = imageDataUrl
@@ -128,7 +168,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   }
 
   async function shareImage(doc: GeneratedDocument) {
-    const imageDataUrl = doc.ai_artifacts?.imageDataUrl
+    const imageDataUrl = imageDetailsById[doc.id]?.imageDataUrl ?? doc.ai_artifacts?.imageDataUrl
     if (!imageDataUrl || !navigator.share) return
     try {
       const file = dataUrlToFile(imageDataUrl, `imagem-${new Date(doc.created_at).getTime()}.png`)
@@ -255,19 +295,21 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
           <div className="flex flex-col gap-[10px] pb-8">
             {visibleDocuments.map((doc) => (
               <div key={doc.id} className="bg-white rounded-app p-4 border border-border shadow-card">
-                {doc.ai_artifacts?.imageDataUrl && (
+                {(imageDetailsById[doc.id]?.imageDataUrl || doc.ai_artifacts?.imageDataUrl) && (
                   <img
-                    src={doc.ai_artifacts.imageDataUrl}
+                    src={imageDetailsById[doc.id]?.imageDataUrl ?? doc.ai_artifacts?.imageDataUrl}
                     alt="Imagem gerada"
                     className="w-full h-[190px] object-cover rounded-app-sm border border-border"
+                    loading="lazy"
+                    decoding="async"
                   />
                 )}
                 <p className="text-[11px] text-muted mt-2">{formatDate(doc.created_at)}</p>
                 <p className="text-[12px] text-ink mt-2 leading-[1.5] line-clamp-3">
-                  {extractImageDescription(doc)}
+                  {extractImageDescription(doc, imageDetailsById[doc.id])}
                 </p>
                 <p className="text-[11px] text-muted mt-2">
-                  Qualidade: <span className="font-bold text-ink">{formatQuality(doc.ai_artifacts?.quality)}</span>
+                  Qualidade: <span className="font-bold text-ink">{formatQuality(imageDetailsById[doc.id]?.quality ?? doc.ai_artifacts?.quality)}</span>
                 </p>
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   <button
@@ -279,7 +321,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                   </button>
                   <button
                     onClick={() => downloadImage(doc)}
-                    disabled={!doc.ai_artifacts?.imageDataUrl}
+                    disabled={!(imageDetailsById[doc.id]?.imageDataUrl || doc.ai_artifacts?.imageDataUrl)}
                     className="rounded-app-sm border border-gp bg-gbg py-2 text-[11px] font-bold text-gd flex items-center justify-center gap-1 disabled:opacity-50"
                   >
                     <Download size={13} />
@@ -287,7 +329,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                   </button>
                   <button
                     onClick={() => shareImage(doc)}
-                    disabled={!navigator.share || !doc.ai_artifacts?.imageDataUrl}
+                    disabled={!navigator.share || !(imageDetailsById[doc.id]?.imageDataUrl || doc.ai_artifacts?.imageDataUrl)}
                     className="rounded-app-sm border border-gp bg-gbg py-2 text-[11px] font-bold text-gd flex items-center justify-center gap-1 disabled:opacity-50"
                   >
                     <Share2 size={13} />
@@ -325,6 +367,8 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                       src={doc.ai_artifacts.imageDataUrl}
                       alt="Imagem de portfólio gerada"
                       className="w-full max-h-[120px] object-cover rounded-app-sm border border-border mt-3"
+                      loading="lazy"
+                      decoding="async"
                     />
                   )}
                   <p className="text-[11px] text-muted mt-1 line-clamp-2">
@@ -354,21 +398,11 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
             />
 
             <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Qualidade da imagem</p>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <button
-                onClick={() => setQuality('medium')}
-                className={`rounded-app-sm border px-3 py-3 text-left ${quality === 'medium' ? 'border-gm bg-gbg' : 'border-border bg-white'}`}
-              >
-                <p className="text-[13px] font-bold text-ink">Média</p>
-                <p className="text-[11px] text-muted mt-1">Geração mais econômica.</p>
-              </button>
-              <button
-                onClick={() => setQuality('high')}
-                className={`rounded-app-sm border px-3 py-3 text-left ${quality === 'high' ? 'border-gm bg-gbg' : 'border-border bg-white'}`}
-              >
-                <p className="text-[13px] font-bold text-ink">Alta</p>
-                <p className="text-[11px] text-muted mt-1">Maior qualidade e maior consumo de GizTokens.</p>
-              </button>
+            <div className="mt-2 rounded-app-sm border border-gp bg-gbg px-3 py-3">
+              <p className="text-[13px] font-bold text-ink">Padrão otimizada</p>
+              <p className="text-[11px] text-muted mt-1">
+                Qualidade equilibrada para manter bom resultado com custo mais baixo.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 mt-4">
@@ -500,16 +534,20 @@ function getEmptyTitle(filters: GeneratedDocumentsData) {
   return 'Nenhum documento gerado'
 }
 
-function extractImageDescription(doc: GeneratedDocument) {
-  const prompt = doc.ai_artifacts?.prompt?.trim()
+function extractImageDescription(
+  doc: GeneratedDocument,
+  details?: { prompt?: string },
+) {
+  const prompt = details?.prompt?.trim() || doc.ai_artifacts?.prompt?.trim()
   if (prompt) return prompt
-  return (doc.body ?? '').replace(/\s+/g, ' ').trim() || 'Sem descrição registrada.'
+  return 'Abra a imagem para ver a descrição completa.'
 }
 
 function formatQuality(value?: string) {
-  if (!value) return 'Média'
+  if (!value) return 'Padrão'
+  if (value === 'standard' || value.toLowerCase() === 'padrão') return 'Padrão'
   if (value === 'high' || value.toLowerCase() === 'alta') return 'Alta'
-  return 'Média'
+  return 'Padrão'
 }
 
 function formatStatus(status: string) {

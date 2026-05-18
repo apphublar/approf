@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     const classId = searchParams.get('classId')?.trim() || undefined
     const limitRaw = Number(searchParams.get('limit'))
     const limit = Number.isFinite(limitRaw) ? limitRaw : undefined
+    const compact = searchParams.get('compact') === '1'
 
     const reports = await listOwnerReports(ownerId, {
       status,
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
       studentId,
       classId,
       limit,
+      compact,
     })
 
     return NextResponse.json({ reports }, { status: 200, headers: CORS_HEADERS })

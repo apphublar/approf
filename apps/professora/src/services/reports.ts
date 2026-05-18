@@ -7,6 +7,7 @@ interface ListReportsFilters {
   studentId?: string
   classId?: string
   limit?: number
+  compact?: boolean
 }
 
 interface UpdateReportInput {
@@ -51,6 +52,7 @@ function buildQuery(filters: ListReportsFilters) {
   if (filters.studentId) params.set('studentId', filters.studentId)
   if (filters.classId) params.set('classId', filters.classId)
   if (typeof filters.limit === 'number') params.set('limit', String(filters.limit))
+  if (filters.compact) params.set('compact', '1')
   const query = params.toString()
   return query ? `?${query}` : ''
 }

@@ -16,7 +16,7 @@ const CORS_HEADERS = {
 
 const GIZTOKENS_PER_COST_CENT = 10
 
-type ImageQuality = 'medium' | 'high'
+type ImageQuality = 'standard'
 
 export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       studentId: typeof body.studentId === 'string' ? body.studentId : null,
       promptVersion,
       requestSummary,
-      pricingOverride: buildQualityEstimate(quality),
+      pricingOverride: buildQualityEstimate(),
     })
 
     const reservedLogId = reservation.logId
@@ -154,20 +154,21 @@ export async function POST(request: Request) {
 }
 
 function parseImageQuality(value: unknown): ImageQuality {
-  if (value === 'medium' || value === 'high') return value
-  return 'medium'
+  if (value === 'standard') return value
+  return 'standard'
 }
 
-function buildQualityEstimate(quality: ImageQuality) {
+function buildQualityEstimate() {
   const baseCostCents = resolveBaseEstimatedImageCostCents()
-  const adjustedCostCents = quality === 'high'
-    ? Math.round(baseCostCents * 1.25)
-    : Math.round(baseCostCents * 0.85)
-
-  const estimatedCostCents = Math.max(1, adjustedCostCents)
+  const estimatedCostCents = Math.max(1, Math.round(baseCostCents))
   return {
+    provider: 'openai',
+    model: resolveStandaloneImageModel(),
     estimatedCostCents,
     giztokens: estimatedCostCents * GIZTOKENS_PER_COST_CENT,
+    imageCount: 1,
+    inputTokens: 0,
+    outputTokens: 0,
   }
 }
 
@@ -175,6 +176,10 @@ function resolveBaseEstimatedImageCostCents() {
   const fromEnv = Number(process.env.OPENAI_STANDALONE_IMAGE_ESTIMATED_COST_CENTS)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
   return 110
+}
+
+function resolveStandaloneImageModel() {
+  return process.env.OPENAI_STANDALONE_IMAGE_MODEL?.trim() || 'gpt-image-1-mini'
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {

@@ -51,9 +51,13 @@ const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2'
 const DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL = 'gpt-image-1-mini'
 const DEFAULT_OPENAI_IMAGE_SIZE = '1024x1536'
 const DEFAULT_OPENAI_IMAGE_QUALITY = 'high'
+const DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY = 'medium'
 const DEFAULT_OPENAI_IMAGE_COST_CENTS = 120
 const DEFAULT_OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD = 8
 const DEFAULT_OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD = 30
+const DEFAULT_OPENAI_STANDALONE_IMAGE_COST_CENTS = 60
+const DEFAULT_OPENAI_STANDALONE_IMAGE_INPUT_COST_PER_MILLION_USD = 2
+const DEFAULT_OPENAI_STANDALONE_IMAGE_OUTPUT_COST_PER_MILLION_USD = 8
 
 export async function generatePortfolioImage(
   input: GeneratePortfolioImageInput,
@@ -72,7 +76,7 @@ export async function generatePortfolioImage(
     user: input.ownerId,
   })
 
-  const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens)
+  const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'portfolio')
   const body = buildPersistedImageBody({
     prompt,
     model,
@@ -134,7 +138,7 @@ export async function generateStandaloneImage(
     user: input.ownerId,
   })
 
-  const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens)
+  const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'standalone')
   const body = buildPersistedStandaloneImageBody({
     prompt,
     size,
@@ -329,9 +333,10 @@ function resolveStandaloneImageSize(summary: Record<string, unknown>) {
 
 function resolveStandaloneImageQuality(summary: Record<string, unknown>) {
   const requested = asString(summary.imageQuality)?.trim().toLowerCase()
+  if (requested === 'standard' || requested === 'padrao' || requested === 'padrão') return 'medium'
   if (requested === 'medium' || requested === 'media' || requested === 'média') return 'medium'
   if (requested === 'high' || requested === 'alta') return 'high'
-  return process.env.OPENAI_IMAGE_QUALITY?.trim() || DEFAULT_OPENAI_IMAGE_QUALITY
+  return process.env.OPENAI_STANDALONE_IMAGE_QUALITY?.trim() || DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY
 }
 
 function buildStandaloneImagePrompt(summary: Record<string, unknown>, size: string) {
@@ -447,35 +452,52 @@ async function persistUsage(
   if (error) throw toError(error, 'Nao foi possivel registrar consumo da imagem.')
 }
 
-function resolveOpenAiImageCostCents() {
-  const fromEnv = Number(process.env.OPENAI_IMAGE_COST_CENTS)
+function resolveOpenAiImageCostCents(profile: 'portfolio' | 'standalone') {
+  const envKey = profile === 'standalone'
+    ? process.env.OPENAI_STANDALONE_IMAGE_COST_CENTS
+    : process.env.OPENAI_IMAGE_COST_CENTS
+  const fromEnv = Number(envKey)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
-  return DEFAULT_OPENAI_IMAGE_COST_CENTS
+  return profile === 'standalone' ? DEFAULT_OPENAI_STANDALONE_IMAGE_COST_CENTS : DEFAULT_OPENAI_IMAGE_COST_CENTS
 }
 
-function estimateOpenAiImageCostCents(inputTokens: number, outputTokens: number) {
+function estimateOpenAiImageCostCents(
+  inputTokens: number,
+  outputTokens: number,
+  profile: 'portfolio' | 'standalone',
+) {
   const normalizedInputTokens = Math.max(0, inputTokens)
   const normalizedOutputTokens = Math.max(0, outputTokens)
   if (normalizedInputTokens <= 0 && normalizedOutputTokens <= 0) {
-    return resolveOpenAiImageCostCents()
+    return resolveOpenAiImageCostCents(profile)
   }
 
-  const inputUsd = (normalizedInputTokens / 1_000_000) * resolveOpenAiImageInputUsdPerMillion()
-  const outputUsd = (normalizedOutputTokens / 1_000_000) * resolveOpenAiImageOutputUsdPerMillion()
+  const inputUsd = (normalizedInputTokens / 1_000_000) * resolveOpenAiImageInputUsdPerMillion(profile)
+  const outputUsd = (normalizedOutputTokens / 1_000_000) * resolveOpenAiImageOutputUsdPerMillion(profile)
   const brl = (inputUsd + outputUsd) * resolveUsdToBrlRate()
   return Math.max(1, Math.round(brl * 100))
 }
 
-function resolveOpenAiImageInputUsdPerMillion() {
-  const fromEnv = Number(process.env.OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD)
+function resolveOpenAiImageInputUsdPerMillion(profile: 'portfolio' | 'standalone') {
+  const envKey = profile === 'standalone'
+    ? process.env.OPENAI_STANDALONE_IMAGE_INPUT_COST_PER_MILLION_USD
+    : process.env.OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD
+  const fromEnv = Number(envKey)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return DEFAULT_OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD
+  return profile === 'standalone'
+    ? DEFAULT_OPENAI_STANDALONE_IMAGE_INPUT_COST_PER_MILLION_USD
+    : DEFAULT_OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD
 }
 
-function resolveOpenAiImageOutputUsdPerMillion() {
-  const fromEnv = Number(process.env.OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD)
+function resolveOpenAiImageOutputUsdPerMillion(profile: 'portfolio' | 'standalone') {
+  const envKey = profile === 'standalone'
+    ? process.env.OPENAI_STANDALONE_IMAGE_OUTPUT_COST_PER_MILLION_USD
+    : process.env.OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD
+  const fromEnv = Number(envKey)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return DEFAULT_OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD
+  return profile === 'standalone'
+    ? DEFAULT_OPENAI_STANDALONE_IMAGE_OUTPUT_COST_PER_MILLION_USD
+    : DEFAULT_OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD
 }
 
 function resolveUsdToBrlRate() {

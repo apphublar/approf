@@ -146,7 +146,6 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
       const result = document.report_type === 'generated_image'
         ? await generateImage({
           description: prompt,
-          quality: document.ai_artifacts?.quality === 'high' ? 'high' : 'medium',
           classId: document.class_id,
           studentId: document.student_id,
         })

@@ -8,6 +8,8 @@ const REPORT_SELECT_WITH_ARTIFACTS =
   'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at'
 const REPORT_SELECT_BASE =
   'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, is_final_version, created_at, updated_at'
+const REPORT_SELECT_COMPACT =
+  'id, owner_id, student_id, class_id, status, report_type, prompt_version, is_final_version, created_at, updated_at'
 
 export interface ReportListFilters {
   status?: ReportStatus
@@ -15,10 +17,23 @@ export interface ReportListFilters {
   studentId?: string
   classId?: string
   limit?: number
+  compact?: boolean
 }
 
 export async function listOwnerReports(ownerId: string, filters: ReportListFilters) {
   const supabase = createSupabaseServiceClient()
+  if (filters.compact) {
+    const compactResult = await applyListFilters(
+      supabase.from('reports').select(REPORT_SELECT_COMPACT),
+      ownerId,
+      filters,
+    )
+    if (compactResult.error) throw toError(compactResult.error, 'Nao foi possivel listar documentos.')
+    return (compactResult.data ?? []).map((report: Record<string, unknown>) =>
+      withEmptyArtifacts({ ...report, body: null }),
+    )
+  }
+
   const { data, error } = await applyListFilters(
     supabase.from('reports').select(REPORT_SELECT_WITH_ARTIFACTS),
     ownerId,

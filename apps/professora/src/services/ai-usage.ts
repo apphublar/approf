@@ -53,7 +53,7 @@ export interface AiImageGenerationInput extends AiUsageReservationInput {
 export interface AiImageGenerationResult extends AiUsageReservationResult {
   imageDataUrl?: string
   prompt?: string
-  quality?: 'medium' | 'high'
+  quality?: 'standard' | 'medium' | 'high'
   reportId?: string
   promptVersion?: string
   provider?: string
@@ -62,7 +62,7 @@ export interface AiImageGenerationResult extends AiUsageReservationResult {
 
 export interface GeneratedImageInput {
   description: string
-  quality: 'medium' | 'high'
+  quality?: 'standard' | 'medium' | 'high'
   classId?: string | null
   studentId?: string | null
 }
@@ -372,6 +372,8 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
     throw new Error('Sessão expirada. Entre novamente para continuar.')
   }
 
+  const quality = input.quality ?? 'standard'
+
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 120000)
   let response: Response
@@ -383,12 +385,12 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        quality: input.quality,
+        quality,
         classId: input.classId ?? null,
         studentId: input.studentId ?? null,
         requestSummary: {
           description: input.description,
-          imageQuality: input.quality,
+          imageQuality: quality,
         },
       }),
       signal: controller.signal,
@@ -422,7 +424,11 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
     entitlement: result.entitlement,
     imageDataUrl: typeof result.imageDataUrl === 'string' ? result.imageDataUrl : undefined,
     prompt: typeof result.prompt === 'string' ? result.prompt : undefined,
-    quality: result.quality === 'high' ? 'high' : 'medium',
+    quality: result.quality === 'high'
+      ? 'high'
+      : result.quality === 'medium'
+        ? 'medium'
+        : 'standard',
     reportId: typeof result.reportId === 'string' ? result.reportId : undefined,
     promptVersion: typeof result.promptVersion === 'string' ? result.promptVersion : undefined,
   }
