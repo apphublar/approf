@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, Check, Mic, Paperclip, Square } from 'lucide-react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, Check, Mic, Paperclip, Send, Square } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { getAppDataMode } from '@/services/app-data'
-import { formatAiUsageMessage, transcribeAnnotationAudio } from '@/services/ai-usage'
+import { formatAiUsageMessage, generateAiChatReply, transcribeAnnotationAudio } from '@/services/ai-usage'
 import { createSupabaseAnnotation, updateSupabaseAnnotation } from '@/services/supabase/annotations'
 import { isSupabaseConfigured } from '@/services/supabase/config'
 import type { Annotation, AnnotationCategory, AnnotationPersistence } from '@/types'
 
 type WorkKind = '' | 'report' | 'planning' | 'memory' | 'personal'
 type Scope = 'child' | 'class' | 'optional-class' | 'teacher'
+type AnnotationViewMode = 'annotation' | 'chat'
+type ChatProvider = 'openai' | 'anthropic'
 
 interface ModelOption {
   id: string
@@ -17,46 +19,39 @@ interface ModelOption {
   scope: Scope
 }
 
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  text: string
+}
+
 const REPORT_MODELS: ModelOption[] = [
-  { id: 'desenvolvimento', label: 'Relatorio de desenvolvimento', desc: 'Evolucao individual da crianca, sem comparacoes.', scope: 'child' },
-  { id: 'atipico', label: 'Relatorio atipico', desc: 'Observacoes pedagogicas, sem diagnostico clinico.', scope: 'child' },
-  { id: 'diario', label: 'Diario de bordo', desc: 'Rotina e acontecimentos do grupo ou da crianca.', scope: 'class' },
-  { id: 'portfolio', label: 'Portfolio pedagogico', desc: 'Evidencias, producoes, fotos e jornada individual.', scope: 'child' },
-  { id: 'especialista', label: 'Relatorio para especialista', desc: 'Neuropediatra, fono, TO, psicologo ou psicopedagogo.', scope: 'child' },
-  { id: 'encaminhamento', label: 'Encaminhamento pedagogico', desc: 'Registro para orientar familia ou especialista.', scope: 'child' },
-  { id: 'anamnese', label: 'Ficha de anamnese', desc: 'Informacoes iniciais e contexto da crianca.', scope: 'child' },
-  { id: 'reuniao-pais', label: 'Registro de reuniao de pais', desc: 'Pontos tratados com a familia.', scope: 'child' },
+  { id: 'desenvolvimento', label: 'Relatório de desenvolvimento', desc: 'Evolução individual da criança, sem comparações.', scope: 'child' },
+  { id: 'atipico', label: 'Relatório atípico', desc: 'Observações pedagógicas, sem diagnóstico clínico.', scope: 'child' },
+  { id: 'diario', label: 'Diário de bordo', desc: 'Rotina coletiva, atividades do dia e vivências da turma.', scope: 'class' },
+  { id: 'portfolio', label: 'Portfólio pedagógico', desc: 'Evidências, produções, fotos e jornada individual.', scope: 'child' },
+  { id: 'especialista', label: 'Relatório para especialista', desc: 'Neuropediatra, fono, TO, psicólogo ou psicopedagogo.', scope: 'child' },
+  { id: 'encaminhamento', label: 'Encaminhamento pedagógico', desc: 'Registro para orientar família ou especialista.', scope: 'child' },
+  { id: 'anamnese', label: 'Ficha de anamnese', desc: 'Informações iniciais e contexto da criança.', scope: 'child' },
+  { id: 'reuniao-pais', label: 'Registro de reunião de pais', desc: 'Pontos tratados com a família.', scope: 'child' },
 ]
 
 const PLANNING_MODELS: ModelOption[] = [
   { id: 'semanal', label: 'Planejamento semanal', desc: 'Rotina e propostas da semana.', scope: 'class' },
-  { id: 'diario', label: 'Plano de aula diario', desc: 'Atividade, objetivo, materiais e desenvolvimento.', scope: 'class' },
-  { id: 'projeto', label: 'Projeto pedagogico especifico', desc: 'Projeto por tema, interesse da turma ou necessidade observada.', scope: 'class' },
+  { id: 'diario', label: 'Plano de aula diário', desc: 'Atividade, objetivo, materiais e desenvolvimento.', scope: 'class' },
+  { id: 'projeto', label: 'Projeto pedagógico específico', desc: 'Projeto por tema, interesse da turma ou necessidade observada.', scope: 'class' },
 ]
 
 const MEMORY_MODELS: ModelOption[] = [
-  { id: 'evolucao', label: 'Evolucao da crianca', desc: 'Marco, progresso, fala, autonomia ou interacao.', scope: 'child' },
-  { id: 'observacao', label: 'Observacao importante', desc: 'Algo que precisa acompanhar a rotina pedagogica.', scope: 'child' },
-  { id: 'ideia', label: 'Ideia solta para depois', desc: 'Pensamento rapido para usar em relatorio ou planejamento.', scope: 'optional-class' },
+  { id: 'evolucao', label: 'Evolução da criança', desc: 'Marco, progresso, fala, autonomia ou interação.', scope: 'child' },
+  { id: 'observacao', label: 'Observação importante', desc: 'Algo que precisa acompanhar a rotina pedagógica.', scope: 'child' },
+  { id: 'ideia', label: 'Ideia solta para depois', desc: 'Pensamento rápido para usar em relatório ou planejamento.', scope: 'optional-class' },
 ]
 
 const PERSONAL_MODELS: ModelOption[] = [
-  { id: 'pessoal', label: 'Anotacao pessoal', desc: 'Registro privado da professora, sem vinculo com crianca ou turma.', scope: 'teacher' },
-  { id: 'lembrete', label: 'Lembrete de rotina', desc: 'Algo para lembrar depois sobre organizacao, materiais ou combinados.', scope: 'teacher' },
+  { id: 'pessoal', label: 'Anotação pessoal', desc: 'Registro privado da professora, sem vínculo com criança ou turma.', scope: 'teacher' },
+  { id: 'lembrete', label: 'Lembrete de rotina', desc: 'Algo para lembrar depois sobre organização, materiais ou combinados.', scope: 'teacher' },
   { id: 'ideia-pessoal', label: 'Ideia para desenvolver', desc: 'Uma ideia livre para amadurecer antes de virar planejamento.', scope: 'teacher' },
-]
-
-const TAGS = [
-  'Linguagem',
-  'Socializacao',
-  'Coord. motora',
-  'Emocoes',
-  'Alimentacao',
-  'Sono',
-  'Autonomia',
-  'Brincadeira',
-  'Rotina',
-  'Evolucao positiva',
 ]
 
 const MAX_AUDIO_SECONDS = 30
@@ -78,7 +73,6 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [modelId, setModelId] = useState('')
   const [classId, setClassId] = useState(activeClass?.id ?? '')
   const [studentId, setStudentId] = useState(activeStudent?.id ?? '')
-  const [tagToAdd, setTagToAdd] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [attachmentName, setAttachmentName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -90,6 +84,18 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [usageMessage, setUsageMessage] = useState('')
   const [audioMessage, setAudioMessage] = useState('')
   const [error, setError] = useState('')
+  const [viewMode, setViewMode] = useState<AnnotationViewMode>('annotation')
+  const [chatProvider, setChatProvider] = useState<ChatProvider>('openai')
+  const [chatInput, setChatInput] = useState('')
+  const [chatThreads, setChatThreads] = useState<Record<ChatProvider, ChatMessage[]>>({
+    openai: [],
+    anthropic: [],
+  })
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatUsageMessage, setChatUsageMessage] = useState('')
+  const [chatError, setChatError] = useState('')
+  const chatBottomRef = useRef<HTMLDivElement | null>(null)
+  const chatMessages = chatThreads[chatProvider]
 
   const editAnnotation = useMemo(() => {
     const data = props?.data
@@ -122,18 +128,6 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const selectedClass = classes.find((item) => item.id === classId) ?? activeClass
   const selectedStudent = selectedClass?.students.find((item) => item.id === studentId)
   const availableStudents = useMemo(() => selectedClass?.students ?? [], [selectedClass])
-  const smartSuggestions = useMemo(
-    () =>
-      buildSmartAnnotationSuggestions({
-        workKind,
-        modelId,
-        modelLabel: selectedModel?.label ?? '',
-        studentName: selectedStudent?.name ?? '',
-        className: selectedClass?.name ?? '',
-      }),
-    [workKind, modelId, selectedModel?.label, selectedStudent?.name, selectedClass?.name],
-  )
-
   const needsClass = isDirectStudentNote || selectedModel?.scope === 'class' || selectedModel?.scope === 'child'
   const needsStudent = isDirectStudentNote || selectedModel?.scope === 'child'
   const canSave = isDirectStudentNote
@@ -162,6 +156,15 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   useEffect(() => () => {
     stopMediaStream()
   }, [])
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [chatMessages, chatLoading])
+
+  useEffect(() => {
+    setChatError('')
+    setChatUsageMessage('')
+  }, [chatProvider])
 
   useEffect(() => {
     if (!editAnnotation || !editConfig) return
@@ -223,12 +226,6 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setStudentId(selectedModel?.scope === 'child' ? nextClass?.students[0]?.id ?? '' : '')
   }
 
-  function addTag(value: string) {
-    if (!value) return
-    setTags((current) => current.includes(value) ? current : [...current, value])
-    setTagToAdd('')
-  }
-
   function selectFile(files: FileList | null) {
     const file = files?.[0]
     if (!file) return
@@ -243,7 +240,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setRecordedSeconds(0)
 
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setAudioMessage('Este navegador nao permite gravar audio aqui.')
+      setAudioMessage('Este navegador não permite gravar áudio aqui.')
       return
     }
 
@@ -264,12 +261,12 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         setRecordedSeconds(finalSeconds)
         setRecordingSeconds(finalSeconds)
         if (blob.size === 0) {
-          setAudioMessage('Nao foi possivel capturar o audio. Grave novamente.')
+          setAudioMessage('Não foi possível capturar o áudio. Grave novamente.')
           stopMediaStream()
           return
         }
         setAudioBlob(blob)
-        setAudioMessage('Audio pronto. Clique em Transcrever para usar a IA.')
+        setAudioMessage('Áudio pronto. Clique em Transcrever para usar a IA.')
         stopMediaStream()
       }
 
@@ -277,7 +274,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       setRecording(true)
       recorder.start()
     } catch {
-      setAudioMessage('Nao foi possivel acessar o microfone. Verifique a permissao do navegador.')
+      setAudioMessage('Não foi possível acessar o microfone. Verifique a permissão do navegador.')
       stopMediaStream()
     }
   }
@@ -288,7 +285,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       recorder.stop()
     }
     setRecording(false)
-    setAudioMessage('Preparando audio...')
+    setAudioMessage('Preparando áudio...')
   }
 
   function stopMediaStream() {
@@ -299,14 +296,14 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
   async function transcribeAudio() {
     if (!audioBlob) {
-      setAudioMessage('Grave e pare o audio antes de transcrever.')
+      setAudioMessage('Grave e pare o áudio antes de transcrever.')
       return
     }
 
     setTranscribing(true)
     setError('')
     setUsageMessage('')
-    setAudioMessage('Enviando audio para transcricao...')
+    setAudioMessage('Enviando áudio para transcrição...')
 
     try {
       const durationSeconds = recordedSeconds || Math.max(1, recordingSeconds)
@@ -324,19 +321,19 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       })
 
       if (!result.allowed) {
-        setError(result.message || 'Nao foi possivel usar IA para transcrever agora.')
+        setError(result.message || 'Não foi possível usar IA para transcrever agora.')
         return
       }
 
       const transcript = result.transcript?.trim()
       if (transcript) {
         setText((current) => current.trim() ? `${current.trim()}\n\n${transcript}` : transcript)
-        setTags((current) => current.includes('Transcricao de audio') ? current : ['Transcricao de audio', ...current])
+        setTags((current) => current.includes('Transcrição de áudio') ? current : ['Transcrição de áudio', ...current])
       }
-      setAudioMessage('Transcricao adicionada na anotacao.')
+      setAudioMessage('Transcrição adicionada na anotação.')
       setUsageMessage(formatAiUsageMessage(result))
     } catch (error) {
-      setAudioMessage(error instanceof Error ? error.message : 'Nao foi possivel transcrever o audio.')
+      setAudioMessage(error instanceof Error ? error.message : 'Não foi possível transcrever o áudio.')
     } finally {
       setTranscribing(false)
     }
@@ -344,7 +341,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
   async function save() {
     if (!canSave || (!selectedModel && !isDirectStudentNote)) {
-      setError('Preencha a anotacao e siga as escolhas indicadas.')
+      setError('Preencha a anotação e siga as escolhas indicadas.')
       return
     }
 
@@ -354,7 +351,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     const resolved = isDirectStudentNote
       ? {
           category: 'evolucao' as AnnotationCategory,
-          label: 'Anotacao direta',
+          label: 'Anotação direta',
           persistence: ['observacao-continua', 'observacao-importante'] as AnnotationPersistence[],
         }
       : resolveAnnotation(workKind, effectiveModel)
@@ -382,7 +379,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       date: 'Agora',
       classId: targetClassId,
       studentId: targetStudentId,
-      tags: [isDirectStudentNote ? 'Anotacao direta' : effectiveModel.label, ...tags],
+      tags: [isDirectStudentNote ? 'Anotação direta' : effectiveModel.label, ...tags],
       persistence: resolved.persistence,
       attachmentName: attachmentName || null,
       scope: !isDirectStudentNote && effectiveModel.scope === 'teacher' ? 'personal' as const : undefined,
@@ -414,9 +411,60 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
       closeSubscreen()
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Nao foi possivel salvar a anotacao agora.')
+      setError(error instanceof Error ? error.message : 'Não foi possível salvar a anotação agora.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function sendChatMessage() {
+    const content = chatInput.trim()
+    if (!content || chatLoading) return
+    setChatError('')
+    setChatUsageMessage('')
+    setChatInput('')
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      text: content,
+    }
+    const history = [...chatMessages, userMessage]
+    setChatThreads((current) => ({ ...current, [chatProvider]: history }))
+    setChatLoading(true)
+
+    try {
+      const result = await generateAiChatReply({
+        provider: chatProvider,
+        messages: history.map((message) => ({ role: message.role, content: message.text })),
+        classId: classId || null,
+        studentId: studentId || null,
+        requestSummary: {
+          source: 'new-annotation-chat',
+          provider: chatProvider,
+          conversationLength: history.length,
+        },
+      })
+
+      if (!result.allowed) {
+        setChatError(result.message || 'Não foi possível continuar o chat agora.')
+        return
+      }
+
+      const assistantText = result.response?.trim()
+      if (!assistantText) {
+        setChatError('A IA não retornou uma resposta válida.')
+        return
+      }
+
+      setChatThreads((current) => ({
+        ...current,
+        [chatProvider]: [...history, { id: `assistant-${Date.now()}`, role: 'assistant', text: assistantText }],
+      }))
+      setChatUsageMessage(formatAiUsageMessage(result))
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : 'Não foi possível responder no chat agora.')
+    } finally {
+      setChatLoading(false)
     }
   }
 
@@ -426,52 +474,54 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">{isDirectStudentNote ? 'Anotacao do aluno' : (isEditing ? 'Editar anotacao' : 'Nova anotacao')}</span>
-        <button
-          onClick={save}
-          disabled={saving || !canSave}
-          className="bg-gm text-white border-none rounded-full px-[16px] py-[7px] text-[13px] font-bold cursor-pointer flex items-center gap-1 disabled:opacity-50"
-        >
-          {saving ? '...' : <><Check size={13} /> {isEditing ? 'Atualizar' : 'Salvar'}</>}
-        </button>
+        <div className="flex-1">
+          <span className="font-serif text-[18px] text-gd block">{isDirectStudentNote ? 'Anotação do aluno' : (isEditing ? 'Editar anotação' : 'Nova anotação')}</span>
+          {!isEditing && (
+            <div className="mt-2 inline-flex rounded-full border border-border bg-cream p-1">
+              <button
+                onClick={() => setViewMode('annotation')}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold ${viewMode === 'annotation' ? 'bg-white text-gd shadow-sm' : 'text-muted'}`}
+              >
+                Anotação
+              </button>
+              <button
+                onClick={() => setViewMode('chat')}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold ${viewMode === 'chat' ? 'bg-white text-gd shadow-sm' : 'text-muted'}`}
+              >
+                Chat
+              </button>
+            </div>
+          )}
+        </div>
+        {viewMode === 'annotation' && (
+          <button
+            onClick={save}
+            disabled={saving || !canSave}
+            className="bg-gm text-white border-none rounded-full px-[16px] py-[7px] text-[13px] font-bold cursor-pointer flex items-center gap-1 disabled:opacity-50"
+          >
+            {saving ? '...' : <><Check size={13} /> {isEditing ? 'Atualizar' : 'Salvar'}</>}
+          </button>
+        )}
       </div>
 
       <div className="scroll-area px-[18px] py-[16px]">
+        {viewMode === 'annotation' ? (
+          <>
         <section className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
-          <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Anotacao da professora</label>
+          <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Anotação da professora</label>
           <textarea
             className="w-full min-h-[168px] px-0 py-3 border-0 bg-white font-sans text-sm text-ink outline-none resize-none leading-[1.7]"
-            placeholder="Escreva o que observou, uma ideia de atividade, um ponto para relatorio ou algo importante da rotina."
+            placeholder="Escreva o que observou, uma ideia de atividade, um ponto para relatório ou algo importante da rotina."
             value={text}
             onChange={(event) => setText(event.target.value)}
           />
           <p className="text-[10px] text-muted text-right">{text.length}</p>
 
-          {smartSuggestions.length > 0 && (
-            <div className="mt-3">
-              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
-                Sugestao inteligente de anotacao
-              </p>
-              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-                {smartSuggestions.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => applySmartSuggestion(suggestion, setText)}
-                    className="px-3 py-2 rounded-full border border-border bg-white text-[11px] font-bold text-muted whitespace-nowrap"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="mt-3 rounded-app-sm border border-border bg-cream p-3">
             <div className="flex items-center justify-between gap-3 mb-2">
               <div>
-                <p className="text-[12px] font-bold text-ink">Audio para transcricao</p>
-                <p className="text-[11px] text-muted">Grave ate 30 segundos. A transcricao consome GizTokens.</p>
+                <p className="text-[12px] font-bold text-ink">Áudio para transcrição</p>
+                <p className="text-[11px] text-muted">Grave até 30 segundos. A transcrição consome GizTokens.</p>
               </div>
               <span className="text-[12px] font-bold text-gd">{recording ? recordingSeconds : recordedSeconds || recordingSeconds}s</span>
             </div>
@@ -509,7 +559,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
             </div>
 
             {audioBlob && !recording && (
-              <p className="text-[11px] text-muted mt-2">Audio pronto para transcricao ({recordedSeconds || recordingSeconds}s).</p>
+              <p className="text-[11px] text-muted mt-2">Áudio pronto para transcrição ({recordedSeconds || recordingSeconds}s).</p>
             )}
             {audioMessage && (
               <p className="text-[11px] text-muted mt-2 leading-[1.4]">{audioMessage}</p>
@@ -522,12 +572,12 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
         {!isDirectStudentNote && (
           <>
-            <StepTitle number="1" title="O que esta anotacao vai ajudar a fazer?" />
+            <StepTitle number="1" title="O que esta anotação vai ajudar a fazer?" />
             <div className="grid grid-cols-1 gap-2 mb-4">
-              <ChoiceButton selected={workKind === 'report'} title="Relatorio ou documento" desc="Desenvolvimento, portfolio, diario de bordo, especialista, reuniao." onClick={() => chooseWorkKind('report')} />
-              <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Semanal, diario ou projeto pedagogico." onClick={() => chooseWorkKind('planning')} />
-              <ChoiceButton selected={workKind === 'memory'} title="Memoria pedagogica" desc="Registro rapido de evolucao, observacao importante ou ideia solta." onClick={() => chooseWorkKind('memory')} />
-              <ChoiceButton selected={workKind === 'personal'} title="Anotacao pessoal" desc="Ideias e lembretes privados da professora, sem crianca vinculada." onClick={() => chooseWorkKind('personal')} />
+              <ChoiceButton selected={workKind === 'report'} title="Relatório ou documento" desc="Desenvolvimento, portfólio, diário de bordo, especialista, reunião." onClick={() => chooseWorkKind('report')} />
+              <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Semanal, diario ou projeto pedagógico." onClick={() => chooseWorkKind('planning')} />
+              <ChoiceButton selected={workKind === 'memory'} title="Memoria pedagógica" desc="Registro rapido de evolucao, observacao importante ou ideia solta." onClick={() => chooseWorkKind('memory')} />
+              <ChoiceButton selected={workKind === 'personal'} title="Anotação pessoal" desc="Ideias e lembretes privados da professora, sem criança vinculada." onClick={() => chooseWorkKind('personal')} />
             </div>
 
             {workKind && (
@@ -551,9 +601,9 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           </>
         )}
 
-        {(selectedModel || isDirectStudentNote) && needsClass && (
+        {!isDirectStudentNote && (selectedModel || isDirectStudentNote) && needsClass && (
           <>
-            <StepTitle number={isDirectStudentNote ? '1' : '3'} title={needsStudent || isDirectStudentNote ? 'Escolha a crianca' : 'Escolha a turma'} />
+            <StepTitle number={isDirectStudentNote ? '1' : '3'} title={needsStudent || isDirectStudentNote ? 'Escolha a criança' : 'Escolha a turma'} />
             <select
               className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
               value={classId}
@@ -570,7 +620,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 value={studentId}
                 onChange={(event) => setStudentId(event.target.value)}
               >
-                <option value="">Escolher crianca</option>
+                <option value="">Escolher criança</option>
                 {availableStudents.map((student) => (
                   <option key={student.id} value={student.id}>{student.name}</option>
                 ))}
@@ -582,17 +632,6 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         {selectedModel && !isDirectStudentNote && (
           <>
             <StepTitle number={needsClass ? '4' : '3'} title="Detalhes opcionais" />
-            <select
-              className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
-              value={tagToAdd}
-              onChange={(event) => addTag(event.target.value)}
-            >
-              <option value="">Adicionar marcador</option>
-              {TAGS.map((tag) => (
-                <option key={tag} value={tag}>{tag}</option>
-              ))}
-            </select>
-
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {tags.map((tag) => (
@@ -626,6 +665,86 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         )}
 
         {error && <p className="text-[12px] text-[#C1440E] mt-4 leading-[1.5]">{error}</p>}
+          </>
+        ) : (
+          <div className="h-full flex flex-col gap-3">
+            <div className="bg-white rounded-app border border-border shadow-card p-3">
+              <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">Modelo de IA</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setChatProvider('openai')}
+                  className={`rounded-app-sm border px-3 py-2 text-sm font-bold ${
+                    chatProvider === 'openai' ? 'border-gp bg-gbg text-gd' : 'border-border bg-cream text-muted'
+                  }`}
+                >
+                  GPT
+                </button>
+                <button
+                  onClick={() => setChatProvider('anthropic')}
+                  className={`rounded-app-sm border px-3 py-2 text-sm font-bold ${
+                    chatProvider === 'anthropic' ? 'border-gp bg-gbg text-gd' : 'border-border bg-cream text-muted'
+                  }`}
+                >
+                  Claude
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-app border border-border shadow-card p-3 flex-1 min-h-[420px] flex flex-col">
+              <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+                {chatMessages.length === 0 && (
+                  <p className="text-sm text-muted leading-relaxed">
+                    Inicie uma conversa. O chat é livre e responde em texto.
+                  </p>
+                )}
+                {chatMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                      message.role === 'user'
+                        ? 'ml-auto bg-gm text-white'
+                        : 'mr-auto bg-cream text-ink border border-border'
+                    }`}
+                  >
+                    {message.text}
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="mr-auto bg-cream text-muted border border-border rounded-2xl px-3 py-2 text-sm">
+                    Pensando...
+                  </div>
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+              <div className="pt-3 mt-3 border-t border-border">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault()
+                        void sendChatMessage()
+                      }
+                    }}
+                    placeholder="Digite sua mensagem..."
+                    className="flex-1 min-h-[46px] max-h-[120px] rounded-app-sm border border-border px-3 py-2 text-sm outline-none resize-none focus:border-gl"
+                  />
+                  <button
+                    onClick={() => void sendChatMessage()}
+                    disabled={chatLoading || chatInput.trim().length === 0}
+                    className="h-[46px] w-[46px] rounded-full bg-gm text-white flex items-center justify-center disabled:opacity-50"
+                    aria-label="Enviar mensagem"
+                  >
+                    <Send size={16} />
+                  </button>
+                </div>
+                {chatUsageMessage && <p className="text-[11px] text-gd mt-2">{chatUsageMessage}</p>}
+                {chatError && <p className="text-[11px] text-[#C1440E] mt-2">{chatError}</p>}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -770,68 +889,5 @@ function normalizeText(value: string) {
     .trim()
 }
 
-function buildSmartAnnotationSuggestions(input: {
-  workKind: WorkKind
-  modelId: string
-  modelLabel: string
-  studentName: string
-  className: string
-}) {
-  const child = input.studentName || 'a criança'
-  const group = input.className || 'a turma'
 
-  if (input.workKind === 'planning') {
-    return [
-      `Objetivo da semana para ${group}`,
-      `Proposta de atividade principal para ${group}`,
-      'Materiais e organização do espaço',
-      'Como observar participação e engajamento',
-    ]
-  }
 
-  if (input.workKind === 'report') {
-    return [
-      `Avanços observados de ${child}`,
-      `Situação de rotina importante de ${child}`,
-      'Interações com colegas e adultos',
-      'Encaminhamentos para escola e família',
-    ]
-  }
-
-  if (input.workKind === 'memory') {
-    return [
-      `Registro rápido de hoje sobre ${child}`,
-      `Fala marcante de ${child}`,
-      'Comportamento que merece acompanhamento',
-      'Ponto para retomar no próximo dia',
-    ]
-  }
-
-  if (input.workKind === 'personal') {
-    return [
-      'Lembrete pessoal da rotina pedagógica',
-      'Ideia de atividade para testar',
-      'Ponto para conversar com a coordenação',
-      'Organização de materiais e ambiente',
-    ]
-  }
-
-  if (input.modelLabel) {
-    return [
-      `Anotação base para ${input.modelLabel}`,
-      `Observação principal de ${child}`,
-      'Contexto, ação e resultado',
-    ]
-  }
-
-  return []
-}
-
-function applySmartSuggestion(suggestion: string, setText: (value: string | ((current: string) => string)) => void) {
-  setText((current) => {
-    const prefix = current.trim()
-    if (!prefix) return `${suggestion}: `
-    if (prefix.toLowerCase().includes(suggestion.toLowerCase())) return current
-    return `${prefix}\n- ${suggestion}: `
-  })
-}

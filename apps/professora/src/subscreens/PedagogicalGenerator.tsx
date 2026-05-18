@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+﻿import { useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Sparkles, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
@@ -25,19 +25,13 @@ const BNCC_FIELDS = [
 
 const AGE_GROUPS = ['0 a 1 ano', '1 a 2 anos', '2 a 3 anos', '3 a 4 anos', '4 a 5 anos']
 
-const QUICK_DIRECTIONS = [
-  'Tom acolhedor e pratico',
-  'Atividades simples para sala',
-  'Adaptar para criancas pequenas',
-  'Incluir objetivos BNCC',
-]
-
 export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGeneratorProps) {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const { classes } = useAppStore()
   const docKind = typeof data === 'object' && data && 'docKind' in data
     ? String((data as { docKind?: string }).docKind)
-    : 'Documento pedagogico'
+    : 'Documento pedagógico'
+  const isSpecificProject = docKind === 'Projeto pedagógico específico'
 
   const [ageGroup, setAgeGroup] = useState('4 a 5 anos')
   const [selectedClass, setSelectedClass] = useState(classes[0]?.name ?? '')
@@ -60,10 +54,6 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
   const canGenerate = theme.trim().length >= 2 && objective.trim().length >= 5
   const selectedClassData = classes.find((item) => item.name === selectedClass)
-
-  function addDirection(text: string) {
-    setExtraContext((current) => current ? `${current}\n${text}.` : `${text}.`)
-  }
 
   function handleFiles(files: FileList | null) {
     if (!files?.length) return
@@ -111,7 +101,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
         requestSummary: {
           docKind,
           className: selectedClassData?.name ?? selectedClass,
-          ageGroup,
+          ageGroup: isSpecificProject ? undefined : ageGroup,
           theme,
           objective,
           bnccFields,
@@ -139,13 +129,13 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
       }, 800)
     } catch (error) {
       setGenerating(false)
-      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel gerar com IA.')
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar com IA.')
     }
   }
 
   async function saveDocument() {
     if (!reportId) {
-      setUsageError('Documento ainda nao foi salvo no backend.')
+      setUsageError('O documento ainda não foi salvo no backend.')
       return
     }
 
@@ -158,7 +148,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
       setEditingDocument(false)
       setUsageMessage('Documento salvo com sucesso.')
     } catch (error) {
-      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel salvar o documento.')
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível salvar o documento.')
     } finally {
       setSavingDocument(false)
     }
@@ -174,7 +164,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
       await updateReport(reportId, { archive: true })
       setUsageMessage('Documento arquivado.')
     } catch (error) {
-      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel arquivar o documento.')
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível arquivar o documento.')
     } finally {
       setSavingDocument(false)
     }
@@ -194,7 +184,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
   function handleBack() {
     if (generated && editingDocument && editableContent !== savedContent) {
-      const discard = window.confirm('Voce tem alteracoes nao salvas. Deseja sair sem salvar?')
+      const discard = window.confirm('Você tem alterações não salvas. Deseja sair sem salvar?')
       if (!discard) return
     }
     closeSubscreen()
@@ -208,7 +198,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
         </button>
         <div className="flex-1">
           <span className="font-serif text-[18px] text-gd block">{docKind}</span>
-          <span className="text-[11px] text-muted">Geracao visual para educacao infantil 0 a 5 anos.</span>
+          <span className="text-[11px] text-muted">Geração visual para educação infantil de 0 a 5 anos.</span>
         </div>
       </div>
 
@@ -222,7 +212,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                 </div>
                 <div className="flex-1">
                   <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
-                  <p className="text-[12px] text-muted leading-snug">Informe o contexto principal. Orientacoes extras e anexos sao opcionais.</p>
+                  <p className="text-[12px] text-muted leading-snug">Informe o contexto principal. Orientações extras e anexos são opcionais.</p>
                 </div>
               </div>
             </div>
@@ -238,20 +228,24 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
               ))}
             </select>
 
-            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Faixa etaria</label>
-            <div className="flex gap-2 overflow-x-auto scrollbar-none mt-2 mb-4 pb-1">
-              {AGE_GROUPS.map((item) => (
-                <button
-                  key={item}
-                  onClick={() => setAgeGroup(item)}
-                  className={`px-3 py-2 rounded-full text-xs font-bold border whitespace-nowrap ${
-                    ageGroup === item ? 'bg-gm border-gm text-white' : 'bg-white border-border text-muted'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
+            {!isSpecificProject && (
+              <>
+            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Faixa etária</label>
+                <div className="flex gap-2 overflow-x-auto scrollbar-none mt-2 mb-4 pb-1">
+                  {AGE_GROUPS.map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setAgeGroup(item)}
+                      className={`px-3 py-2 rounded-full text-xs font-bold border whitespace-nowrap ${
+                        ageGroup === item ? 'bg-gm border-gm text-white' : 'bg-white border-border text-muted'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Tema</label>
             <input
@@ -261,10 +255,10 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
               onChange={(event) => setTheme(event.target.value)}
             />
 
-            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Objetivo pedagogico</label>
+            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Objetivo pedagógico</label>
             <textarea
               className="w-full min-h-[104px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none leading-[1.6]"
-              placeholder="Ex: estimular linguagem oral, exploracao sensorial, autonomia, socializacao..."
+              placeholder="Ex.: estimular linguagem oral, exploração sensorial, autonomia e socialização..."
               value={objective}
               onChange={(event) => setObjective(event.target.value)}
             />
@@ -298,8 +292,8 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                     useAnnotations ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
                   }`}
                 >
-                  <span className="block text-[13px] font-bold">Usar anotacoes</span>
-                  <span className="block text-[11px] mt-1">Ideias ja registradas</span>
+                  <span className="block text-[13px] font-bold">Usar anotações</span>
+                  <span className="block text-[11px] mt-1">Ideias já registradas</span>
                 </button>
                 <button
                   onClick={() => setUseAnnotations(false)}
@@ -307,7 +301,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                     !useAnnotations ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
                   }`}
                 >
-                  <span className="block text-[13px] font-bold">Comecar do zero</span>
+                  <span className="block text-[13px] font-bold">Começar do zero</span>
                   <span className="block text-[11px] mt-1">Somente este contexto</span>
                 </button>
               </div>
@@ -315,21 +309,14 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                Orientacao extra
+                Orientação extra
               </label>
               <textarea
                 className="w-full min-h-[104px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                placeholder="Ex: usar materiais simples, incluir brincadeira de roda, adaptar para turma agitada..."
+                placeholder="Ex.: usar materiais simples, incluir brincadeira de roda e adaptar para turma agitada..."
                 value={extraContext}
                 onChange={(event) => setExtraContext(event.target.value)}
               />
-              <div className="flex gap-2 overflow-x-auto scrollbar-none mt-3 pb-1">
-                {QUICK_DIRECTIONS.map((item) => (
-                  <button key={item} onClick={() => addDirection(item)} className="px-3 py-2 rounded-full text-xs font-bold border border-border bg-white text-muted whitespace-nowrap">
-                    {item}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
@@ -339,7 +326,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                 </div>
                 <div className="flex-1">
                   <p className="text-[13px] font-bold text-ink">Anexos de apoio</p>
-                  <p className="text-[11px] text-muted leading-[1.5] mt-1">Voce pode anexar mais de um arquivo, ou gerar sem anexar nada.</p>
+                  <p className="text-[11px] text-muted leading-[1.5] mt-1">Você pode anexar mais de um arquivo ou gerar sem anexar nada.</p>
                   {attachments.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
                       {attachments.map((item) => (
@@ -432,7 +419,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
             <button onClick={() => {
               if (editingDocument && editableContent !== savedContent) {
-                const discard = window.confirm('Voce tem alteracoes nao salvas. Deseja descartar?')
+                const discard = window.confirm('Você tem alterações não salvas. Deseja descartar?')
                 if (!discard) return
               }
               setGenerated(false)
@@ -457,13 +444,15 @@ function createPreview(input: {
   useAnnotations: boolean
   attachments: Attachment[]
 }) {
+  const ageLine = input.docKind === 'Projeto pedagógico específico'
+    ? ''
+    : `Faixa etária: ${input.ageGroup}\n`
   const base = `DOCUMENTO GERADO COM IA
 Tipo: ${input.docKind}
-Turma: ${input.selectedClass || 'Nao informada'}
-Faixa etaria: ${input.ageGroup}
-Tema: ${input.theme || '-'}
+Turma: ${input.selectedClass || 'Não informada'}
+${ageLine}Tema: ${input.theme || '-'}
 Campos BNCC: ${input.bnccFields.join(', ')}
-Base: ${input.useAnnotations ? 'anotacoes e ideias registradas pela professora' : 'documento iniciado do zero'}
+Base: ${input.useAnnotations ? 'anotações e ideias registradas pela professora' : 'documento iniciado do zero'}
 
 OBJETIVO
 
@@ -479,7 +468,7 @@ ${input.extraContext.trim() || 'Nenhuma orientacao extra informada.'}`
 PLANEJAMENTO ANUAL
 
 Intencionalidade:
-Definir diretrizes gerais para o ano letivo, articulando BNCC, campos de experiencia, direitos de aprendizagem e Projeto Politico Pedagogico da escola.
+Definir diretrizes gerais para o ano letivo, articulando BNCC, campos de experiencia, direitos de aprendizagem e Projeto Politico Pedagógico da escola.
 
 Eixos do ano:
 - convivencia, brincadeira e participacao;
@@ -493,10 +482,10 @@ Organizacao por periodos:
 - projetos e sequencias tematicas;
 - experiencias com literatura, musica, movimento e artes;
 - registros pedagogicos e comunicacao com familias;
-- retomadas e avaliacao processual sem carater classificatorio.
+- retomadas e avaliação processual sem carater classificatorio.
 
 Indicadores de acompanhamento:
-Observar trajetorias individuais e coletivas, sem comparacao entre criancas, registrando avancos, interesses, desafios e necessidades de apoio.${formatAttachments(input.attachments)}`
+Observar trajetorias individuais e coletivas, sem comparacao entre crianças, registrando avancos, interesses, desafios e necessidades de apoio.${formatAttachments(input.attachments)}`
   }
 
   if (input.docKind === 'Planejamento semestral') {
@@ -518,12 +507,12 @@ Projetos e sequencias:
 
 Acompanhamento:
 - registros diarios e semanais;
-- portfolio e evidencias de producoes;
-- relatorios de desenvolvimento quando necessario;
+- portfólio e evidências de produções;
+- relatórios de desenvolvimento quando necessario;
 - comunicacao cuidadosa com as familias.
 
 Avaliação processual:
-Acompanhar o desenvolvimento por meio de observacao e registros, sem classificacao, promocao ou comparacao entre criancas.${formatAttachments(input.attachments)}`
+Acompanhar o desenvolvimento por meio de observacao e registros, sem classificacao, promocao ou comparacao entre crianças.${formatAttachments(input.attachments)}`
   }
 
   if (input.docKind === 'Planejamento mensal' || input.docKind === 'Planejamento quinzenal') {
@@ -547,12 +536,12 @@ Sequencia de experiencias:
 2. exploracao com corpo, sentidos e materiais;
 3. brincadeiras, historias, musicas e rodas;
 4. producoes, fotografias privadas ou registros;
-5. retomada, escuta das criancas e planejamento dos proximos passos.
+5. retomada, escuta das crianças e planejamento dos proximos passos.
 
 Recursos:
 - livros, musicas, imagens e objetos reais;
-- materiais nao estruturados e seguros;
-- registros da rotina e anotacoes ja feitas pela professora.
+- materiais não estruturados e seguros;
+- registros da rotina e anotações ja feitas pela professora.
 
 Acompanhamento:
 Observar participacao, interacoes, linguagem, autonomia, movimento e bem-estar da turma.${formatAttachments(input.attachments)}`
@@ -568,10 +557,10 @@ Organizacao da semana:
 Dia 1 - Acolhimento e investigacao inicial
 - roda breve de conversa;
 - apresentacao de objeto, imagem, musica ou historia;
-- escuta das hipoteses e interesses das criancas.
+- escuta das hipoteses e interesses das crianças.
 
 Dia 2 - Exploracao sensorial
-- materiais simples, seguros e adequados a faixa etaria;
+- materiais simples, seguros e adequados à faixa etária;
 - livre exploracao com acompanhamento atento;
 - registro de falas, gestos e descobertas.
 
@@ -582,17 +571,17 @@ Dia 3 - Movimento e brincadeira
 
 Dia 4 - Expressao e registro
 - desenho, pintura, colagem, foto privada ou relato oral;
-- valorizacao do processo, nao do resultado final;
-- registro pedagogico para relatorios futuros.
+- valorizacao do processo, não do resultado final;
+- registro pedagógico para relatórios futuros.
 
 Dia 5 - Retomada e fechamento
 - conversa sobre o que foi vivido;
 - musica, historia ou combinados da rotina;
-- anotacao dos proximos interesses percebidos.
+- anotação dos proximos interesses percebidos.
 
 OBSERVACAO
 
-As propostas devem respeitar o tempo da crianca pequena, sem comparacoes e sem exigencia de desempenho escolar formal.${formatAttachments(input.attachments)}`
+As propostas devem respeitar o tempo da criança pequena, sem comparacoes e sem exigencia de desempenho escolar formal.${formatAttachments(input.attachments)}`
   }
 
   if (input.docKind === 'Plano de aula diario') {
@@ -600,8 +589,8 @@ As propostas devem respeitar o tempo da crianca pequena, sem comparacoes e sem e
 
 PLANO DE AULA DIARIO
 
-Objetivo especifico:
-${input.objective || 'Definir uma experiencia significativa e adequada a faixa etaria.'}
+Objetivo específico:
+${input.objective || 'Definir uma experiência significativa e adequada à faixa etária.'}
 
 Tempo estimado:
 Organizar conforme a rotina da turma, respeitando sono, alimentacao, higiene, brincadeira livre e tempos de transicao.
@@ -624,11 +613,11 @@ Estrategias metodologicas:
 - respeito aos diferentes ritmos;
 - adaptacoes para necessidades individuais.
 
-Avaliacao:
+Avaliação:
 Registro descritivo do envolvimento, das descobertas e das interacoes, sem nota, classificacao ou comparacao.${formatAttachments(input.attachments)}`
   }
 
-  if (input.docKind === 'Projeto pedagogico especifico') {
+  if (input.docKind === 'Projeto pedagógico específico') {
     return `${base}
 
 PROJETO PEDAGOGICO ESPECIFICO
@@ -652,8 +641,8 @@ Etapas:
 Resultados esperados:
 Documentar descobertas, interacoes, avancos e interesses sem transformar o projeto em produto final obrigatorio.
 
-Avaliacao:
-Observacao continua, diario de bordo, portfolio, fotos privadas autorizadas e relatorios pedagogicos quando necessario.${formatAttachments(input.attachments)}`
+Avaliação:
+Observação contínua, diário de bordo, portfólio, fotos privadas autorizadas e relatórios pedagógicos quando necessário.${formatAttachments(input.attachments)}`
   }
 
   if (input.docKind === 'Atividade Tematica') {
@@ -671,9 +660,9 @@ Materiais:
 
 Como conduzir:
 1. Apresente o tema em roda, com linguagem simples.
-2. Convide as criancas a explorar materiais com o corpo e os sentidos.
+2. Convide as crianças a explorar materiais com o corpo e os sentidos.
 3. Registre falas espontaneas e pequenas descobertas.
-4. Finalize valorizando o percurso de cada crianca.
+4. Finalize valorizando o percurso de cada criança.
 
 Intencionalidade: favorecer exploracao, linguagem oral, convivencia e autonomia.${formatAttachments(input.attachments)}`
   }
@@ -684,7 +673,7 @@ Intencionalidade: favorecer exploracao, linguagem oral, convivencia e autonomia.
 RODA DE CONVERSA
 
 Abertura:
-- acolher as criancas pelo nome;
+- acolher as crianças pelo nome;
 - apresentar um objeto, imagem ou musica relacionada ao tema.
 
 Perguntas disparadoras:
@@ -695,8 +684,8 @@ Perguntas disparadoras:
 Conducao:
 - respeitar falas curtas;
 - acolher silencio e gestos;
-- evitar corrigir a crianca de forma expositiva;
-- registrar frases espontaneas para relatorios futuros.
+- evitar corrigir a criança de forma expositiva;
+- registrar frases espontaneas para relatórios futuros.
 
 Fechamento:
 - retomar uma descoberta coletiva;
@@ -707,10 +696,12 @@ Fechamento:
 
 TEXTO PEDAGOGICO
 
-Este documento organiza o contexto informado pela professora em linguagem acolhedora, adequada a educacao infantil de 0 a 5 anos, considerando a rotina, os vinculos, as brincadeiras e o desenvolvimento integral da crianca.${formatAttachments(input.attachments)}`
+Este documento organiza o contexto informado pela professora em linguagem acolhedora, adequada a educação infantil de 0 a 5 anos, considerando a rotina, os vinculos, as brincadeiras e o desenvolvimento integral da criança.${formatAttachments(input.attachments)}`
 }
 
 function formatAttachments(attachments: Attachment[]) {
   if (!attachments.length) return ''
   return `\n\nANEXOS CONSIDERADOS\n\n${attachments.map((item) => `- ${item.name}`).join('\n')}`
 }
+
+

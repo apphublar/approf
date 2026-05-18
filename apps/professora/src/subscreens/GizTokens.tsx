@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { AlertTriangle, ChevronLeft, Coins, Gift, History, ShieldCheck } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
@@ -19,7 +19,7 @@ export default function GizTokensSubscreen() {
         }
       })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : 'Nao foi possivel carregar seus GizTokens.')
+        if (active) setError(err instanceof Error ? err.message : 'Não foi possível carregar seus GizTokens.')
       })
 
     return () => {
@@ -50,7 +50,7 @@ export default function GizTokensSubscreen() {
         <div className="rounded-app p-5 text-white mb-4" style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[12px] opacity-75 mb-1">Saldo deste mes</p>
+              <p className="text-[12px] opacity-75 mb-1">Saldo deste mês</p>
               <p className="text-[34px] font-bold leading-none">{formatNumber(remaining)}</p>
               <p className="text-[12px] opacity-80 mt-2">
                 {formatNumber(used)} GizTokens usados neste ciclo.
@@ -71,11 +71,11 @@ export default function GizTokensSubscreen() {
             <AlertTriangle size={18} color="#856404" className="mt-[2px] flex-shrink-0" />
             <div>
               <p className="text-[13px] font-bold text-[#6B5300]">
-                {isNegative ? 'Margem de seguranca em uso' : 'Alerta de uso mensal'}
+                {isNegative ? 'Margem de segurança em uso' : 'Alerta de uso mensal'}
               </p>
               <p className="text-[12px] text-[#6B5300] leading-[1.5] mt-1">
-                Ao usar o saldo principal, a margem pode chegar ate {formatNumber(-overageLimit)} GizTokens.
-                Esse extra sera considerado no proximo ciclo.
+                Ao usar o saldo principal, a margem pode chegar até {formatNumber(-overageLimit)} GizTokens.
+                Esse extra será considerado no próximo ciclo.
               </p>
             </div>
           </div>
@@ -98,10 +98,10 @@ export default function GizTokensSubscreen() {
             </div>
           </div>
           <div className="space-y-2 text-[12px] text-muted leading-[1.6]">
-            <p>GizTokens sao creditos internos para usar recursos de IA, como relatorios, planejamentos e portfolios.</p>
-            <p>O saldo principal do ciclo e de {formatNumber(included)} GizTokens.</p>
+            <p>GizTokens são créditos internos para usar recursos de IA, como relatórios, planejamentos e portfólios.</p>
+            <p>O saldo principal do ciclo é de {formatNumber(included)} GizTokens.</p>
             <p>Algumas atividades podem entrar como cota inclusa e aparecer com 0 GizToken descontado.</p>
-            <p>Existe uma margem tecnica de {formatNumber(overageLimit)} GizTokens para evitar bloqueios bruscos.</p>
+            <p>Existe uma margem técnica de {formatNumber(overageLimit)} GizTokens para evitar bloqueios bruscos.</p>
           </div>
         </section>
 
@@ -112,7 +112,7 @@ export default function GizTokensSubscreen() {
             </div>
             <div>
               <p className="text-[13px] font-bold text-ink">Cotas inclusas</p>
-              <p className="text-[11px] text-muted">Nao descontam GizTokens da professora.</p>
+              <p className="text-[11px] text-muted">Não descontam GizTokens da professora.</p>
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -127,7 +127,7 @@ export default function GizTokensSubscreen() {
 
             {(summary?.entitlements ?? []).length === 0 && (
               <p className="text-[12px] text-muted leading-[1.5]">
-                As cotas aparecem aqui quando voce gera relatorios de desenvolvimento ou portfolios com imagem.
+                As cotas aparecem aqui quando você gera relatórios de desenvolvimento ou portfólios com imagem.
               </p>
             )}
           </div>
@@ -136,7 +136,7 @@ export default function GizTokensSubscreen() {
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-[10px]">
             <History size={15} className="text-muted" />
-            <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Historico recente</p>
+            <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Histórico recente</p>
           </div>
           <div className="flex flex-col gap-[9px]">
             {(summary?.recentUsage ?? []).map((item) => (
@@ -164,7 +164,7 @@ export default function GizTokensSubscreen() {
             {(summary?.recentUsage ?? []).length === 0 && (
               <div className="bg-white rounded-app p-5 border border-border shadow-card text-center">
                 <p className="text-[13px] font-bold text-ink">Sem uso recente</p>
-                <p className="text-[12px] text-muted mt-1">Quando voce gerar documentos ou imagens, o historico aparece aqui.</p>
+                <p className="text-[12px] text-muted mt-1">Quando você gerar documentos ou imagens, o histórico aparece aqui.</p>
               </div>
             )}
           </div>
@@ -180,18 +180,18 @@ function formatNumber(value: number) {
 
 function formatDateTime(value: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Data indisponivel'
+  if (Number.isNaN(date.getTime())) return 'Data indisponível'
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date)
 }
 
 function formatGenerationType(value: string) {
   const labels: Record<string, string> = {
-    development_report: 'Relatorio de desenvolvimento',
-    general_report: 'Relatorio geral',
+    development_report: 'Relatório de desenvolvimento',
+    general_report: 'Relatório geral',
     planning: 'Planejamento',
-    portfolio_text: 'Portfolio em texto',
-    portfolio_image: 'Imagem de portfolio',
-    audio_transcription: 'Transcricao de audio',
+    portfolio_text: 'Portfólio em texto',
+    portfolio_image: 'Imagem de portfólio',
+    audio_transcription: 'Transcrição de áudio',
     specialist_report: 'Encaminhamento',
     other: 'Documento',
   }
@@ -204,8 +204,8 @@ function formatEntitlement(
   classes: ReturnType<typeof useAppStore.getState>['classes'],
 ) {
   const studentName = findStudentName(studentId, classes)
-  if (value === 'development_report') return studentName ? `${studentName} - relatorios` : 'Relatorios de desenvolvimento'
-  if (value === 'portfolio_image') return 'Imagens de portfolio do mes'
+  if (value === 'development_report') return studentName ? `${studentName} - relatórios` : 'Relatórios de desenvolvimento'
+  if (value === 'portfolio_image') return 'Imagens de portfólio do mês'
   return 'Cota inclusa'
 }
 
@@ -217,7 +217,7 @@ function formatChargeSource(value: string) {
 }
 
 function formatStatus(value: string) {
-  if (value === 'completed') return 'concluido'
+  if (value === 'completed') return 'concluído'
   if (value === 'estimated') return 'reservado'
   if (value === 'failed') return 'falhou'
   if (value === 'refunded') return 'estornado'
@@ -232,3 +232,4 @@ function findStudentName(studentId: string | null, classes: ReturnType<typeof us
   }
   return null
 }
+

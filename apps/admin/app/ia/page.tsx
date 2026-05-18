@@ -6,7 +6,7 @@ export default function AiUsagePage() {
     <>
       <PageHeader
         eyebrow="Uso de IA"
-        title="Relatorios e custos"
+        title="Relatórios e custos"
         description="Controle tokens, custos estimados e uso anormal antes de liberar limites maiores."
       />
 
@@ -14,7 +14,7 @@ export default function AiUsagePage() {
         <div className="table">
           <div className="table-row table-head ai-grid">
             <span>Professora</span>
-            <span>Relatorios</span>
+            <span>Relatórios</span>
             <span>Tokens</span>
             <span>Custo</span>
             <span>Status</span>

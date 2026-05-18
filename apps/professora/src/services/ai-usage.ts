@@ -59,6 +59,20 @@ export interface AiImageGenerationResult extends AiUsageReservationResult {
   model?: string
 }
 
+export interface AiChatGenerationInput {
+  provider: 'openai' | 'anthropic'
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+  classId?: string | null
+  studentId?: string | null
+  requestSummary?: Record<string, unknown>
+}
+
+export interface AiChatGenerationResult extends AiUsageReservationResult {
+  response?: string
+  provider?: string
+  model?: string
+}
+
 export interface AiAudioTranscriptionResult extends AiUsageReservationResult {
   transcript?: string
   durationSeconds?: number
@@ -308,6 +322,59 @@ export async function generateAiPortfolioImage(input: AiImageGenerationInput): P
     prompt: typeof result.prompt === 'string' ? result.prompt : undefined,
     reportId: typeof result.reportId === 'string' ? result.reportId : undefined,
     promptVersion: typeof result.promptVersion === 'string' ? result.promptVersion : undefined,
+    provider: typeof result.provider === 'string' ? result.provider : undefined,
+    model: typeof result.model === 'string' ? result.model : undefined,
+  }
+}
+
+export async function generateAiChatReply(input: AiChatGenerationInput): Promise<AiChatGenerationResult> {
+  const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
+  if (!apiBaseUrl) {
+    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    throw new Error('Supabase nao configurado para registrar uso de IA.')
+  }
+
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+
+  const token = data.session?.access_token
+  if (!token) {
+    throw new Error('Sessao expirada. Entre novamente para usar o chat.')
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  })
+
+  const result = await response.json().catch(() => null) as Partial<AiChatGenerationResult> | { error?: string } | null
+
+  if (!response.ok && response.status !== 402) {
+    const message = result && 'error' in result && typeof result.error === 'string'
+      ? result.error
+      : 'Nao foi possivel responder no chat agora.'
+    throw new Error(message)
+  }
+
+  if (!result || !('allowed' in result)) {
+    throw new Error('Resposta invalida do backend de IA.')
+  }
+
+  return {
+    allowed: Boolean(result.allowed),
+    message: typeof result.message === 'string' ? result.message : '',
+    chargeSource: result.chargeSource,
+    wallet: result.wallet,
+    entitlement: result.entitlement,
+    response: typeof result.response === 'string' ? result.response : undefined,
     provider: typeof result.provider === 'string' ? result.provider : undefined,
     model: typeof result.model === 'string' ? result.model : undefined,
   }

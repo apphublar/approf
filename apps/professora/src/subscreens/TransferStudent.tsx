@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { ChevronLeft, MoveRight, ShieldCheck } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 
@@ -35,14 +35,14 @@ export default function TransferStudentSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1">
-          <span className="font-serif text-[18px] text-gd block">Transferir crianca</span>
-          <span className="text-[11px] text-muted">{student.name} - {student.childCode ?? 'codigo pendente'}</span>
+          <span className="font-serif text-[18px] text-gd block">Transferir criança</span>
+          <span className="text-[11px] text-muted">{student.name} - {student.childCode ?? 'código pendente'}</span>
         </div>
       </div>
 
       <div className="scroll-area px-[18px] py-[16px]">
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-          <p className="text-[11px] text-muted">Seu codigo de professora</p>
+          <p className="text-[11px] text-muted">Seu código de professora</p>
           <p className="text-[18px] font-bold text-gd mt-1">{teacherCode}</p>
         </div>
 
@@ -63,7 +63,7 @@ export default function TransferStudentSubscreen() {
 
         {mode === 'teacher' ? (
           <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Codigo da professora destino</label>
+            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Código da professora de destino</label>
             <input
               className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
               placeholder="Ex: PROF-MARIA-2026"
@@ -86,10 +86,10 @@ export default function TransferStudentSubscreen() {
           </div>
         )}
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Motivo ou observacao</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Motivo ou observação</label>
         <textarea
           className="w-full min-h-[110px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none mb-4"
-          placeholder="Ex: troca de professora, virada de ano, mudanca de turma..."
+          placeholder="Ex.: troca de professora, virada de ano, mudança de turma..."
           value={reason}
           onChange={(event) => setReason(event.target.value)}
         />
@@ -98,7 +98,7 @@ export default function TransferStudentSubscreen() {
           <div className="flex items-start gap-3">
             <ShieldCheck size={18} className="text-gm mt-[2px] flex-shrink-0" />
             <p className="text-[12px] text-soft leading-[1.6]">
-              A timeline acompanha a crianca somente apos aceite da professora destino ou aprovacao do Super Admin.
+              A timeline acompanha a criança somente após aceite da professora de destino ou aprovação do Super Admin.
             </p>
           </div>
         </div>
@@ -109,9 +109,10 @@ export default function TransferStudentSubscreen() {
           className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40"
         >
           <MoveRight size={18} />
-          {done ? 'Transferencia registrada' : 'Registrar transferencia'}
+          {done ? 'Transferência registrada' : 'Registrar transferência'}
         </button>
       </div>
     </div>
   )
 }
+

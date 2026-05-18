@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+﻿import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreVertical, Pencil, Trash2, PenLine, Sparkles, CalendarDays, Lightbulb } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
@@ -8,12 +8,12 @@ import AnnotationCard from '@/components/ui/AnnotationCard'
 import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
 
 const QUICK_ACCESS = [
-  { label: 'Anotações',    desc: 'Registre o dia a dia da turma',      icon: '📝', bg: '#D8F3DC', tab: 'annotations' as const, sub: null },
-  { label: 'Minhas Turmas',desc: 'Alunos, perfis e progressos',         icon: '👧', bg: '#FFF3CD', tab: 'classes' as const,     sub: null },
-  { label: 'Calendário',   desc: 'Eventos e tarefas pedagógicas',       icon: '📅', bg: '#E3D5F5', tab: null,                   sub: 'calendar' as const },
-  { label: 'Comunidade',   desc: 'Troque ideias com outras profas',     icon: '🌱', bg: '#D8F3DC', tab: null,                   sub: 'community' as const },
-  { label: 'Conquistas',   desc: 'Sua evolução como professora',        icon: '🏅', bg: '#FFF3CD', tab: 'achievements' as const,sub: null },
-  { label: 'Documentos',   desc: 'Docs pessoais armazenados com segurança', icon: '📁', bg: '#D0E8FF', tab: null,              sub: 'documents' as const },
+  { label: 'Anotações',    desc: 'Registre o dia a dia da turma',      icon: 'ðŸ“', bg: '#D8F3DC', tab: 'annotations' as const, sub: null },
+  { label: 'Minhas Turmas',desc: 'Alunos, perfis e progressos',         icon: 'ðŸ‘§', bg: '#FFF3CD', tab: 'classes' as const,     sub: null },
+  { label: 'Calendário',   desc: 'Eventos e tarefas pedagógicas',       icon: 'ðŸ“…', bg: '#E3D5F5', tab: null,                   sub: 'calendar' as const },
+  { label: 'Comunidade',   desc: 'Troque ideias com outras professoras', icon: 'ðŸŒ±', bg: '#D8F3DC', tab: null,                   sub: 'community' as const },
+  { label: 'Conquistas',   desc: 'Sua evolução como professora',        icon: 'ðŸ…', bg: '#FFF3CD', tab: 'achievements' as const,sub: null },
+  { label: 'Documentos',   desc: 'Docs pessoais armazenados com segurança', icon: 'ðŸ“', bg: '#D0E8FF', tab: null,              sub: 'documents' as const },
 ] as const
 
 export default function HomeScreen() {
@@ -41,7 +41,7 @@ export default function HomeScreen() {
     ...boardNotes.map((n): { isMain: false; note: BoardNote } => ({ isMain: false, note: n })),
   ]
 
-  // Clamp slide index synchronously — prevents white flash when a note is deleted
+  // Clamp slide index synchronously â€” prevents white flash when a note is deleted
   const safeSlide = Math.min(currentSlide, allSlides.length - 1)
 
   // Keep state in sync (silent, no flash)
@@ -109,7 +109,7 @@ export default function HomeScreen() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* ── Board ── */}
+      {/* â”€â”€ Board â”€â”€ */}
       <div
         className="chalk-bg flex-shrink-0 relative border-b-4 border-[#142B1E] overflow-hidden"
         style={{ backgroundColor: '#1B4332' }}
@@ -142,9 +142,9 @@ export default function HomeScreen() {
           ))}
         </div>
 
-        {/* Top-right actions — always same size, same row */}
+        {/* Top-right actions â€” always same size, same row */}
         <div className="absolute top-3 right-4 z-10 flex items-center gap-[10px]">
-          {/* ⋮ note options — only shown when viewing a note slide */}
+          {/* â‹® note options â€” only shown when viewing a note slide */}
           {currentViewedNote && (
             <div className="relative">
               <button
@@ -187,7 +187,7 @@ export default function HomeScreen() {
             </div>
           )}
 
-          {/* ✏ add new note */}
+          {/* âœ add new note */}
           <button
             onClick={openNewNoteModal}
             className="rounded-full border-none flex items-center justify-center"
@@ -220,46 +220,46 @@ export default function HomeScreen() {
         )}
       </div>
 
-      {/* ── Scrollable content ── */}
+      {/* â”€â”€ Scrollable content â”€â”€ */}
       <div className="scroll-area">
         <div className="px-[18px]">
           <button
             onClick={() => openSubscreen('interventions')}
             className="w-full rounded-app p-4 mt-[14px] mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
-            style={{ background: 'linear-gradient(135deg,#5A6ACF,#6E89FF)' }}
+            style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}
           >
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-[12px] bg-white/20 flex items-center justify-center">
                 <Lightbulb size={21} />
               </div>
               <div className="flex-1">
-                <h3 className="text-[14px] font-bold">Intervencoes</h3>
-                <p className="text-[11px] opacity-90 leading-snug">Receba sugestoes pedagogicas para apoiar o desenvolvimento da crianca</p>
+                <h3 className="text-[14px] font-bold">Intervenções</h3>
+                <p className="text-[11px] opacity-90 leading-snug">Receba sugestões pedagógicas para apoiar o desenvolvimento da criança</p>
               </div>
-              <span className="text-white/80 text-[18px]">›</span>
+              <span className="text-white/80 text-[18px]">â€º</span>
             </div>
           </button>
 
           <button
             onClick={() => openSubscreen('ai')}
             className="w-full rounded-app p-4 mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
-            style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}
+            style={{ background: 'linear-gradient(135deg,#4F8341,#83C451)' }}
           >
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-[12px] bg-white/15 flex items-center justify-center">
                 <Sparkles size={22} />
               </div>
               <div className="flex-1">
-                <h3 className="text-[14px] font-bold">Relatorios e Planejamentos</h3>
-                <p className="text-[11px] opacity-80 leading-snug">Relatorios, planejamentos e pareceres com base nas suas anotacoes</p>
+                <h3 className="text-[14px] font-bold">Relatórios e Planejamentos</h3>
+                <p className="text-[11px] opacity-80 leading-snug">Relatórios, planejamentos e pareceres com base nas suas anotações</p>
               </div>
-              <span className="text-white/70 text-[18px]">›</span>
+              <span className="text-white/70 text-[18px]">â€º</span>
             </div>
           </button>
 
           <div className="bg-white rounded-app p-4 mb-[14px] border border-border shadow-card">
             <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
-              Sugestoes pedagogicas
+              Sugestões pedagógicas
             </p>
             <button
               onClick={() => openSubscreen('ai')}
@@ -269,8 +269,8 @@ export default function HomeScreen() {
                 <Sparkles size={17} color="#856404" />
               </div>
               <div className="flex-1">
-                <p className="text-[12px] font-bold text-ink">3 relatorios pendentes</p>
-                <p className="text-[11px] text-muted leading-snug">Lucas, Sofia e Valentina ja tem anotacoes suficientes.</p>
+                <p className="text-[12px] font-bold text-ink">3 relatórios pendentes</p>
+                <p className="text-[11px] text-muted leading-snug">Lucas, Sofia e Valentina já têm anotações suficientes.</p>
               </div>
             </button>
           </div>
@@ -283,10 +283,10 @@ export default function HomeScreen() {
               <CalendarDays size={19} />
             </div>
             <div className="flex-1">
-              <h3 className="text-[13px] font-bold text-ink">Datas proximas</h3>
-              <p className="text-[11px] text-muted">Reuniao de pais e fechamento de relatorios nesta semana</p>
+              <h3 className="text-[13px] font-bold text-ink">Datas próximas</h3>
+              <p className="text-[11px] text-muted">Reunião de pais e fechamento de relatórios nesta semana</p>
             </div>
-            <span className="text-muted text-[18px]">›</span>
+            <span className="text-muted text-[18px]">â€º</span>
           </button>
 
           <section className="bg-white rounded-app p-4 mb-[14px] border border-border shadow-card">
@@ -316,8 +316,8 @@ export default function HomeScreen() {
                 <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Detector sem registro</p>
                 <p className="text-[13px] font-bold text-ink mt-1">
                   {studentsWithoutRecentNotes.length
-                    ? `${studentsWithoutRecentNotes.length} criancas sem anotacao recente`
-                    : 'Nenhuma crianca sem registro recente'}
+                    ? `${studentsWithoutRecentNotes.length} crianças sem anotação recente`
+                    : 'Nenhuma criança sem registro recente'}
                 </p>
               </div>
               <button
@@ -344,13 +344,13 @@ export default function HomeScreen() {
                     className="w-full rounded-app-sm border border-border bg-cream px-3 py-3 text-left active:scale-[.98] transition-transform"
                   >
                     <p className="text-[12px] font-bold text-ink">{item.studentName}</p>
-                    <p className="text-[11px] text-muted mt-1">Turma {item.className} - sem registro nos ultimos 7 dias</p>
+                    <p className="text-[11px] text-muted mt-1">Turma {item.className} - sem registro nos últimos 7 dias</p>
                   </button>
                 ))}
               </div>
             ) : (
               <p className="mt-3 text-[11px] text-muted leading-[1.5]">
-                Continue mantendo registros recorrentes para alimentar relatorios e planejamentos com dados atualizados.
+                Continue mantendo registros recorrentes para alimentar relatórios e planejamentos com dados atualizados.
               </p>
             )}
           </section>
@@ -372,7 +372,7 @@ export default function HomeScreen() {
                   <h3 className="text-[14px] font-bold text-ink">{item.label}</h3>
                   <p className="text-[11px] text-muted leading-snug">{item.desc}</p>
                 </div>
-                <span className="text-muted text-[18px] flex-shrink-0">›</span>
+                <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
               </button>
             ))}
           </div>
@@ -381,12 +381,12 @@ export default function HomeScreen() {
             onClick={() => setTab('materials')}
             className="w-full bg-white rounded-app px-[15px] py-[15px] cursor-pointer border border-border shadow-card flex items-center gap-[13px] mt-[11px] mb-[22px] active:scale-[.98] transition-transform"
           >
-            <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center text-[22px] flex-shrink-0" style={{ background: '#D8F3DC' }}>📚</div>
+            <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center text-[22px] flex-shrink-0" style={{ background: '#D8F3DC' }}>ðŸ“š</div>
             <div className="flex-1 text-left">
               <h3 className="text-[14px] font-bold text-ink">Material de Apoio</h3>
               <p className="text-[11px] text-muted">Modelos editáveis prontos para usar</p>
             </div>
-            <span className="text-muted text-[18px] flex-shrink-0">›</span>
+            <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
           </button>
 
           <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-[10px]">
@@ -416,7 +416,7 @@ export default function HomeScreen() {
   )
 }
 
-/* ── MainSlide ── */
+/* â”€â”€ MainSlide â”€â”€ */
 function MainSlide({
   name,
   annotations,
@@ -448,7 +448,7 @@ function MainSlide({
   ]
   return (
     <div className="relative z-10">
-      <p className="font-chalk text-base" style={{ color: 'rgba(255,255,255,0.55)' }}>✏︎ {greeting},</p>
+      <p className="font-chalk text-base" style={{ color: 'rgba(255,255,255,0.55)' }}>âœï¸Ž {greeting},</p>
       <h1 className="font-chalk text-white text-[34px] font-bold leading-[1.05] mb-[5px] break-words pr-12">{name}</h1>
       <div className="w-[52%] h-[2px] rounded-sm mb-4" style={{ background: 'rgba(255,255,255,0.15)' }} />
       <div className="grid grid-cols-4 gap-[7px]">
@@ -468,7 +468,7 @@ function MainSlide({
   )
 }
 
-/* ── NoteSlide — sem botões próprios, gerenciados pelo board header ── */
+/* â”€â”€ NoteSlide â€” sem botões próprios, gerenciados pelo board header â”€â”€ */
 function NoteSlide({ note }: { note: BoardNote }) {
   return (
     <div className="relative z-10 pr-4">
@@ -484,13 +484,13 @@ function NoteSlide({ note }: { note: BoardNote }) {
         </>
       )}
       {note.expiresAt && (
-        <p className="text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.40)' }}>⏳ Expira em {formatDate(note.expiresAt)}</p>
+        <p className="text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.40)' }}>â³ Expira em {formatDate(note.expiresAt)}</p>
       )}
     </div>
   )
 }
 
-/* ── BoardNoteModal — add or edit a single note ── */
+/* â”€â”€ BoardNoteModal â€” add or edit a single note â”€â”€ */
 function BoardNoteModal({
   initialNote,
   onClose,
@@ -540,7 +540,7 @@ function BoardNoteModal({
   }
 
   const previewTitle = title || 'Título da nota'
-  const previewBody  = body  || 'Sua nota aparece aqui…'
+  const previewBody  = body  || 'Sua nota aparece aquiâ€¦'
 
   const appRoot = document.getElementById('app-root')
   if (!appRoot) return null
@@ -572,7 +572,7 @@ function BoardNoteModal({
         <div className="overflow-y-auto" style={{ maxHeight: 'calc(90dvh - 32px)' }}>
           <div className="px-[18px] pb-10">
             <p className="text-[15px] font-bold mb-[14px]">
-              {isEditing ? '✏︎ Editar nota' : '✏︎ Nova nota no quadro'}
+              {isEditing ? 'âœï¸Ž Editar nota' : 'âœï¸Ž Nova nota no quadro'}
             </p>
 
             {/* Preview */}
@@ -590,7 +590,7 @@ function BoardNoteModal({
 
             {/* Style toggle */}
             <div className="flex gap-[7px] mb-3">
-              {[{ v: true, label: '✏︎ Giz' }, { v: false, label: 'Aa Normal' }].map((opt) => (
+              {[{ v: true, label: 'âœï¸Ž Giz' }, { v: false, label: 'Aa Normal' }].map((opt) => (
                 <button
                   key={String(opt.v)}
                   onClick={() => setChalk(opt.v)}
@@ -618,14 +618,14 @@ function BoardNoteModal({
             <textarea
               className="w-full min-h-[80px] px-3 py-[10px] rounded-app-sm text-sm text-ink outline-none resize-none leading-[1.6] mb-2"
               style={{ fontFamily: '"DM Sans",sans-serif', border: '1.5px solid #D4EBC8' }}
-              placeholder="Escreva sua nota…"
+              placeholder="Escreva sua notaâ€¦"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               onFocus={(e) => (e.target.style.borderColor = '#83C451')}
               onBlur={(e) => (e.target.style.borderColor = '#D4EBC8')}
             />
 
-            <label className="block text-[11px] text-muted mb-[5px]">📅 Data de expiração — opcional</label>
+            <label className="block text-[11px] text-muted mb-[5px]">ðŸ“… Data de expiração â€” opcional</label>
             <input
               type="date"
               className="w-full px-3 py-[10px] rounded-app-sm text-sm text-ink outline-none mb-4"
@@ -661,7 +661,7 @@ function getDisplayFirstName(name: string) {
   const cleaned = name
     .replace(/prof\.?\s*(ª|a|o)?/i, '')
     .replace(/prof\.?\s*/i, '')
-    .replace(/Âª/gi, '')
+    .replace(/Ã‚ª/gi, '')
     .trim()
 
   const firstName = toTitleCaseName(cleaned).split(/\s+/)[0] || 'Professora'
@@ -784,3 +784,4 @@ function findStudentName(studentId: string, classes: ReturnType<typeof useAppSto
   }
   return null
 }
+

@@ -1,53 +1,48 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { ChevronLeft, FileText, Search, Sparkles } from 'lucide-react'
 import { useNavStore } from '@/store'
 
 const AI_SECTIONS = [
   {
-    title: 'Relatorios pedagogicos',
+    title: 'Relatórios pedagógicos',
     actions: [
-      { title: 'Relatorio de desenvolvimento', desc: 'Acompanhamento das aprendizagens sem carater classificatorio.', icon: 'chart', flow: 'report' },
-      { title: 'Diario de bordo', desc: 'Registro narrativo da rotina do grupo ou da crianca.', icon: 'text', flow: 'report' },
-      { title: 'Portfolio pedagogico', desc: 'Evidencias, producoes, fotos e relatos da jornada.', icon: 'portfolio', flow: 'report' },
+      { title: 'Relatório de desenvolvimento', desc: 'Acompanhamento das aprendizagens sem caráter classificatório.', icon: 'chart', flow: 'report' },
+      { title: 'Diário de bordo', desc: 'Registro pedagógico coletivo da rotina e experiências da turma.', icon: 'text', flow: 'report' },
+      { title: 'Portfólio pedagógico', desc: 'Evidências, produções, fotos e relatos da jornada.', icon: 'portfolio', flow: 'report' },
     ],
   },
   {
     title: 'Planejamentos',
     actions: [
-      { title: 'Planejamento', desc: 'Escolha anual, semestral, mensal, quinzenal, semanal ou diario.', icon: 'plan', flow: 'planning' },
+      { title: 'Planejamento', desc: 'Modelos práticos de planejamento semanal e plano de aula diário.', icon: 'plan', flow: 'planning' },
     ],
   },
   {
     title: 'Especialistas e encaminhamentos',
     actions: [
-      { title: 'Encaminhamento para especialista', desc: 'Documento conciso justificando avaliacao externa.', icon: 'care', flow: 'report' },
+      { title: 'Encaminhamento para especialista', desc: 'Documento conciso justificando avaliação externa.', icon: 'care', flow: 'report' },
     ],
   },
   {
-    title: 'Documentacao complementar',
+    title: 'Documentação complementar',
     actions: [
-      { title: 'Projeto pedagogico especifico', desc: 'Projeto tematico com objetivos, atividades e avaliacao.', icon: 'portfolio', flow: 'generator' },
-      { title: 'Ficha de anamnese', desc: 'Historico, habitos, rotina e contexto familiar.', icon: 'text', flow: 'report' },
-      { title: 'Registro de reuniao de pais', desc: 'Pauta, combinados e encaminhamentos com a familia.', icon: 'text', flow: 'report' },
+      { title: 'Projeto pedagógico específico', desc: 'Projeto temático com objetivos, atividades e avaliação.', icon: 'portfolio', flow: 'generator' },
+      { title: 'Ficha de anamnese', desc: 'Histórico, hábitos, rotina e contexto familiar.', icon: 'text', flow: 'report' },
+      { title: 'Registro de reunião de pais', desc: 'Pauta, combinados e encaminhamentos com a família.', icon: 'text', flow: 'report' },
     ],
   },
 ] as const
 
 const PLANNING_PERIODS = [
-  { title: 'Planejamento anual', desc: 'Diretrizes gerais alinhadas a BNCC e ao PPP.' },
-  { title: 'Planejamento semestral', desc: 'Objetivos e campos de experiencia por semestre.' },
-  { title: 'Planejamento mensal', desc: 'Unidades tematicas, projetos e sequencias do mes.' },
-  { title: 'Planejamento quinzenal', desc: 'Organizacao especifica para duas semanas.' },
-  { title: 'Planejamento semanal', desc: 'Semanario com rotina, cuidado e brincadeira.' },
-  { title: 'Plano de aula diario', desc: 'Atividades do dia, objetivos, materiais e avaliacao.' },
+  { title: 'Planejamento semanal', desc: 'Semanário com rotina, cuidado e brincadeira.' },
+  { title: 'Plano de aula diario', desc: 'Atividades do dia, objetivos, materiais e avaliação.' },
 ] as const
 
 type AiAction = (typeof AI_SECTIONS)[number]['actions'][number]
-type SectionTitle = (typeof AI_SECTIONS)[number]['title'] | 'Todos'
+type SectionTitle = (typeof AI_SECTIONS)[number]['title']
 
 export default function AiPedagogicaSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const [activeSection, setActiveSection] = useState<SectionTitle>('Todos')
   const [query, setQuery] = useState('')
   const [choosingPlanningPeriod, setChoosingPlanningPeriod] = useState(false)
 
@@ -55,7 +50,6 @@ export default function AiPedagogicaSubscreen() {
     const normalizedQuery = normalizeText(query)
 
     return AI_SECTIONS
-      .filter((section) => activeSection === 'Todos' || section.title === activeSection)
       .map((section) => ({
         ...section,
         actions: section.actions.filter((action) => {
@@ -64,7 +58,7 @@ export default function AiPedagogicaSubscreen() {
         }),
       }))
       .filter((section) => section.actions.length > 0)
-  }, [activeSection, query])
+  }, [query])
 
   const totalDocuments = AI_SECTIONS.reduce((sum, section) => sum + section.actions.length, 0) + PLANNING_PERIODS.length - 1
 
@@ -86,7 +80,7 @@ export default function AiPedagogicaSubscreen() {
     if (action.flow === 'report') {
       openSubscreen('report', {
         reportKind: action.title,
-        assistantMode: action.title === 'Registro de reuniao de pais' ? 'parents-meeting' : undefined,
+        assistantMode: action.title === 'Registro de reunião de pais' ? 'parents-meeting' : undefined,
       })
       return
     }
@@ -101,7 +95,7 @@ export default function AiPedagogicaSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <span className="font-serif text-[18px] text-gd flex-1">
-          {choosingPlanningPeriod ? 'Planejamento' : 'IA Pedagogica'}
+          {choosingPlanningPeriod ? 'Planejamento' : 'Relatórios e Planejamentos'}
         </span>
       </div>
 
@@ -114,9 +108,9 @@ export default function AiPedagogicaSubscreen() {
                   <FileText size={21} />
                 </div>
                 <div className="flex-1">
-                  <h2 className="font-serif text-[20px] text-gd">Escolha o periodo</h2>
+                  <h2 className="font-serif text-[20px] text-gd">Escolha o tipo</h2>
                   <p className="text-[12px] text-muted leading-snug mt-1">
-                    O planejamento agora fica unificado. Selecione o recorte para gerar o documento.
+                    Selecione o modelo de planejamento que deseja gerar.
                   </p>
                 </div>
               </div>
@@ -130,10 +124,10 @@ export default function AiPedagogicaSubscreen() {
                 <FileText size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-ink leading-tight">Historico de planejamentos</p>
-                <p className="text-[11px] text-muted leading-snug mt-1">Veja, edite e acompanhe planejamentos ja gerados.</p>
+                <p className="text-[13px] font-bold text-ink leading-tight">Histórico de planejamentos</p>
+                <p className="text-[11px] text-muted leading-snug mt-1">Veja, edite e acompanhe planejamentos já gerados.</p>
               </div>
-              <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
+              <span className="text-muted text-[18px] flex-shrink-0">ââ‚¬º</span>
             </button>
 
             <div className="flex flex-col gap-[11px]">
@@ -150,7 +144,7 @@ export default function AiPedagogicaSubscreen() {
                     <h3 className="text-[14px] font-bold text-ink leading-tight">{period.title}</h3>
                     <p className="text-[11px] text-muted leading-snug mt-1">{period.desc}</p>
                   </div>
-                  <span className="text-muted text-[18px] flex-shrink-0">›</span>
+                  <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
                 </button>
               ))}
             </div>
@@ -158,10 +152,10 @@ export default function AiPedagogicaSubscreen() {
         ) : (
           <>
             <div className="rounded-app p-5 mt-[14px] mb-[16px] text-white" style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}>
-              <p className="text-[12px] opacity-70 mb-1">Assistente pedagogica</p>
-              <h2 className="font-serif text-[22px] mb-2">O que voce precisa hoje?</h2>
+              <p className="text-[12px] opacity-70 mb-1">Assistente pedagógica</p>
+              <h2 className="font-serif text-[22px] mb-2">O que você precisa hoje?</h2>
               <p className="text-[13px] opacity-80 leading-[1.6]">
-                {totalDocuments} modelos para relatorios, planejamentos, especialistas e documentacao da educacao infantil.
+                {totalDocuments} modelos para relatórios, planejamentos, especialistas e documentação da educação infantil.
               </p>
             </div>
 
@@ -174,9 +168,9 @@ export default function AiPedagogicaSubscreen() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-bold text-ink leading-tight">Ver gerados</p>
-                <p className="text-[11px] text-muted leading-snug mt-1">Historico do mes e geral de tudo que foi criado por IA.</p>
+                <p className="text-[11px] text-muted leading-snug mt-1">Histórico do mês e geral de tudo que foi criado por IA.</p>
               </div>
-              <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
+              <span className="text-muted text-[18px] flex-shrink-0">ââ‚¬º</span>
             </button>
 
             <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
@@ -185,26 +179,10 @@ export default function AiPedagogicaSubscreen() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar relatorio, planejamento..."
+                  placeholder="Buscar relatório, planejamento..."
                   className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
                 />
               </div>
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2 mb-4">
-              {(['Todos', ...AI_SECTIONS.map((section) => section.title)] as SectionTitle[]).map((sectionTitle) => (
-                <button
-                  key={sectionTitle}
-                  onClick={() => setActiveSection(sectionTitle)}
-                  className={`px-3 py-2 rounded-full text-xs font-bold border whitespace-nowrap ${
-                    activeSection === sectionTitle
-                      ? 'bg-gm border-gm text-white'
-                      : 'bg-white border-border text-muted'
-                  }`}
-                >
-                  {sectionTitle}
-                </button>
-              ))}
             </div>
 
             {visibleSections.length > 0 ? visibleSections.map((section) => (
@@ -216,11 +194,11 @@ export default function AiPedagogicaSubscreen() {
                   <button
                     onClick={() => openSubscreen('generated-documents', {
                       reportTypes: getSectionReportTypes(section.title),
-                      kind: section.title === 'Relatorios pedagogicos' ? 'all' : 'documents',
+                      kind: section.title === 'Relatórios pedagógicos' ? 'all' : 'documents',
                     })}
                     className="text-[11px] font-bold text-gm"
                   >
-                    Historico
+                    Histórico
                   </button>
                 </div>
 
@@ -238,7 +216,7 @@ export default function AiPedagogicaSubscreen() {
                         <h3 className="text-[14px] font-bold text-ink leading-tight">{item.title}</h3>
                         <p className="text-[11px] text-muted leading-snug mt-1">{item.desc}</p>
                       </div>
-                      <span className="text-muted text-[18px] flex-shrink-0">›</span>
+                      <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
                     </button>
                   ))}
                 </div>
@@ -248,7 +226,7 @@ export default function AiPedagogicaSubscreen() {
                 <Sparkles size={22} className="text-gm mx-auto mb-2" />
                 <p className="text-[13px] font-bold text-ink">Nenhum modelo encontrado</p>
                 <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-                  Tente buscar por relatorio, planejamento, especialista ou documentacao.
+                  Tente buscar por relatório, planejamento, especialista ou documentação.
                 </p>
               </div>
             )}
@@ -256,10 +234,10 @@ export default function AiPedagogicaSubscreen() {
             <div className="rounded-app p-4 border border-gp mb-8" style={{ background: '#F0FAF4' }}>
               <div className="flex items-center gap-2 text-gm font-bold text-[13px] mb-1">
                 <Sparkles size={15} />
-                Relatorios pendentes
+                Relatórios pendentes
               </div>
               <p className="text-[12px] text-soft leading-[1.6]">
-                Lucas, Sofia e Valentina ja tem anotacoes suficientes para gerar uma primeira versao de relatorio.
+                Lucas, Sofia e Valentina já têm anotações suficientes para gerar uma primeira versão de relatório.
               </p>
             </div>
           </>
@@ -278,9 +256,11 @@ function normalizeText(value: string) {
 }
 
 function getSectionReportTypes(sectionTitle: SectionTitle) {
-  if (sectionTitle === 'Relatorios pedagogicos') return ['development_report', 'general_report', 'portfolio_text', 'portfolio_image']
+  if (sectionTitle === 'Relatórios pedagógicos') return ['development_report', 'general_report', 'portfolio_text', 'portfolio_image']
   if (sectionTitle === 'Planejamentos') return ['planning']
   if (sectionTitle === 'Especialistas e encaminhamentos') return ['specialist_report']
-  if (sectionTitle === 'Documentacao complementar') return ['general_report', 'other']
+  if (sectionTitle === 'Documentação complementar') return ['general_report', 'other']
   return undefined
 }
+
+

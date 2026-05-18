@@ -9,7 +9,7 @@ export default function AdminHome() {
       <PageHeader
         eyebrow="Super Admin MVP"
         title="Controle operacional do Approf"
-        description="Visao geral de professoras, assinaturas manuais, materiais, IA e riscos de privacidade."
+        description="Visão geral de professoras, assinaturas manuais, materiais, IA e riscos de privacidade."
         action={
           <span className="status-pill">
             <ShieldCheck size={16} />
@@ -18,7 +18,7 @@ export default function AdminHome() {
         }
       />
 
-      <section className="metrics-grid" aria-label="Metricas principais">
+      <section className="metrics-grid" aria-label="Métricas principais">
         {dashboardMetrics.map((metric) => {
           const Icon = metric.icon
           return (
@@ -57,7 +57,7 @@ export default function AdminHome() {
                 </span>
                 <StatusBadge status={teacher.status} />
                 <span>{teacher.classes} turmas</span>
-                <span>{teacher.aiReports} relatorios</span>
+                <span>{teacher.aiReports} relatórios</span>
               </div>
             ))}
           </div>
@@ -87,7 +87,7 @@ export default function AdminHome() {
         <article className="panel privacy-panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Dados sensiveis</p>
+              <p className="eyebrow">Dados sensíveis</p>
               <h2>Checklist de privacidade</h2>
             </div>
             <Bot size={20} />
@@ -107,7 +107,7 @@ export default function AdminHome() {
           <AlertTriangle size={22} />
           <div>
             <p className="eyebrow">Aguardando Supabase</p>
-            <h2>Dados reais entram depois da validacao</h2>
+            <h2>Dados reais entram depois da validação</h2>
             <p>As telas agora definem o fluxo operacional. Depois vamos trocar mocks por consultas protegidas com RLS.</p>
           </div>
         </article>

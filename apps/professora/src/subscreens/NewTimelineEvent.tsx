@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, FileUp } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
@@ -6,17 +6,17 @@ import { createSupabaseTimelineEvent } from '@/services/supabase/timeline'
 import type { TimelineEvent, TimelineEventType } from '@/types'
 
 const EVENT_TYPES: { id: TimelineEventType; label: string; desc: string }[] = [
-  { id: 'evolucao', label: 'Evolucao', desc: 'Progresso observado na rotina.' },
-  { id: 'atividade', label: 'Atividade', desc: 'Vivencia ou proposta pedagogica.' },
-  { id: 'emocao', label: 'Emocao', desc: 'Expressao emocional e acolhimento.' },
-  { id: 'alimentacao', label: 'Alimentacao', desc: 'Rotina alimentar e experimentacoes.' },
-  { id: 'socializacao', label: 'Socializacao', desc: 'Interacoes com pares e adultos.' },
+  { id: 'evolucao', label: 'Evolução', desc: 'Progresso observado na rotina.' },
+  { id: 'atividade', label: 'Atividade', desc: 'Vivência ou proposta pedagógica.' },
+  { id: 'emocao', label: 'Emoção', desc: 'Expressão emocional e acolhimento.' },
+  { id: 'alimentacao', label: 'Alimentação', desc: 'Rotina alimentar e experimentações.' },
+  { id: 'socializacao', label: 'Socialização', desc: 'Interações com pares e adultos.' },
   { id: 'desenvolvimento', label: 'Desenvolvimento', desc: 'Linguagem, corpo, autonomia.' },
   { id: 'foto', label: 'Foto', desc: 'Registro visual privado.' },
   { id: 'marco', label: 'Marco especial', desc: 'Momento importante da jornada.' },
 ]
 
-const QUICK_TAGS = ['Linguagem', 'Autonomia', 'Acolhimento', 'Brincadeira', 'Movimento', 'Musicalizacao', 'Rotina', 'Familia']
+const QUICK_TAGS = ['Linguagem', 'Autonomia', 'Acolhimento', 'Brincadeira', 'Movimento', 'Musicalização', 'Rotina', 'Família']
 const MAX_ATTACHMENT_SIZE_MB = 10
 const ACCEPTED_ATTACHMENT_TYPES = [
   'image/',
@@ -106,7 +106,7 @@ export default function NewTimelineEventSubscreen() {
       addTimelineEvent(cls.id, student.id, event)
       closeSubscreen()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel salvar o marco.')
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar o marco.')
     } finally {
       setSaving(false)
     }
@@ -120,7 +120,7 @@ export default function NewTimelineEventSubscreen() {
         </button>
         <div className="flex-1">
           <span className="font-serif text-[18px] text-gd block">Novo marco</span>
-          <span className="text-[11px] text-muted">{student.name} - memoria pedagogica</span>
+          <span className="text-[11px] text-muted">{student.name} - memória pedagógica</span>
         </div>
       </div>
 
@@ -141,7 +141,7 @@ export default function NewTimelineEventSubscreen() {
           ))}
         </div>
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Titulo</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Título</label>
         <input
           className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
           placeholder="Ex: primeira pintura com tinta"
@@ -152,12 +152,12 @@ export default function NewTimelineEventSubscreen() {
         <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Registro da professora</label>
         <textarea
           className="w-full min-h-[132px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none leading-[1.6]"
-          placeholder="Descreva o que aconteceu, o contexto, como a crianca reagiu e por que esse momento importa."
+          placeholder="Descreva o que aconteceu, o contexto, como a criança reagiu e por que esse momento importa."
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
 
-        <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">Tags rapidas</p>
+        <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">Tags rápidas</p>
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2 mb-4">
           {QUICK_TAGS.map((tag) => (
             <button
@@ -180,7 +180,7 @@ export default function NewTimelineEventSubscreen() {
             <div className="flex-1">
               <p className="text-[13px] font-bold text-ink">Foto ou documento opcional</p>
               <p className="text-[11px] text-muted leading-[1.5] mt-1">
-                Arquivos de criancas ficam privados no Supabase Storage.
+                Arquivos de crianças ficam privados no Supabase Storage.
               </p>
               {attachmentName && <p className="text-[12px] text-soft bg-cream rounded-app-sm px-3 py-2 mt-3">{attachmentName}</p>}
               {attachmentPreviewUrl && (
@@ -221,3 +221,4 @@ export default function NewTimelineEventSubscreen() {
     </div>
   )
 }
+

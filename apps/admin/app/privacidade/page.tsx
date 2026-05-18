@@ -7,8 +7,8 @@ export default function PrivacyPage() {
     <>
       <PageHeader
         eyebrow="Privacidade"
-        title="Protecao de dados sensiveis"
-        description="Regras operacionais para professoras, alunos, fotos de criancas, relatorios e notificacoes externas."
+        title="Proteção de dados sensíveis"
+        description="Regras operacionais para professoras, alunos, fotos de crianças, relatórios e notificações externas."
       />
 
       <section className="content-grid">
@@ -16,7 +16,7 @@ export default function PrivacyPage() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">Checklist</p>
-              <h2>Antes de usuarias reais</h2>
+              <h2>Antes de usuárias reais</h2>
             </div>
             <LockKeyhole size={20} />
           </div>

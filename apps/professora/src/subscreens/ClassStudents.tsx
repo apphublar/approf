@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { BarChart3, CalendarDays, Check, ChevronLeft, ClipboardCheck, Pencil, Users } from 'lucide-react'
+import { BarChart3, CalendarDays, Check, ChevronLeft, ClipboardCheck, Pencil, Search, Users } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { saveSupabaseAttendanceRecord } from '@/services/supabase/attendance'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import type { AttendanceRecord, Student } from '@/types'
-
-type StudentFilter = 'all' | 'atypical' | 'report'
 type ClassTool = 'students' | 'attendance' | 'calendar' | 'report'
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
@@ -16,7 +14,6 @@ export default function ClassStudentsSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const { classes, activeClassId, setActiveStudent, attendanceRecords, saveAttendanceRecord, upsertAttendanceRecord } = useAppStore()
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<StudentFilter>('all')
   const [activeTool, setActiveTool] = useState<ClassTool>('students')
   const [attendanceDate, setAttendanceDate] = useState(getTodayKey())
   const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()))
@@ -44,15 +41,7 @@ export default function ClassStudentsSubscreen() {
   if (!cls) return null
 
   const filteredStudents = cls.students.filter((student) => {
-    const matchesQuery = student.name.toLowerCase().includes(query.toLowerCase())
-    const matchesFilter =
-      filter === 'all'
-        ? true
-        : filter === 'atypical'
-          ? Boolean(student.tag)
-          : student.annotationCount >= 5
-
-    return matchesQuery && matchesFilter
+    return student.name.toLowerCase().includes(query.toLowerCase())
   })
   const reportRows = buildAttendanceReport(cls.students, classAttendanceRecords)
   const selectedCalendarRecord = attendanceByDate.get(selectedCalendarDate)
@@ -104,7 +93,7 @@ export default function ClassStudentsSubscreen() {
     setMonthDate(startOfMonth(parseDateKey(attendanceDate)))
     setSavedMessage('Chamada registrada com sucesso.')
     } catch (error) {
-      setAttendanceError(error instanceof Error ? error.message : 'Nao foi possivel salvar a chamada.')
+      setAttendanceError(error instanceof Error ? error.message : 'Não foi possível salvar a chamada.')
     } finally {
       setSavingAttendance(false)
     }
@@ -143,8 +132,8 @@ export default function ClassStudentsSubscreen() {
           {[
             { id: 'students', label: 'Alunos', icon: Users },
             { id: 'attendance', label: 'Chamada', icon: ClipboardCheck },
-            { id: 'calendar', label: 'Calendario', icon: CalendarDays },
-            { id: 'report', label: 'Relatorio', icon: BarChart3 },
+            { id: 'calendar', label: 'Calendário', icon: CalendarDays },
+            { id: 'report', label: 'Relatório', icon: BarChart3 },
           ].map((item) => {
             const Icon = item.icon
             const active = activeTool === item.id
@@ -165,30 +154,16 @@ export default function ClassStudentsSubscreen() {
 
         {activeTool === 'students' && (
           <>
-            <div className="bg-white rounded-app-sm border border-border px-3 py-2 mb-[10px]">
-              <input
-                className="w-full bg-transparent outline-none text-[13px] text-ink"
-                placeholder="Buscar aluno..."
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-            <div className="flex gap-[7px] overflow-x-auto pb-[6px] mb-[10px] scrollbar-none">
-              {[
-                { id: 'all', label: 'Todos' },
-                { id: 'atypical', label: 'Atipicos' },
-                { id: 'report', label: 'Com relatorio' },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setFilter(item.id as StudentFilter)}
-                  className={`px-[13px] py-[6px] rounded-full text-xs font-semibold border-[1.5px] whitespace-nowrap flex-shrink-0 ${
-                    filter === item.id ? 'bg-gm border-gm text-white' : 'bg-white border-border text-muted'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
+              <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
+                <Search size={16} className="text-muted flex-shrink-0" />
+                <input
+                  className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
+                  placeholder="Buscar aluno..."
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </div>
             </div>
             <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mt-[14px] mb-[10px]">
               {filteredStudents.length} de {cls.students.length} alunos
@@ -201,7 +176,7 @@ export default function ClassStudentsSubscreen() {
                   rightSlot={
                     <div className="text-right flex-shrink-0">
                       <span className="text-[11px] font-semibold text-gm">{student.annotationCount}</span>
-                      <span className="text-[10px] text-muted block">anotacoes</span>
+                      <span className="text-[10px] text-muted block">anotações</span>
                     </div>
                   }
                   onClick={() => openStudent(student.id)}
@@ -289,14 +264,14 @@ export default function ClassStudentsSubscreen() {
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-center justify-between mb-3">
                 <button onClick={() => setMonthDate(addMonths(monthDate, -1))} className="w-9 h-9 rounded-full border border-border text-muted bg-white">
-                  ‹
+                  â€¹
                 </button>
                 <div className="text-center">
                   <p className="font-serif text-[19px] text-gd capitalize">{formatMonthTitle(monthDate)}</p>
                   <p className="text-[11px] text-muted">{classAttendanceRecords.length} chamadas registradas</p>
                 </div>
                 <button onClick={() => setMonthDate(addMonths(monthDate, 1))} className="w-9 h-9 rounded-full border border-border text-muted bg-white">
-                  ›
+                  â€º
                 </button>
               </div>
 
@@ -352,7 +327,7 @@ export default function ClassStudentsSubscreen() {
                   <BarChart3 size={20} />
                 </div>
                 <div className="flex-1">
-                  <h2 className="font-serif text-[20px] text-gd">Relatorio de frequencia</h2>
+                  <h2 className="font-serif text-[20px] text-gd">Relatório de frequência</h2>
                   <p className="text-[12px] text-muted leading-snug">
                     Resumo baseado em {classAttendanceRecords.length} chamadas registradas para esta turma.
                   </p>
@@ -368,11 +343,11 @@ export default function ClassStudentsSubscreen() {
                       <StudentAvatar student={row.student} />
                       <div className="flex-1 min-w-0">
                         <p className="text-[14px] font-bold text-ink truncate">{row.student.name}</p>
-                        <p className="text-[11px] text-muted">{row.presences} presencas · {row.absences} faltas</p>
+                        <p className="text-[11px] text-muted">{row.presences} presenças · {row.absences} faltas</p>
                       </div>
                       <div className="text-right">
                         <span className="text-[15px] font-bold text-gm">{row.rate}%</span>
-                        <span className="text-[10px] block text-muted">presenca</span>
+                        <span className="text-[10px] block text-muted">presença</span>
                       </div>
                     </div>
                     <div className="h-2 rounded-full bg-cream overflow-hidden mt-3">
@@ -385,7 +360,7 @@ export default function ClassStudentsSubscreen() {
               <div className="bg-white rounded-app p-5 border border-border shadow-card text-center">
                 <CalendarDays size={22} className="text-gm mx-auto mb-2" />
                 <p className="text-[13px] font-bold text-ink">Nenhuma chamada registrada</p>
-                <p className="text-[12px] text-muted mt-1 leading-[1.5]">Registre a primeira lista de chamada para ver o relatorio.</p>
+                <p className="text-[12px] text-muted mt-1 leading-[1.5]">Registre a primeira lista de chamada para ver o relatório.</p>
               </div>
             )}
           </div>
@@ -407,7 +382,7 @@ function StudentRow({ student, rightSlot, onClick }: { student: Student; rightSl
         <p className="text-[11px] text-muted">{student.age} anos {student.tag ? `· ${student.tag}` : ''}</p>
       </div>
       {rightSlot}
-      <span className="text-muted text-[19px] ml-1">›</span>
+      <span className="text-muted text-[19px] ml-1">â€º</span>
     </button>
   )
 }
@@ -483,7 +458,7 @@ function AttendanceDayDetails({
         </div>
       ) : (
         <p className="text-[12px] text-muted leading-[1.6]">
-          Selecione fazer chamada para registrar as presencas desta data.
+          Selecione fazer chamada para registrar as presenças desta data.
         </p>
       )}
     </div>
@@ -575,3 +550,4 @@ function formatMonthTitle(date: Date) {
 function formatDateTitle(dateKey: string) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(parseDateKey(dateKey))
 }
+

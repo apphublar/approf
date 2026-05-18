@@ -1,15 +1,15 @@
-import { ChevronLeft, ExternalLink, FileText, MoveRight, Pencil, Plus, Sparkles } from 'lucide-react'
+﻿import { ChevronLeft, ExternalLink, FileText, MoveRight, Pencil, Plus, Sparkles } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import type { TimelineEvent, TimelineEventType } from '@/types'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 
 const EVENT_STYLE: Record<TimelineEventType, { label: string; bg: string; fg: string }> = {
-  evolucao: { label: 'Evolucao', bg: '#D8F3DC', fg: '#2D6A4F' },
+  evolucao: { label: 'Evolução', bg: '#D8F3DC', fg: '#2D6A4F' },
   atividade: { label: 'Atividade', bg: '#FFF3CD', fg: '#856404' },
   foto: { label: 'Foto', bg: '#D0E8FF', fg: '#0A558C' },
-  emocao: { label: 'Emocoes', bg: '#F0E6FF', fg: '#6B21A8' },
-  alimentacao: { label: 'Alimentacao', bg: '#FFE8CC', fg: '#9C4E00' },
-  socializacao: { label: 'Socializacao', bg: '#E3D5F5', fg: '#6930C3' },
+  emocao: { label: 'Emoções', bg: '#F0E6FF', fg: '#6B21A8' },
+  alimentacao: { label: 'Alimentação', bg: '#FFE8CC', fg: '#9C4E00' },
+  socializacao: { label: 'Socialização', bg: '#E3D5F5', fg: '#6930C3' },
   desenvolvimento: { label: 'Desenvolvimento', bg: '#D8F3DC', fg: '#2D6A4F' },
   marco: { label: 'Marco especial', bg: '#FFE5D9', fg: '#C1440E' },
 }
@@ -47,6 +47,7 @@ export default function StudentProfileSubscreen() {
   const absenceRecords = attendanceRecords
     .filter((record) => record.classId === cls.id && !record.presentStudentIds.includes(student.id))
     .sort((a, b) => b.date.localeCompare(a.date))
+  const totalAttendanceCalls = attendanceRecords.filter((record) => record.classId === cls.id).length
   const totalAbsences = absenceRecords.length
   const lastAbsences = absenceRecords.slice(0, 3)
 
@@ -109,17 +110,36 @@ export default function StudentProfileSubscreen() {
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
           <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Faltas do aluno</p>
-          <p className="text-[13px] text-ink">
-            {totalAbsences > 0 ? `${totalAbsences} faltas registradas.` : 'Sem faltas registradas ate o momento.'}
+          <p className="text-[12px] text-muted mb-3">
+            Resumo baseado nos registros de chamada da turma.
           </p>
-          {lastAbsences.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {lastAbsences.map((absence) => (
-                <span key={absence.id} className="px-2 py-1 rounded-full bg-cream border border-border text-[10px] text-muted">
-                  {formatAttendanceDate(absence.date)}
-                </span>
-              ))}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-app-sm border px-2 py-3 text-center bg-gbg border-gp text-gd">
+              <span className="block text-[18px] font-bold leading-none">{Math.max(0, totalAttendanceCalls - totalAbsences)}</span>
+              <span className="block text-[10px] font-bold mt-1">Presencas</span>
             </div>
+            <div className="rounded-app-sm border px-2 py-3 text-center bg-[#FFF3CD] border-[#EAD58A] text-[#856404]">
+              <span className="block text-[18px] font-bold leading-none">{totalAbsences}</span>
+              <span className="block text-[10px] font-bold mt-1">Faltas</span>
+            </div>
+            <div className="rounded-app-sm border px-2 py-3 text-center bg-cream border-border text-muted">
+              <span className="block text-[18px] font-bold leading-none">{totalAttendanceCalls}</span>
+              <span className="block text-[10px] font-bold mt-1">Chamadas</span>
+            </div>
+          </div>
+          {lastAbsences.length > 0 ? (
+            <div className="mt-3 rounded-app-sm bg-cream border border-border p-3">
+              <p className="text-[11px] font-bold text-ink mb-2">Ãšltimas faltas</p>
+              <div className="flex flex-wrap gap-2">
+                {lastAbsences.map((absence) => (
+                  <span key={absence.id} className="text-[11px] text-muted bg-white border border-border rounded-full px-2 py-1">
+                    {formatAttendanceDate(absence.date)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-[12px] text-muted mt-3">Sem faltas registradas até o momento.</p>
           )}
         </div>
 
@@ -146,7 +166,7 @@ export default function StudentProfileSubscreen() {
           })}
           className="w-full py-[14px] rounded-app bg-white text-gd font-bold text-[14px] border border-gp mb-3 cursor-pointer"
         >
-          Fazer anotacao direta do aluno
+          Fazer anotação direta do aluno
         </button>
 
         <button
@@ -154,32 +174,32 @@ export default function StudentProfileSubscreen() {
           className="w-full py-[14px] rounded-app bg-gd text-white font-bold text-[14px] border-none flex items-center justify-center gap-2 mb-5 cursor-pointer"
         >
           <Sparkles size={16} strokeWidth={2} />
-          Gerar relatorio
+          Gerar relatório
         </button>
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
-          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Gerados da crianca</p>
+          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Gerados da criança</p>
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => openSubscreen('generated-documents', { studentId: student.id, kind: 'all' })}
               className="rounded-app-sm border border-gp bg-gbg px-3 py-3 text-left text-gd"
             >
               <span className="block text-[13px] font-bold">Tudo</span>
-              <span className="block text-[11px] mt-1">Mes e historico geral</span>
+              <span className="block text-[11px] mt-1">Mês e histórico geral</span>
             </button>
             <button
               onClick={() => openSubscreen('generated-documents', { studentId: student.id, kind: 'documents' })}
               className="rounded-app-sm border border-border bg-cream px-3 py-3 text-left text-muted"
             >
               <span className="block text-[13px] font-bold">Docs</span>
-              <span className="block text-[11px] mt-1">Relatorios e textos</span>
+              <span className="block text-[11px] mt-1">Relatórios e textos</span>
             </button>
             <button
               onClick={() => openSubscreen('generated-documents', { studentId: student.id, kind: 'images' })}
               className="rounded-app-sm border border-border bg-cream px-3 py-3 text-left text-muted"
             >
               <span className="block text-[13px] font-bold">Imagens</span>
-              <span className="block text-[11px] mt-1">Portfolios visuais</span>
+              <span className="block text-[11px] mt-1">Portfólios visuais</span>
             </button>
           </div>
         </div>
@@ -189,11 +209,11 @@ export default function StudentProfileSubscreen() {
           className="w-full py-[13px] rounded-app-sm bg-white text-gm font-bold text-[14px] border border-gp flex items-center justify-center gap-2 mb-5 cursor-pointer"
         >
           <MoveRight size={16} strokeWidth={2} />
-          Transferir ou mover crianca
+          Transferir ou mover criança
         </button>
 
         <div className="flex items-center justify-between mb-[10px]">
-          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Timeline de evolucao</p>
+          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Timeline de evolução</p>
           <button
             onClick={() => openSubscreen('new-timeline-event')}
             className="flex items-center gap-1 text-[12px] font-bold text-gm"
@@ -274,3 +294,4 @@ function normalizeText(value: string) {
     .toLowerCase()
     .trim()
 }
+

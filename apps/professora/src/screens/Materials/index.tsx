@@ -1,18 +1,19 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
+import { Search } from 'lucide-react'
 
 const CATEGORIES = [
-  { label: 'Plano de Aula', emoji: '📋', count: 6, bg: '#FFF3CD', isNew: true },
-  { label: 'Lista de Chamada', emoji: '📋', count: 4, bg: '#D0E8FF' },
-  { label: 'Relatorios', emoji: '📄', count: 8, bg: '#D8F3DC', isNew: true },
-  { label: 'Portfolio', emoji: '🗂️', count: 5, bg: '#FFE5D9' },
-  { label: 'Atividades', emoji: '✏️', count: 12, bg: '#E3D5F5' },
-  { label: 'Avaliacao', emoji: '📊', count: 7, bg: '#F0E6FF' },
-  { label: 'Comunicados', emoji: '📢', count: 5, bg: '#FFE8CC' },
-  { label: 'Aluno Atipico', emoji: '🩺', count: 6, bg: '#FFD6D6', isNew: true },
-  { label: 'Musicalizacao', emoji: '🎵', count: 8, bg: '#E0F2FE' },
-  { label: 'Artes Visuais', emoji: '🎨', count: 10, bg: '#FEF3C7' },
-  { label: 'Reuniao de Pais', emoji: '🤝', count: 3, bg: '#D8F3DC' },
-  { label: 'Imagens e Recursos', emoji: '🖼️', count: 7, bg: '#D0E8FF' },
+  { label: 'Plano de Aula', emoji: 'ðŸ“‹', count: 6, bg: '#FFF3CD', isNew: true },
+  { label: 'Lista de Chamada', emoji: 'ðŸ“‹', count: 4, bg: '#D0E8FF' },
+  { label: 'Relatórios', emoji: 'ðŸ“„', count: 8, bg: '#D8F3DC', isNew: true },
+  { label: 'Portfólio', emoji: '🗂️', count: 5, bg: '#FFE5D9' },
+  { label: 'Atividades', emoji: 'âœï¸', count: 12, bg: '#E3D5F5' },
+  { label: 'Avaliação', emoji: 'ðŸ“Š', count: 7, bg: '#F0E6FF' },
+  { label: 'Comunicados', emoji: 'ðŸ“¢', count: 5, bg: '#FFE8CC' },
+  { label: 'Aluno Atipico', emoji: 'ðŸ©º', count: 6, bg: '#FFD6D6', isNew: true },
+  { label: 'Musicalizacao', emoji: 'ðŸŽµ', count: 8, bg: '#E0F2FE' },
+  { label: 'Artes Visuais', emoji: 'ðŸŽ¨', count: 10, bg: '#FEF3C7' },
+  { label: 'Reuniao de Pais', emoji: 'ðŸ¤', count: 3, bg: '#D8F3DC' },
+  { label: 'Imagens e Recursos', emoji: 'ðŸ–¼ï¸', count: 7, bg: '#D0E8FF' },
 ]
 
 export default function MaterialsScreen() {
@@ -30,13 +31,16 @@ export default function MaterialsScreen() {
       </div>
 
       <div className="scroll-area px-[18px]">
-        <div className="bg-white rounded-app-sm border border-border px-3 py-2 mt-[14px] mb-[12px]">
-          <input
-            className="w-full bg-transparent outline-none text-[13px] text-ink"
-            placeholder="Buscar material..."
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
+        <div className="bg-white rounded-app p-3 border border-border shadow-card mt-[14px] mb-[12px]">
+          <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
+            <Search size={16} className="text-muted flex-shrink-0" />
+            <input
+              className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
+              placeholder="Buscar material..."
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
         </div>
 
         <div className="flex flex-col gap-[11px]">
@@ -60,7 +64,7 @@ export default function MaterialsScreen() {
                 <p className="text-[14px] font-bold text-ink leading-tight">{cat.label}</p>
                 <span className="text-[11px] text-muted">{cat.count} modelos</span>
               </div>
-              <span className="text-muted text-[18px] flex-shrink-0">›</span>
+              <span className="text-muted text-[18px] flex-shrink-0">â€º</span>
             </button>
           ))}
         </div>
@@ -72,3 +76,4 @@ export default function MaterialsScreen() {
     </div>
   )
 }
+

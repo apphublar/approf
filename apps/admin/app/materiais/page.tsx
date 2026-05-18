@@ -1,4 +1,4 @@
-import { Download, FileUp, FolderPlus, UploadCloud } from 'lucide-react'
+﻿import { Download, FileUp, FolderPlus, UploadCloud } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { materialCategories, materials } from '../lib/mock-admin-data'
@@ -42,12 +42,12 @@ export default function MaterialsPage() {
 
           <div className="form-grid">
             <label>
-              Titulo
-              <input placeholder="Ex: Modelo de relatorio semestral" />
+              Título
+              <input placeholder="Ex.: Modelo de relatório semestral" />
             </label>
             <label>
               Categoria
-              <select defaultValue="Modelos de Relatorio">
+              <select defaultValue="Modelos de Relatório">
                 {materialCategories.map((category) => (
                   <option key={category.name}>{category.name}</option>
                 ))}
@@ -62,8 +62,8 @@ export default function MaterialsPage() {
               </select>
             </label>
             <label>
-              Descricao
-              <textarea placeholder="Resumo para a professora entender quando usar este material." />
+              Descrição
+              <textarea placeholder="Resumo para orientar a professora sobre quando usar este material." />
             </label>
           </div>
         </article>
@@ -72,7 +72,7 @@ export default function MaterialsPage() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">Categorias</p>
-              <h2>Organizacao</h2>
+              <h2>Organização</h2>
             </div>
           </div>
           <div className="stack-list">
@@ -125,3 +125,5 @@ export default function MaterialsPage() {
     </>
   )
 }
+
+

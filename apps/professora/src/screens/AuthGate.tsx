@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Check, Loader2 } from 'lucide-react'
 import { requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
@@ -46,7 +46,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     loadTeacherWorkspace()
       .then((workspace) => hydrateWorkspace(workspace))
       .catch((error) => {
-        console.error('Nao foi possivel carregar dados do Supabase.', error)
+        console.error('Não foi possível carregar dados do Supabase.', error)
       })
       .finally(() => setLoadingWorkspace(false))
   }, [hydrateWorkspace, session])
@@ -149,7 +149,7 @@ function AuthScreen({
         setMode('signin')
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nao foi possivel autenticar agora.')
+      setMessage(error instanceof Error ? error.message : 'Não foi possível autenticar agora.')
     } finally {
       setSubmitting(false)
     }
@@ -163,31 +163,19 @@ function AuthScreen({
           {getAuthTitle(mode)}
         </h1>
         <p className="text-white/60 text-sm mt-3 leading-relaxed">
-          Acesso seguro para professoras da educacao infantil.
+          Acesso seguro para professoras da educação infantil.
         </p>
       </div>
 
       <div className="px-5 pb-8 overflow-y-auto">
         <div className="bg-white rounded-app p-5 shadow-xl">
-          {mode !== 'reset' && (
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <button
-                onClick={() => setMode('signin')}
-                className={`py-2 rounded-app-sm text-sm font-bold border ${
-                  mode === 'signin' ? 'bg-gbg border-gp text-gm' : 'bg-white border-border text-muted'
-                }`}
-              >
-                Entrar
-              </button>
-              <button
-                onClick={() => setMode('signup')}
-                className={`py-2 rounded-app-sm text-sm font-bold border ${
-                  mode === 'signup' ? 'bg-gbg border-gp text-gm' : 'bg-white border-border text-muted'
-                }`}
-              >
-                Cadastrar
-              </button>
-            </div>
+          {mode === 'signup' && (
+            <button
+              onClick={() => setMode('signin')}
+              className="mb-4 w-full py-2 rounded-app-sm text-sm font-bold border bg-white border-border text-muted"
+            >
+              Já tenho conta
+            </button>
           )}
 
           {mode === 'signup' && (
@@ -206,7 +194,7 @@ function AuthScreen({
               <input
                 className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white text-sm text-ink outline-none focus:border-gl"
                 type="email"
-                placeholder="voce@email.com"
+                placeholder="você@email.com"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
@@ -239,7 +227,7 @@ function AuthScreen({
 
           {mode === 'forgot' && (
             <p className="text-xs text-muted leading-relaxed mb-4">
-              Enviaremos um link seguro para voce criar uma nova senha.
+              Enviaremos um link seguro para você criar uma nova senha.
             </p>
           )}
 
@@ -258,13 +246,26 @@ function AuthScreen({
             {getSubmitLabel(mode)}
           </button>
 
-          <div className="mt-4 flex items-center justify-center gap-3 text-xs font-bold text-gm">
+          <div className="mt-4 flex flex-col items-center justify-center gap-2 text-xs font-bold text-gm">
             {mode === 'signin' && (
               <button onClick={() => setMode('forgot')} className="underline">
                 Esqueci minha senha
               </button>
             )}
+            {mode === 'signin' && (
+              <button
+                onClick={() => setMode('signup')}
+                className="w-full py-3 rounded-app-sm border border-gp bg-white text-gm text-sm font-bold"
+              >
+                Criar conta
+              </button>
+            )}
             {(mode === 'forgot' || mode === 'reset') && (
+              <button onClick={() => setMode('signin')} className="underline">
+                Voltar para entrar
+              </button>
+            )}
+            {mode === 'signup' && (
               <button onClick={() => setMode('signin')} className="underline">
                 Voltar para entrar
               </button>
@@ -304,3 +305,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   )
 }
+

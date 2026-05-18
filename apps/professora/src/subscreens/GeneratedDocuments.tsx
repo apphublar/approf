@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, FileText, Image as ImageIcon, Search } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { listReports } from '@/services/reports'
@@ -42,7 +42,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
         }
       })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : 'Nao foi possivel carregar documentos.')
+        if (active) setError(err instanceof Error ? err.message : 'Não foi possível carregar documentos.')
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -107,7 +107,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                   : 'bg-white text-muted border-border'
               }`}
             >
-              {option === 'month' ? 'Este mes' : 'Todos'}
+              {option === 'month' ? 'Este mês' : 'Todos'}
             </button>
           ))}
         </div>
@@ -156,8 +156,8 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
             </p>
             <p className="text-[12px] text-muted mt-1 leading-[1.5]">
               {archiveFilter === 'archived'
-                ? 'Quando voce arquivar documentos ou imagens, eles aparecem aqui para consulta e recuperacao.'
-                : 'Quando voce gerar com IA, o item salvo aparece aqui.'}
+                ? 'Quando você arquivar documentos ou imagens, eles aparecem aqui para consulta e recuperação.'
+                : 'Quando você gerar com IA, o item salvo aparece aqui.'}
             </p>
           </div>
         ) : (
@@ -181,12 +181,12 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                     )}
                   </div>
                   <p className="text-[11px] text-muted mt-1">
-                    {findStudentName(doc.student_id, classes) ?? 'Sem crianca'} - {formatDate(doc.created_at)}
+                    {findStudentName(doc.student_id, classes) ?? 'Sem criança'} - {formatDate(doc.created_at)}
                   </p>
                   {isImageReport(doc) && doc.ai_artifacts?.imageDataUrl && (
                     <img
                       src={doc.ai_artifacts.imageDataUrl}
-                      alt="Imagem de portfolio gerada"
+                      alt="Imagem de portfólio gerada"
                       className="w-full max-h-[120px] object-cover rounded-app-sm border border-border mt-3"
                     />
                   )}
@@ -221,12 +221,12 @@ function findClassName(classId: string | null, classes: ReturnType<typeof useApp
 
 function formatReportType(type: string) {
   const labels: Record<string, string> = {
-    development_report: 'Relatorio de desenvolvimento',
+    development_report: 'Relatório de desenvolvimento',
     planning: 'Planejamento',
-    portfolio_text: 'Portfolio pedagogico',
-    portfolio_image: 'Imagem de portfolio',
+    portfolio_text: 'Portfólio pedagógico',
+    portfolio_image: 'Imagem de portfólio',
     specialist_report: 'Encaminhamento',
-    general_report: 'Relatorio pedagogico',
+    general_report: 'Relatório pedagógico',
   }
   return labels[type] ?? 'Documento'
 }
@@ -265,7 +265,7 @@ function getTitle(filters: GeneratedDocumentsData) {
   if (filters.kind === 'images') return 'Imagens'
   if (filters.kind === 'documents') return 'Documentos'
   if (filters.reportType === 'portfolio_image' || filters.reportType === 'portfolio_text') return 'Portfolios'
-  if (filters.reportType === 'development_report') return 'Relatorios'
+  if (filters.reportType === 'development_report') return 'Relatórios'
   if (filters.reportType === 'planning') return 'Planejamentos'
   return 'Gerados'
 }
@@ -274,13 +274,13 @@ function getSubtitle(filters: GeneratedDocumentsData, classes: ReturnType<typeof
   const studentName = filters.studentId ? findStudentName(filters.studentId, classes) : null
   if (studentName) {
     return {
-      heading: `Historico de ${studentName}`,
-      body: 'Tudo que foi gerado por IA para esta crianca fica aqui, separado entre este mes e o historico geral.',
+      heading: `Histórico de ${studentName}`,
+      body: 'Tudo que foi gerado por IA para esta criança fica aqui, separado entre este mês e o histórico geral.',
     }
   }
   return {
-    heading: filters.kind === 'images' ? 'Historico de imagens geradas' : filters.kind === 'documents' ? 'Historico de documentos gerados' : 'Historico gerado com IA',
-    body: 'Documentos, planejamentos, relatorios e imagens salvos ficam aqui para visualizar, editar, arquivar, recuperar ou marcar versao final.',
+    heading: filters.kind === 'images' ? 'Histórico de imagens geradas' : filters.kind === 'documents' ? 'Histórico de documentos gerados' : 'Histórico gerado com IA',
+    body: 'Documentos, planejamentos, relatórios e imagens salvos ficam aqui para visualizar, editar, arquivar, recuperar ou marcar versão final.',
   }
 }
 
@@ -324,3 +324,5 @@ function normalizeText(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
 }
+
+

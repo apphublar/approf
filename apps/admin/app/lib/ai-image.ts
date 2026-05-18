@@ -35,10 +35,11 @@ const DEFAULT_OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD = 30
 export async function generatePortfolioImage(
   input: GeneratePortfolioImageInput,
 ): Promise<GeneratePortfolioImageResult> {
+  const summary = input.requestSummary ?? {}
   const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_IMAGE_MODEL
-  const size = process.env.OPENAI_IMAGE_SIZE?.trim() || DEFAULT_OPENAI_IMAGE_SIZE
+  const size = resolvePortfolioImageSize(summary)
   const quality = process.env.OPENAI_IMAGE_QUALITY?.trim() || DEFAULT_OPENAI_IMAGE_QUALITY
-  const prompt = buildPortfolioImagePrompt(input.requestSummary ?? {})
+  const prompt = buildPortfolioImagePrompt(summary, size)
 
   const generated = await requestOpenAiImage({
     model,
@@ -141,7 +142,7 @@ async function requestOpenAiImage(input: {
   }
 }
 
-function buildPortfolioImagePrompt(summary: Record<string, unknown>) {
+function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: string) {
   const studentName = asString(summary.studentName) ?? 'crianca'
   const className = asString(summary.className) ?? 'turma'
   const selectedAnnotations = asObjectArray(summary.selectedAnnotations)
@@ -161,10 +162,11 @@ function buildPortfolioImagePrompt(summary: Record<string, unknown>) {
     ? attachments.map((item) => `- ${asString(item.name) ?? 'arquivo anexado'}`).join('\n')
     : 'Sem anexos visuais autorizados.'
 
-  return `Crie uma imagem vertical unica de portfolio pedagogico de desenvolvimento para educacao infantil com qualidade profissional premium, semelhante a um material editorial/Canva profissional para escola.
+  const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
+  return `Crie uma imagem unica de portfolio pedagogico de desenvolvimento para educacao infantil com qualidade profissional premium, semelhante a um material editorial/Canva profissional para escola.
 
 Direcao visual obrigatoria:
-- imagem vertical 1024x1536, em alta qualidade, com acabamento profissional, limpo e pronto para compartilhar;
+- imagem no formato ${formatLabel}, tamanho ${size}, em alta qualidade, com acabamento profissional, limpo e pronto para compartilhar;
 - estilo pedagogico brasileiro, acolhedor, infantil, sofisticado e colorido em tons pastel;
 - layout de pagina unica, bem diagramado, com margens generosas, cards arredondados, icones consistentes e hierarquia visual clara;
 - usar composicao tipo portfolio escolar premium: titulo, identificacao, campos de experiencia BNCC, avancos, proximos passos e pequenos registros visuais;
@@ -193,6 +195,15 @@ Importante:
 - Priorize qualidade visual e leitura. A imagem deve parecer feita por designer profissional para Educacao Infantil.
 - Todo texto visivel deve estar em portugues brasileiro, com grafia correta.
 - A imagem deve seguir a BNCC da Educacao Infantil (0 a 5 anos) sem parecer laudo clinico.`
+}
+
+function resolvePortfolioImageSize(summary: Record<string, unknown>) {
+  const fromSummary = asString(summary.portfolioImageFormat)?.trim().toLowerCase()
+  if (fromSummary === 'landscape') return '1536x1024'
+  if (fromSummary === 'square') return '1024x1024'
+  if (fromSummary === 'portrait') return '1024x1536'
+  const fromEnv = process.env.OPENAI_IMAGE_SIZE?.trim()
+  return fromEnv || DEFAULT_OPENAI_IMAGE_SIZE
 }
 
 function buildPersistedImageBody(input: {

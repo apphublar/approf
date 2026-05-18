@@ -1,4 +1,4 @@
-import { PageHeader } from '../components/PageHeader'
+﻿import { PageHeader } from '../components/PageHeader'
 import { auditLogs } from '../lib/mock-admin-data'
 
 export default function AuditPage() {
@@ -6,15 +6,15 @@ export default function AuditPage() {
     <>
       <PageHeader
         eyebrow="Auditoria"
-        title="Registro de acoes administrativas"
-        description="Toda liberacao, bloqueio, publicacao e acesso sensivel deve gerar trilha de auditoria."
+        title="Registro de ações administrativas"
+        description="Toda liberação, bloqueio, publicação e acesso sensível deve gerar trilha de auditoria."
       />
 
       <article className="panel">
         <div className="table">
           <div className="table-row table-head audit-grid">
             <span>Ator</span>
-            <span>Acao</span>
+            <span>Ação</span>
             <span>Alvo</span>
             <span>Data</span>
           </div>
@@ -31,3 +31,4 @@ export default function AuditPage() {
     </>
   )
 }
+

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { ChevronLeft, Search, ShieldCheck } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import type { ChildSearchPreview } from '@/types'
@@ -60,14 +60,14 @@ export default function FindChildSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1">
-          <span className="font-serif text-[18px] text-gd block">Buscar crianca existente</span>
-          <span className="text-[11px] text-muted">Continuidade pedagogica com previa segura.</span>
+          <span className="font-serif text-[18px] text-gd block">Buscar criança existente</span>
+          <span className="text-[11px] text-muted">Continuidade pedagógica com prévia segura.</span>
         </div>
       </div>
 
       <div className="scroll-area px-[18px] py-[16px]">
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-          <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Codigo da crianca</label>
+          <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Código da criança</label>
           <input
             className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
             placeholder="Ex: CRI-LUC-4F8K"
@@ -77,10 +77,10 @@ export default function FindChildSubscreen() {
         </div>
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-3">Sem codigo</p>
+          <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-3">Sem código</p>
           <input
             className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mb-3 text-[14px] outline-none"
-            placeholder="Nome da crianca"
+            placeholder="Nome da criança"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -96,20 +96,20 @@ export default function FindChildSubscreen() {
           <div className="flex items-start gap-3">
             <ShieldCheck size={18} className="text-gm mt-[2px] flex-shrink-0" />
             <p className="text-[12px] text-soft leading-[1.6]">
-              A previa nao exibe fotos, documentos ou relatorios completos. Ela serve apenas para reconhecer se e a mesma crianca.
+              A prévia não exibe fotos, documentos ou relatórios completos. Ela serve apenas para reconhecer se é a mesma criança.
             </p>
           </div>
         </div>
 
         <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-[10px]">
-          Possiveis correspondencias
+          Possíveis correspondências
         </p>
 
         {results.length === 0 ? (
           <div className="bg-white rounded-app p-5 border border-border text-center">
             <Search size={22} className="text-muted mx-auto mb-2" />
-            <p className="text-[13px] font-bold text-ink">Nenhuma previa localizada</p>
-            <p className="text-[12px] text-muted mt-1">Informe o codigo ou nome com data de nascimento.</p>
+            <p className="text-[13px] font-bold text-ink">Nenhuma prévia localizada</p>
+            <p className="text-[12px] text-muted mt-1">Informe o código ou nome com data de nascimento.</p>
           </div>
         ) : (
           results.map((child) => (
@@ -131,7 +131,7 @@ export default function FindChildSubscreen() {
                 onClick={() => setRequestedId(child.id)}
                 className="w-full mt-3 py-[11px] rounded-app-sm bg-gm text-white text-sm font-bold"
               >
-                {requestedId === child.id ? 'Solicitacao registrada' : 'Solicitar vinculo'}
+                {requestedId === child.id ? 'Solicitação registrada' : 'Solicitar vínculo'}
               </button>
             </article>
           ))
@@ -142,7 +142,8 @@ export default function FindChildSubscreen() {
 }
 
 function formatDate(value: string) {
-  if (!value) return 'Nascimento nao informado'
+  if (!value) return 'Nascimento não informado'
   const [year, month, day] = value.split('-')
   return `${day}/${month}/${year}`
 }
+

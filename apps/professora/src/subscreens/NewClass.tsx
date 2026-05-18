@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
@@ -6,7 +6,7 @@ import { createSupabaseClass } from '@/services/supabase/classes'
 import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 import type { ClassData } from '@/types'
 
-const SHIFTS = ['Manha', 'Tarde', 'Integral']
+const SHIFTS = ['Manhã', 'Tarde', 'Integral']
 
 export default function NewClassSubscreen() {
   const { closeSubscreen } = useNavStore()
@@ -47,7 +47,7 @@ export default function NewClassSubscreen() {
       setActiveClass(newClass.id)
       closeSubscreen()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel salvar a turma.')
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar a turma.')
     } finally {
       setSaving(false)
     }
@@ -61,7 +61,7 @@ export default function NewClassSubscreen() {
         </button>
         <div className="flex-1">
           <span className="font-serif text-[18px] text-gd block">Nova turma</span>
-          <span className="text-[11px] text-muted">Organize uma sala antes de adicionar as criancas.</span>
+          <span className="text-[11px] text-muted">Organize uma sala antes de adicionar as crianças.</span>
         </div>
       </div>
 
@@ -82,7 +82,7 @@ export default function NewClassSubscreen() {
           onChange={(event) => setSchool(event.target.value)}
         />
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Periodo</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Período</label>
         <div className="grid grid-cols-3 gap-2 mt-2 mb-4">
           {SHIFTS.map((item) => (
             <button
@@ -97,10 +97,10 @@ export default function NewClassSubscreen() {
           ))}
         </div>
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Faixa etaria</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Faixa etária</label>
         <AgeRangeSelector value={ageGroup} onChange={setAgeGroup} />
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Observacoes gerais</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Observações gerais</label>
         <textarea
           className="w-full min-h-[104px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
           placeholder="Rotina, combinados, necessidades da turma..."
@@ -122,3 +122,4 @@ export default function NewClassSubscreen() {
     </div>
   )
 }
+

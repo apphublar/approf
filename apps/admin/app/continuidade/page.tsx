@@ -1,4 +1,4 @@
-import { MoveRight, ShieldAlert, ShieldCheck } from 'lucide-react'
+﻿import { MoveRight, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { ContinuityRequestsPanel } from './ContinuityRequestsPanel'
@@ -13,13 +13,13 @@ export default function ContinuityPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Continuidade pedagogica"
-        title="Vinculos e transferencias de criancas"
-        description="Aprove casos sem codigo, acompanhe transferencias entre professoras e preserve a memoria pedagogica sem expor dados sensiveis."
+        eyebrow="Continuidade pedagógica"
+        title="Vínculos e transferências de crianças"
+        description="Aprove casos sem código, acompanhe transferências entre professoras e preserve a memória pedagógica sem expor dados sensíveis."
         action={
           <span className="status-pill">
             <ShieldCheck size={16} />
-            Previa segura obrigatoria
+            Prévia segura obrigatória
           </span>
         }
       />
@@ -42,16 +42,16 @@ export default function ContinuityPage() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">Regras</p>
-              <h2>Protecao</h2>
+              <h2>Proteção</h2>
             </div>
             <ShieldCheck size={22} />
           </div>
 
           <ul className="privacy-list">
-            <li><ShieldCheck size={16} /> Previa sem fotos, anexos, relatorios completos ou observacoes sensiveis.</li>
-            <li><ShieldCheck size={16} /> Acesso completo apenas apos vinculo aprovado.</li>
-            <li><ShieldCheck size={16} /> Toda busca, aprovacao e transferencia deve gerar auditoria.</li>
-            <li><ShieldCheck size={16} /> Timeline acompanha a identidade continua da crianca.</li>
+            <li><ShieldCheck size={16} /> Prévia sem fotos, anexos, relatórios completos ou observações sensíveis.</li>
+            <li><ShieldCheck size={16} /> Acesso completo apenas após vínculo aprovado.</li>
+            <li><ShieldCheck size={16} /> Toda busca, aprovação e transferência deve gerar auditoria.</li>
+            <li><ShieldCheck size={16} /> Timeline acompanha a identidade contínua da criança.</li>
           </ul>
         </article>
       </section>
@@ -59,18 +59,18 @@ export default function ContinuityPage() {
       <article className="panel spaced-panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Transferencias</p>
+            <p className="eyebrow">Transferências</p>
             <h2>Entre professoras ou turmas</h2>
           </div>
           <span className="status-pill">
             <MoveRight size={16} />
-            Aceite ou aprovacao
+            Aceite ou aprovação
           </span>
         </div>
 
         <div className="table">
           <div className="table-row table-head continuity-grid">
-            <span>Crianca</span>
+            <span>Criança</span>
             <span>Origem</span>
             <span>Destino</span>
             <span>Status</span>
@@ -101,7 +101,7 @@ export default function ContinuityPage() {
         <div className="table">
           <div className="table-row table-head audit-grid">
             <span>Ator</span>
-            <span>Acao</span>
+            <span>Ação</span>
             <span>Alvo</span>
             <span>Data</span>
           </div>
@@ -118,3 +118,4 @@ export default function ContinuityPage() {
     </>
   )
 }
+

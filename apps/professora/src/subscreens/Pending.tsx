@@ -1,4 +1,4 @@
-import { ChevronLeft, FileQuestion, NotebookPen, Sparkles } from 'lucide-react'
+﻿import { ChevronLeft, FileQuestion, NotebookPen, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 
 export default function PendingSubscreen() {
@@ -17,14 +17,14 @@ export default function PendingSubscreen() {
         <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">Pendencias</span>
+        <span className="font-serif text-[18px] text-gd flex-1">Pendências</span>
       </div>
 
       <div className="scroll-area px-[18px] py-5">
         <div className="bg-gbg border border-gp rounded-app p-4 mb-4">
-          <p className="text-[13px] font-bold text-gd mb-2">Sugestoes para revisar</p>
+          <p className="text-[13px] font-bold text-gd mb-2">Sugestões para revisar</p>
           <p className="text-[12px] text-muted leading-[1.6]">
-            Aqui ficam pontos que merecem um olhar rapido antes de gerar relatorios, planejamentos ou portfolios.
+            Aqui ficam pontos que merecem um olhar rápido antes de gerar relatórios, planejamentos ou portfólios.
           </p>
         </div>
 
@@ -33,7 +33,7 @@ export default function PendingSubscreen() {
             <Sparkles size={25} className="text-gm mx-auto mb-2" />
             <p className="text-[13px] font-bold text-ink">Tudo em dia</p>
             <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-              Nao encontramos anotacoes sem destino nem criancas sem registro recente.
+              Não encontramos anotações sem destino nem crianças sem registro recente.
             </p>
           </div>
         )}
@@ -41,7 +41,7 @@ export default function PendingSubscreen() {
         {undirectedNotes.length > 0 && (
           <section className="mb-4">
             <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-[10px]">
-              Anotacoes sem destino
+              Anotações sem destino
             </p>
             <button
               onClick={() => setTab('annotations')}
@@ -53,7 +53,7 @@ export default function PendingSubscreen() {
               <div className="flex-1">
                 <p className="text-[13px] font-bold text-ink">{undirectedNotes.length} para classificar</p>
                 <p className="text-[12px] text-muted leading-[1.5]">
-                  Revise anotacoes livres para vincular a uma crianca, turma ou uso pedagogico.
+                  Revise anotações livres para vincular a uma criança, turma ou uso pedagógico.
                 </p>
               </div>
             </button>
@@ -82,7 +82,7 @@ export default function PendingSubscreen() {
                   <div className="flex-1">
                     <p className="text-[13px] font-bold text-ink">{item.studentName}</p>
                     <p className="text-[12px] text-muted leading-[1.5]">
-                      {item.lastLabel}. Toque para registrar uma observacao.
+                      {item.lastLabel}. Toque para registrar uma observação.
                     </p>
                   </div>
                 </button>
@@ -116,8 +116,9 @@ function getStudentsWithoutRecentNote(
         studentId: student.id,
         studentName: student.name,
         last,
-        lastLabel: days === null ? 'Sem anotacoes ainda' : `${days} dias sem nova anotacao`,
+        lastLabel: days === null ? 'Sem anotações ainda' : `${days} dias sem nova anotação`,
       }
     }),
   ).filter((item) => !item.last || now - item.last > sevenDaysMs)
 }
+

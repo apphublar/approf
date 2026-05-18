@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import type { Tab } from '@/types'
 import { useNavStore, useAppStore } from '@/store'
 
@@ -91,7 +91,7 @@ export default function BottomNav() {
         <button
           onClick={() => openSubscreen('new-annotation')}
           className="w-[52px] h-[52px] rounded-full bg-gm text-white border-none shadow-fab flex items-center justify-center -mt-5"
-          aria-label="Nova anotacao"
+          aria-label="Nova anotação"
         >
           <svg viewBox="0 0 24 24" className="w-6 h-6" stroke="currentColor" fill="none" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
@@ -129,3 +129,4 @@ export default function BottomNav() {
     </nav>
   )
 }
+

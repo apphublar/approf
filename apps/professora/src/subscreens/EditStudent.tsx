@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ImagePlus } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
@@ -6,7 +6,7 @@ import { updateSupabaseStudent } from '@/services/supabase/students'
 import { birthDateInputToIso, formatBirthDateInput, isoToBirthDateInput } from '@/utils/date'
 import { getAdjustedPhotoStyle, parsePhotoAdjustment, serializePhotoAdjustment } from '@/utils/photo'
 
-const TAGS = ['Sem tag', 'TEA', 'TDAH', 'Acompanhamento', 'Adaptacao']
+const TAGS = ['Sem tag', 'TEA', 'TDAH', 'Acompanhamento', 'Adaptação']
 
 function calculateAgeParts(birthDate: string) {
   if (!birthDate) return { years: 0, months: 0 }
@@ -109,7 +109,7 @@ export default function EditStudentSubscreen() {
       updateStudent(cls.id, student.id, updates)
       closeSubscreen()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel salvar as alteracoes.')
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar as alterações.')
     } finally {
       setSaving(false)
     }
@@ -122,8 +122,8 @@ export default function EditStudentSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1">
-          <span className="font-serif text-[18px] text-gd block">Editar crianca</span>
-          <span className="text-[11px] text-muted">{cls.name} - educacao infantil 0 a 5 anos</span>
+          <span className="font-serif text-[18px] text-gd block">Editar criança</span>
+          <span className="text-[11px] text-muted">{cls.name} - educação infantil de 0 a 5 anos</span>
         </div>
       </div>
 
@@ -162,7 +162,7 @@ export default function EditStudentSubscreen() {
             </div>
           )}
           <p className="text-[11px] text-muted mt-3">
-            A foto continua privada e aparece em formato redondo no perfil da crianca.
+            A foto continua privada e aparece em formato redondo no perfil da criança.
           </p>
         </div>
 
@@ -183,7 +183,7 @@ export default function EditStudentSubscreen() {
           onChange={(event) => setBirthDateInput(formatBirthDateInput(event.target.value))}
         />
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Marcador pedagogico</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Marcador pedagógico</label>
         <div className="flex gap-2 overflow-x-auto scrollbar-none mt-2 mb-4 pb-1">
           {TAGS.map((item) => (
             <button
@@ -198,7 +198,7 @@ export default function EditStudentSubscreen() {
           ))}
         </div>
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Observacoes gerais</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Observações gerais</label>
         <textarea
           className="w-full min-h-[124px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
           value={generalNotes}
@@ -213,7 +213,7 @@ export default function EditStudentSubscreen() {
           disabled={!canSave || saving}
           className="w-full bg-gm text-white rounded-app-sm py-[13px] text-[14px] font-bold disabled:opacity-40"
         >
-          {saving ? 'Salvando...' : 'Salvar alteracoes'}
+          {saving ? 'Salvando...' : 'Salvar alterações'}
         </button>
       </div>
     </div>
@@ -250,3 +250,4 @@ function PhotoPositionSlider({
     </label>
   )
 }
+

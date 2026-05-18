@@ -1,4 +1,4 @@
-import { useAppStore, useNavStore } from '@/store'
+﻿import { useAppStore, useNavStore } from '@/store'
 
 export default function ClassesScreen() {
   const { classes, setActiveClass } = useAppStore()
@@ -28,8 +28,8 @@ export default function ClassesScreen() {
           onClick={() => openSubscreen('find-child')}
           className="w-full bg-gd text-white rounded-app p-4 mt-[14px] mb-[14px] text-left shadow-card active:scale-[.98] transition-transform"
         >
-          <p className="text-[13px] font-bold">Buscar crianca existente</p>
-          <p className="text-[11px] opacity-80 mt-1">Use o codigo da crianca ou nome + nascimento para continuidade pedagogica.</p>
+          <p className="text-[13px] font-bold">Buscar criança existente</p>
+          <p className="text-[11px] opacity-80 mt-1">Use o código da criança ou nome + nascimento para continuidade pedagógica.</p>
         </button>
 
         <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mt-[14px] mb-[10px]">
@@ -46,7 +46,7 @@ export default function ClassesScreen() {
               className="w-12 h-12 rounded-[13px] flex items-center justify-center text-[22px] flex-shrink-0"
               style={{ background: cls.iconBg }}
             >
-              🏫
+              ðŸ«
             </div>
             <div className="flex-1 text-left">
               <h3 className="text-[15px] font-bold text-ink mb-[2px]">{cls.name}</h3>
@@ -55,7 +55,7 @@ export default function ClassesScreen() {
             <span className="bg-gbg text-gm text-xs font-bold px-[10px] py-1 rounded-full flex-shrink-0">
               {cls.students.length} alunos
             </span>
-            <span className="text-muted text-[19px] ml-1">›</span>
+            <span className="text-muted text-[19px] ml-1">â€º</span>
           </button>
         ))}
 
@@ -69,3 +69,4 @@ export default function ClassesScreen() {
     </div>
   )
 }
+

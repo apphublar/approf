@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
@@ -6,17 +6,10 @@ import { listReports, updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import type { Annotation } from '@/types'
 
-const DIRECTION_SUGGESTIONS = [
-  'Valorizar evolucoes recentes',
-  'Usar tom mais acolhedor',
-  'Trazer encaminhamentos para familia',
-  'Destacar adaptacao e rotina',
-]
-
 const AGE_GROUP_OPTIONS = [
   'Bebes (0 a 1 ano e 6 meses)',
-  'Criancas bem pequenas (1 ano e 7 meses a 3 anos e 11 meses)',
-  'Criancas pequenas (4 anos a 5 anos e 11 meses)',
+  'Crianças bem pequenas (1 ano e 7 meses a 3 anos e 11 meses)',
+  'Crianças pequenas (4 anos a 5 anos e 11 meses)',
 ]
 
 const BNCC_FIELD_OPTIONS = [
@@ -41,6 +34,7 @@ interface ReportAttachment {
 
 type ReportMode = 'annotations' | 'blank'
 type PortfolioOutput = 'text' | 'image'
+type PortfolioImageFormat = 'portrait' | 'landscape' | 'square'
 
 export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const { closeSubscreen, openSubscreen } = useNavStore()
@@ -50,13 +44,20 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     () => classes.flatMap((classData) => classData.students.map((student) => ({ ...student, classId: classData.id, className: classData.name }))),
     [classes],
   )
+  const defaultClassId = classes[0]?.id ?? ''
   const fallbackStudentId = activeStudentId ?? allStudents[0]?.id ?? ''
   const [selectedStudentId, setSelectedStudentId] = useState(fallbackStudentId)
+  const [selectedClassId, setSelectedClassId] = useState(defaultClassId)
+  const [historyScope, setHistoryScope] = useState<'model' | 'student'>('model')
+  const [diaryDate, setDiaryDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [diaryTheme, setDiaryTheme] = useState('')
+  const [diaryRawText, setDiaryRawText] = useState('')
   const selectedStudent = allStudents.find((student) => student.id === selectedStudentId) ?? allStudents[0]
+  const selectedClass = classes.find((cls) => cls.id === selectedClassId) ?? classes[0]
 
   const reportKind = typeof data === 'object' && data && 'reportKind' in data
     ? String((data as { reportKind?: string }).reportKind)
-    : 'Relatorio de desenvolvimento'
+    : 'Relatório de desenvolvimento'
   const assistantMode = typeof data === 'object' && data && 'assistantMode' in data
     ? String((data as { assistantMode?: string }).assistantMode)
     : ''
@@ -68,6 +69,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [extraContext, setExtraContext] = useState('')
   const [attachments, setAttachments] = useState<ReportAttachment[]>([])
   const [portfolioOutput, setPortfolioOutput] = useState<PortfolioOutput>('text')
+  const [portfolioImageFormat, setPortfolioImageFormat] = useState<PortfolioImageFormat>('portrait')
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
   const [savedContent, setSavedContent] = useState('')
@@ -93,25 +95,29 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     [annotations, selectedStudentId, selectedStudent?.name],
   )
   const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
-  const firstName = selectedStudent?.name.split(' ')[0] ?? 'A crianca'
-  const isPortfolio = reportKind === 'Portfolio pedagogico'
+  const firstName = selectedStudent?.name.split(' ')[0] ?? 'A criança'
+  const isPortfolio = reportKind === 'Portfólio pedagógico'
   const isPlanning = isPlanningKind(reportKind)
-  const isDevelopmentReport = reportKind === 'Relatorio de desenvolvimento'
-  const isParentsMeeting = reportKind === 'Registro de reuniao de pais'
+  const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento'
+  const isClassDiary = reportKind === 'Diário de bordo'
+  const isParentsMeeting = reportKind === 'Registro de reunião de pais'
   const supportsLivingReport = isDevelopmentReport || isParentsMeeting
   const needsBnccFields = isPlanning || isDevelopmentReport
+  const needsAgeGroup = isPlanning
   const needsObjective = isPlanning
   const needsEvaluationPeriod = isDevelopmentReport
   const currentReportType = getReportGenerationType(reportKind, portfolioOutput)
-  const hasContentBase = mode === 'blank'
+  const hasContentBase = isClassDiary
+    ? diaryRawText.trim().length >= 20
+    : mode === 'blank'
     ? blankContext.trim().length >= 20
     : Boolean(selectedStudent)
-  const hasRequiredBnccInput = !needsBnccFields || (ageGroup.trim().length > 0 && bnccFields.length > 0)
+  const hasRequiredBnccInput = !needsBnccFields || ((!needsAgeGroup || ageGroup.trim().length > 0) && bnccFields.length > 0)
   const hasRequiredObjective = !needsObjective || objective.trim().length >= 10
   const hasRequiredPeriod = !needsEvaluationPeriod || evaluationPeriod.trim().length >= 5
   const canGenerate = hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod
   const voiceAnnotations = useMemo(
-    () => studentAnnotations.filter((annotation) => (annotation.tags ?? []).some((tag) => normalize(tag).includes('transcricao'))),
+    () => studentAnnotations.filter((annotation) => (annotation.tags ?? []).some((tag) => normalize(tag).includes('transcrição'))),
     [studentAnnotations],
   )
 
@@ -132,6 +138,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setLivingReport(false)
     setLatestReportId('')
     setLatestReportBody('')
+    setHistoryScope('model')
+    setPortfolioImageFormat('portrait')
   }, [selectedStudentId, studentAnnotations])
 
   useEffect(() => {
@@ -164,14 +172,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setExtraContext((current) =>
       current.trim()
         ? current
-        : 'Organizar a reuniao em pauta, observacoes, combinados e encaminhamentos claros para familia e escola.',
+        : 'Organizar a reunião em pauta, observações, combinados e encaminhamentos claros para família e escola.',
     )
   }, [assistantMode])
 
   const mockReport = createReportPreview({
     reportKind,
-    studentName: selectedStudent?.name ?? '-',
-    className: selectedStudent?.className ?? '-',
+    studentName: isClassDiary ? '-' : (selectedStudent?.name ?? '-'),
+    className: isClassDiary ? (selectedClass?.name ?? '-') : (selectedStudent?.className ?? '-'),
     firstName,
     mode,
     selectedAnnotations,
@@ -180,18 +188,18 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     extraContext,
     attachments,
     portfolioOutput,
+    portfolioImageFormat,
+    diaryDate,
+    diaryTheme,
+    diaryRawText,
   })
 
   function handleBack() {
     if (generated && editingDocument && editableContent !== savedContent) {
-      const discard = window.confirm('Voce tem alteracoes nao salvas. Deseja sair sem salvar?')
+      const discard = window.confirm('Você tem alterações não salvas. Deseja sair sem salvar?')
       if (!discard) return
     }
     closeSubscreen()
-  }
-
-  function addDirection(text: string) {
-    setExtraContext((current) => current ? `${current}\n${text}.` : `${text}.`)
   }
 
   function toggleAnnotation(id: string) {
@@ -244,13 +252,18 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       const requestSummary = {
         reportKind,
         portfolioOutput,
+        portfolioImageFormat,
+        historyScope,
         mode,
-        studentName: selectedStudent?.name ?? null,
-        className: selectedStudent?.className ?? null,
+        studentName: isClassDiary ? null : (selectedStudent?.name ?? null),
+        className: isClassDiary ? (selectedClass?.name ?? null) : (selectedStudent?.className ?? null),
         ageGroup: ageGroup || null,
         bnccFields,
         objective: objective || null,
         evaluationPeriod: evaluationPeriod || null,
+        diaryDate: isClassDiary ? diaryDate : null,
+        diaryTheme: isClassDiary ? (diaryTheme || null) : null,
+        diaryRawText: isClassDiary ? diaryRawText : null,
         assistantMode: assistantMode || null,
         livingReport,
         voiceAnnotationsCount: voiceAnnotations.length,
@@ -273,15 +286,15 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       const result = generationType === 'portfolio_image'
         ? await generateAiPortfolioImage({
             generationType,
-            classId: selectedStudent?.classId ?? null,
-            studentId: selectedStudent?.id ?? null,
+            classId: isClassDiary ? (selectedClass?.id ?? null) : (selectedStudent?.classId ?? null),
+            studentId: isClassDiary ? null : (selectedStudent?.id ?? null),
             promptVersion: 'portfolio-image-v1',
             requestSummary,
           })
         : await generateAiTextDocument({
             generationType,
-            classId: selectedStudent?.classId ?? null,
-            studentId: selectedStudent?.id ?? null,
+            classId: isClassDiary ? (selectedClass?.id ?? null) : (selectedStudent?.classId ?? null),
+            studentId: isClassDiary ? null : (selectedStudent?.id ?? null),
             promptVersion: 'professora-report-v1',
             requestSummary,
           })
@@ -296,7 +309,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       const generatedBody = 'generatedText' in result && result.generatedText
         ? result.generatedText
         : 'prompt' in result && result.prompt
-          ? `Imagem de portfolio gerada com ChatGPT.\n\nPrompt usado:\n\n${result.prompt}`
+          ? `Imagem de portfólio gerada com ChatGPT.\n\nPrompt usado:\n\n${result.prompt}`
           : mockReport
       const nextImageUrl = 'imageDataUrl' in result && result.imageDataUrl ? result.imageDataUrl : ''
       let nextBody = generatedBody
@@ -325,13 +338,13 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       }, 900)
     } catch (error) {
       setGenerating(false)
-      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel gerar com IA.')
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar com IA.')
     }
   }
 
   async function saveDocument() {
     if (!reportId) {
-      setUsageError('Documento ainda nao foi salvo no backend.')
+      setUsageError('O documento ainda não foi salvo no backend.')
       return
     }
 
@@ -344,7 +357,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       setEditingDocument(false)
       setUsageMessage('Documento salvo com sucesso.')
     } catch (error) {
-      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel salvar o documento.')
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível salvar o documento.')
     } finally {
       setSavingDocument(false)
     }
@@ -361,7 +374,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       await updateReport(reportId, { archive: true })
       setUsageMessage('Documento arquivado.')
     } catch (error) {
-      setUsageError(error instanceof Error ? error.message : 'Nao foi possivel arquivar o documento.')
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível arquivar o documento.')
     } finally {
       setSavingDocument(false)
     }
@@ -386,27 +399,79 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 </div>
                 <div className="flex-1">
                   <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
-                  <p className="text-[12px] text-muted leading-snug">Escolha a crianca. Orientacoes extras e anexos sao opcionais.</p>
+                  <p className="text-[12px] text-muted leading-snug">
+                    {isClassDiary
+                      ? 'Preencha rapidamente os dados do dia da turma para gerar o diário.'
+                      : 'Escolha a criança. Orientações extras e anexos são opcionais.'}
+                  </p>
                 </div>
               </div>
 
-              <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                Crianca
-              </label>
-              <select
-                className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
-                value={selectedStudentId}
-                onChange={(event) => setSelectedStudentId(event.target.value)}
-              >
-                {allStudents.map((student) => (
-                  <option key={`${student.classId}-${student.id}`} value={student.id}>
-                    {student.name} - {student.className}
-                  </option>
-                ))}
-              </select>
+              {isClassDiary ? (
+                <>
+                  <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                    Turma
+                  </label>
+                  <select
+                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                    value={selectedClassId}
+                    onChange={(event) => setSelectedClassId(event.target.value)}
+                  >
+                    {classes.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                    Data
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                    value={diaryDate}
+                    onChange={(event) => setDiaryDate(event.target.value)}
+                  />
+                  <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                    Tema do dia (opcional)
+                  </label>
+                  <input
+                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                    placeholder="Ex: Coordenacao motora, musica, socializacao..."
+                    value={diaryTheme}
+                    onChange={(event) => setDiaryTheme(event.target.value)}
+                  />
+                  <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                    Relato da professora
+                  </label>
+                  <textarea
+                    className="w-full min-h-[150px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
+                    placeholder="Descreva como foi o dia da turma, as atividades realizadas, participacao das crianças e momentos importantes."
+                    value={diaryRawText}
+                    onChange={(event) => setDiaryRawText(event.target.value)}
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                    Criança
+                  </label>
+                  <select
+                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                    value={selectedStudentId}
+                    onChange={(event) => setSelectedStudentId(event.target.value)}
+                  >
+                    {allStudents.map((student) => (
+                      <option key={`${student.classId}-${student.id}`} value={student.id}>
+                        {student.name} - {student.className}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
             </div>
 
-            {(needsBnccFields || needsObjective || needsEvaluationPeriod) && (
+            {!isClassDiary && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Dados BNCC obrigatorios
@@ -414,24 +479,28 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
                 {needsBnccFields && (
                   <>
-                    <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                      Faixa etaria
-                    </label>
-                    <select
-                      className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
-                      value={ageGroup}
-                      onChange={(event) => setAgeGroup(event.target.value)}
-                    >
-                      <option value="">Selecionar faixa etaria</option>
-                      {AGE_GROUP_OPTIONS.map((item) => (
-                        <option key={item} value={item}>{item}</option>
-                      ))}
-                    </select>
+                    {needsAgeGroup && (
+                      <>
+                        <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                          Faixa etária
+                        </label>
+                        <select
+                          className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                          value={ageGroup}
+                          onChange={(event) => setAgeGroup(event.target.value)}
+                        >
+                          <option value="">Selecionar faixa etária</option>
+                          {AGE_GROUP_OPTIONS.map((item) => (
+                            <option key={item} value={item}>{item}</option>
+                          ))}
+                        </select>
+                      </>
+                    )}
 
                     <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4 mb-2">
                       Campos de experiencia BNCC
                     </label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-1 gap-2">
                       {BNCC_FIELD_OPTIONS.map((item) => {
                         const selected = bnccFields.includes(item)
                         return (
@@ -442,10 +511,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                                 ? current.filter((field) => field !== item)
                                 : [...current, item],
                             )}
-                            className={`px-3 py-2 rounded-full text-[11px] font-bold border ${
+                            className={`w-full rounded-app-sm border px-3 py-3 text-left text-[12px] font-bold ${
                               selected ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'
                             }`}
                           >
+                            {selected ? '[x] ' : '[ ] '}
                             {item}
                           </button>
                         )
@@ -471,7 +541,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 {needsEvaluationPeriod && (
                   <>
                     <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
-                      Periodo de avaliacao
+                      Período de avaliação
                     </label>
                     <input
                       className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none"
@@ -487,10 +557,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             {supportsLivingReport && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
-                  Relatorio vivo
+                  Relatório vivo
                 </p>
                 <p className="text-[12px] text-muted leading-[1.6] mb-3">
-                  Atualize continuamente o mesmo documento ao inves de criar sempre um novo.
+                  Atualize continuamente o mesmo documento ao invés de criar sempre um novo.
                 </p>
                 <button
                   onClick={() => setLivingReport((current) => !current)}
@@ -502,49 +572,78 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   } disabled:opacity-50`}
                 >
                   <span className="block text-[13px] font-bold">
-                    {livingReport ? 'Atualizando relatorio existente' : 'Criar novo documento'}
+                    {livingReport ? 'Atualizando relatório existente' : 'Criar novo documento'}
                   </span>
                   <span className="block text-[11px] mt-1">
                     {loadingLatest
-                      ? 'Buscando ultimo documento...'
+                      ? 'Buscando último documento...'
                       : latestReportId
-                        ? 'Ultimo documento encontrado para esta crianca.'
+                        ? 'Ãšltimo documento encontrado para esta criança.'
                         : 'Nenhum documento anterior encontrado para este tipo.'}
                   </span>
                 </button>
               </div>
             )}
 
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
-                Base do documento
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setMode('annotations')}
-                  className={`rounded-app-sm border px-3 py-3 text-left ${
-                    mode === 'annotations' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
-                  }`}
-                >
-                  <span className="block text-[13px] font-bold">Usar anotacoes</span>
-                  <span className="block text-[11px] mt-1">Selecionar registros do app</span>
-                </button>
-                <button
-                  onClick={() => setMode('blank')}
-                  className={`rounded-app-sm border px-3 py-3 text-left ${
-                    mode === 'blank' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
-                  }`}
-                >
-                  <span className="block text-[13px] font-bold">Comecar do zero</span>
-                  <span className="block text-[11px] mt-1">Descrever tudo manualmente</span>
-                </button>
+            {!isClassDiary && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
+                  Base do documento
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setMode('annotations')}
+                    className={`rounded-app-sm border px-3 py-3 text-left ${
+                      mode === 'annotations' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                    }`}
+                  >
+                    <span className="block text-[13px] font-bold">Usar anotações</span>
+                    <span className="block text-[11px] mt-1">Selecionar registros do app</span>
+                  </button>
+                  <button
+                    onClick={() => setMode('blank')}
+                    className={`rounded-app-sm border px-3 py-3 text-left ${
+                      mode === 'blank' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                    }`}
+                  >
+                    <span className="block text-[13px] font-bold">Começar do zero</span>
+                    <span className="block text-[11px] mt-1">Descrever tudo manualmente</span>
+                  </button>
+                </div>
+                {portfolioOutput === 'image' && (
+                  <div className="mt-3">
+                    <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
+                      Formato da imagem
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { id: 'portrait', label: 'Retrato', preview: '▮' },
+                        { id: 'landscape', label: 'Paisagem', preview: '▬' },
+                        { id: 'square', label: 'Quadrado', preview: '■' },
+                      ] as const).map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => setPortfolioImageFormat(item.id)}
+                          className={`rounded-app-sm border px-2 py-3 text-center ${
+                            portfolioImageFormat === item.id
+                              ? 'bg-gbg border-gp text-gd'
+                              : 'bg-cream border-border text-muted'
+                          }`}
+                        >
+                          <span className="block text-[18px] leading-none">{item.preview}</span>
+                          <span className="block text-[11px] font-bold mt-2">{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             {isPortfolio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
-                  Tipo de portifolio
+                  Tipo de portfólio
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -554,7 +653,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                     }`}
                   >
                     <span className="block text-[13px] font-bold">Texto com Claude</span>
-                    <span className="block text-[11px] mt-1">Narrativa pedagogica e evidencias</span>
+                    <span className="block text-[11px] mt-1">Narrativa pedagógica e evidências</span>
                   </button>
                   <button
                     onClick={() => setPortfolioOutput('image')}
@@ -569,34 +668,44 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
+            {!isClassDiary && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
-                Historico
+                Histórico
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => openSubscreen('generated-documents', { reportType: currentReportType })}
-                  className="rounded-app-sm border border-gp bg-gbg px-3 py-3 text-left text-gd"
+                  onClick={() => setHistoryScope('model')}
+                  className={`rounded-app-sm border px-3 py-3 text-left ${
+                    historyScope === 'model'
+                      ? 'border-gp bg-gbg text-gd'
+                      : 'border-border bg-cream text-muted'
+                  }`}
                 >
                   <span className="block text-[13px] font-bold">Este modelo</span>
-                  <span className="block text-[11px] mt-1">Mes e historico geral</span>
+                  <span className="block text-[11px] mt-1">Usar histórico geral do modelo</span>
                 </button>
                 <button
-                  onClick={() => openSubscreen('generated-documents', { reportType: currentReportType, studentId: selectedStudent?.id })}
+                  onClick={() => setHistoryScope('student')}
                   disabled={!selectedStudent?.id}
-                  className="rounded-app-sm border border-border bg-cream px-3 py-3 text-left text-muted disabled:opacity-50"
+                  className={`rounded-app-sm border px-3 py-3 text-left disabled:opacity-50 ${
+                    historyScope === 'student'
+                      ? 'border-gp bg-gbg text-gd'
+                      : 'border-border bg-cream text-muted'
+                  }`}
                 >
-                  <span className="block text-[13px] font-bold">Desta crianca</span>
-                  <span className="block text-[11px] mt-1">Tudo vinculado a ela</span>
+                  <span className="block text-[13px] font-bold">Desta criança</span>
+                  <span className="block text-[11px] mt-1">Usar apenas o contexto da criança selecionada</span>
                 </button>
               </div>
             </div>
+            )}
 
-            {mode === 'annotations' ? (
+            {!isClassDiary && (mode === 'annotations' ? (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
-                    <p className="text-[13px] font-bold text-ink">Anotacoes de {firstName}</p>
+                    <p className="text-[13px] font-bold text-ink">Anotações base de {firstName}</p>
                     <p className="text-[11px] text-muted">{selectedAnnotations.length} de {studentAnnotations.length} selecionadas</p>
                   </div>
                   <div className="flex gap-2">
@@ -624,7 +733,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                     </button>
                   )) : (
                     <p className="text-[12px] text-muted leading-[1.6]">
-                      Ainda nao ha anotacoes vinculadas a esta crianca. Voce pode comecar do zero ou incluir orientacoes abaixo.
+                      Ainda não há anotações vinculadas a esta criança. Você pode começar do zero ou incluir orientações abaixo.
                     </p>
                   )}
                 </div>
@@ -632,14 +741,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 {voiceAnnotations.length > 0 && (
                   <div className="mt-3 rounded-app-sm border border-gp bg-gbg p-3">
                     <p className="text-[11px] font-bold text-gd">
-                      {voiceAnnotations.length} anotacoes por voz detectadas
+                      {voiceAnnotations.length} anotações por voz detectadas
                     </p>
                     <div className="mt-2 flex gap-2">
                       <button
                         onClick={() => setSelectedAnnotationIds(voiceAnnotations.map((annotation) => annotation.id))}
                         className="px-3 py-2 rounded-full text-[11px] font-bold border border-gp bg-white text-gm"
                       >
-                        Selecionar so voz
+                        Selecionar só voz
                       </button>
                       <button
                         onClick={() => setExtraContext((current) => {
@@ -659,7 +768,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 </label>
                 <textarea
                   className="w-full min-h-[86px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                  placeholder="Ex: nao considerar a anotacao sobre choro da primeira semana, pois ja foi superado..."
+                  placeholder="Ex: não considerar a anotação sobre choro da primeira semana, pois ja foi superado..."
                   value={ignoredNotes}
                   onChange={(event) => setIgnoredNotes(event.target.value)}
                 />
@@ -667,38 +776,45 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             ) : (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                  Descricao completa para gerar do zero
+                  Descrição completa para gerar do zero
                 </label>
                 <textarea
                   className="w-full min-h-[180px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                  placeholder="Descreva a rotina, evolucoes, pontos de atencao, interacoes, autonomia, linguagem, familia, encaminhamentos e o tom desejado para o documento..."
+                  placeholder="Descreva a rotina, evoluções, pontos de atenção, interações, autonomia, linguagem, família, encaminhamentos e o tom desejado para o documento..."
                   value={blankContext}
                   onChange={(event) => setBlankContext(event.target.value)}
                 />
+              </div>
+            ))}
+
+            {isClassDiary && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
+                  Histórico do diário
+                </p>
+                <p className="text-[12px] text-muted leading-[1.6] mb-3">
+                  Consulte os diários anteriores da turma em timeline e busca por data.
+                </p>
+                <button
+                  onClick={() => openSubscreen('generated-documents', { reportType: currentReportType, classId: selectedClass?.id })}
+                  className="w-full rounded-app-sm border border-gp bg-gbg px-3 py-3 text-left text-gd"
+                >
+                  <span className="block text-[13px] font-bold">Ver histórico da turma</span>
+                  <span className="block text-[11px] mt-1">Registros coletivos já gerados</span>
+                </button>
               </div>
             )}
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                Orientacao para a IA
+                Orientação para a IA
               </label>
               <textarea
                 className="w-full min-h-[118px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                placeholder="Ex: destacar a adaptacao nas ultimas semanas, evitar linguagem muito tecnica, incluir encaminhamentos para a familia..."
+                placeholder="Ex.: destacar a adaptação nas últimas semanas, evitar linguagem muito técnica e incluir encaminhamentos para a família..."
                 value={extraContext}
                 onChange={(event) => setExtraContext(event.target.value)}
               />
-              <div className="flex gap-2 overflow-x-auto scrollbar-none mt-3 pb-1">
-                {DIRECTION_SUGGESTIONS.map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => addDirection(item)}
-                    className="px-3 py-2 rounded-full text-xs font-bold border border-border bg-white text-muted whitespace-nowrap"
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
@@ -709,7 +825,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 <div className="flex-1">
                   <p className="text-[13px] font-bold text-ink">Anexos complementares</p>
                   <p className="text-[11px] text-muted leading-[1.5] mt-1">
-                    Voce pode anexar mais de um arquivo, ou gerar sem anexar nada.
+                    Você pode anexar mais de um arquivo ou gerar sem anexar nada.
                   </p>
                   {attachments.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
@@ -755,7 +871,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               disabled={!canGenerate || generating}
               className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> Gerar com IA</>}
+              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> {isClassDiary ? 'Gerar diário' : 'Gerar com IA'}</>}
             </button>
             {(usageError || usageMessage) && (
               <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
@@ -777,11 +893,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 <div className="flex flex-col gap-3">
                   <img
                     src={generatedImageUrl}
-                    alt="Portfolio pedagogico gerado com IA"
+                    alt="Portfólio pedagógico gerado com IA"
                     className="w-full rounded-app-sm border border-border bg-cream"
                   />
                   <p className="text-[11px] text-muted leading-[1.5]">
-                    A imagem foi gerada com base nas anotacoes e orientacoes selecionadas. O prompt usado foi salvo no documento.
+                    A imagem foi gerada com base nas anotações e orientações selecionadas. O prompt usado foi salvo no documento.
                   </p>
                 </div>
               ) : editingDocument ? (
@@ -796,10 +912,15 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
 
             <button
-              onClick={() => openSubscreen('generated-documents', { reportType: currentReportType, studentId: selectedStudent?.id, focusReportId: reportId })}
+              onClick={() => openSubscreen('generated-documents', {
+                reportType: currentReportType,
+                studentId: isClassDiary ? undefined : selectedStudent?.id,
+                classId: isClassDiary ? selectedClass?.id : undefined,
+                focusReportId: reportId,
+              })}
               className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2"
             >
-              Historico de gerados
+              Histórico de gerados
             </button>
 
             {editingDocument ? (
@@ -823,18 +944,18 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               Arquivar
             </button>
 
-            {selectedStudent?.id && (
+            {!isClassDiary && selectedStudent?.id && (
               <button
                 onClick={() => openSubscreen('generated-documents', { studentId: selectedStudent.id })}
                 className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2"
               >
-                Ver historico desta crianca
+                Ver histórico desta criança
               </button>
             )}
 
             <button onClick={() => {
               if (editingDocument && editableContent !== savedContent) {
-                const discard = window.confirm('Voce tem alteracoes nao salvas. Deseja descartar?')
+                const discard = window.confirm('Você tem alterações não salvas. Deseja descartar?')
                 if (!discard) return
               }
               setGenerated(false)
@@ -855,8 +976,8 @@ function matchesStudent(annotation: Annotation, studentId: string, studentName?:
 }
 
 function getReportGenerationType(reportKind: string, portfolioOutput: PortfolioOutput): AiGenerationType {
-  if (reportKind === 'Relatorio de desenvolvimento') return 'development_report'
-  if (reportKind === 'Portfolio pedagogico') {
+  if (reportKind === 'Relatório de desenvolvimento') return 'development_report'
+  if (reportKind === 'Portfólio pedagógico') {
     return portfolioOutput === 'image' ? 'portfolio_image' : 'portfolio_text'
   }
   if (isSpecialistReport(reportKind) || reportKind === 'Rel. Atipico') return 'specialist_report'
@@ -875,27 +996,31 @@ function createReportPreview(input: {
   extraContext: string
   attachments: ReportAttachment[]
   portfolioOutput: PortfolioOutput
+  portfolioImageFormat: PortfolioImageFormat
+  diaryDate: string
+  diaryTheme: string
+  diaryRawText: string
 }) {
   const annotationBlock = input.selectedAnnotations.length
     ? input.selectedAnnotations.map((annotation) => `- ${annotation.date} | ${annotation.label}: ${annotation.text}`).join('\n')
-    : 'Nenhuma anotacao selecionada.'
+    : 'Nenhuma anotação selecionada.'
 
   const sourceBlock = input.mode === 'blank'
     ? `RELATO INFORMADO PELA PROFESSORA\n\n${input.blankContext.trim() || '-'}`
     : `ANOTACOES SELECIONADAS\n\n${annotationBlock}\n\nDESCONSIDERAR\n\n${input.ignoredNotes.trim() || 'Nada informado para desconsiderar.'}`
 
   const header = `${input.reportKind.toUpperCase()}
-Crianca: ${input.studentName}
+Criança: ${input.studentName}
 Turma: ${input.className}
-Periodo: 2026
+Período: 2026
 
 BASE UTILIZADA
 
 ${sourceBlock}
 
-ORIENTACAO ADICIONAL DA PROFESSORA
+ORIENTAÇÃƒO ADICIONAL DA PROFESSORA
 
-${input.extraContext.trim() || 'Nenhuma orientacao adicional foi incluida antes da geracao.'}`
+${input.extraContext.trim() || 'Nenhuma orientação adicional foi incluída antes da geração.'}`
 
   if (input.reportKind === 'Ficha de anamnese') {
     return `${header}
@@ -903,190 +1028,184 @@ ${input.extraContext.trim() || 'Nenhuma orientacao adicional foi incluida antes 
 FICHA DE ANAMNESE
 
 Identificacao e contexto familiar:
-- dados da crianca, responsaveis e contatos;
-- composicao familiar e rotina em casa;
-- pessoas de referencia e vinculos importantes;
-- entrada na escola e historico de adaptacao.
+- dados da criança, responsáveis e contatos;
+- composição familiar e rotina em casa;
+- pessoas de referência e vínculos importantes;
+- entrada na escola e histórico de adaptação.
 
-Historico de saude e desenvolvimento:
-- gestacao, nascimento e marcos do desenvolvimento informados pela familia;
-- acompanhamentos medicos ou terapeuticos, quando houver;
-- alergias, medicacoes, restricoes e cuidados especificos;
+Histórico de saúde e desenvolvimento:
+- gestação, nascimento e marcos do desenvolvimento informados pela família;
+- acompanhamentos médicos ou terapêuticos, quando houver;
+- alergias, medicações, restrições e cuidados específicos;
 - sono, alimentacao, higiene e autonomia.
 
-Habitos e rotina:
-- horarios, preferencias, medos, interesses e objetos de apego;
-- formas de comunicacao usadas pela crianca;
+Hábitos e rotina:
+- horários, preferências, medos, interesses e objetos de apego;
+- formas de comunicação usadas pela criança;
 - brincadeiras preferidas;
-- situacoes que acalmam ou desorganizam.
+- situações que acalmam ou desorganizam.
 
-Observacoes pedagogicas:
-As informacoes devem apoiar o acolhimento, a seguranca e o planejamento de experiencias respeitosas para ${input.firstName}, sempre com acesso restrito e uso pedagogico autorizado.${formatAttachments(input.attachments)}
+Observações pedagógicas:
+As informações devem apoiar o acolhimento, a segurança e o planejamento de experiências respeitosas para ${input.firstName}, sempre com acesso restrito e uso pedagógico autorizado.${formatAttachments(input.attachments)}
 
-Documento gerado com auxilio de IA a partir das informacoes autorizadas pela professora.`
+Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
   }
 
-  if (input.reportKind === 'Registro de reuniao de pais') {
+  if (input.reportKind === 'Registro de reunião de pais') {
     return `${header}
 
-REGISTRO DE REUNIAO DE PAIS
+REGISTRO DE REUNIÃƒO DE PAIS
 
 Pauta:
-- acolhimento da familia;
-- apresentacao dos registros pedagogicos;
-- rotina, desenvolvimento, autonomia e interacoes;
-- combinados entre escola e familia.
+- acolhimento da família;
+- apresentação dos registros pedagógicos;
+- rotina, desenvolvimento, autonomia e interações;
+- combinados entre escola e família.
 
-Observacoes compartilhadas:
-Registrar com linguagem objetiva o que foi apresentado, preservando a privacidade da crianca e mantendo foco em fatos observados na rotina escolar.
+Observações compartilhadas:
+Registrar com linguagem objetiva o que foi apresentado, preservando a privacidade da criança e mantendo foco em fatos observados na rotina escolar.
 
 Combinados:
-- estrategias que serao mantidas pela escola;
+- estratégias que serão mantidas pela escola;
 - possibilidades de continuidade em casa;
-- comunicacoes futuras;
+- comunicações futuras;
 - responsabilidades e prazos, quando houver.
 
 Encaminhamentos:
-Formalizar proximos passos, necessidade de novo encontro ou acompanhamento da coordenacao. O registro nao deve expor outras criancas nem criar comparacoes.${formatAttachments(input.attachments)}
+Formalizar próximos passos, necessidade de novo encontro ou acompanhamento da coordenação. O registro não deve expor outras crianças nem criar comparações.${formatAttachments(input.attachments)}
 
-Documento gerado com auxilio de IA a partir das informacoes autorizadas pela professora.`
+Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
   }
 
-  if (input.reportKind === 'Diario de bordo') {
+  if (input.reportKind === 'Diário de bordo') {
     return `${header}
 
-DIARIO DE BORDO PEDAGOGICO
+DIÁRIO DE BORDO PEDAGÓGICO
 
-Entrada do dia:
-${input.firstName} participou da rotina com suas formas proprias de expressao, interacao e exploracao. Os registros selecionados ajudam a narrar o percurso vivido, valorizando pequenos gestos, falas, tentativas e descobertas.
+Turma: ${input.className}
+Data: ${input.diaryDate || 'Não informada'}
+Tema do dia: ${input.diaryTheme || 'Não informado'}
 
-Momentos observados:
-- chegada, acolhimento e vinculo com a professora;
-- participacao nas propostas coletivas;
-- brincadeiras, interesses e escolhas espontaneas;
-- interacoes com colegas;
-- sinais de autonomia, linguagem, movimento e cuidado.
+Anotação original da professora:
+${input.diaryRawText.trim() || '-'}
 
-Reflexao da professora:
-O registro deve apoiar a continuidade do olhar pedagogico, preservando a singularidade da crianca e ajudando a planejar novas experiencias para os proximos dias.
+Versão organizada:
+A turma participou com envolvimento nas propostas do dia, com destaque para momentos de interação coletiva e exploração dos materiais apresentados. Ao longo da rotina, observou-se participação ativa em rodas, brincadeiras e combinados, favorecendo convivência, comunicação e autonomia.
 
-Proximos registros sugeridos:
-- observar como a crianca se envolve em pequenos grupos;
-- registrar falas espontaneas;
-- acompanhar autonomia em momentos da rotina.${formatAttachments(input.attachments)}
+O registro indica continuidade positiva do percurso pedagógico da turma, com oportunidades para retomar o tema em novas experiências e manter a documentação do cotidiano de forma leve e objetiva.${formatAttachments(input.attachments)}
 
-Documento gerado com auxilio de IA a partir das informacoes autorizadas pela professora.`
+Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
   }
 
-  if (input.reportKind === 'Portfolio pedagogico') {
+  if (input.reportKind === 'Portfólio pedagógico') {
     if (input.portfolioOutput === 'image') {
       return `${header}
 
-PORTIFOLIO VISUAL COM CHATGPT
+PORTFÓLIO VISUAL COM CHATGPT
 
 Objetivo da imagem:
-Gerar uma capa ou painel visual para o portifolio pedagogico de ${input.firstName}, usando apenas informacoes e anexos autorizados pela professora.
+Gerar uma capa ou painel visual para o portfólio pedagógico de ${input.firstName}, usando apenas informações e anexos autorizados pela professora.
 
-Direcao visual:
-- composicao clara, delicada e apropriada para educacao infantil;
-- espacos para titulo, nome da crianca, turma e periodo;
+Direção visual:
+- composição clara, delicada e apropriada para educação infantil;
+- espaços para título, nome da criança, turma e período;
 - elementos de aprendizagem, brincadeira, natureza, artes e descobertas;
-- nao expor outras criancas;
-- usar fotos e documentos anexados apenas como referencia autorizada.
+- não expor outras crianças;
+- usar fotos e documentos anexados apenas como referência autorizada.
 
 Prompt base para imagem:
-"Criar uma capa de portifolio pedagogico infantil para ${input.firstName}, turma ${input.className}, com estetica acolhedora, organizada e profissional para educacao infantil. Usar tons suaves, elementos de aprendizagem, brincadeira, natureza, artes e descobertas. Evitar texto pequeno ilegivel e nao expor outras criancas."
+"Criar uma capa de portfólio pedagógico infantil para ${input.firstName}, turma ${input.className}, em formato ${formatPortfolioImageFormat(input.portfolioImageFormat)}, com estética acolhedora, organizada e profissional para educação infantil. Usar tons suaves, elementos de aprendizagem, brincadeira, natureza, artes e descobertas. Evitar texto pequeno ilegível e não expor outras crianças."
 
-Observacao:
-Quando a API de imagem estiver ligada, esta opcao usara ChatGPT para gerar a imagem do portifolio. O texto pedagogico pode continuar sendo gerado separadamente.${formatAttachments(input.attachments)}
+Observação:
+Quando a API de imagem estiver ligada, esta opção usará ChatGPT para gerar a imagem do portfólio. O texto pedagógico pode continuar sendo gerado separadamente.${formatAttachments(input.attachments)}
 
-Imagem preparada com auxilio de IA a partir das informacoes autorizadas pela professora.`
+Imagem preparada com auxílio de IA a partir das informações autorizadas pela professora.`
     }
 
     return `${header}
 
-PORTFOLIO PEDAGOGICO
+PORTFÓLIO PEDAGÓGICO
 
-Apresentacao:
-Este portfolio organiza evidencias da jornada de ${input.firstName} na educacao infantil, reunindo registros de experiencias, producoes, falas, brincadeiras e momentos significativos.
+Apresentação:
+Este portfólio organiza evidências da jornada de ${input.firstName} na educação infantil, reunindo registros de experiências, produções, falas, brincadeiras e momentos significativos.
 
-Evidencias selecionadas:
-- registros de atividades e exploracoes;
-- observacoes da rotina;
+Evidências selecionadas:
+- registros de atividades e explorações;
+- observações da rotina;
 - conquistas de autonomia;
-- interacoes sociais;
+- interações sociais;
 - fotos ou documentos anexados pela professora, quando autorizados.
 
-Leitura pedagogica:
-As evidencias mostram como ${input.firstName} explora o ambiente, constroi vinculos, expressa ideias, participa das propostas e amplia suas possibilidades de comunicacao, movimento e convivencia.
+Leitura pedagógica:
+As evidências mostram como ${input.firstName} explora o ambiente, constrói vínculos, expressa ideias, participa das propostas e amplia suas possibilidades de comunicação, movimento e convivência.
 
-Memoria afetiva:
-Mais do que reunir atividades prontas, este portfolio guarda marcas do percurso vivido pela crianca, respeitando seu tempo, seus interesses e suas formas de aprender.
+Memória afetiva:
+Mais do que reunir atividades prontas, este portfólio guarda marcas do percurso vivido pela criança, respeitando seu tempo, seus interesses e suas formas de aprender.
 
 Continuidade:
-Novas evidencias podem ser adicionadas ao longo do periodo para formar uma memoria pedagogica viva e segura.${formatAttachments(input.attachments)}
+Novas evidências podem ser adicionadas ao longo do período para formar uma memória pedagógica viva e segura.${formatAttachments(input.attachments)}
 
-Documento gerado com auxilio de IA a partir das informacoes autorizadas pela professora.`
+Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
   }
 
   if (isSpecialistReport(input.reportKind) || input.reportKind === 'Rel. Atipico') {
     const specialistSections = getSpecialistSections(input.reportKind)
     return `${header}
 
-RELATORIO PEDAGOGICO PARA ESPECIALISTA
+RELATÓRIO PEDAGÓGICO PARA ESPECIALISTA
 
-Observacao de cuidado:
-Este texto organiza observacoes pedagogicas e nao realiza diagnostico clinico. O foco e acolher ${input.firstName}, registrar fatos observados na escola e apoiar a continuidade do acompanhamento com a familia, equipe escolar e profissionais especializados.
+Observação de cuidado:
+Este texto organiza observações pedagógicas e não realiza diagnóstico clínico. O foco é acolher ${input.firstName}, registrar fatos observados na escola e apoiar a continuidade do acompanhamento com a família, equipe escolar e profissionais especializados.
 
 Objetivo do documento:
 ${specialistSections.objective}
 
-Eixos de observacao:
+Eixos de observação:
 ${specialistSections.axes.map((axis) => `- ${axis}`).join('\n')}
 
 Potencialidades e respostas positivas:
-- interesses, iniciativas e momentos de participacao;
-- vinculos construidos com adultos e colegas;
-- estrategias que favoreceram seguranca, comunicacao ou organizacao;
-- situacoes em que a crianca demonstrou curiosidade, autonomia ou bem-estar.
+- interesses, iniciativas e momentos de participação;
+- vínculos construídos com adultos e colegas;
+- estratégias que favoreceram segurança, comunicação ou organização;
+- situações em que a criança demonstrou curiosidade, autonomia ou bem-estar.
 
 Pontos de apoio observados:
-- situacoes que exigem mediacao mais proxima;
+- situações que exigem mediação mais próxima;
 - contextos de maior desafio na rotina;
 - recursos, adaptacoes ou antecipacoes que podem ajudar;
-- parceria necessaria entre escola, familia e especialista.
+- parceria necessária entre escola, família e especialista.
 
 Encaminhamentos:
-Manter registros frequentes, compartilhar apenas informacoes autorizadas e alinhar os proximos passos com coordenacao, familia e profissional responsavel.${formatAttachments(input.attachments)}
+Manter registros frequentes, compartilhar apenas informações autorizadas e alinhar os próximos passos com coordenação, família e profissional responsável.${formatAttachments(input.attachments)}
 
-Documento gerado com auxilio de IA a partir das informacoes autorizadas pela professora.`
+Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
   }
 
   return `${header}
 
-RELATORIO DE DESENVOLVIMENTO
+RELATÓRIO DE DESENVOLVIMENTO
 
-Sintese do percurso:
-${input.firstName} vem construindo sua jornada de desenvolvimento de forma unica, com registros que ajudam a compreender sua rotina, suas conquistas, seus interesses e os pontos que ainda precisam de acompanhamento.
+Síntese do percurso:
+${input.firstName} vem construindo sua jornada de desenvolvimento de forma única, com registros que ajudam a compreender sua rotina, suas conquistas, seus interesses e os pontos que ainda precisam de acompanhamento.
 
 Aspectos observados:
-- linguagem oral, escuta e comunicacao;
+- linguagem oral, escuta e comunicação;
 - autonomia nos momentos da rotina;
-- interacao com colegas e adultos;
-- participacao em brincadeiras e propostas;
-- expressao corporal, movimento e exploracao;
-- emocao, seguranca e vinculos afetivos.
+- interação com colegas e adultos;
+- participação em brincadeiras e propostas;
+- expressão corporal, movimento e exploração;
+- emoção, segurança e vínculos afetivos.
 
-Avancos percebidos:
-O texto final deve valorizar as evolucoes observadas sem transformar o desenvolvimento em comparacao ou medida rigida. Cada crianca tem seu tempo e sua forma de aprender.
+Avanços percebidos:
+O texto final deve valorizar as evoluções observadas sem transformar o desenvolvimento em comparação ou medida rígida. Cada criança tem seu tempo e sua forma de aprender.
 
 Aspectos em acompanhamento:
-Devem ser descritos com linguagem cuidadosa, indicando possibilidades de apoio, experiencias futuras e continuidade entre escola e familia.
+Devem ser descritos com linguagem cuidadosa, indicando possibilidades de apoio, experiências futuras e continuidade entre escola e família.
 
 Encaminhamentos:
-Manter observacoes frequentes, registrar novas evolucoes e alinhar com a familia quando houver pontos que precisem de continuidade entre escola e casa.${formatAttachments(input.attachments)}
+Manter observações frequentes, registrar novas evoluções e alinhar com a família quando houver pontos que precisem de continuidade entre escola e casa.${formatAttachments(input.attachments)}
 
-Documento gerado com auxilio de IA a partir das informacoes autorizadas pela professora.`
+Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
 }
 
 function formatAttachments(attachments: ReportAttachment[]) {
@@ -1096,12 +1215,12 @@ function formatAttachments(attachments: ReportAttachment[]) {
 
 function isSpecialistReport(reportKind: string) {
   return [
-    'Relatorio para neuropediatra',
-    'Relatorio para psiquiatra infantil',
-    'Relatorio para fonoaudiologo',
-    'Relatorio para terapeuta ocupacional',
-    'Relatorio para psicologo',
-    'Relatorio para psicopedagogo',
+    'Relatório para neuropediatra',
+    'Relatório para psiquiatra infantil',
+    'Relatório para fonoaudiologo',
+    'Relatório para terapeuta ocupacional',
+    'Relatório para psicologo',
+    'Relatório para psicopedagogo',
     'Encaminhamento para especialista',
   ].includes(reportKind)
 }
@@ -1113,11 +1232,11 @@ function isPlanningKind(reportKind: string) {
     .toLowerCase()
   return normalized.includes('planejamento')
     || normalized.includes('plano de aula')
-    || normalized.includes('projeto pedagogico')
+    || normalized.includes('projeto pedagógico')
 }
 
 function getSpecialistSections(reportKind: string) {
-  if (reportKind === 'Relatorio para fonoaudiologo') {
+  if (reportKind === 'Relatório para fonoaudiologo') {
     return {
       objective: 'Descrever fala, linguagem, compreensao e interacao comunicativa observadas no cotidiano escolar.',
       axes: [
@@ -1129,9 +1248,9 @@ function getSpecialistSections(reportKind: string) {
     }
   }
 
-  if (reportKind === 'Relatorio para terapeuta ocupacional') {
+  if (reportKind === 'Relatório para terapeuta ocupacional') {
     return {
-      objective: 'Descrever aspectos sensoriais, motores e de autonomia que interferem na participacao da crianca nas atividades diarias.',
+      objective: 'Descrever aspectos sensoriais, motores e de autonomia que interferem na participacao da criança nas atividades diarias.',
       axes: [
         'processamento sensorial diante de ruidos, texturas, luz, cheiros e movimentos',
         'habilidades motoras finas, preensao, manipulacao e uso de materiais',
@@ -1141,7 +1260,7 @@ function getSpecialistSections(reportKind: string) {
     }
   }
 
-  if (reportKind === 'Relatorio para psicologo') {
+  if (reportKind === 'Relatório para psicologo') {
     return {
       objective: 'Descrever aspectos emocionais, sociais e comportamentais observados na rotina escolar.',
       axes: [
@@ -1153,32 +1272,32 @@ function getSpecialistSections(reportKind: string) {
     }
   }
 
-  if (reportKind === 'Relatorio para psicopedagogo') {
+  if (reportKind === 'Relatório para psicopedagogo') {
     return {
-      objective: 'Descrever processos de aprendizagem, engajamento e estrategias que favorecem a participacao da crianca.',
+      objective: 'Descrever processos de aprendizagem, engajamento e estrategias que favorecem a participacao da criança.',
       axes: [
         'formas de aprender: visual, auditiva, corporal, pratica ou por imitacao',
         'atencao, memoria, raciocinio logico e resolucao de problemas',
         'motivacao e engajamento nas propostas pedagogicas',
-        'estrategias pedagogicas que funcionam melhor para a crianca',
+        'estrategias pedagogicas que funcionam melhor para a criança',
       ],
     }
   }
 
   if (reportKind === 'Encaminhamento para especialista') {
     return {
-      objective: 'Registrar de forma concisa as observacoes que justificam uma avaliacao externa, sem concluir diagnostico.',
+      objective: 'Registrar de forma concisa as observações que justificam uma avaliação externa, sem concluir diagnóstico.',
       axes: [
         'motivo do encaminhamento e situacoes observadas',
         'frequencia, contexto e impacto na rotina escolar',
         'estrategias ja tentadas pela escola',
-        'solicitacao de avaliacao e orientacoes para continuidade do acompanhamento',
+        'solicitacao de avaliação e orientacoes para continuidade do acompanhamento',
       ],
     }
   }
 
   return {
-    objective: 'Descrever observacoes pedagogicas sobre comunicacao, socializacao, comportamento, aspectos sensoriais, autonomia, psicomotricidade e aprendizagem.',
+    objective: 'Descrever observações pedagógicas sobre comunicação, socialização, comportamento, aspectos sensoriais, autonomia, psicomotricidade e aprendizagem.',
     axes: [
       'linguagem e comunicacao: gestos, contato visual, fala, vocabulario e compreensao',
       'habilidades sociais: interacao com pares e adultos, imitacao e brincadeiras coletivas',
@@ -1208,7 +1327,7 @@ function summarizeVoiceAnnotations(annotations: Annotation[]) {
   const items = annotations
     .slice(0, 4)
     .map((annotation) => `- ${annotation.date}: ${annotation.text.slice(0, 120)}`)
-  return `Resumo de anotacoes por voz:\n${items.join('\n')}`
+  return `Resumo de anotações por voz:\n${items.join('\n')}`
 }
 
 function normalize(value: string) {
@@ -1218,3 +1337,11 @@ function normalize(value: string) {
     .toLowerCase()
     .trim()
 }
+
+function formatPortfolioImageFormat(value: PortfolioImageFormat) {
+  if (value === 'landscape') return 'paisagem'
+  if (value === 'square') return 'quadrado'
+  return 'retrato'
+}
+
+

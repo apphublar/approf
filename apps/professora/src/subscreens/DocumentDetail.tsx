@@ -276,7 +276,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <img
                     src={document.ai_artifacts.imageDataUrl}
-                    alt="Imagem de portfolio gerada com IA"
+                    alt="Imagem de portfólio gerada com IA"
                     className="w-full rounded-app-sm border border-border bg-cream"
                   />
                   <div className="grid grid-cols-2 gap-2 mt-3">

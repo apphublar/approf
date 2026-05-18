@@ -5,13 +5,13 @@ import { adminSections } from '../lib/mock-admin-data'
 export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="admin-shell">
-      <aside className="sidebar" aria-label="Navegacao admin">
+      <aside className="sidebar" aria-label="Navegação admin">
         <div>
           <Link href="/" className="brand-link">
             <span className="brand-mark">A</span>
             <span>
               <strong>Approf Admin</strong>
-              <small>Operacao e privacidade</small>
+              <small>Operação e privacidade</small>
             </span>
           </Link>
 
@@ -30,7 +30,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         <div className="sidebar-note">
           <ShieldCheck size={16} />
-          <span>Dados sensiveis exigem RLS, auditoria e buckets privados.</span>
+          <span>Dados sensíveis exigem RLS, auditoria e buckets privados.</span>
         </div>
       </aside>
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import AnnotationCard from '@/components/ui/AnnotationCard'
@@ -31,7 +31,7 @@ export default function AnnotationsScreen() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="bg-white px-[18px] pt-12 pb-3 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
-          <span className="font-serif text-[22px] text-gd">Anotacoes</span>
+          <span className="font-serif text-[22px] text-gd">Anotações</span>
           <button
             onClick={() => openSubscreen('new-annotation')}
             className="bg-gm text-white border-none rounded-full px-[14px] py-[7px] text-xs font-bold cursor-pointer flex items-center gap-1"
@@ -45,7 +45,7 @@ export default function AnnotationsScreen() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por tipo, texto, crianca ou data..."
+            placeholder="Buscar por tipo, texto, criança ou data..."
             className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
           />
         </div>
@@ -54,7 +54,7 @@ export default function AnnotationsScreen() {
       <div className="scroll-area px-[18px] pt-[14px]">
         {filtered.length === 0 ? (
           <div className="text-center py-10 text-muted">
-            <p className="text-[13px]">Nenhuma anotacao aqui ainda.</p>
+            <p className="text-[13px]">Nenhuma anotação por aqui ainda.</p>
           </div>
         ) : (
           filtered.map((annotation) => (
@@ -81,13 +81,14 @@ function normalizeText(value: string) {
 
 function formatCategory(category: string) {
   const labels: Record<string, string> = {
-    evolucao: 'Evolucao',
+    evolucao: 'Evolução',
     plano: 'Planejamento',
-    portfolio: 'Portfolio',
+    portfolio: 'Portfólio',
     projeto: 'Projeto',
-    formacao: 'Formacao',
+    formacao: 'Formação',
     carta: 'Carta',
-    atipico: 'Atipico',
+    atipico: 'Atípico',
   }
-  return labels[category] ?? 'Anotacao'
+  return labels[category] ?? 'Anotação'
 }
+

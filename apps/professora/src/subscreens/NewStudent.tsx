@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ImagePlus } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
@@ -115,7 +115,7 @@ export default function NewStudentSubscreen() {
       setActiveStudent(student.id)
       closeSubscreen()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel salvar a crianca.')
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar a criança.')
     } finally {
       setSaving(false)
     }
@@ -128,7 +128,7 @@ export default function NewStudentSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1">
-          <span className="font-serif text-[18px] text-gd block">Nova crianca</span>
+          <span className="font-serif text-[18px] text-gd block">Nova criança</span>
           <span className="text-[11px] text-muted">{cls.name}</span>
         </div>
       </div>
@@ -168,14 +168,14 @@ export default function NewStudentSubscreen() {
             </div>
           )}
           <p className="text-[11px] text-muted mt-3">
-            A foto fica privada e aparece em formato redondo no perfil da crianca.
+            A foto fica privada e aparece em formato redondo no perfil da criança.
           </p>
         </div>
 
         <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Nome</label>
         <input
           className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
-          placeholder="Nome da crianca"
+          placeholder="Nome da criança"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
@@ -190,7 +190,7 @@ export default function NewStudentSubscreen() {
           onChange={(event) => setBirthDateInput(formatBirthDateInput(event.target.value))}
         />
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Marcador pedagogico</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Marcador pedagógico</label>
         <div className="flex gap-2 overflow-x-auto scrollbar-none mt-2 mb-4 pb-1">
           {TAGS.map((item) => (
             <button
@@ -205,10 +205,10 @@ export default function NewStudentSubscreen() {
           ))}
         </div>
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Observacoes gerais</label>
+        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Observações gerais</label>
         <textarea
           className="w-full min-h-[124px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
-          placeholder="Preferencias, rotina, acolhimento, informacoes importantes..."
+          placeholder="Preferências, rotina, acolhimento, informações importantes..."
           value={generalNotes}
           onChange={(event) => setGeneralNotes(event.target.value)}
         />
@@ -221,7 +221,7 @@ export default function NewStudentSubscreen() {
           disabled={!canSave || saving}
           className="w-full bg-gm text-white rounded-app-sm py-[13px] text-[14px] font-bold disabled:opacity-40"
         >
-          {saving ? 'Salvando...' : 'Salvar crianca'}
+          {saving ? 'Salvando...' : 'Salvar criança'}
         </button>
       </div>
     </div>
@@ -293,3 +293,4 @@ function PhotoPositionSlider({
     </label>
   )
 }
+

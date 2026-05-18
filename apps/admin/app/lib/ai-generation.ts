@@ -1,4 +1,4 @@
-import type { AiGenerationType } from './ai-usage'
+﻿import type { AiGenerationType } from './ai-usage'
 import { createSupabaseServiceClient } from './supabase-server'
 import type { BuildPromptInput } from './pedagogical-prompts'
 import {
@@ -27,7 +27,7 @@ export interface PipelineStageMetadata {
   promptVersion: string
   inputTokens: number
   outputTokens: number
-  /** Custo estimado a partir dos tokens (API nao retorna USD direto). */
+  /** Custo estimado a partir dos tokens (API não retorna USD direto). */
   estimatedCostCents: number
   /** Igual a estimatedCostCents nesta integracao; reservado para futura fatura real. */
   actualCostCents: number
@@ -129,7 +129,7 @@ export async function generatePedagogicalText(
 
     reportId = await persistGeneratedReport(input, s3.text)
     if (!reportId) {
-      throw new PublicAiGenerationError('Nao foi possivel salvar o relatorio gerado. Tente novamente.')
+      throw new PublicAiGenerationError('Não foi possivel salvar o relatório gerado. Tente novamente.')
     }
 
     await persistUsage(
@@ -226,9 +226,9 @@ async function ensureRequiredStructure(input: {
 
   const repair = await requestClaudeText(
     [
-      'Voce e revisor final de qualidade BNCC para Educacao Infantil.',
+      'Você e revisor final de qualidade BNCC para Educação Infantil.',
       'Reescreva integralmente o documento para cumprir TODAS as secoes obrigatorias, sem inventar fatos novos.',
-      'Mantenha linguagem formal, acolhedora, sem comparacao entre criancas e sem diagnostico clinico.',
+      'Mantenha linguagem formal, acolhedora, sem comparacao entre crianças e sem diagnostico clinico.',
       'Retorne APENAS o documento final completo.',
     ].join('\n'),
     [
@@ -258,7 +258,7 @@ async function ensureRequiredStructure(input: {
 
   const repairedValidation = validateRequiredStructure(input.generationType, input.reportKind, merged.text)
   if (!repairedValidation.ok) {
-    throw new PublicAiGenerationError('Nao foi possivel estruturar o documento no formato BNCC obrigatorio. Tente ajustar o contexto e gerar novamente.')
+    throw new PublicAiGenerationError('Não foi possivel estruturar o documento no formato BNCC obrigatorio. Tente ajustar o contexto e gerar novamente.')
   }
 
   return { completion: merged }
@@ -267,16 +267,12 @@ async function ensureRequiredStructure(input: {
 function validateRequiredStructure(generationType: AiGenerationType, reportKind: string | undefined, text: string) {
   if (generationType === 'planning') {
     const missing = [
-      !hasAnyHeading(text, ['identificacao']) && 'Identificacao',
       !hasAnyHeading(text, ['tema', 'titulo']) && 'Tema/Titulo',
-      !hasAnyHeading(text, ['faixa etaria']) && 'Faixa etaria',
-      !hasAnyHeading(text, ['campos de experiencia']) && 'Campos de experiencia',
-      !hasAnyHeading(text, ['objetivos de aprendizagem', 'objetivos de desenvolvimento', 'objetivo']) && 'Objetivos de aprendizagem/desenvolvimento',
+      !hasAnyHeading(text, ['objetivo']) && 'Objetivo',
+      !hasAnyHeading(text, ['atividade', 'desenvolvimento', 'passo a passo']) && 'Atividade/Desenvolvimento',
       !hasAnyHeading(text, ['materiais']) && 'Materiais necessarios',
-      !hasAnyHeading(text, ['desenvolvimento', 'passo a passo']) && 'Desenvolvimento/Passo a passo',
-      !hasAnyHeading(text, ['avaliacao', 'observacao']) && 'Avaliacao/Observacao',
-      !containsAny(text, ['inicio']) && 'Subsecao Inicio',
-      !containsAny(text, ['conclusao', 'fechamento']) && 'Subsecao Conclusao/Fechamento',
+      !hasAnyHeading(text, ['duracao', 'tempo estimado']) && 'Duracao/Tempo estimado',
+      !hasAnyHeading(text, ['observacoes', 'avaliação']) && 'Observacoes/Avaliação',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
   }
@@ -287,7 +283,7 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
 
   if (isDevelopmentLike) {
     const missing = [
-      !hasAnyHeading(text, ['informacoes basicas', 'identificacao']) && 'Informacoes basicas',
+      !hasAnyHeading(text, ['informações basicas', 'identificacao']) && 'Informações basicas',
       !hasAnyHeading(text, ['descricao geral', 'adaptacao']) && 'Descricao geral e adaptacao',
       !hasAnyHeading(text, ['campos de experiencia']) && 'Desenvolvimento nos campos de experiencia',
       !hasAnyHeading(text, ['conquistas']) && 'Conquistas',
@@ -309,11 +305,6 @@ function hasAnyHeading(text: string, candidates: string[]) {
       .replace(/^#+\s*/, '')
     return candidates.some((candidate) => normalizedLine.includes(normalize(candidate)))
   })
-}
-
-function containsAny(text: string, candidates: string[]) {
-  const normalizedText = normalize(text)
-  return candidates.some((candidate) => normalizedText.includes(normalize(candidate)))
 }
 
 function normalize(value: string) {
@@ -405,7 +396,7 @@ async function requestClaudeText(system: string, user: string, options: RequestC
 
   if (!response.ok) {
     console.error('[ai-generation] Claude HTTP', response.status, payload?.error?.message)
-    throw new PublicAiGenerationError('Nao foi possivel gerar o texto agora. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Não foi possivel gerar o texto agora. Tente novamente em instantes.')
   }
 
   const text = payload?.content
@@ -415,7 +406,7 @@ async function requestClaudeText(system: string, user: string, options: RequestC
     .trim()
 
   if (!text) {
-    throw new PublicAiGenerationError('A IA nao retornou conteudo suficiente. Ajuste o contexto e tente novamente.')
+    throw new PublicAiGenerationError('A IA não retornou conteudo suficiente. Ajuste o contexto e tente novamente.')
   }
 
   const inputTokens = payload?.usage?.input_tokens ?? 0
@@ -474,12 +465,12 @@ async function requestOpenAiInterventionText(options: RequestOpenAiInterventionO
 
   if (!response.ok) {
     console.error('[ai-generation] OpenAI HTTP', response.status, payload?.error?.message)
-    throw new PublicAiGenerationError('Nao foi possivel gerar sugestoes agora. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Não foi possivel gerar sugestões agora. Tente novamente em instantes.')
   }
 
   const text = payload?.choices?.[0]?.message?.content?.trim()
   if (!text) {
-    throw new PublicAiGenerationError('A IA nao retornou conteudo suficiente para intervencoes.')
+    throw new PublicAiGenerationError('A IA não retornou conteudo suficiente para intervenções.')
   }
 
   const inputTokens = payload?.usage?.prompt_tokens ?? 0
@@ -507,12 +498,16 @@ function buildPromptInputFromSummary(
     ageGroup: asString(summary.ageGroup),
     evaluationPeriod: asString(summary.evaluationPeriod),
     mode: asString(summary.mode),
+    historyScope: asHistoryScope(summary.historyScope),
     selectedAnnotations: asObjectArray(summary.selectedAnnotations) as BuildPromptInput['selectedAnnotations'],
     ignoredNotes: asString(summary.ignoredNotes),
     blankContext: asString(summary.blankContext),
     extraContext: asString(summary.extraContext),
     objective: asString(summary.objective),
     theme: asString(summary.theme),
+    diaryDate: asString(summary.diaryDate),
+    diaryTheme: asString(summary.diaryTheme),
+    diaryRawText: asString(summary.diaryRawText),
     bnccFields: asStringArray(summary.bnccFields),
     useAnnotations: asBoolean(summary.useAnnotations),
     attachments: asObjectArray(summary.attachments) as BuildPromptInput['attachments'],
@@ -542,7 +537,7 @@ async function persistGeneratedReport(input: GeneratePedagogicalTextInput, body:
     .single()
 
   if (error || !data?.id) {
-    throw new PublicAiGenerationError('Nao foi possivel salvar o relatorio gerado. Tente novamente.')
+    throw new PublicAiGenerationError('Não foi possivel salvar o relatório gerado. Tente novamente.')
   }
 
   return data.id
@@ -568,7 +563,7 @@ async function persistUsage(
     cost_cents: costCents,
   })
 
-  if (error) throw toError(error, 'Nao foi possivel registrar consumo do relatorio.')
+  if (error) throw toError(error, 'Não foi possivel registrar consumo do relatório.')
 }
 
 async function deleteReportUsage(reportId: string, ownerId: string) {
@@ -580,7 +575,7 @@ async function deleteReportUsage(reportId: string, ownerId: string) {
     .eq('owner_id', ownerId)
 
   if (error) {
-    throw toError(error, 'Nao foi possivel limpar uso parcial do relatorio.')
+    throw toError(error, 'Não foi possivel limpar uso parcial do relatório.')
   }
 }
 
@@ -593,7 +588,7 @@ async function deleteReport(reportId: string, ownerId: string) {
     .eq('owner_id', ownerId)
 
   if (error) {
-    throw toError(error, 'Nao foi possivel limpar relatorio parcial apos falha.')
+    throw toError(error, 'Não foi possivel limpar relatório parcial apos falha.')
   }
 }
 
@@ -679,6 +674,10 @@ function asInterventionMode(value: unknown): BuildPromptInput['interventionMode'
   return value === 'suggestions' || value === 'feedback_analysis' ? value : undefined
 }
 
+function asHistoryScope(value: unknown): BuildPromptInput['historyScope'] {
+  return value === 'model' || value === 'student' ? value : undefined
+}
+
 function isInterventionMode(mode: BuildPromptInput['interventionMode']): mode is 'suggestions' | 'feedback_analysis' {
   return mode === 'suggestions' || mode === 'feedback_analysis'
 }
@@ -750,3 +749,4 @@ function toError(error: unknown, fallback: string) {
   }
   return new Error(fallback)
 }
+

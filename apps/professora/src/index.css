@@ -117,11 +117,11 @@ html, body, #root {
 
 .auth-loading-wrap {
   position: relative;
-  width: min(74vw, 420px);
+  width: clamp(170px, 44vw, 240px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .auth-loading-logo {

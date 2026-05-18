@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { CheckCircle2, Eye, X, XCircle } from 'lucide-react'
@@ -48,12 +48,12 @@ export function ContinuityRequestsPanel({ requests }: { requests: ChildLinkReque
       <article className="panel panel-wide">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Solicitacoes</p>
-            <h2>Vinculo de crianca existente</h2>
+            <p className="eyebrow">Solicitações</p>
+            <h2>Vínculo de criança existente</h2>
           </div>
           <span className="status-pill">
             <Eye size={16} />
-            Sem fotos na previa
+            Sem fotos na prévia
           </span>
         </div>
 
@@ -138,7 +138,7 @@ function DecisionModal({
 
         <div className="decision-summary">
           <span>
-            <strong>Codigo da crianca</strong>
+            <strong>Código da criança</strong>
             {decision.request.childCode}
           </span>
           <span>
@@ -154,8 +154,8 @@ function DecisionModal({
         <section className="safe-preview-panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Previa segura da timeline</p>
-              <h3>Marcos resumidos para conferencia</h3>
+              <p className="eyebrow">Prévia segura da timeline</p>
+              <h3>Marcos resumidos para conferência</h3>
             </div>
             <span className="status-pill">Sem anexos</span>
           </div>
@@ -175,12 +175,12 @@ function DecisionModal({
           <textarea
             value={justification}
             onChange={(event) => setJustification(event.target.value)}
-            placeholder={isApproval ? 'Ex: dados conferidos com escola e previa bate com a crianca.' : 'Ex: dados insuficientes para confirmar identidade.'}
+            placeholder={isApproval ? 'Ex.: dados conferidos com a escola e a prévia confere com a criança.' : 'Ex.: dados insuficientes para confirmar identidade.'}
           />
         </label>
 
         <p className="modal-warning">
-          Esta acao deve gerar log no Supabase com ator, data, decisao e justificativa. Fotos e relatorios completos seguem bloqueados ate o vinculo aprovado.
+          Esta ação deve gerar log no Supabase com ator, data, decisão e justificativa. Fotos e relatórios completos seguem bloqueados até o vínculo aprovado.
         </p>
 
         <div className="modal-actions">
@@ -190,7 +190,7 @@ function DecisionModal({
             disabled={!justification.trim()}
             onClick={() => onConfirm(justification)}
           >
-            {isApproval ? 'Confirmar aprovacao' : 'Confirmar negativa'}
+            {isApproval ? 'Confirmar aprovação' : 'Confirmar negativa'}
           </button>
         </div>
       </div>
@@ -202,3 +202,4 @@ function formatDate(value: string) {
   const [year, month, day] = value.split('-')
   return `${day}/${month}/${year}`
 }
+

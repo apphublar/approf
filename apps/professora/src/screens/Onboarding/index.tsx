@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { useAppStore, useOnboardingStore } from '@/store'
@@ -7,7 +7,7 @@ import { isSupabaseConfigured } from '@/services/supabase/config'
 import { updateTeacherOnboardingProfile } from '@/services/supabase/profile'
 import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 
-const SHIFTS = ['Manha', 'Tarde', 'Integral']
+const SHIFTS = ['Manhã', 'Tarde', 'Integral']
 
 export default function Onboarding() {
   const { step, data, setStep, setData, complete } = useOnboardingStore()
@@ -38,7 +38,7 @@ export default function Onboarding() {
   }
 
   async function finish() {
-    if (!s3Note.trim()) return alert('Escreva sua primeira anotacao.')
+    if (!s3Note.trim()) return alert('Escreva sua primeira anotação.')
     const estimatedStudentCount = clampStudentCount(Number(s2StudentCount))
     setFinishing(true)
     setFinishError('')
@@ -56,12 +56,12 @@ export default function Onboarding() {
       addAnnotation({
         id: `ob-${Date.now()}`,
         category: 'formacao',
-        label: 'Anotacao pessoal',
+        label: 'Anotação pessoal',
         badgeClass: 'badge-ev',
         studentName: null,
         text: s3Note,
         date: 'Agora',
-        tags: ['Anotacao pessoal'],
+        tags: ['Anotação pessoal'],
         scope: 'personal',
       })
       confetti({
@@ -72,7 +72,7 @@ export default function Onboarding() {
       })
       setTimeout(() => complete(), 800)
     } catch (error) {
-      setFinishError(error instanceof Error ? error.message : 'Nao foi possivel finalizar agora.')
+      setFinishError(error instanceof Error ? error.message : 'Não foi possível finalizar agora.')
     } finally {
       setFinishing(false)
     }
@@ -174,7 +174,7 @@ function StepOne({
           />
         </Field>
 
-        <Field label="Escola que voce leciona">
+        <Field label="Escola em que você leciona">
           <input
             className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors"
             placeholder="Ex: E.M. Joao XXIII"
@@ -232,7 +232,7 @@ function StepTwo({
           Cadastre sua primeira turma
         </h1>
         <p className="text-white/55 text-sm mt-3 leading-relaxed">
-          Voce pode adicionar mais turmas depois. Comece pela principal.
+          Você pode adicionar mais turmas depois. Comece pela principal.
         </p>
       </div>
 
@@ -246,11 +246,11 @@ function StepTwo({
           />
         </Field>
 
-        <Field label="Faixa etaria">
+        <Field label="Faixa etária">
           <AgeRangeSelector value={ageGroup} onChange={setAgeGroup} />
         </Field>
 
-        <Field label="Quantidade aproximada de criancas">
+        <Field label="Quantidade aproximada de crianças">
           <input
             className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors"
             type="number"
@@ -262,7 +262,7 @@ function StepTwo({
             onChange={(event) => setEstimatedStudentCount(event.target.value)}
           />
           <p className="text-[11px] text-muted leading-[1.5] mt-2">
-            Usamos esse numero para estimar GizTokens e garantir os relatorios semestrais enquanto voce cadastra as criancas.
+            Usamos esse número para estimar GizTokens e garantir os relatórios semestrais enquanto você cadastra as crianças.
           </p>
         </Field>
       </div>
@@ -286,10 +286,10 @@ function StepThree({
       <div>
         <p className="font-chalk text-white/60 text-xl mb-1">Passo 3</p>
         <h1 className="font-chalk text-white text-4xl font-bold leading-tight">
-          Faca sua primeira anotacao
+          Faça sua primeira anotação
         </h1>
         <p className="text-white/55 text-sm mt-3 leading-relaxed">
-          Este primeiro registro fica como anotacao pessoal, so para voce organizar ideias da rotina.
+          Este primeiro registro fica como anotação pessoal, só para você organizar ideias da rotina.
         </p>
       </div>
 
@@ -302,7 +302,7 @@ function StepThree({
         />
 
         <div className="bg-gbg rounded-app-sm p-3 border border-gp text-xs text-gd leading-relaxed">
-          Esta anotacao nao sera vinculada a uma crianca. Depois voce tambem podera criar anotacoes pessoais pela aba Anotacoes.
+          Esta anotação não será vinculada a uma criança. Depois você também poderá criar anotações pessoais pela aba Anotações.
         </div>
       </div>
 
@@ -344,3 +344,4 @@ function clampStudentCount(value: number) {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.min(300, Math.round(value)))
 }
+

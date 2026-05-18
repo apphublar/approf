@@ -6,9 +6,9 @@ export default function NotificationsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Notificacoes"
+        eyebrow="Notificações"
         title="Email, Telegram e sistema"
-        description="Fila unica para mensagens transacionais e alertas, sempre evitando expor dados completos de criancas."
+        description="Fila única para mensagens transacionais e alertas, sempre evitando expor dados completos de crianças."
       />
 
       <article className="panel">
