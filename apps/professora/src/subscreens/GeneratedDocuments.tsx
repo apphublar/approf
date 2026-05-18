@@ -360,14 +360,14 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                 className={`rounded-app-sm border px-3 py-3 text-left ${quality === 'medium' ? 'border-gm bg-gbg' : 'border-border bg-white'}`}
               >
                 <p className="text-[13px] font-bold text-ink">Média</p>
-                <p className="text-[11px] text-muted mt-1">Geração mais econômica (900 GizTokens).</p>
+                <p className="text-[11px] text-muted mt-1">Geração mais econômica.</p>
               </button>
               <button
                 onClick={() => setQuality('high')}
                 className={`rounded-app-sm border px-3 py-3 text-left ${quality === 'high' ? 'border-gm bg-gbg' : 'border-border bg-white'}`}
               >
                 <p className="text-[13px] font-bold text-ink">Alta</p>
-                <p className="text-[11px] text-muted mt-1">Maior qualidade e maior consumo (1500 GizTokens).</p>
+                <p className="text-[11px] text-muted mt-1">Maior qualidade e maior consumo de GizTokens.</p>
               </button>
             </div>
 

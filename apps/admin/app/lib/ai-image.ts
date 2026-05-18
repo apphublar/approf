@@ -48,6 +48,7 @@ interface GenerateStandaloneImageResult {
 }
 
 const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2'
+const DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL = 'gpt-image-1-mini'
 const DEFAULT_OPENAI_IMAGE_SIZE = '1024x1536'
 const DEFAULT_OPENAI_IMAGE_QUALITY = 'high'
 const DEFAULT_OPENAI_IMAGE_COST_CENTS = 120
@@ -120,7 +121,7 @@ export async function generateStandaloneImage(
   input: GenerateStandaloneImageInput,
 ): Promise<GenerateStandaloneImageResult> {
   const summary = input.requestSummary ?? {}
-  const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_IMAGE_MODEL
+  const model = process.env.OPENAI_STANDALONE_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL
   const size = resolveStandaloneImageSize(summary)
   const quality = resolveStandaloneImageQuality(summary)
   const prompt = buildStandaloneImagePrompt(summary, size)

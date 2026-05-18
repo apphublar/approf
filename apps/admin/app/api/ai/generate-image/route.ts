@@ -14,12 +14,9 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
 
-const QUALITY_PRICING = {
-  medium: { estimatedCostCents: 90, giztokens: 900 },
-  high: { estimatedCostCents: 150, giztokens: 1500 },
-} as const
+const GIZTOKENS_PER_COST_CENT = 10
 
-type ImageQuality = keyof typeof QUALITY_PRICING
+type ImageQuality = 'medium' | 'high'
 
 export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
@@ -49,7 +46,7 @@ export async function POST(request: Request) {
       studentId: typeof body.studentId === 'string' ? body.studentId : null,
       promptVersion,
       requestSummary,
-      pricingOverride: QUALITY_PRICING[quality],
+      pricingOverride: buildQualityEstimate(quality),
     })
 
     const reservedLogId = reservation.logId
@@ -159,6 +156,25 @@ export async function POST(request: Request) {
 function parseImageQuality(value: unknown): ImageQuality {
   if (value === 'medium' || value === 'high') return value
   return 'medium'
+}
+
+function buildQualityEstimate(quality: ImageQuality) {
+  const baseCostCents = resolveBaseEstimatedImageCostCents()
+  const adjustedCostCents = quality === 'high'
+    ? Math.round(baseCostCents * 1.25)
+    : Math.round(baseCostCents * 0.85)
+
+  const estimatedCostCents = Math.max(1, adjustedCostCents)
+  return {
+    estimatedCostCents,
+    giztokens: estimatedCostCents * GIZTOKENS_PER_COST_CENT,
+  }
+}
+
+function resolveBaseEstimatedImageCostCents() {
+  const fromEnv = Number(process.env.OPENAI_STANDALONE_IMAGE_ESTIMATED_COST_CENTS)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
+  return 110
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
