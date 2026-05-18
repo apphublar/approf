@@ -29,10 +29,6 @@ const REPORT_MODELS: ModelOption[] = [
 ]
 
 const PLANNING_MODELS: ModelOption[] = [
-  { id: 'anual', label: 'Planejamento anual', desc: 'Organizacao ampla do ano letivo.', scope: 'class' },
-  { id: 'semestral', label: 'Planejamento semestral', desc: 'Objetivos e propostas do semestre.', scope: 'class' },
-  { id: 'mensal', label: 'Planejamento mensal', desc: 'Temas, objetivos e vivencias do mes.', scope: 'class' },
-  { id: 'quinzenal', label: 'Planejamento quinzenal', desc: 'Sequencia de atividades para duas semanas.', scope: 'class' },
   { id: 'semanal', label: 'Planejamento semanal', desc: 'Rotina e propostas da semana.', scope: 'class' },
   { id: 'diario', label: 'Plano de aula diario', desc: 'Atividade, objetivo, materiais e desenvolvimento.', scope: 'class' },
   { id: 'projeto', label: 'Projeto pedagogico especifico', desc: 'Projeto por tema, interesse da turma ou necessidade observada.', scope: 'class' },
@@ -116,8 +112,10 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       classId: typeof input.classId === 'string' ? input.classId : null,
       studentId: typeof input.studentId === 'string' ? input.studentId : null,
       text: typeof input.text === 'string' ? input.text : null,
+      directStudentNote: Boolean(input.directStudentNote),
     }
   }, [props?.data])
+  const isDirectStudentNote = Boolean(prefillData?.directStudentNote) && !isEditing
 
   const modelOptions = getModelOptions(workKind)
   const selectedModel = modelOptions.find((item) => item.id === modelId)
@@ -136,13 +134,16 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     [workKind, modelId, selectedModel?.label, selectedStudent?.name, selectedClass?.name],
   )
 
-  const needsClass = selectedModel?.scope === 'class' || selectedModel?.scope === 'child'
-  const needsStudent = selectedModel?.scope === 'child'
-  const canSave =
-    text.trim().length >= 5 &&
-    Boolean(workKind && selectedModel) &&
-    (!needsClass || Boolean(classId)) &&
-    (!needsStudent || Boolean(studentId))
+  const needsClass = isDirectStudentNote || selectedModel?.scope === 'class' || selectedModel?.scope === 'child'
+  const needsStudent = isDirectStudentNote || selectedModel?.scope === 'child'
+  const canSave = isDirectStudentNote
+    ? text.trim().length >= 5 && Boolean(classId) && Boolean(studentId)
+    : (
+        text.trim().length >= 5 &&
+        Boolean(workKind && selectedModel) &&
+        (!needsClass || Boolean(classId)) &&
+        (!needsStudent || Boolean(studentId))
+      )
 
   useEffect(() => {
     if (!recording) return
@@ -184,6 +185,10 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     if (prefillData.classId) setClassId(prefillData.classId)
     if (prefillData.studentId) setStudentId(prefillData.studentId)
     if (prefillData.text) setText(prefillData.text)
+    if (prefillData.directStudentNote) {
+      setWorkKind('memory')
+      setModelId('observacao')
+    }
   }, [isEditing, prefillData])
 
   function chooseWorkKind(value: WorkKind) {
@@ -338,17 +343,24 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   }
 
   async function save() {
-    if (!canSave || !selectedModel) {
+    if (!canSave || (!selectedModel && !isDirectStudentNote)) {
       setError('Preencha a anotacao e siga as escolhas indicadas.')
       return
     }
 
     setSaving(true)
     setError('')
-    const resolved = resolveAnnotation(workKind, selectedModel)
-    const targetClassId = selectedModel.scope === 'teacher' ? undefined : classId || undefined
-    const targetStudentId = selectedModel.scope === 'child' ? selectedStudent?.id : undefined
-    const targetStudentName = selectedModel.scope === 'child' ? selectedStudent?.name ?? null : null
+    const effectiveModel = selectedModel ?? MEMORY_MODELS[1]
+    const resolved = isDirectStudentNote
+      ? {
+          category: 'evolucao' as AnnotationCategory,
+          label: 'Anotacao direta',
+          persistence: ['observacao-continua', 'observacao-importante'] as AnnotationPersistence[],
+        }
+      : resolveAnnotation(workKind, effectiveModel)
+    const targetClassId = effectiveModel.scope === 'teacher' ? undefined : classId || undefined
+    const targetStudentId = (isDirectStudentNote || effectiveModel.scope === 'child') ? selectedStudent?.id : undefined
+    const targetStudentName = (isDirectStudentNote || effectiveModel.scope === 'child') ? selectedStudent?.name ?? null : null
     const annotationInput = {
       category: resolved.category,
       label: resolved.label,
@@ -370,10 +382,10 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       date: 'Agora',
       classId: targetClassId,
       studentId: targetStudentId,
-      tags: [selectedModel.label, ...tags],
+      tags: [isDirectStudentNote ? 'Anotacao direta' : effectiveModel.label, ...tags],
       persistence: resolved.persistence,
       attachmentName: attachmentName || null,
-      scope: selectedModel.scope === 'teacher' ? 'personal' as const : undefined,
+      scope: !isDirectStudentNote && effectiveModel.scope === 'teacher' ? 'personal' as const : undefined,
     }
 
     try {
@@ -414,9 +426,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">
-          {isEditing ? 'Editar anotacao' : 'Nova anotacao'}
-        </span>
+        <span className="font-serif text-[18px] text-gd flex-1">{isDirectStudentNote ? 'Anotacao do aluno' : (isEditing ? 'Editar anotacao' : 'Nova anotacao')}</span>
         <button
           onClick={save}
           disabled={saving || !canSave}
@@ -510,36 +520,40 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           </div>
         </section>
 
-        <StepTitle number="1" title="O que esta anotacao vai ajudar a fazer?" />
-        <div className="grid grid-cols-1 gap-2 mb-4">
-          <ChoiceButton selected={workKind === 'report'} title="Relatorio ou documento" desc="Desenvolvimento, portfolio, diario de bordo, especialista, reuniao." onClick={() => chooseWorkKind('report')} />
-          <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Anual, mensal, semanal, plano de aula ou projeto pedagogico." onClick={() => chooseWorkKind('planning')} />
-          <ChoiceButton selected={workKind === 'memory'} title="Memoria pedagogica" desc="Registro rapido de evolucao, observacao importante ou ideia solta." onClick={() => chooseWorkKind('memory')} />
-          <ChoiceButton selected={workKind === 'personal'} title="Anotacao pessoal" desc="Ideias e lembretes privados da professora, sem crianca vinculada." onClick={() => chooseWorkKind('personal')} />
-        </div>
-
-        {workKind && (
+        {!isDirectStudentNote && (
           <>
-            <StepTitle number="2" title="Escolha o tipo correto" />
-            <select
-              className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
-              value={modelId}
-              onChange={(event) => chooseModel(event.target.value)}
-            >
-              <option value="">Selecionar tipo</option>
-              {modelOptions.map((option) => (
-                <option key={option.id} value={option.id}>{option.label}</option>
-              ))}
-            </select>
-            {selectedModel && (
-              <p className="text-[11px] text-muted leading-[1.5] mb-4">{selectedModel.desc}</p>
+            <StepTitle number="1" title="O que esta anotacao vai ajudar a fazer?" />
+            <div className="grid grid-cols-1 gap-2 mb-4">
+              <ChoiceButton selected={workKind === 'report'} title="Relatorio ou documento" desc="Desenvolvimento, portfolio, diario de bordo, especialista, reuniao." onClick={() => chooseWorkKind('report')} />
+              <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Semanal, diario ou projeto pedagogico." onClick={() => chooseWorkKind('planning')} />
+              <ChoiceButton selected={workKind === 'memory'} title="Memoria pedagogica" desc="Registro rapido de evolucao, observacao importante ou ideia solta." onClick={() => chooseWorkKind('memory')} />
+              <ChoiceButton selected={workKind === 'personal'} title="Anotacao pessoal" desc="Ideias e lembretes privados da professora, sem crianca vinculada." onClick={() => chooseWorkKind('personal')} />
+            </div>
+
+            {workKind && (
+              <>
+                <StepTitle number="2" title="Escolha o tipo correto" />
+                <select
+                  className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
+                  value={modelId}
+                  onChange={(event) => chooseModel(event.target.value)}
+                >
+                  <option value="">Selecionar tipo</option>
+                  {modelOptions.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
+                {selectedModel && (
+                  <p className="text-[11px] text-muted leading-[1.5] mb-4">{selectedModel.desc}</p>
+                )}
+              </>
             )}
           </>
         )}
 
-        {selectedModel && needsClass && (
+        {(selectedModel || isDirectStudentNote) && needsClass && (
           <>
-            <StepTitle number="3" title={needsStudent ? 'Escolha a crianca' : 'Escolha a turma'} />
+            <StepTitle number={isDirectStudentNote ? '1' : '3'} title={needsStudent || isDirectStudentNote ? 'Escolha a crianca' : 'Escolha a turma'} />
             <select
               className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
               value={classId}
@@ -550,7 +564,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 <option key={cls.id} value={cls.id}>{cls.name}</option>
               ))}
             </select>
-            {needsStudent && (
+            {(needsStudent || isDirectStudentNote) && (
               <select
                 className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-4"
                 value={studentId}
@@ -565,7 +579,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           </>
         )}
 
-        {selectedModel && (
+        {selectedModel && !isDirectStudentNote && (
           <>
             <StepTitle number={needsClass ? '4' : '3'} title="Detalhes opcionais" />
             <select

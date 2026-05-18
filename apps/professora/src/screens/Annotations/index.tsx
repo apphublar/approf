@@ -1,33 +1,27 @@
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Plus, Search } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import AnnotationCard from '@/components/ui/AnnotationCard'
-import type { AnnotationCategory } from '@/types'
-
-type AnnotationFilter = AnnotationCategory | 'todas' | 'pessoais'
-
-const CHIPS: { id: AnnotationFilter; label: string }[] = [
-  { id: 'todas', label: 'Todas' },
-  { id: 'pessoais', label: 'Pessoais' },
-  { id: 'evolucao', label: 'Evolucao' },
-  { id: 'plano', label: 'Plano de aula' },
-  { id: 'portfolio', label: 'Portfolio' },
-  { id: 'projeto', label: 'Projeto' },
-  { id: 'formacao', label: 'Formacao' },
-  { id: 'carta', label: 'Carta' },
-  { id: 'atipico', label: 'Atipico' },
-]
 
 export default function AnnotationsScreen() {
   const { annotations } = useAppStore()
   const { openSubscreen } = useNavStore()
-  const [active, setActive] = useState<AnnotationFilter>('todas')
+  const [query, setQuery] = useState('')
 
-  const filtered = active === 'todas'
-    ? annotations
-    : active === 'pessoais'
-      ? annotations.filter((annotation) => annotation.scope === 'personal')
-      : annotations.filter((annotation) => annotation.category === active)
+  const filtered = useMemo(() => {
+    const normalizedQuery = normalizeText(query)
+    if (!normalizedQuery) return annotations
+    return annotations.filter((annotation) =>
+      normalizeText([
+        annotation.label,
+        formatCategory(annotation.category),
+        annotation.text,
+        annotation.studentName ?? '',
+        annotation.date,
+        ...(annotation.tags ?? []),
+      ].join(' ')).includes(normalizedQuery),
+    )
+  }, [annotations, query])
 
   function openAnnotation(annotation: (typeof annotations)[number]) {
     openSubscreen('new-annotation', { annotationId: annotation.id })
@@ -35,7 +29,7 @@ export default function AnnotationsScreen() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="bg-white px-[18px] pt-12 pb-0 border-b border-border flex-shrink-0">
+      <div className="bg-white px-[18px] pt-12 pb-3 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <span className="font-serif text-[22px] text-gd">Anotacoes</span>
           <button
@@ -46,20 +40,14 @@ export default function AnnotationsScreen() {
           </button>
         </div>
 
-        <div className="flex gap-[7px] overflow-x-auto pb-[13px] scrollbar-none">
-          {CHIPS.map((chip) => (
-            <button
-              key={chip.id}
-              onClick={() => setActive(chip.id)}
-              className={`px-[13px] py-[6px] rounded-full text-xs font-semibold border-[1.5px] whitespace-nowrap flex-shrink-0 transition-colors ${
-                active === chip.id
-                  ? 'bg-gm border-gm text-white'
-                  : 'bg-white border-border text-muted'
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
+        <div className="bg-cream rounded-app-sm border border-border px-3 py-2 flex items-center gap-2">
+          <Search size={15} className="text-muted flex-shrink-0" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar por tipo, texto, crianca ou data..."
+            className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
+          />
         </div>
       </div>
 
@@ -81,4 +69,25 @@ export default function AnnotationsScreen() {
 
     </div>
   )
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function formatCategory(category: string) {
+  const labels: Record<string, string> = {
+    evolucao: 'Evolucao',
+    plano: 'Planejamento',
+    portfolio: 'Portfolio',
+    projeto: 'Projeto',
+    formacao: 'Formacao',
+    carta: 'Carta',
+    atipico: 'Atipico',
+  }
+  return labels[category] ?? 'Anotacao'
 }

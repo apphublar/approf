@@ -233,7 +233,7 @@ export default function HomeScreen() {
                 <Sparkles size={22} />
               </div>
               <div className="flex-1">
-                <h3 className="text-[14px] font-bold">IA Pedagogica</h3>
+                <h3 className="text-[14px] font-bold">Relatorios e Planejamentos</h3>
                 <p className="text-[11px] opacity-80 leading-snug">Relatorios, planejamentos e pareceres com base nas suas anotacoes</p>
               </div>
               <span className="text-white/70 text-[18px]">›</span>
@@ -242,7 +242,7 @@ export default function HomeScreen() {
 
           <div className="bg-white rounded-app p-4 mb-[14px] border border-border shadow-card">
             <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
-              Sugestoes inteligentes
+              Sugestoes pedagogicas
             </p>
             <button
               onClick={() => openSubscreen('ai')}

@@ -16,25 +16,21 @@ const EVENT_STYLE: Record<TimelineEventType, { label: string; bg: string; fg: st
 
 export default function StudentProfileSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes, activeStudentId, activeClassId, annotations } = useAppStore()
+  const { classes, activeStudentId, activeClassId, annotations, attendanceRecords } = useAppStore()
 
   const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
   const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
+  if (!student || !cls) return null
+
+  const studentNameNormalized = normalizeText(student.name)
   const studentAnns = annotations.filter(
     (annotation) =>
       annotation.studentId === student?.id ||
+      normalizeText(annotation.studentName ?? '') === studentNameNormalized ||
       annotation.studentName === `${student?.name.split(' ')[0]} ${student?.name.split(' ')[1]?.[0]}.`,
   )
 
-  if (!student) return null
-
-  const development = student.development ?? {
-    linguagem: 45,
-    socializacao: 45,
-    coordenacao: 45,
-    autonomia: 45,
-  }
-  const timeline: TimelineEvent[] = student.timeline ?? studentAnns.map((annotation) => ({
+  const timelineFromAnnotations: TimelineEvent[] = studentAnns.map((annotation) => ({
     id: annotation.id,
     type: 'evolucao' as const,
     title: annotation.label,
@@ -45,6 +41,14 @@ export default function StudentProfileSubscreen() {
     attachmentUrl: null,
     attachmentKind: annotation.attachmentName ? 'file' : undefined,
   }))
+  const timeline: TimelineEvent[] = student.timeline && student.timeline.length > 0 ? student.timeline : timelineFromAnnotations
+  const totalRecords = studentAnns.length
+  const totalMilestones = timeline.filter((event) => event.type === 'marco').length || timeline.length
+  const absenceRecords = attendanceRecords
+    .filter((record) => record.classId === cls.id && !record.presentStudentIds.includes(student.id))
+    .sort((a, b) => b.date.localeCompare(a.date))
+  const totalAbsences = absenceRecords.length
+  const lastAbsences = absenceRecords.slice(0, 3)
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
@@ -63,7 +67,13 @@ export default function StudentProfileSubscreen() {
           >
             <Pencil size={15} />
           </button>
-          <button onClick={() => openSubscreen('new-annotation')} className="text-[13px] font-bold text-gm">
+          <button onClick={() => openSubscreen('new-annotation', {
+            prefill: {
+              classId: cls.id,
+              studentId: student.id,
+              directStudentNote: true,
+            },
+          })} className="text-[13px] font-bold text-gm">
             + Nota
           </button>
         </div>
@@ -90,24 +100,33 @@ export default function StudentProfileSubscreen() {
               {student.birthDate && <p className="text-[11px] opacity-65 mt-1">Nascimento: {formatBirthDate(student.birthDate)}</p>}
               <div className="flex gap-2 flex-wrap mt-3">
                 {student.tag && <span className="bg-white/18 text-white text-[10px] font-bold px-3 py-1 rounded-full">{student.tag}</span>}
-                <span className="bg-white/18 text-white text-[10px] font-bold px-3 py-1 rounded-full">{student.annotationCount} registros</span>
+                <span className="bg-white/18 text-white text-[10px] font-bold px-3 py-1 rounded-full">{totalRecords} registros</span>
                 <span className="bg-white/18 text-white text-[10px] font-bold px-3 py-1 rounded-full">{student.childCode ?? 'CRI-PENDENTE'}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {student.generalNotes && (
-          <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
-            <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Observacoes gerais</p>
-            <p className="text-[13px] text-soft leading-[1.65]">{student.generalNotes}</p>
-          </div>
-        )}
+        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
+          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Faltas do aluno</p>
+          <p className="text-[13px] text-ink">
+            {totalAbsences > 0 ? `${totalAbsences} faltas registradas.` : 'Sem faltas registradas ate o momento.'}
+          </p>
+          {lastAbsences.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {lastAbsences.map((absence) => (
+                <span key={absence.id} className="px-2 py-1 rounded-full bg-cream border border-border text-[10px] text-muted">
+                  {formatAttendanceDate(absence.date)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-3 gap-[10px] mb-5">
           {[
-            { n: student.annotationCount, l: 'Registros' },
-            { n: timeline.length, l: 'Marcos' },
+            { n: totalRecords, l: 'Registros' },
+            { n: totalMilestones, l: 'Marcos' },
             { n: student.age, l: 'Anos' },
           ].map((item) => (
             <div key={item.l} className="bg-white rounded-app p-3 text-center border border-border">
@@ -117,29 +136,25 @@ export default function StudentProfileSubscreen() {
           ))}
         </div>
 
-        <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-[10px]">Jornada individual</p>
-        <div className="grid grid-cols-2 gap-[10px] mb-5">
-          {[
-            { label: 'Linguagem', value: development.linguagem },
-            { label: 'Socializacao', value: development.socializacao },
-            { label: 'Coord. Motora', value: development.coordenacao },
-            { label: 'Autonomia', value: development.autonomia },
-          ].map((item) => (
-            <div key={item.label} className="bg-white rounded-app p-3 border border-border">
-              <div className="text-[11px] font-bold text-ink mb-2">{item.label}</div>
-              <div className="h-[6px] rounded-full bg-border overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${item.value}%`, background: 'linear-gradient(90deg,#4F8341,#83C451)' }} />
-              </div>
-            </div>
-          ))}
-        </div>
+        <button
+          onClick={() => openSubscreen('new-annotation', {
+            prefill: {
+              classId: cls.id,
+              studentId: student.id,
+              directStudentNote: true,
+            },
+          })}
+          className="w-full py-[14px] rounded-app bg-white text-gd font-bold text-[14px] border border-gp mb-3 cursor-pointer"
+        >
+          Fazer anotacao direta do aluno
+        </button>
 
         <button
           onClick={() => openSubscreen('report')}
           className="w-full py-[14px] rounded-app bg-gd text-white font-bold text-[14px] border-none flex items-center justify-center gap-2 mb-5 cursor-pointer"
         >
           <Sparkles size={16} strokeWidth={2} />
-          Gerar relatorio com IA
+          Gerar relatorio
         </button>
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
@@ -245,4 +260,17 @@ export default function StudentProfileSubscreen() {
 function formatBirthDate(value: string) {
   const [year, month, day] = value.split('-')
   return `${day}/${month}/${year}`
+}
+
+function formatAttendanceDate(value: string) {
+  const [year, month, day] = value.split('-')
+  return `${day}/${month}/${year}`
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }
