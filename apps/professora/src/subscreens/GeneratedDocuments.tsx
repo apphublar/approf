@@ -157,7 +157,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
             <p className="text-[12px] text-muted mt-1 leading-[1.5]">
               {archiveFilter === 'archived'
                 ? 'Quando você arquivar documentos ou imagens, eles aparecem aqui para consulta e recuperação.'
-                : 'Quando você gerar com IA, o item salvo aparece aqui.'}
+                : 'Quando você gerar um documento, o item salvo aparece aqui.'}
             </p>
           </div>
         ) : (
@@ -192,7 +192,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                   )}
                   <p className="text-[11px] text-muted mt-1 line-clamp-2">
                     {isImageReport(doc)
-                      ? 'Imagem gerada com IA. Toque para visualizar.'
+                      ? 'Imagem gerada. Toque para visualizar.'
                       : (doc.body ?? '').slice(0, 150) || formatStatus(doc.status)}
                   </p>
                 </div>
@@ -264,7 +264,7 @@ function isFromCurrentMonth(doc: GeneratedDocument) {
 function getTitle(filters: GeneratedDocumentsData) {
   if (filters.kind === 'images') return 'Imagens'
   if (filters.kind === 'documents') return 'Documentos'
-  if (filters.reportType === 'portfolio_image' || filters.reportType === 'portfolio_text') return 'Portfolios'
+  if (filters.reportType === 'portfolio_image' || filters.reportType === 'portfolio_text') return 'Portfólios'
   if (filters.reportType === 'development_report') return 'Relatórios'
   if (filters.reportType === 'planning') return 'Planejamentos'
   return 'Gerados'
@@ -275,11 +275,11 @@ function getSubtitle(filters: GeneratedDocumentsData, classes: ReturnType<typeof
   if (studentName) {
     return {
       heading: `Histórico de ${studentName}`,
-      body: 'Tudo que foi gerado por IA para esta criança fica aqui, separado entre este mês e o histórico geral.',
+      body: 'Tudo que foi gerado para esta criança fica aqui, separado entre este mês e o histórico geral.',
     }
   }
   return {
-    heading: filters.kind === 'images' ? 'Histórico de imagens geradas' : filters.kind === 'documents' ? 'Histórico de documentos gerados' : 'Histórico gerado com IA',
+    heading: filters.kind === 'images' ? 'Histórico de imagens geradas' : filters.kind === 'documents' ? 'Histórico de documentos gerados' : 'Histórico de gerados',
     body: 'Documentos, planejamentos, relatórios e imagens salvos ficam aqui para visualizar, editar, arquivar, recuperar ou marcar versão final.',
   }
 }

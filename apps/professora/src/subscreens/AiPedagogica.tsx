@@ -35,7 +35,7 @@ const AI_SECTIONS = [
 
 const PLANNING_PERIODS = [
   { title: 'Planejamento semanal', desc: 'Semanário com rotina, cuidado e brincadeira.' },
-  { title: 'Plano de aula diario', desc: 'Atividades do dia, objetivos, materiais e avaliação.' },
+  { title: 'Plano de aula diário', desc: 'Atividades do dia, objetivos, materiais e avaliação.' },
 ] as const
 
 type AiAction = (typeof AI_SECTIONS)[number]['actions'][number]
@@ -168,7 +168,7 @@ export default function AiPedagogicaSubscreen() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-bold text-ink leading-tight">Ver gerados</p>
-                <p className="text-[11px] text-muted leading-snug mt-1">Histórico do mês e geral de tudo que foi criado por IA.</p>
+                <p className="text-[11px] text-muted leading-snug mt-1">Histórico do mês e geral de tudo que foi criado.</p>
               </div>
               <ChevronRight size={18} className="text-muted flex-shrink-0" />
             </button>

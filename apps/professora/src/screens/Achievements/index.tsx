@@ -6,7 +6,7 @@ const BADGES = [
   { id: 'turma', label: 'Primeira Turma', icon: School, desc: 'Cadastrou sua primeira turma.', unlocked: true, color: '#FFF3CD', fg: '#856404' },
   { id: '50ann', label: '50 Anotações', icon: Star, desc: 'Você chegou a 50 registros.', unlocked: false, color: '#eee', fg: '#aaa' },
   { id: '1aluno', label: 'Perfil Completo', icon: UserRoundSearch, desc: 'Completou o perfil de um aluno.', unlocked: false, color: '#eee', fg: '#aaa' },
-  { id: 'ia', label: 'Relatório com IA', icon: Bot, desc: 'Gerou seu primeiro relatório com IA.', unlocked: false, color: '#eee', fg: '#aaa' },
+  { id: 'ia', label: 'Primeiro relatório', icon: Bot, desc: 'Gerou seu primeiro relatório.', unlocked: false, color: '#eee', fg: '#aaa' },
   { id: '100ann', label: '100 Anotações', icon: Award, desc: '100 anotações registradas.', unlocked: false, color: '#eee', fg: '#aaa' },
   { id: '30dias', label: '30 dias ativo', icon: Flame, desc: 'Usou o Approf por 30 dias.', unlocked: false, color: '#eee', fg: '#aaa' },
 ]

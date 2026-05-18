@@ -49,6 +49,8 @@ export default function StudentProfileSubscreen() {
     .sort((a, b) => b.date.localeCompare(a.date))
   const totalAttendanceCalls = attendanceRecords.filter((record) => record.classId === cls.id).length
   const totalAbsences = absenceRecords.length
+  const totalPresences = Math.max(0, totalAttendanceCalls - totalAbsences)
+  const attendanceRate = totalAttendanceCalls > 0 ? Math.round((totalPresences / totalAttendanceCalls) * 100) : 0
   const lastAbsences = absenceRecords.slice(0, 3)
 
   return (
@@ -109,22 +111,25 @@ export default function StudentProfileSubscreen() {
         </div>
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
-          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Faltas do aluno</p>
-          <p className="text-[12px] text-muted mb-3">
-            Resumo baseado nos registros de chamada da turma.
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-app-sm border px-2 py-3 text-center bg-gbg border-gp text-gd">
-              <span className="block text-[18px] font-bold leading-none">{Math.max(0, totalAttendanceCalls - totalAbsences)}</span>
-              <span className="block text-[10px] font-bold mt-1">Presencas</span>
+          <div className="rounded-app border border-[#D4EBC8] bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-gbg text-gd flex items-center justify-center text-[24px] font-bold flex-shrink-0">
+                P
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[22px] font-bold text-ink leading-tight">PRESENÇAS</p>
+                <p className="text-[16px] text-muted mt-1">{totalPresences} presenças · {totalAbsences} faltas</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[22px] font-bold text-gm leading-tight">{attendanceRate}%</p>
+                <p className="text-[13px] text-muted">presença</p>
+              </div>
             </div>
-            <div className="rounded-app-sm border px-2 py-3 text-center bg-[#FFF3CD] border-[#EAD58A] text-[#856404]">
-              <span className="block text-[18px] font-bold leading-none">{totalAbsences}</span>
-              <span className="block text-[10px] font-bold mt-1">Faltas</span>
-            </div>
-            <div className="rounded-app-sm border px-2 py-3 text-center bg-cream border-border text-muted">
-              <span className="block text-[18px] font-bold leading-none">{totalAttendanceCalls}</span>
-              <span className="block text-[10px] font-bold mt-1">Chamadas</span>
+            <div className="h-4 rounded-full bg-cream border border-border mt-4 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gm transition-all"
+                style={{ width: `${attendanceRate}%` }}
+              />
             </div>
           </div>
           {lastAbsences.length > 0 ? (

@@ -126,12 +126,12 @@ export interface AiUsageSummary {
 export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+    throw new Error('Serviço de geração não configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
   }
 
   const supabase = getSupabaseClient()
   if (!supabase) {
-    throw new Error('Supabase nao configurado para consultar uso de IA.')
+    throw new Error('Supabase não configurado para consultar uso.')
   }
 
   const { data, error } = await supabase.auth.getSession()
@@ -139,7 +139,7 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
 
   const token = data.session?.access_token
   if (!token) {
-    throw new Error('Sessao expirada. Entre novamente para consultar uso de IA.')
+    throw new Error('Sessão expirada. Entre novamente para consultar uso.')
   }
 
   const response = await fetch(`${apiBaseUrl}/api/ai/usage-summary`, {
@@ -154,12 +154,12 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   if (!response.ok) {
     const message = result && 'error' in result && typeof result.error === 'string'
       ? result.error
-      : 'Nao foi possivel consultar o saldo de IA.'
+      : 'Não foi possível consultar o saldo agora.'
     throw new Error(message)
   }
 
   if (!result || !('wallet' in result)) {
-    throw new Error('Resposta invalida do backend de IA.')
+    throw new Error('Resposta inválida do servidor.')
   }
 
   return result
@@ -169,12 +169,12 @@ export async function reserveAiUsage(input: AiUsageReservationInput): Promise<Ai
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
 
   if (!apiBaseUrl) {
-    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+    throw new Error('Serviço de geração não configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
   }
 
   const supabase = getSupabaseClient()
   if (!supabase) {
-    throw new Error('Supabase nao configurado para registrar uso de IA.')
+    throw new Error('Supabase não configurado para registrar uso.')
   }
 
   const { data, error } = await supabase.auth.getSession()
@@ -182,7 +182,7 @@ export async function reserveAiUsage(input: AiUsageReservationInput): Promise<Ai
 
   const token = data.session?.access_token
   if (!token) {
-    throw new Error('Sessao expirada. Entre novamente para gerar com IA.')
+    throw new Error('Sessão expirada. Entre novamente para continuar.')
   }
 
   const response = await fetch(`${apiBaseUrl}/api/ai/reserve`, {
@@ -199,12 +199,12 @@ export async function reserveAiUsage(input: AiUsageReservationInput): Promise<Ai
   if (!response.ok && response.status !== 402) {
     const message = result && 'error' in result && typeof result.error === 'string'
       ? result.error
-      : 'Nao foi possivel registrar o uso de IA.'
+      : 'Não foi possível registrar o uso agora.'
     throw new Error(message)
   }
 
   if (!result || !('allowed' in result)) {
-    throw new Error('Resposta invalida do backend de IA.')
+    throw new Error('Resposta inválida do servidor.')
   }
 
   return {
@@ -219,12 +219,12 @@ export async function reserveAiUsage(input: AiUsageReservationInput): Promise<Ai
 export async function generateAiTextDocument(input: AiTextGenerationInput): Promise<AiTextGenerationResult> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+    throw new Error('Serviço de geração não configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
   }
 
   const supabase = getSupabaseClient()
   if (!supabase) {
-    throw new Error('Supabase nao configurado para registrar uso de IA.')
+    throw new Error('Supabase não configurado para registrar uso.')
   }
 
   const { data, error } = await supabase.auth.getSession()
@@ -232,7 +232,7 @@ export async function generateAiTextDocument(input: AiTextGenerationInput): Prom
 
   const token = data.session?.access_token
   if (!token) {
-    throw new Error('Sessao expirada. Entre novamente para gerar com IA.')
+    throw new Error('Sessão expirada. Entre novamente para continuar.')
   }
 
   const response = await fetch(`${apiBaseUrl}/api/ai/generate-text`, {
@@ -249,12 +249,12 @@ export async function generateAiTextDocument(input: AiTextGenerationInput): Prom
   if (!response.ok && response.status !== 402) {
     const message = result && 'error' in result && typeof result.error === 'string'
       ? result.error
-      : 'Nao foi possivel gerar documento com IA.'
+      : 'Não foi possível gerar o documento agora.'
     throw new Error(message)
   }
 
   if (!result || !('allowed' in result)) {
-    throw new Error('Resposta invalida do backend de IA.')
+    throw new Error('Resposta inválida do servidor.')
   }
 
   return {
@@ -274,12 +274,12 @@ export async function generateAiTextDocument(input: AiTextGenerationInput): Prom
 export async function generateAiPortfolioImage(input: AiImageGenerationInput): Promise<AiImageGenerationResult> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+    throw new Error('Serviço de geração não configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
   }
 
   const supabase = getSupabaseClient()
   if (!supabase) {
-    throw new Error('Supabase nao configurado para registrar uso de IA.')
+    throw new Error('Supabase não configurado para registrar uso.')
   }
 
   const { data, error } = await supabase.auth.getSession()
@@ -287,29 +287,46 @@ export async function generateAiPortfolioImage(input: AiImageGenerationInput): P
 
   const token = data.session?.access_token
   if (!token) {
-    throw new Error('Sessao expirada. Entre novamente para gerar com IA.')
+    throw new Error('Sessão expirada. Entre novamente para continuar.')
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/ai/generate-portfolio-image`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(input),
-  })
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 120000)
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/api/ai/generate-portfolio-image`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('A geração da imagem demorou mais do que o esperado. Tente novamente.')
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
 
   const result = await response.json().catch(() => null) as Partial<AiImageGenerationResult> | { error?: string } | null
 
   if (!response.ok && response.status !== 402) {
     const message = result && 'error' in result && typeof result.error === 'string'
       ? result.error
-      : 'Nao foi possivel gerar imagem com IA.'
+      : 'Não foi possível gerar a imagem agora.'
     throw new Error(message)
   }
 
   if (!result || !('allowed' in result)) {
-    throw new Error('Resposta invalida do backend de IA.')
+    throw new Error('Resposta inválida do servidor.')
+  }
+
+  if (result.allowed && !result.imageDataUrl) {
+    throw new Error('Não foi possível obter a imagem do portfólio. Tente novamente.')
   }
 
   return {
@@ -330,12 +347,12 @@ export async function generateAiPortfolioImage(input: AiImageGenerationInput): P
 export async function generateAiChatReply(input: AiChatGenerationInput): Promise<AiChatGenerationResult> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+    throw new Error('Serviço de geração não configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
   }
 
   const supabase = getSupabaseClient()
   if (!supabase) {
-    throw new Error('Supabase nao configurado para registrar uso de IA.')
+    throw new Error('Supabase não configurado para registrar uso.')
   }
 
   const { data, error } = await supabase.auth.getSession()
@@ -365,7 +382,7 @@ export async function generateAiChatReply(input: AiChatGenerationInput): Promise
   }
 
   if (!result || !('allowed' in result)) {
-    throw new Error('Resposta invalida do backend de IA.')
+    throw new Error('Resposta inválida do servidor.')
   }
 
   return {
@@ -389,12 +406,12 @@ export async function transcribeAnnotationAudio(input: {
 }): Promise<AiAudioTranscriptionResult> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend de IA nao configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
+    throw new Error('Serviço de geração não configurado. Informe VITE_APPROF_ADMIN_API_URL no app da professora.')
   }
 
   const supabase = getSupabaseClient()
   if (!supabase) {
-    throw new Error('Supabase nao configurado para registrar uso de IA.')
+    throw new Error('Supabase não configurado para registrar uso.')
   }
 
   const { data, error } = await supabase.auth.getSession()
@@ -425,12 +442,12 @@ export async function transcribeAnnotationAudio(input: {
   if (!response.ok && response.status !== 402) {
     const message = result && 'error' in result && typeof result.error === 'string'
       ? result.error
-      : 'Nao foi possivel transcrever o audio.'
+      : 'Não foi possível transcrever o áudio.'
     throw new Error(message)
   }
 
   if (!result || !('allowed' in result)) {
-    throw new Error('Resposta invalida do backend de IA.')
+    throw new Error('Resposta inválida do servidor.')
   }
 
   return {
@@ -466,5 +483,5 @@ export function formatAiUsageMessage(result: AiUsageReservationResult) {
     return `GizTokens restantes: ${result.wallet.giztokensRemaining}.`
   }
 
-  return result.message || 'Uso de IA registrado.'
+  return result.message || 'Uso registrado.'
 }

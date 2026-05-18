@@ -2,6 +2,7 @@
 import { ChevronLeft, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
+import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import type {
   InterventionHistoryItem,
   InterventionReturnChoice,
@@ -12,7 +13,7 @@ type Step = 'form' | 'suggestions' | 'chosen' | 'feedback' | 'analysis'
 
 export default function InterventionsSubscreen() {
   const { closeSubscreen } = useNavStore()
-  const { classes, activeStudentId, interventions, addIntervention, updateIntervention, addAnnotation } = useAppStore()
+  const { classes, activeStudentId, interventions, addIntervention, updateIntervention, addAnnotation, userId } = useAppStore()
 
   const allStudents = useMemo(
     () => classes.flatMap((classData) => classData.students.map((student) => ({ ...student, classId: classData.id, className: classData.name }))),
@@ -33,6 +34,8 @@ export default function InterventionsSubscreen() {
   const [analysisText, setAnalysisText] = useState('')
   const [followupSuggestions, setFollowupSuggestions] = useState<InterventionSuggestion[]>([])
   const [activeInterventionId, setActiveInterventionId] = useState('')
+  const [draftMessage, setDraftMessage] = useState('')
+  const draftKey = `approf:draft:interventions:${userId}`
 
   const studentHistory = useMemo(
     () => interventions.filter((item) => item.studentId === selectedStudent?.id),
@@ -52,6 +55,42 @@ export default function InterventionsSubscreen() {
     setActiveInterventionId('')
     setReturnChoice('houve_avanco')
   }, [selectedStudentId])
+
+  useEffect(() => {
+    const draft = loadDraft<{
+      selectedStudentId: string
+      observation: string
+      teacherReturn: string
+      returnChoice: InterventionReturnChoice
+      step: Step
+    }>(draftKey)
+    if (!draft) return
+    if (draft.selectedStudentId) setSelectedStudentId(draft.selectedStudentId)
+    setObservation(draft.observation || '')
+    setTeacherReturn(draft.teacherReturn || '')
+    setReturnChoice(draft.returnChoice || 'houve_avanco')
+    if (draft.step === 'form' || draft.step === 'feedback') setStep(draft.step)
+    setDraftMessage('Rascunho recuperado')
+  }, [draftKey])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      saveDraft(draftKey, {
+        selectedStudentId,
+        observation,
+        teacherReturn,
+        returnChoice,
+        step,
+      })
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [draftKey, observation, returnChoice, selectedStudentId, step, teacherReturn])
+
+  useEffect(() => {
+    if (!draftMessage) return
+    const timeout = window.setTimeout(() => setDraftMessage(''), 3500)
+    return () => window.clearTimeout(timeout)
+  }, [draftMessage])
 
   async function handleGenerateSuggestions() {
     if (!selectedStudent || observation.trim().length < 12) return
@@ -197,6 +236,7 @@ export default function InterventionsSubscreen() {
       setFollowupSuggestions(returnChoice === 'houve_avanco' ? [] : parsed.recommendedSuggestions)
       setUsageMessage(formatAiUsageMessage(result))
       setStep('analysis')
+      clearDraft(draftKey)
     } catch (analysisError) {
       setError(analysisError instanceof Error ? analysisError.message : 'Não foi possível analisar o retorno agora.')
     } finally {
@@ -396,6 +436,7 @@ export default function InterventionsSubscreen() {
             {error || usageMessage}
           </p>
         )}
+        {draftMessage && <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>}
 
         {studentHistory.length > 0 && (
           <div className="mt-5">

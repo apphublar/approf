@@ -4,6 +4,7 @@ import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
 import { listReports, updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
+import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import type { Annotation } from '@/types'
 
 const AGE_GROUP_OPTIONS = [
@@ -38,7 +39,7 @@ type PortfolioImageFormat = 'portrait' | 'landscape' | 'square'
 
 export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes, activeStudentId, annotations } = useAppStore()
+  const { classes, activeStudentId, annotations, userId } = useAppStore()
 
   const allStudents = useMemo(
     () => classes.flatMap((classData) => classData.students.map((student) => ({ ...student, classId: classData.id, className: classData.name }))),
@@ -88,7 +89,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [latestReportId, setLatestReportId] = useState('')
   const [latestReportBody, setLatestReportBody] = useState('')
   const [loadingLatest, setLoadingLatest] = useState(false)
+  const [draftMessage, setDraftMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const draftKeyRef = useRef('')
+  const loadedDraftRef = useRef(false)
 
   const studentAnnotations = useMemo(
     () => annotations.filter((annotation) => matchesStudent(annotation, selectedStudentId, selectedStudent?.name)),
@@ -140,7 +144,107 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setLatestReportBody('')
     setHistoryScope('model')
     setPortfolioImageFormat('portrait')
-  }, [selectedStudentId, studentAnnotations])
+  }, [selectedStudentId])
+
+  useEffect(() => {
+    if (loadedDraftRef.current) return
+    const key = `approf:draft:report:${userId}:${reportKind}`
+    draftKeyRef.current = key
+    const draft = loadDraft<{
+      selectedStudentId: string
+      selectedClassId: string
+      historyScope: 'model' | 'student'
+      diaryDate: string
+      diaryTheme: string
+      diaryRawText: string
+      mode: ReportMode
+      selectedAnnotationIds: string[]
+      ignoredNotes: string
+      blankContext: string
+      extraContext: string
+      portfolioOutput: PortfolioOutput
+      portfolioImageFormat: PortfolioImageFormat
+      ageGroup: string
+      bnccFields: string[]
+      objective: string
+      evaluationPeriod: string
+      livingReport: boolean
+    }>(key)
+    if (draft) {
+      setSelectedStudentId(draft.selectedStudentId || fallbackStudentId)
+      setSelectedClassId(draft.selectedClassId || defaultClassId)
+      setHistoryScope(draft.historyScope || 'model')
+      setDiaryDate(draft.diaryDate || new Date().toISOString().slice(0, 10))
+      setDiaryTheme(draft.diaryTheme || '')
+      setDiaryRawText(draft.diaryRawText || '')
+      setMode(draft.mode || 'annotations')
+      setSelectedAnnotationIds(draft.selectedAnnotationIds || [])
+      setIgnoredNotes(draft.ignoredNotes || '')
+      setBlankContext(draft.blankContext || '')
+      setExtraContext(draft.extraContext || '')
+      setPortfolioOutput(draft.portfolioOutput || 'text')
+      setPortfolioImageFormat(draft.portfolioImageFormat || 'portrait')
+      setAgeGroup(draft.ageGroup || '')
+      setBnccFields(draft.bnccFields || [])
+      setObjective(draft.objective || '')
+      setEvaluationPeriod(draft.evaluationPeriod || '')
+      setLivingReport(Boolean(draft.livingReport))
+      setDraftMessage('Rascunho recuperado')
+    }
+    loadedDraftRef.current = true
+  }, [defaultClassId, fallbackStudentId, reportKind, userId])
+
+  useEffect(() => {
+    if (!loadedDraftRef.current || !draftKeyRef.current) return
+    const timeout = window.setTimeout(() => {
+      saveDraft(draftKeyRef.current, {
+        selectedStudentId,
+        selectedClassId,
+        historyScope,
+        diaryDate,
+        diaryTheme,
+        diaryRawText,
+        mode,
+        selectedAnnotationIds,
+        ignoredNotes,
+        blankContext,
+        extraContext,
+        portfolioOutput,
+        portfolioImageFormat,
+        ageGroup,
+        bnccFields,
+        objective,
+        evaluationPeriod,
+        livingReport,
+      })
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [
+    ageGroup,
+    blankContext,
+    bnccFields,
+    diaryDate,
+    diaryRawText,
+    diaryTheme,
+    evaluationPeriod,
+    extraContext,
+    historyScope,
+    ignoredNotes,
+    livingReport,
+    mode,
+    objective,
+    portfolioImageFormat,
+    portfolioOutput,
+    selectedAnnotationIds,
+    selectedClassId,
+    selectedStudentId,
+  ])
+
+  useEffect(() => {
+    if (!draftMessage) return
+    const timeout = window.setTimeout(() => setDraftMessage(''), 3500)
+    return () => window.clearTimeout(timeout)
+  }, [draftMessage])
 
   useEffect(() => {
     if (!supportsLivingReport || !selectedStudent?.id) return
@@ -300,16 +404,19 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
           })
 
       if (!result.allowed) {
-        setUsageError(result.message || 'Esta geracao precisa de pacote extra.')
+        setUsageError(result.message || 'Esta geração precisa de pacote extra.')
         setGenerating(false)
         return
+      }
+      if (generationType === 'portfolio_image' && !('imageDataUrl' in result && result.imageDataUrl)) {
+        throw new Error('Não foi possível obter a imagem do portfólio. Tente novamente.')
       }
 
       setUsageMessage(formatAiUsageMessage(result))
       const generatedBody = 'generatedText' in result && result.generatedText
         ? result.generatedText
         : 'prompt' in result && result.prompt
-          ? `Imagem de portfólio gerada com ChatGPT.\n\nPrompt usado:\n\n${result.prompt}`
+          ? `Imagem de portfólio gerada com sucesso.\n\nDescrição usada:\n\n${result.prompt}`
           : mockReport
       const nextImageUrl = 'imageDataUrl' in result && result.imageDataUrl ? result.imageDataUrl : ''
       let nextBody = generatedBody
@@ -336,9 +443,12 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         setGenerating(false)
         setGenerated(true)
       }, 900)
+      if (draftKeyRef.current) {
+        clearDraft(draftKeyRef.current)
+      }
     } catch (error) {
       setGenerating(false)
-      setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar com IA.')
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar agora.')
     }
   }
 
@@ -652,7 +762,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                       portfolioOutput === 'text' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
                     }`}
                   >
-                    <span className="block text-[13px] font-bold">Texto com Claude</span>
+                    <span className="block text-[13px] font-bold">Portfólio em texto</span>
                     <span className="block text-[11px] mt-1">Narrativa pedagógica e evidências</span>
                   </button>
                   <button
@@ -661,7 +771,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                       portfolioOutput === 'image' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
                     }`}
                   >
-                    <span className="block text-[13px] font-bold">Imagem com ChatGPT</span>
+                    <span className="block text-[13px] font-bold">Portfólio em imagem</span>
                     <span className="block text-[11px] mt-1">Capa ou painel visual</span>
                   </button>
                 </div>
@@ -807,7 +917,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                Orientação para a IA
+                Orientação adicional
               </label>
               <textarea
                 className="w-full min-h-[118px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
@@ -871,7 +981,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               disabled={!canGenerate || generating}
               className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> {isClassDiary ? 'Gerar diário' : 'Gerar com IA'}</>}
+              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando documento...</> : <><Sparkles size={18} /> {isClassDiary ? 'Gerar diário' : 'Gerar documento'}</>}
             </button>
             {(usageError || usageMessage) && (
               <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
@@ -879,6 +989,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               }`}>
                 {usageError || usageMessage}
               </p>
+            )}
+            {draftMessage && (
+              <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>
             )}
           </div>
         ) : (
@@ -893,7 +1006,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 <div className="flex flex-col gap-3">
                   <img
                     src={generatedImageUrl}
-                    alt="Portfólio pedagógico gerado com IA"
+                    alt="Portfólio pedagógico gerado"
                     className="w-full rounded-app-sm border border-border bg-cream"
                   />
                   <p className="text-[11px] text-muted leading-[1.5]">
@@ -1048,7 +1161,7 @@ Hábitos e rotina:
 Observações pedagógicas:
 As informações devem apoiar o acolhimento, a segurança e o planejamento de experiências respeitosas para ${input.firstName}, sempre com acesso restrito e uso pedagógico autorizado.${formatAttachments(input.attachments)}
 
-Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
+Documento gerado a partir das informações autorizadas pela professora.`
   }
 
   if (input.reportKind === 'Registro de reunião de pais') {
@@ -1074,7 +1187,7 @@ Combinados:
 Encaminhamentos:
 Formalizar próximos passos, necessidade de novo encontro ou acompanhamento da coordenação. O registro não deve expor outras crianças nem criar comparações.${formatAttachments(input.attachments)}
 
-Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
+Documento gerado a partir das informações autorizadas pela professora.`
   }
 
   if (input.reportKind === 'Diário de bordo') {
@@ -1094,7 +1207,7 @@ A turma participou com envolvimento nas propostas do dia, com destaque para mome
 
 O registro indica continuidade positiva do percurso pedagógico da turma, com oportunidades para retomar o tema em novas experiências e manter a documentação do cotidiano de forma leve e objetiva.${formatAttachments(input.attachments)}
 
-Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
+Documento gerado a partir das informações autorizadas pela professora.`
   }
 
   if (input.reportKind === 'Portfólio pedagógico') {
@@ -1117,9 +1230,9 @@ Prompt base para imagem:
 "Criar uma capa de portfólio pedagógico infantil para ${input.firstName}, turma ${input.className}, em formato ${formatPortfolioImageFormat(input.portfolioImageFormat)}, com estética acolhedora, organizada e profissional para educação infantil. Usar tons suaves, elementos de aprendizagem, brincadeira, natureza, artes e descobertas. Evitar texto pequeno ilegível e não expor outras crianças."
 
 Observação:
-Quando a API de imagem estiver ligada, esta opção usará ChatGPT para gerar a imagem do portfólio. O texto pedagógico pode continuar sendo gerado separadamente.${formatAttachments(input.attachments)}
+Quando a geração de imagem estiver disponível, esta opção criará a imagem do portfólio com base no contexto informado.${formatAttachments(input.attachments)}
 
-Imagem preparada com auxílio de IA a partir das informações autorizadas pela professora.`
+Imagem preparada a partir das informações autorizadas pela professora.`
     }
 
     return `${header}
@@ -1145,7 +1258,7 @@ Mais do que reunir atividades prontas, este portfólio guarda marcas do percurso
 Continuidade:
 Novas evidências podem ser adicionadas ao longo do período para formar uma memória pedagógica viva e segura.${formatAttachments(input.attachments)}
 
-Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
+Documento gerado a partir das informações autorizadas pela professora.`
   }
 
   if (isSpecialistReport(input.reportKind) || input.reportKind === 'Rel. Atipico') {
@@ -1178,7 +1291,7 @@ Pontos de apoio observados:
 Encaminhamentos:
 Manter registros frequentes, compartilhar apenas informações autorizadas e alinhar os próximos passos com coordenação, família e profissional responsável.${formatAttachments(input.attachments)}
 
-Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
+Documento gerado a partir das informações autorizadas pela professora.`
   }
 
   return `${header}
@@ -1205,7 +1318,7 @@ Devem ser descritos com linguagem cuidadosa, indicando possibilidades de apoio, 
 Encaminhamentos:
 Manter observações frequentes, registrar novas evoluções e alinhar com a família quando houver pontos que precisem de continuidade entre escola e casa.${formatAttachments(input.attachments)}
 
-Documento gerado com auxílio de IA a partir das informações autorizadas pela professora.`
+Documento gerado a partir das informações autorizadas pela professora.`
 }
 
 function formatAttachments(attachments: ReportAttachment[]) {

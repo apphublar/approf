@@ -1,9 +1,10 @@
-﻿import { useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, FileText, FileUp, Sparkles, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
 import { updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
+import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 
 interface PedagogicalGeneratorProps {
   data?: unknown
@@ -27,7 +28,7 @@ const AGE_GROUPS = ['0 a 1 ano', '1 a 2 anos', '2 a 3 anos', '3 a 4 anos', '4 a 
 
 export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGeneratorProps) {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes } = useAppStore()
+  const { classes, userId } = useAppStore()
   const docKind = typeof data === 'object' && data && 'docKind' in data
     ? String((data as { docKind?: string }).docKind)
     : 'Documento pedagógico'
@@ -50,10 +51,54 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   const [savingDocument, setSavingDocument] = useState(false)
   const [usageMessage, setUsageMessage] = useState('')
   const [usageError, setUsageError] = useState('')
+  const [draftMessage, setDraftMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const draftKey = `approf:draft:planning:${userId}:${docKind}`
 
   const canGenerate = theme.trim().length >= 2 && objective.trim().length >= 5
   const selectedClassData = classes.find((item) => item.name === selectedClass)
+
+  useEffect(() => {
+    const draft = loadDraft<{
+      ageGroup: string
+      selectedClass: string
+      theme: string
+      objective: string
+      bnccFields: string[]
+      extraContext: string
+      useAnnotations: boolean
+    }>(draftKey)
+    if (!draft) return
+    setAgeGroup(draft.ageGroup || '4 a 5 anos')
+    setSelectedClass(draft.selectedClass || classes[0]?.name || '')
+    setTheme(draft.theme || '')
+    setObjective(draft.objective || '')
+    setBnccFields(draft.bnccFields?.length ? draft.bnccFields : [BNCC_FIELDS[0]])
+    setExtraContext(draft.extraContext || '')
+    setUseAnnotations(Boolean(draft.useAnnotations))
+    setDraftMessage('Rascunho recuperado')
+  }, [classes, draftKey])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      saveDraft(draftKey, {
+        ageGroup,
+        selectedClass,
+        theme,
+        objective,
+        bnccFields,
+        extraContext,
+        useAnnotations,
+      })
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [ageGroup, bnccFields, draftKey, extraContext, objective, selectedClass, theme, useAnnotations])
+
+  useEffect(() => {
+    if (!draftMessage) return
+    const timeout = window.setTimeout(() => setDraftMessage(''), 3500)
+    return () => window.clearTimeout(timeout)
+  }, [draftMessage])
 
   function handleFiles(files: FileList | null) {
     if (!files?.length) return
@@ -112,7 +157,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
       })
 
       if (!result.allowed) {
-        setUsageError(result.message || 'Esta geracao precisa de pacote extra.')
+        setUsageError(result.message || 'Esta geração precisa de pacote extra.')
         setGenerating(false)
         return
       }
@@ -127,9 +172,10 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
         setGenerating(false)
         setGenerated(true)
       }, 800)
+      clearDraft(draftKey)
     } catch (error) {
       setGenerating(false)
-      setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar com IA.')
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar agora.')
     }
   }
 
@@ -360,7 +406,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
               disabled={!canGenerate || generating}
               className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando com IA...</> : <><Sparkles size={18} /> Gerar com IA</>}
+              {generating ? <><div className="spinner !w-5 !h-5" /> Gerando documento...</> : <><Sparkles size={18} /> Gerar documento</>}
             </button>
             {(usageError || usageMessage) && (
               <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
@@ -369,6 +415,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                 {usageError || usageMessage}
               </p>
             )}
+            {draftMessage && <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>}
           </div>
         ) : (
           <div className="py-4">
@@ -447,7 +494,7 @@ function createPreview(input: {
   const ageLine = input.docKind === 'Projeto pedagógico específico'
     ? ''
     : `Faixa etária: ${input.ageGroup}\n`
-  const base = `DOCUMENTO GERADO COM IA
+  const base = `DOCUMENTO GERADO
 Tipo: ${input.docKind}
 Turma: ${input.selectedClass || 'Não informada'}
 ${ageLine}Tema: ${input.theme || '-'}
@@ -477,7 +524,7 @@ Eixos do ano:
 - autonomia, cuidado, vinculos e pertencimento;
 - acompanhamento continuo do desenvolvimento infantil.
 
-Organizacao por periodos:
+Organização por períodos:
 - acolhimento e adaptacao;
 - projetos e sequencias tematicas;
 - experiencias com literatura, musica, movimento e artes;
@@ -506,7 +553,7 @@ Projetos e sequencias:
 - momentos de cuidado, autonomia e socializacao.
 
 Acompanhamento:
-- registros diarios e semanais;
+- registros diários e semanais;
 - portfólio e evidências de produções;
 - relatórios de desenvolvimento quando necessario;
 - comunicacao cuidadosa com as familias.
@@ -584,10 +631,10 @@ OBSERVACAO
 As propostas devem respeitar o tempo da criança pequena, sem comparacoes e sem exigencia de desempenho escolar formal.${formatAttachments(input.attachments)}`
   }
 
-  if (input.docKind === 'Plano de aula diario') {
+  if (input.docKind === 'Plano de aula diário') {
     return `${base}
 
-PLANO DE AULA DIARIO
+PLANO DE AULA DIÁRIO
 
 Objetivo específico:
 ${input.objective || 'Definir uma experiência significativa e adequada à faixa etária.'}

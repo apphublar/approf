@@ -94,11 +94,11 @@ export default function GizTokensSubscreen() {
             </div>
             <div>
               <p className="text-[13px] font-bold text-ink">Como funciona</p>
-              <p className="text-[11px] text-muted">GizToken acompanha o uso de IA no app.</p>
+              <p className="text-[11px] text-muted">GizToken acompanha o uso dos recursos automáticos do app.</p>
             </div>
           </div>
           <div className="space-y-2 text-[12px] text-muted leading-[1.6]">
-            <p>GizTokens são créditos internos para usar recursos de IA, como relatórios, planejamentos e portfólios.</p>
+            <p>GizTokens são créditos internos para gerar relatórios, planejamentos e portfólios.</p>
             <p>O saldo principal do ciclo é de {formatNumber(included)} GizTokens.</p>
             <p>Algumas atividades podem entrar como cota inclusa e aparecer com 0 GizToken descontado.</p>
             <p>Existe uma margem técnica de {formatNumber(overageLimit)} GizTokens para evitar bloqueios bruscos.</p>
@@ -213,7 +213,7 @@ function formatChargeSource(value: string) {
   if (value === 'semester_entitlement') return 'cota inclusa'
   if (value === 'giztokens') return 'GizTokens'
   if (value === 'paid_extra') return 'pacote extra'
-  return 'IA'
+  return 'Recurso'
 }
 
 function formatStatus(value: string) {

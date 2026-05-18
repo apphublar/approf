@@ -13,6 +13,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [passwordRecovery, setPasswordRecovery] = useState(() => hasPasswordRecoveryUrl())
   const [loadingSession, setLoadingSession] = useState(true)
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null)
   const hydrateWorkspace = useAppStore((state) => state.hydrateWorkspace)
 
   useEffect(() => {
@@ -33,14 +34,24 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setSession(null)
         return
       }
+      if (event === 'SIGNED_OUT') {
+        setSession(null)
+        setHydratedUserId(null)
+        return
+      }
       setSession(nextSession)
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        setHydratedUserId(null)
+      }
     })
 
     return () => subscription.subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
-    if (!session) return
+    const userId = session?.user?.id
+    if (!userId) return
+    if (hydratedUserId === userId) return
 
     setLoadingWorkspace(true)
     loadTeacherWorkspace()
@@ -48,8 +59,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       .catch((error) => {
         console.error('Não foi possível carregar dados do Supabase.', error)
       })
-      .finally(() => setLoadingWorkspace(false))
-  }, [hydrateWorkspace, session])
+      .finally(() => {
+        setHydratedUserId(userId)
+        setLoadingWorkspace(false)
+      })
+  }, [hydrateWorkspace, hydratedUserId, session?.user?.id])
 
   if (loadingSession || loadingWorkspace) {
     return (

@@ -276,12 +276,12 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <img
                     src={document.ai_artifacts.imageDataUrl}
-                    alt="Imagem de portfólio gerada com IA"
+                    alt="Imagem de portfólio gerada"
                     className="w-full rounded-app-sm border border-border bg-cream"
                   />
                   <div className="grid grid-cols-2 gap-2 mt-3">
                     <button
-                      onClick={() => downloadBlob(dataUrlToBlob(document.ai_artifacts?.imageDataUrl ?? ''), 'portfolio-ia.png')}
+                      onClick={() => downloadBlob(dataUrlToBlob(document.ai_artifacts?.imageDataUrl ?? ''), 'portfolio.png')}
                       className="rounded-app-sm border border-gp bg-gbg py-3 text-[12px] font-bold text-gd flex items-center justify-center gap-2"
                     >
                       <Download size={14} />

@@ -5,12 +5,12 @@ import { getAppDataMode } from '@/services/app-data'
 import { formatAiUsageMessage, generateAiChatReply, transcribeAnnotationAudio } from '@/services/ai-usage'
 import { createSupabaseAnnotation, updateSupabaseAnnotation } from '@/services/supabase/annotations'
 import { isSupabaseConfigured } from '@/services/supabase/config'
+import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import type { Annotation, AnnotationCategory, AnnotationPersistence } from '@/types'
 
 type WorkKind = '' | 'report' | 'planning' | 'memory' | 'personal'
 type Scope = 'child' | 'class' | 'optional-class' | 'teacher'
 type AnnotationViewMode = 'annotation' | 'chat'
-type ChatProvider = 'openai' | 'anthropic'
 
 interface ModelOption {
   id: string
@@ -58,7 +58,7 @@ const MAX_AUDIO_SECONDS = 30
 
 export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
-  const { addAnnotation, updateAnnotation, annotations, classes, activeClassId, activeStudentId } = useAppStore()
+  const { addAnnotation, updateAnnotation, annotations, classes, activeClassId, activeStudentId, userId } = useAppStore()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
@@ -85,17 +85,14 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [audioMessage, setAudioMessage] = useState('')
   const [error, setError] = useState('')
   const [viewMode, setViewMode] = useState<AnnotationViewMode>('annotation')
-  const [chatProvider, setChatProvider] = useState<ChatProvider>('openai')
   const [chatInput, setChatInput] = useState('')
-  const [chatThreads, setChatThreads] = useState<Record<ChatProvider, ChatMessage[]>>({
-    openai: [],
-    anthropic: [],
-  })
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatLoading, setChatLoading] = useState(false)
   const [chatUsageMessage, setChatUsageMessage] = useState('')
   const [chatError, setChatError] = useState('')
+  const [draftMessage, setDraftMessage] = useState('')
   const chatBottomRef = useRef<HTMLDivElement | null>(null)
-  const chatMessages = chatThreads[chatProvider]
+  const draftKeyRef = useRef('')
 
   const editAnnotation = useMemo(() => {
     const data = props?.data
@@ -162,9 +159,10 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   }, [chatMessages, chatLoading])
 
   useEffect(() => {
-    setChatError('')
-    setChatUsageMessage('')
-  }, [chatProvider])
+    if (!draftMessage) return
+    const timeout = window.setTimeout(() => setDraftMessage(''), 3500)
+    return () => window.clearTimeout(timeout)
+  }, [draftMessage])
 
   useEffect(() => {
     if (!editAnnotation || !editConfig) return
@@ -193,6 +191,69 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       setModelId('observacao')
     }
   }, [isEditing, prefillData])
+
+  useEffect(() => {
+    if (isEditing) return
+    if (prefillData) return
+    const key = `approf:draft:new-annotation:${userId}`
+    draftKeyRef.current = key
+    const draft = loadDraft<{
+      text: string
+      workKind: WorkKind
+      modelId: string
+      classId: string
+      studentId: string
+      tags: string[]
+      attachmentName: string
+      viewMode: AnnotationViewMode
+      chatInput: string
+      chatMessages: ChatMessage[]
+    }>(key)
+    if (!draft) return
+    setText(draft.text || '')
+    setWorkKind(draft.workKind || '')
+    setModelId(draft.modelId || '')
+    setClassId(draft.classId || '')
+    setStudentId(draft.studentId || '')
+    setTags(draft.tags || [])
+    setAttachmentName(draft.attachmentName || '')
+    setViewMode(draft.viewMode || 'annotation')
+    setChatInput(draft.chatInput || '')
+    setChatMessages(draft.chatMessages || [])
+    setDraftMessage('Rascunho recuperado')
+  }, [isEditing, prefillData, userId])
+
+  useEffect(() => {
+    if (isEditing) return
+    if (!draftKeyRef.current) return
+    const timeout = window.setTimeout(() => {
+      saveDraft(draftKeyRef.current, {
+        text,
+        workKind,
+        modelId,
+        classId,
+        studentId,
+        tags,
+        attachmentName,
+        viewMode,
+        chatInput,
+        chatMessages,
+      })
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [
+    attachmentName,
+    chatInput,
+    chatMessages,
+    classId,
+    isEditing,
+    modelId,
+    studentId,
+    tags,
+    text,
+    viewMode,
+    workKind,
+  ])
 
   function chooseWorkKind(value: WorkKind) {
     setWorkKind(value)
@@ -266,7 +327,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           return
         }
         setAudioBlob(blob)
-        setAudioMessage('Áudio pronto. Clique em Transcrever para usar a IA.')
+        setAudioMessage('Áudio pronto. Clique em Transcrever.')
         stopMediaStream()
       }
 
@@ -321,7 +382,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       })
 
       if (!result.allowed) {
-        setError(result.message || 'Não foi possível usar IA para transcrever agora.')
+        setError(result.message || 'Não foi possível transcrever agora.')
         return
       }
 
@@ -409,6 +470,9 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         }
       }
 
+      if (!isEditing && draftKeyRef.current) {
+        clearDraft(draftKeyRef.current)
+      }
       closeSubscreen()
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Não foi possível salvar a anotação agora.')
@@ -429,18 +493,19 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       text: content,
     }
     const history = [...chatMessages, userMessage]
-    setChatThreads((current) => ({ ...current, [chatProvider]: history }))
+    setChatMessages(history)
     setChatLoading(true)
 
     try {
       const result = await generateAiChatReply({
-        provider: chatProvider,
+        provider: 'openai',
         messages: history.map((message) => ({ role: message.role, content: message.text })),
         classId: classId || null,
         studentId: studentId || null,
         requestSummary: {
           source: 'new-annotation-chat',
-          provider: chatProvider,
+          provider: 'openai',
+          model: 'gpt-4o-mini',
           conversationLength: history.length,
         },
       })
@@ -452,14 +517,11 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
       const assistantText = result.response?.trim()
       if (!assistantText) {
-        setChatError('A IA não retornou uma resposta válida.')
+        setChatError('Não foi possível obter uma resposta válida.')
         return
       }
 
-      setChatThreads((current) => ({
-        ...current,
-        [chatProvider]: [...history, { id: `assistant-${Date.now()}`, role: 'assistant', text: assistantText }],
-      }))
+      setChatMessages([...history, { id: `assistant-${Date.now()}`, role: 'assistant', text: assistantText }])
       setChatUsageMessage(formatAiUsageMessage(result))
     } catch (err) {
       setChatError(err instanceof Error ? err.message : 'Não foi possível responder no chat agora.')
@@ -575,7 +637,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
             <StepTitle number="1" title="O que esta anotação vai ajudar a fazer?" />
             <div className="grid grid-cols-1 gap-2 mb-4">
               <ChoiceButton selected={workKind === 'report'} title="Relatório ou documento" desc="Desenvolvimento, portfólio, diário de bordo, especialista, reunião." onClick={() => chooseWorkKind('report')} />
-              <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Semanal, diario ou projeto pedagógico." onClick={() => chooseWorkKind('planning')} />
+              <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Semanal, diário ou projeto pedagógico." onClick={() => chooseWorkKind('planning')} />
               <ChoiceButton selected={workKind === 'memory'} title="Memoria pedagógica" desc="Registro rapido de evolucao, observacao importante ou ideia solta." onClick={() => chooseWorkKind('memory')} />
               <ChoiceButton selected={workKind === 'personal'} title="Anotação pessoal" desc="Ideias e lembretes privados da professora, sem criança vinculada." onClick={() => chooseWorkKind('personal')} />
             </div>
@@ -669,25 +731,8 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         ) : (
           <div className="h-full flex flex-col gap-3">
             <div className="bg-white rounded-app border border-border shadow-card p-3">
-              <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">Modelo de IA</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setChatProvider('openai')}
-                  className={`rounded-app-sm border px-3 py-2 text-sm font-bold ${
-                    chatProvider === 'openai' ? 'border-gp bg-gbg text-gd' : 'border-border bg-cream text-muted'
-                  }`}
-                >
-                  GPT
-                </button>
-                <button
-                  onClick={() => setChatProvider('anthropic')}
-                  className={`rounded-app-sm border px-3 py-2 text-sm font-bold ${
-                    chatProvider === 'anthropic' ? 'border-gp bg-gbg text-gd' : 'border-border bg-cream text-muted'
-                  }`}
-                >
-                  Claude
-                </button>
-              </div>
+              <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Chat</p>
+              <p className="text-[12px] text-muted mt-1">Assistente ativo: GPT-4o Mini</p>
             </div>
 
             <div className="bg-white rounded-app border border-border shadow-card p-3 flex-1 min-h-[420px] flex flex-col">
@@ -741,6 +786,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 </div>
                 {chatUsageMessage && <p className="text-[11px] text-gd mt-2">{chatUsageMessage}</p>}
                 {chatError && <p className="text-[11px] text-[#C1440E] mt-2">{chatError}</p>}
+                {draftMessage && <p className="text-[11px] text-gm mt-2">{draftMessage}</p>}
               </div>
             </div>
           </div>

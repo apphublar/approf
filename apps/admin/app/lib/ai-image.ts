@@ -57,7 +57,8 @@ export async function generatePortfolioImage(
     quality,
   })
 
-  const reportId = await persistGeneratedReport(input, body, `data:image/png;base64,${generated.b64Json}`, {
+  const imageDataUrl = generated.image
+  const reportId = await persistGeneratedReport(input, body, imageDataUrl, {
     prompt,
     model,
     size,
@@ -74,7 +75,7 @@ export async function generatePortfolioImage(
   )
 
   return {
-    imageDataUrl: `data:image/png;base64,${generated.b64Json}`,
+    imageDataUrl,
     prompt,
     provider: 'openai',
     model,
@@ -99,24 +100,37 @@ async function requestOpenAiImage(input: {
     throw new PublicAiGenerationError('Servico de imagem indisponivel no momento. Tente novamente em instantes.')
   }
 
-  const response = await fetch('https://api.openai.com/v1/images/generations', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: input.model,
-      prompt: input.prompt,
-      n: 1,
-      size: input.size,
-      quality: input.quality,
-      user: input.user,
-    }),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 120000)
+  let response: Response
+  try {
+    response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: input.model,
+        prompt: input.prompt,
+        n: 1,
+        size: input.size,
+        quality: input.quality,
+        user: input.user,
+      }),
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new PublicAiGenerationError('A geração da imagem demorou demais. Tente novamente.')
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
 
   const payload = (await response.json().catch(() => null)) as {
-    data?: Array<{ b64_json?: string }>
+    data?: Array<{ b64_json?: string; url?: string }>
     usage?: {
       input_tokens?: number
       output_tokens?: number
@@ -131,12 +145,14 @@ async function requestOpenAiImage(input: {
   }
 
   const b64Json = payload?.data?.[0]?.b64_json
-  if (!b64Json) {
+  const imageUrl = payload?.data?.[0]?.url
+  const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
+  if (!image) {
     throw new PublicAiGenerationError('A IA nao retornou uma imagem valida. Ajuste o contexto e tente novamente.')
   }
 
   return {
-    b64Json,
+    image,
     inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
     outputTokens: payload?.usage?.output_tokens ?? 0,
   }

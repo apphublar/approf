@@ -11,7 +11,6 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)),
   )
-  self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {
@@ -22,7 +21,6 @@ self.addEventListener('activate', (event) => {
         Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))),
       ),
   )
-  self.clients.claim()
 })
 
 self.addEventListener('fetch', (event) => {
