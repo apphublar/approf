@@ -8,6 +8,8 @@ import {
 import { PublicAiGenerationError, rollbackGeneratedArtifacts } from '@/app/lib/ai-generation'
 import { generateStandaloneImage } from '@/app/lib/ai-image'
 
+export const maxDuration = 300
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',

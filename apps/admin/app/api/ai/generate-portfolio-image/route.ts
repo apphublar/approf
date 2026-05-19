@@ -8,6 +8,8 @@ import {
 import { PublicAiGenerationError, rollbackGeneratedArtifacts } from '@/app/lib/ai-generation'
 import { generatePortfolioImage } from '@/app/lib/ai-image'
 
+export const maxDuration = 300
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
         entitlement: reservation.entitlement,
         imageDataUrl: generated.imageDataUrl,
         prompt: generated.prompt,
+        quality: generated.quality,
         reportId: generated.reportId,
         promptVersion,
         provider: generated.provider,

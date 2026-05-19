@@ -65,21 +65,23 @@ export async function generatePortfolioImage(
   const summary = input.requestSummary ?? {}
   const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_IMAGE_MODEL
   const size = resolvePortfolioImageSize(summary)
-  const quality = process.env.OPENAI_IMAGE_QUALITY?.trim() || DEFAULT_OPENAI_IMAGE_QUALITY
+  const quality = resolvePortfolioImageQuality()
   const prompt = buildPortfolioImagePrompt(summary, size)
 
   const generated = await requestOpenAiImage({
     model,
+    fallbackModels: resolvePortfolioImageFallbackModels(model),
     prompt,
     size,
     quality,
     user: input.ownerId,
+    timeoutMs: 240000,
   })
 
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'portfolio')
   const body = buildPersistedImageBody({
     prompt,
-    model,
+    model: generated.model,
     size,
     quality,
   })
@@ -92,7 +94,7 @@ export async function generatePortfolioImage(
     imageDataUrl,
     artifact: {
       prompt,
-      model,
+      model: generated.model,
       size,
       quality,
     },
@@ -101,7 +103,7 @@ export async function generatePortfolioImage(
     reportId,
     input.ownerId,
     'openai',
-    model,
+    generated.model,
     generated.inputTokens,
     generated.outputTokens,
     actualCostCents,
@@ -111,7 +113,7 @@ export async function generatePortfolioImage(
     imageDataUrl,
     prompt,
     provider: 'openai',
-    model,
+    model: generated.model,
     size,
     quality,
     inputTokens: generated.inputTokens,
@@ -136,6 +138,7 @@ export async function generateStandaloneImage(
     size,
     quality,
     user: input.ownerId,
+    timeoutMs: 180000,
   })
 
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'standalone')
@@ -184,72 +187,97 @@ export async function generateStandaloneImage(
 
 async function requestOpenAiImage(input: {
   model: string
+  fallbackModels?: string[]
   prompt: string
   size: string
   quality: string
   user: string
+  timeoutMs?: number
 }) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new PublicAiGenerationError('Servico de imagem indisponivel no momento. Tente novamente em instantes.')
   }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 120000)
-  let response: Response
-  try {
-    response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: input.model,
-        prompt: input.prompt,
-        n: 1,
-        size: input.size,
-        quality: input.quality,
-        user: input.user,
-      }),
-      signal: controller.signal,
-    })
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new PublicAiGenerationError('A geração da imagem demorou demais. Tente novamente.')
+  const models = [input.model, ...(input.fallbackModels ?? [])]
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, list) => list.indexOf(item) === index)
+
+  let lastErrorMessage = ''
+
+  for (const model of models) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 180000)
+    let response: Response
+    try {
+      response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          prompt: input.prompt,
+          n: 1,
+          size: input.size,
+          quality: input.quality,
+          background: 'opaque',
+          moderation: 'low',
+          output_format: 'png',
+          user: input.user,
+        }),
+        signal: controller.signal,
+      })
+    } catch (error) {
+      clearTimeout(timeout)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new PublicAiGenerationError('A criação da imagem demorou mais do que o esperado. Tente novamente.')
+      }
+      throw error
+    } finally {
+      clearTimeout(timeout)
     }
-    throw error
-  } finally {
-    clearTimeout(timeout)
-  }
 
-  const payload = (await response.json().catch(() => null)) as {
-    data?: Array<{ b64_json?: string; url?: string }>
-    usage?: {
-      input_tokens?: number
-      output_tokens?: number
-      total_tokens?: number
+    const payload = (await response.json().catch(() => null)) as {
+      data?: Array<{ b64_json?: string; url?: string }>
+      usage?: {
+        input_tokens?: number
+        output_tokens?: number
+        total_tokens?: number
+      }
+      error?: { message?: string; code?: string; type?: string }
+    } | null
+
+    if (!response.ok) {
+      lastErrorMessage = payload?.error?.message ?? `HTTP ${response.status}`
+      console.error('[ai-image] OpenAI HTTP', response.status, model, payload?.error)
+      if (shouldTryNextImageModel(payload?.error?.message, payload?.error?.code, response.status, models, model)) {
+        continue
+      }
+      throw new PublicAiGenerationError(toPublicImageErrorMessage(response.status, payload?.error?.message))
     }
-    error?: { message?: string }
-  } | null
 
-  if (!response.ok) {
-    console.error('[ai-image] OpenAI HTTP', response.status, payload?.error?.message)
-    throw new PublicAiGenerationError('Nao foi possivel gerar a imagem agora. Tente novamente em instantes.')
+    const b64Json = payload?.data?.[0]?.b64_json
+    const imageUrl = payload?.data?.[0]?.url
+    const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
+    if (!image) {
+      lastErrorMessage = 'Resposta sem imagem'
+      console.error('[ai-image] OpenAI sem imagem', model, payload)
+      continue
+    }
+
+    return {
+      image,
+      model,
+      inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
+      outputTokens: payload?.usage?.output_tokens ?? 0,
+    }
   }
 
-  const b64Json = payload?.data?.[0]?.b64_json
-  const imageUrl = payload?.data?.[0]?.url
-  const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
-  if (!image) {
-    throw new PublicAiGenerationError('A IA nao retornou uma imagem valida. Ajuste o contexto e tente novamente.')
-  }
-
-  return {
-    image,
-    inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
-    outputTokens: payload?.usage?.output_tokens ?? 0,
-  }
+  console.error('[ai-image] falha em todos os modelos', lastErrorMessage)
+  throw new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
 }
 
 function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: string) {
@@ -314,6 +342,18 @@ function resolvePortfolioImageSize(summary: Record<string, unknown>) {
   if (fromSummary === 'portrait') return '1024x1536'
   const fromEnv = process.env.OPENAI_IMAGE_SIZE?.trim()
   return fromEnv || DEFAULT_OPENAI_IMAGE_SIZE
+}
+
+function resolvePortfolioImageQuality() {
+  const requested = process.env.OPENAI_IMAGE_QUALITY?.trim().toLowerCase() || DEFAULT_OPENAI_IMAGE_QUALITY
+  if (requested === 'low' || requested === 'medium' || requested === 'high' || requested === 'auto') return requested
+  return DEFAULT_OPENAI_IMAGE_QUALITY
+}
+
+function resolvePortfolioImageFallbackModels(model: string) {
+  const configured = process.env.OPENAI_IMAGE_FALLBACK_MODEL?.trim()
+  const fallbacks = configured ? [configured] : ['gpt-image-1']
+  return fallbacks.filter((item) => item !== model)
 }
 
 function resolveStandaloneImageSize(summary: Record<string, unknown>) {
@@ -513,6 +553,36 @@ function asString(value: unknown) {
 function asObjectArray(value: unknown): Array<Record<string, unknown>> {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object' && !Array.isArray(item)))
+}
+
+function shouldTryNextImageModel(
+  message: string | undefined,
+  code: string | undefined,
+  status: number,
+  models: string[],
+  currentModel: string,
+) {
+  if (models.indexOf(currentModel) >= models.length - 1) return false
+  const normalized = `${message ?? ''} ${code ?? ''}`.toLowerCase()
+  return status === 400 && (
+    normalized.includes('model')
+    || normalized.includes('quality')
+    || normalized.includes('size')
+    || normalized.includes('unsupported')
+    || normalized.includes('invalid')
+  )
+}
+
+function toPublicImageErrorMessage(status: number, message?: string) {
+  const normalized = (message ?? '').toLowerCase()
+  if (status === 429) return 'O serviço de imagem está muito usado no momento. Tente novamente em alguns minutos.'
+  if (normalized.includes('content_policy') || normalized.includes('safety') || normalized.includes('moderation')) {
+    return 'Não foi possível criar a imagem com essa descrição. Ajuste o texto e tente novamente.'
+  }
+  if (normalized.includes('billing') || normalized.includes('quota')) {
+    return 'O serviço de imagem está sem saldo/configuração no momento.'
+  }
+  return 'Não foi possível criar a imagem agora. Tente novamente em instantes.'
 }
 
 function toError(error: unknown, fallback: string) {

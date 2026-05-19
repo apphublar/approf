@@ -305,7 +305,7 @@ export async function generateAiPortfolioImage(input: AiImageGenerationInput): P
   }
 
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 120000)
+  const timeout = window.setTimeout(() => controller.abort(), 300000)
   let response: Response
   try {
     response = await fetch(`${apiBaseUrl}/api/ai/generate-portfolio-image`, {
@@ -319,7 +319,7 @@ export async function generateAiPortfolioImage(input: AiImageGenerationInput): P
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('A geração da imagem demorou mais do que o esperado. Tente novamente.')
+      throw new Error('A criação da imagem demorou mais do que o esperado. Tente novamente.')
     }
     throw error
   } finally {

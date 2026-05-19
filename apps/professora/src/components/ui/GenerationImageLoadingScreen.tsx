@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2, Image as ImageIcon, Loader2 } from 'lucide-react'
 
 const IMAGE_STEPS = [
-  'Interpretando descrição',
-  'Criando composição visual',
-  'Ajustando detalhes',
+  'Organizando as referências',
+  'Criando a composição visual',
+  'Refinando cores e detalhes',
   'Salvando no histórico',
 ]
 
@@ -13,9 +13,9 @@ export default function GenerationImageLoadingScreen() {
 
   useEffect(() => {
     const timers = [
-      window.setTimeout(() => setActiveStep(1), 1300),
-      window.setTimeout(() => setActiveStep(2), 2600),
-      window.setTimeout(() => setActiveStep(3), 3900),
+      window.setTimeout(() => setActiveStep(1), 12000),
+      window.setTimeout(() => setActiveStep(2), 36000),
+      window.setTimeout(() => setActiveStep(3), 78000),
     ]
     return () => timers.forEach((timer) => window.clearTimeout(timer))
   }, [])
@@ -28,7 +28,7 @@ export default function GenerationImageLoadingScreen() {
         </div>
         <h2 className="mt-4 text-center font-serif text-[22px] text-gd">Criando sua imagem...</h2>
         <p className="mt-2 text-center text-[13px] text-muted leading-[1.5]">
-          Estamos preparando o visual com base na sua descrição.
+          Imagens de portfólio podem levar alguns minutos, principalmente quando há muitos detalhes.
         </p>
 
         <div className="mt-5 rounded-app-sm border border-border bg-cream p-3 space-y-2">
@@ -49,7 +49,7 @@ export default function GenerationImageLoadingScreen() {
         </div>
 
         <p className="mt-4 text-[12px] text-center text-gd leading-[1.5]">
-          Não feche o aplicativo até a imagem ficar pronta.
+          Pode demorar um pouco. Não feche o aplicativo até a imagem ficar pronta.
         </p>
       </div>
     </div>
