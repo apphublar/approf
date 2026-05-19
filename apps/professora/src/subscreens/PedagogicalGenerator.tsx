@@ -56,7 +56,12 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const draftKey = `approf:draft:planning:${userId}:${docKind}`
 
-  const canGenerate = theme.trim().length >= 2 && objective.trim().length >= 5
+  const canGenerate = theme.trim().length >= 4 && objective.trim().length >= 12
+  const generationRequirementHint = getPlanningRequirementHint({
+    docKind,
+    themeLength: theme.trim().length,
+    objectiveLength: objective.trim().length,
+  })
   const selectedClassData = classes.find((item) => item.name === selectedClass)
   const generationViewKey = generated ? 'result' : generating ? 'loading' : 'form'
 
@@ -142,7 +147,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
     try {
       const result = await generateAiTextDocument({
-        generationType: 'planning',
+        generationType: resolvePlanningGenerationType(docKind),
         classId: selectedClassData?.id ?? null,
         promptVersion: 'professora-planning-v1',
         requestSummary: {
@@ -413,6 +418,11 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
             >
               <><Sparkles size={18} /> Gerar documento</>
             </button>
+            {!canGenerate && generationRequirementHint && (
+              <p className="mt-3 rounded-app-sm border border-[#F1D58B] bg-[#FFF8DC] px-3 py-2 text-[12px] leading-[1.5] text-[#6B5300]">
+                {generationRequirementHint}
+              </p>
+            )}
             {(usageError || usageMessage) && (
               <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
                 usageError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
@@ -763,6 +773,35 @@ Este documento organiza o contexto informado pela professora em linguagem acolhe
 function formatAttachments(attachments: Attachment[]) {
   if (!attachments.length) return ''
   return `\n\nANEXOS CONSIDERADOS\n\n${attachments.map((item) => `- ${item.name}`).join('\n')}`
+}
+
+function resolvePlanningGenerationType(docKind: string) {
+  if (docKind === 'Planejamento semanal') return 'weekly_planning' as const
+  if (docKind === 'Plano de aula diário') return 'daily_lesson_plan' as const
+  if (docKind === 'Projeto pedagógico específico') return 'pedagogical_project' as const
+  return 'weekly_planning' as const
+}
+
+function getPlanningRequirementHint(input: {
+  docKind: string
+  themeLength: number
+  objectiveLength: number
+}) {
+  if (input.themeLength < 4) {
+    return input.docKind === 'Projeto pedagógico específico'
+      ? 'Informe o tema central do projeto para organizar as etapas.'
+      : 'Informe o tema principal do planejamento.'
+  }
+
+  if (input.objectiveLength < 12) {
+    return input.docKind === 'Plano de aula diário'
+      ? 'Escreva o objetivo da experiência do dia com um pouco mais de detalhe.'
+      : input.docKind === 'Projeto pedagógico específico'
+        ? 'Descreva o objetivo do projeto com um pouco mais de detalhe.'
+        : 'Descreva o objetivo pedagógico da semana com um pouco mais de detalhe.'
+  }
+
+  return ''
 }
 
 

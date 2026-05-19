@@ -100,6 +100,13 @@ function PublicShell({ children }: { children: React.ReactNode }) {
 function formatReportType(type: string) {
   const labels: Record<string, string> = {
     development_report: 'Relatório de desenvolvimento',
+    class_diary: 'Diário de bordo',
+    weekly_planning: 'Planejamento semanal',
+    daily_lesson_plan: 'Plano de aula diário',
+    pedagogical_project: 'Projeto pedagógico específico',
+    specialist_referral: 'Relatório para especialista',
+    parents_meeting_record: 'Registro de reunião de pais',
+    manual_anamnesis: 'Ficha de anamnese',
     planning: 'Planejamento',
     portfolio_text: 'Portfólio pedagógico',
     portfolio_image: 'Portfólio pedagógico',

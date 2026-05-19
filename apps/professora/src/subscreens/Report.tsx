@@ -3,6 +3,7 @@ import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
 import { listReports, updateReport } from '@/services/reports'
+import { createManualReport } from '@/services/reports-create'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
@@ -107,21 +108,39 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento'
   const isClassDiary = reportKind === 'Diário de bordo'
   const isParentsMeeting = reportKind === 'Registro de reunião de pais'
+  const isAnamnesis = reportKind === 'Ficha de anamnese'
   const supportsLivingReport = isDevelopmentReport || isParentsMeeting
   const needsBnccFields = isPlanning || isDevelopmentReport
   const needsAgeGroup = isPlanning
   const needsObjective = isPlanning
   const needsEvaluationPeriod = isDevelopmentReport
   const currentReportType = getReportGenerationType(reportKind, portfolioOutput)
+  const isSpecialistReferral = currentReportType === 'specialist_referral' || currentReportType === 'specialist_report'
   const hasContentBase = isClassDiary
     ? diaryRawText.trim().length >= 20
     : mode === 'blank'
-    ? blankContext.trim().length >= 20
-    : Boolean(selectedStudent)
+      ? blankContext.trim().length >= 20
+      : selectedAnnotations.length > 0 || extraContext.trim().length >= 20
   const hasRequiredBnccInput = !needsBnccFields || ((!needsAgeGroup || ageGroup.trim().length > 0) && bnccFields.length > 0)
   const hasRequiredObjective = !needsObjective || objective.trim().length >= 10
   const hasRequiredPeriod = !needsEvaluationPeriod || evaluationPeriod.trim().length >= 5
-  const canGenerate = hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod
+  const canGenerate = isAnamnesis
+    ? true
+    : hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod
+  const generationRequirementHint = getGenerationRequirementHint({
+    isAnamnesis,
+    isClassDiary,
+    isSpecialistReferral,
+    isParentsMeeting,
+    mode,
+    selectedAnnotationsCount: selectedAnnotations.length,
+    extraContextLength: extraContext.trim().length,
+    blankContextLength: blankContext.trim().length,
+    diaryRawLength: diaryRawText.trim().length,
+    hasRequiredBnccInput,
+    hasRequiredObjective,
+    hasRequiredPeriod,
+  })
   const generationViewKey = generated ? 'result' : generating ? 'loading' : 'form'
   const voiceAnnotations = useMemo(
     () => studentAnnotations.filter((annotation) => (annotation.tags ?? []).some((tag) => normalize(tag).includes('transcrição'))),
@@ -356,6 +375,47 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setEditingDocument(false)
 
     try {
+      if (isAnamnesis) {
+        const manualBody = createReportPreview({
+          reportKind,
+          studentName: selectedStudent?.name ?? '-',
+          className: selectedStudent?.className ?? selectedClass?.name ?? '-',
+          firstName,
+          mode,
+          selectedAnnotations,
+          ignoredNotes,
+          blankContext,
+          extraContext,
+          attachments,
+          portfolioOutput,
+          portfolioImageFormat,
+          diaryDate,
+          diaryTheme,
+          diaryRawText,
+        })
+        const manualReport = await createManualReport({
+          reportType: 'manual_anamnesis',
+          studentId: selectedStudent?.id ?? null,
+          classId: selectedStudent?.classId ?? null,
+          promptVersion: 'manual-anamnesis-v1',
+          body: manualBody,
+        })
+        setUsageMessage('Ficha criada sem consumo de GizTokens.')
+        setSavedContent(manualReport.body ?? manualBody)
+        setEditableContent(manualReport.body ?? manualBody)
+        setReportId(manualReport.id)
+        setGeneratedImageUrl('')
+        window.setTimeout(() => {
+          celebrateAiGeneration()
+          setGenerating(false)
+          setGenerated(true)
+        }, 450)
+        if (draftKeyRef.current) {
+          clearDraft(draftKeyRef.current)
+        }
+        return
+      }
+
       const requestSummary = {
         reportKind,
         portfolioOutput,
@@ -516,9 +576,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   <Sparkles size={22} color="#4F8341" strokeWidth={1.7} />
                 </div>
                 <div className="flex-1">
-                  <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
+                  <h2 className="font-serif text-[20px] text-gd">{isAnamnesis ? 'Antes de criar' : 'Antes de gerar'}</h2>
                   <p className="text-[12px] text-muted leading-snug">
-                    {isClassDiary
+                    {isAnamnesis
+                      ? 'Selecione a criança e crie a ficha base. Depois você pode editar os campos com calma.'
+                      : isClassDiary
                       ? 'Preencha rapidamente os dados do dia da turma para gerar o diário.'
                       : 'Escolha a criança. Orientações extras e anexos são opcionais.'}
                   </p>
@@ -589,7 +651,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               )}
             </div>
 
-            {!isClassDiary && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
+            {!isClassDiary && !isAnamnesis && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Dados BNCC obrigatorios
@@ -672,7 +734,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {supportsLivingReport && (
+            {supportsLivingReport && !isAnamnesis && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
                   Relatório vivo
@@ -703,7 +765,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && (
+            {!isClassDiary && !isAnamnesis && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Base do documento
@@ -758,7 +820,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {isPortfolio && (
+            {isPortfolio && !isAnamnesis && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Tipo de portfólio
@@ -786,7 +848,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && (
+            {!isClassDiary && !isAnamnesis && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                 Histórico
@@ -819,7 +881,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
-            {!isClassDiary && (mode === 'annotations' ? (
+            {!isClassDiary && !isAnamnesis && (mode === 'annotations' ? (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
@@ -923,6 +985,17 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
+            {isAnamnesis ? (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
+                  Ficha manual
+                </p>
+                <p className="text-[12px] text-muted leading-[1.6]">
+                  Esta ficha é criada em formato manual e editável, sem uso de IA e sem consumo de GizTokens.
+                </p>
+              </div>
+            ) : null}
+
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
                 Orientação adicional
@@ -989,8 +1062,13 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               disabled={!canGenerate || generating}
               className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <><Sparkles size={18} /> {isClassDiary ? 'Gerar diário' : 'Gerar documento'}</>
+              <><Sparkles size={18} /> {isAnamnesis ? 'Criar ficha' : isClassDiary ? 'Gerar diário' : 'Gerar documento'}</>
             </button>
+            {!canGenerate && generationRequirementHint && (
+              <p className="mt-3 rounded-app-sm border border-[#F1D58B] bg-[#FFF8DC] px-3 py-2 text-[12px] leading-[1.5] text-[#6B5300]">
+                {generationRequirementHint}
+              </p>
+            )}
             {(usageError || usageMessage) && (
               <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
                 usageError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
@@ -1107,10 +1185,15 @@ function matchesStudent(annotation: Annotation, studentId: string, studentName?:
 
 function getReportGenerationType(reportKind: string, portfolioOutput: PortfolioOutput): AiGenerationType {
   if (reportKind === 'Relatório de desenvolvimento') return 'development_report'
+  if (reportKind === 'Diário de bordo') return 'class_diary'
+  if (reportKind === 'Planejamento semanal') return 'weekly_planning'
+  if (reportKind === 'Plano de aula diário') return 'daily_lesson_plan'
+  if (reportKind === 'Projeto pedagógico específico') return 'pedagogical_project'
+  if (reportKind === 'Registro de reunião de pais') return 'parents_meeting_record'
   if (reportKind === 'Portfólio pedagógico') {
     return portfolioOutput === 'image' ? 'portfolio_image' : 'portfolio_text'
   }
-  if (isSpecialistReport(reportKind) || reportKind === 'Rel. Atipico') return 'specialist_report'
+  if (isSpecialistReport(reportKind) || reportKind === 'Rel. Atipico') return 'specialist_referral'
   return 'general_report'
 }
 
@@ -1480,6 +1563,40 @@ function resolveDocumentLoadingVariant(reportKind: string) {
   if (reportKind.toLowerCase().includes('interven')) return 'intervention'
   if (reportKind.toLowerCase().includes('relat')) return 'report'
   return 'default'
+}
+
+function getGenerationRequirementHint(input: {
+  isAnamnesis: boolean
+  isClassDiary: boolean
+  isSpecialistReferral: boolean
+  isParentsMeeting: boolean
+  mode: ReportMode
+  selectedAnnotationsCount: number
+  extraContextLength: number
+  blankContextLength: number
+  diaryRawLength: number
+  hasRequiredBnccInput: boolean
+  hasRequiredObjective: boolean
+  hasRequiredPeriod: boolean
+}) {
+  if (input.isAnamnesis) return ''
+  if (input.isClassDiary && input.diaryRawLength < 20) {
+    return 'Escreva um relato breve do dia da turma para criar um diário mais fiel.'
+  }
+  if (input.mode === 'blank' && input.blankContextLength < 20) {
+    return input.isSpecialistReferral
+      ? 'Descreva o motivo do encaminhamento e os comportamentos observados na rotina.'
+      : input.isParentsMeeting
+        ? 'Descreva a pauta, observações, combinados ou encaminhamentos da reunião.'
+        : 'Descreva melhor o contexto antes de gerar o documento.'
+  }
+  if (input.mode === 'annotations' && input.selectedAnnotationsCount === 0 && input.extraContextLength < 20) {
+    return 'Selecione pelo menos uma anotação ou escreva uma orientação adicional com o contexto principal.'
+  }
+  if (!input.hasRequiredPeriod) return 'Informe o período de avaliação para contextualizar o relatório.'
+  if (!input.hasRequiredBnccInput) return 'Complete os campos pedagógicos obrigatórios antes de gerar.'
+  if (!input.hasRequiredObjective) return 'Informe o objetivo pedagógico com um pouco mais de detalhe.'
+  return ''
 }
 
 

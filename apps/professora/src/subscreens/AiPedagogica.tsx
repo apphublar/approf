@@ -117,7 +117,7 @@ export default function AiPedagogicaSubscreen() {
             </div>
 
             <button
-              onClick={() => openSubscreen('generated-documents', { reportType: 'planning' })}
+              onClick={() => openSubscreen('generated-documents', { reportTypes: ['weekly_planning', 'daily_lesson_plan', 'pedagogical_project', 'planning'] })}
               className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
             >
               <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
@@ -256,10 +256,10 @@ function normalizeText(value: string) {
 }
 
 function getSectionReportTypes(sectionTitle: SectionTitle) {
-  if (sectionTitle === 'Relatórios pedagógicos') return ['development_report', 'general_report', 'portfolio_text', 'portfolio_image']
-  if (sectionTitle === 'Planejamentos') return ['planning']
-  if (sectionTitle === 'Especialistas e encaminhamentos') return ['specialist_report']
-  if (sectionTitle === 'Documentação complementar') return ['general_report', 'other']
+  if (sectionTitle === 'Relatórios pedagógicos') return ['development_report', 'class_diary', 'portfolio_text', 'portfolio_image']
+  if (sectionTitle === 'Planejamentos') return ['weekly_planning', 'daily_lesson_plan', 'pedagogical_project']
+  if (sectionTitle === 'Especialistas e encaminhamentos') return ['specialist_referral']
+  if (sectionTitle === 'Documentação complementar') return ['parents_meeting_record', 'general_report', 'other']
   return undefined
 }
 

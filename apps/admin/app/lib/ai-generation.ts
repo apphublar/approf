@@ -50,6 +50,15 @@ export class PublicAiGenerationError extends Error {}
 
 const DEFAULT_ANTHROPIC_TEXT_MODEL = 'claude-sonnet-4-20250514'
 const DEFAULT_OPENAI_INTERVENTIONS_MODEL = 'gpt-4o-mini'
+const HAIKU_MODEL = 'claude-3-5-haiku-20241022'
+
+interface DocumentPipelineConfig {
+  stages: 1 | 2 | 3
+  pipelineName: string
+  draftModel: string
+  reviewModel: string
+  refineModel?: string
+}
 
 function resolveAnthropicTextModelFallback(): string {
   const fromEnv = process.env.ANTHROPIC_TEXT_MODEL?.trim()
@@ -84,48 +93,72 @@ export async function generatePedagogicalText(
   const modelDraft = resolveDraftModelId()
   const modelReview = resolveReviewModelId()
   const modelRefine = resolveRefineModelId()
+  const pipelineConfig = resolveDocumentPipelineConfig(promptInput.generationType, {
+    draft: modelDraft,
+    review: modelReview,
+    refine: modelRefine,
+  })
 
   let reportId: string | null = null
 
   try {
     const stage1Prompt = buildStage1DraftPrompt(promptInput)
     const s1 = await runPipelineStage(1, stage1Prompt.system, stage1Prompt.user, {
-      model: modelDraft,
+      model: pipelineConfig.draftModel,
       maxTokens: 2200,
       temperature: 0.35,
     })
 
     const stage2Prompt = buildStage2BnccReviewPrompt(promptInput, s1.text)
     const s2 = await runPipelineStage(2, stage2Prompt.system, stage2Prompt.user, {
-      model: modelReview,
+      model: pipelineConfig.reviewModel,
       maxTokens: 2400,
       temperature: 0.2,
     })
 
-    const stage3Prompt = buildStage3FinalRefinementPrompt(promptInput, s2.text)
-    const s3Initial = await runPipelineStage(3, stage3Prompt.system, stage3Prompt.user, {
-      model: modelRefine,
-      maxTokens: 2000,
-      temperature: 0.45,
-    })
+    const stage3Prompt = pipelineConfig.stages === 3
+      ? buildStage3FinalRefinementPrompt(promptInput, s2.text)
+      : null
+    const s3Initial = pipelineConfig.stages === 3
+      ? await runPipelineStage(3, stage3Prompt!.system, stage3Prompt!.user, {
+          model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
+          maxTokens: 2000,
+          temperature: 0.45,
+        })
+      : s2
     const structured = await ensureRequiredStructure({
-      generationType: input.generationType,
+      generationType: promptInput.generationType,
       reportKind: promptInput.reportKind ?? promptInput.docKind,
       candidate: s3Initial,
-      model: modelRefine,
+      model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
     })
-    const s3 = structured.completion
+    const qualityChecked = await ensureDocumentQuality({
+      generationType: promptInput.generationType,
+      candidate: structured.completion,
+      model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
+    })
+    const s3 = qualityChecked.completion
 
-    const pipelineStages: PipelineStageMetadata[] = [
-      toStageMeta(input.promptVersion, 1, 'rascunho_pedagogico', s1),
-      toStageMeta(input.promptVersion, 2, 'revisao_bncc_seguranca', s2),
-      toStageMeta(input.promptVersion, 3, 'refinamento_final', s3),
-    ]
+    const pipelineStages: PipelineStageMetadata[] = pipelineConfig.stages === 3
+      ? [
+          toStageMeta(input.promptVersion, 1, 'rascunho_pedagogico', s1),
+          toStageMeta(input.promptVersion, 2, 'revisao_bncc_seguranca', s2),
+          toStageMeta(input.promptVersion, 3, 'refinamento_final', s3),
+        ]
+      : [
+          toStageMeta(input.promptVersion, 1, 'rascunho_pedagogico', s1),
+          toStageMeta(input.promptVersion, 2, 'revisao_bncc_seguranca', s3),
+        ]
 
-    const inputTokens = s1.inputTokens + s2.inputTokens + s3.inputTokens
-    const outputTokens = s1.outputTokens + s2.outputTokens + s3.outputTokens
-    const actualCostCents =
-      s1.actualCostCents + s2.actualCostCents + s3.actualCostCents
+    const inputTokens = pipelineConfig.stages === 3
+      ? s1.inputTokens + s2.inputTokens + s3.inputTokens
+      : s1.inputTokens + s3.inputTokens
+    const outputTokens = pipelineConfig.stages === 3
+      ? s1.outputTokens + s2.outputTokens + s3.outputTokens
+      : s1.outputTokens + s3.outputTokens
+    const actualCostCents = pipelineConfig.stages === 3
+      ? s1.actualCostCents + s2.actualCostCents + s3.actualCostCents
+      : s1.actualCostCents + s3.actualCostCents
 
     reportId = await persistGeneratedReport(input, s3.text)
     if (!reportId) {
@@ -136,7 +169,9 @@ export async function generatePedagogicalText(
       reportId,
       input.ownerId,
       'anthropic',
-      `3stage:${s1.model}|${s2.model}|${s3.model}`,
+      pipelineConfig.stages === 3
+        ? `3stage:${s1.model}|${s2.model}|${s3.model}`
+        : `2stage:${s1.model}|${s3.model}`,
       inputTokens,
       outputTokens,
       actualCostCents,
@@ -146,7 +181,7 @@ export async function generatePedagogicalText(
       text: s3.text,
       provider: 'anthropic',
       model: s3.model,
-      pipeline: 'claude-text-3-stage',
+      pipeline: pipelineConfig.pipelineName,
       promptVersion: input.promptVersion,
       inputTokens,
       outputTokens,
@@ -264,8 +299,50 @@ async function ensureRequiredStructure(input: {
   return { completion: merged }
 }
 
+async function ensureDocumentQuality(input: {
+  generationType: AiGenerationType
+  candidate: Awaited<ReturnType<typeof requestClaudeText>>
+  model: string
+}) {
+  const validation = validateDocumentQuality(input.generationType, input.candidate.text)
+  if (validation.ok) {
+    return { completion: input.candidate }
+  }
+
+  const repair = await requestClaudeText(
+    [
+      'Você é revisor final de documentos pedagógicos da Educação Infantil.',
+      'Ajuste o texto para cumprir regras de tamanho, linguagem natural e segurança pedagógica.',
+      'Preserve todas as informações relevantes da professora e não invente fatos.',
+      'Retorne APENAS o documento final corrigido.',
+    ].join('\n'),
+    [
+      'DOCUMENTO ATUAL:',
+      input.candidate.text.trim(),
+      '',
+      'AJUSTES OBRIGATORIOS:',
+      ...validation.issues.map((item) => `- ${item}`),
+    ].join('\n'),
+    {
+      model: input.model,
+      maxTokens: 2000,
+      temperature: 0.25,
+    },
+  )
+
+  return {
+    completion: {
+      ...repair,
+      inputTokens: input.candidate.inputTokens + repair.inputTokens,
+      outputTokens: input.candidate.outputTokens + repair.outputTokens,
+      estimatedCostCents: input.candidate.estimatedCostCents + repair.estimatedCostCents,
+      actualCostCents: input.candidate.actualCostCents + repair.actualCostCents,
+    },
+  }
+}
+
 function validateRequiredStructure(generationType: AiGenerationType, reportKind: string | undefined, text: string) {
-  if (generationType === 'planning') {
+  if (generationType === 'weekly_planning' || generationType === 'daily_lesson_plan' || generationType === 'planning') {
     const missing = [
       !hasAnyHeading(text, ['tema', 'titulo']) && 'Tema/Titulo',
       !hasAnyHeading(text, ['objetivo']) && 'Objetivo',
@@ -273,6 +350,35 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
       !hasAnyHeading(text, ['materiais']) && 'Materiais necessarios',
       !hasAnyHeading(text, ['duracao', 'tempo estimado']) && 'Duracao/Tempo estimado',
       !hasAnyHeading(text, ['observacoes', 'avaliação']) && 'Observacoes/Avaliação',
+    ].filter(Boolean) as string[]
+    return { ok: missing.length === 0, missing }
+  }
+
+  if (generationType === 'pedagogical_project') {
+    const missing = [
+      !hasAnyHeading(text, ['justificativa']) && 'Justificativa',
+      !hasAnyHeading(text, ['objetivo']) && 'Objetivos',
+      !hasAnyHeading(text, ['etapas', 'desenvolvimento']) && 'Etapas/Desenvolvimento',
+      !hasAnyHeading(text, ['avaliacao', 'acompanhamento']) && 'Avaliação/Acompanhamento',
+    ].filter(Boolean) as string[]
+    return { ok: missing.length === 0, missing }
+  }
+
+  if (generationType === 'parents_meeting_record') {
+    const missing = [
+      !hasAnyHeading(text, ['pauta']) && 'Pauta',
+      !hasAnyHeading(text, ['combinados']) && 'Combinados',
+      !hasAnyHeading(text, ['encaminhamentos']) && 'Encaminhamentos',
+    ].filter(Boolean) as string[]
+    return { ok: missing.length === 0, missing }
+  }
+
+  if (generationType === 'specialist_referral' || generationType === 'specialist_report') {
+    const missing = [
+      !hasAnyHeading(text, ['motivo', 'encaminhamento']) && 'Motivo do encaminhamento',
+      !hasAnyHeading(text, ['observacoes', 'comportamentos']) && 'Observações/Comportamentos observáveis',
+      !hasAnyHeading(text, ['estrategias', 'apoio']) && 'Estratégias já aplicadas',
+      !hasAnyHeading(text, ['encaminhamentos finais', 'solicitacao']) && 'Encaminhamento final',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
   }
@@ -294,6 +400,93 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
   }
 
   return { ok: true, missing: [] as string[] }
+}
+
+function validateDocumentQuality(generationType: AiGenerationType, text: string) {
+  const issues: string[] = []
+  const normalized = normalize(text)
+  const words = text.trim().split(/\s+/).filter(Boolean).length
+
+  const forbidden = [
+    'diagnostico',
+    'transtorno',
+    'deficit',
+    'laudo',
+    'tdah',
+    'tea',
+    'suspeita de',
+    'incapaz',
+    'problema de comportamento',
+  ]
+  const forbiddenMatches = forbidden.filter((term) => normalized.includes(term))
+  if (forbiddenMatches.length) {
+    issues.push(`Remover linguagem clínica ou julgadora: ${forbiddenMatches.join(', ')}.`)
+  }
+
+  if (generationType === 'class_diary') {
+    if (words > 230) issues.push('Reduzir o diário para 1 a 3 parágrafos curtos.')
+    if (normalized.includes('bncc') || normalized.includes('campo de experiencia')) {
+      issues.push('Remover menções diretas à BNCC; diário de bordo deve ser registro natural da rotina.')
+    }
+  }
+
+  if (generationType === 'parents_meeting_record' && words > 450) {
+    issues.push('Reduzir o registro de reunião para uma ata simples e objetiva.')
+  }
+
+  if ((generationType === 'specialist_referral' || generationType === 'specialist_report') && words > 650) {
+    issues.push('Reduzir o encaminhamento para especialista, mantendo apenas fatos observáveis, estratégias e solicitação.')
+  }
+
+  if (generationType === 'daily_lesson_plan' && words > 700) {
+    issues.push('Reduzir o plano de aula diário para formato operacional e escaneável.')
+  }
+
+  if (generationType === 'weekly_planning' && words > 950) {
+    issues.push('Reduzir o planejamento semanal, mantendo organização por dias/blocos e itens aplicáveis.')
+  }
+
+  if (generationType === 'development_report' && words > 900) {
+    issues.push('Reduzir o relatório de desenvolvimento para tamanho médio, preservando avanços e pontos de continuidade.')
+  }
+
+  if (generationType === 'pedagogical_project' && words > 1100) {
+    issues.push('Reduzir o projeto pedagógico para estrutura objetiva, sem texto acadêmico extenso.')
+  }
+
+  return { ok: issues.length === 0, issues }
+}
+
+function resolveDocumentPipelineConfig(
+  generationType: AiGenerationType,
+  models: { draft: string; review: string; refine: string },
+): DocumentPipelineConfig {
+  if (generationType === 'class_diary' || generationType === 'parents_meeting_record' || generationType === 'specialist_referral' || generationType === 'specialist_report' || generationType === 'daily_lesson_plan') {
+    return {
+      stages: 2,
+      pipelineName: 'claude-text-2-stage',
+      draftModel: HAIKU_MODEL,
+      reviewModel: models.refine,
+    }
+  }
+
+  if (generationType === 'weekly_planning' || generationType === 'pedagogical_project' || generationType === 'development_report' || generationType === 'portfolio_text') {
+    return {
+      stages: 3,
+      pipelineName: 'claude-text-3-stage',
+      draftModel: HAIKU_MODEL,
+      reviewModel: models.review,
+      refineModel: models.refine,
+    }
+  }
+
+  return {
+    stages: 3,
+    pipelineName: 'claude-text-3-stage',
+    draftModel: models.draft,
+    reviewModel: models.review,
+    refineModel: models.refine,
+  }
 }
 
 function hasAnyHeading(text: string, candidates: string[]) {
@@ -488,8 +681,13 @@ function buildPromptInputFromSummary(
   input: GeneratePedagogicalTextInput,
   summary: Record<string, unknown>,
 ): BuildPromptInput {
+  const resolvedGenerationType = resolveLegacyGenerationType(
+    input.generationType,
+    asString(summary.reportKind),
+    asString(summary.docKind),
+  )
   return {
-    generationType: input.generationType,
+    generationType: resolvedGenerationType,
     promptVersion: input.promptVersion,
     reportKind: asString(summary.reportKind),
     docKind: asString(summary.docKind),
@@ -518,6 +716,30 @@ function buildPromptInputFromSummary(
     teacherReturn: asString(summary.teacherReturn),
     returnChoice: asString(summary.returnChoice),
   }
+}
+
+function resolveLegacyGenerationType(
+  generationType: AiGenerationType,
+  reportKind?: string,
+  docKind?: string,
+): AiGenerationType {
+  const normalizedReportKind = normalize(reportKind ?? '')
+  const normalizedDocKind = normalize(docKind ?? '')
+
+  if (generationType === 'planning') {
+    if (normalizedDocKind.includes('plano de aula')) return 'daily_lesson_plan'
+    if (normalizedDocKind.includes('projeto pedagogico')) return 'pedagogical_project'
+    return 'weekly_planning'
+  }
+
+  if (generationType === 'specialist_report') return 'specialist_referral'
+  if (generationType === 'general_report') {
+    if (normalizedReportKind.includes('diario de bordo')) return 'class_diary'
+    if (normalizedReportKind.includes('reuniao de pais')) return 'parents_meeting_record'
+    if (normalizedReportKind.includes('especialista') || normalizedReportKind.includes('encaminhamento')) return 'specialist_referral'
+  }
+
+  return generationType
 }
 
 async function persistGeneratedReport(input: GeneratePedagogicalTextInput, body: string) {

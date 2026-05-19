@@ -445,13 +445,20 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
 
 function formatReportType(type: string) {
   switch (type) {
-    case 'development_report': return 'Relat\u00f3rio de desenvolvimento'
+    case 'development_report': return 'Relatório de desenvolvimento'
+    case 'class_diary': return 'Diário de bordo'
+    case 'weekly_planning': return 'Planejamento semanal'
+    case 'daily_lesson_plan': return 'Plano de aula diário'
+    case 'pedagogical_project': return 'Projeto pedagógico específico'
     case 'planning': return 'Planejamento'
-    case 'portfolio_text': return 'Portf\u00f3lio pedag\u00f3gico'
-    case 'portfolio_image': return 'Portf\u00f3lio pedag\u00f3gico'
+    case 'portfolio_text': return 'Portfólio pedagógico'
+    case 'portfolio_image': return 'Portfólio pedagógico'
     case 'generated_image': return 'Imagem'
-    case 'specialist_report': return 'Relat\u00f3rio para especialista'
-    case 'general_report': return 'Relat\u00f3rio pedag\u00f3gico'
+    case 'specialist_referral': return 'Relatório para especialista'
+    case 'specialist_report': return 'Relatório para especialista'
+    case 'parents_meeting_record': return 'Registro de reunião de pais'
+    case 'manual_anamnesis': return 'Ficha de anamnese'
+    case 'general_report': return 'Relatório pedagógico'
     default: return type
   }
 }

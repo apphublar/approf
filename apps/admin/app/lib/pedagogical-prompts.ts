@@ -48,6 +48,7 @@ export function pipelineStagePromptVersion(baseVersion: string, stage: 1 | 2 | 3
 export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalPrompt {
   const kind = input.reportKind || input.docKind || mapGenerationType(input.generationType)
   const pv = pipelineStagePromptVersion(input.promptVersion, 1)
+  const documentGuidelines = buildDocumentPromptGuidelines(input)
   if (isInterventionMode(input, 'suggestions')) {
     return buildInterventionSuggestionsPrompt(input, pv, 1)
   }
@@ -66,6 +67,8 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
     'Nunca compare crianças entre si.',
     'Nunca realize diagnostico medico, clinico ou psicologico.',
     'Não invente fatos: use apenas o contexto fornecido.',
+    'Transforme as informações da professora: preserve detalhes relevantes, organize melhor, corrija a escrita e humanize sem apagar o que foi informado.',
+    ...documentGuidelines.system,
     'A saida desta etapa e um rascunho que sera revisado nas etapas seguintes; não precisa estar perfeita, mas deve ser completa e estruturada.',
   ].join('\n')
 
@@ -80,6 +83,7 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
 export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromStage1: string): PedagogicalPrompt {
   const kind = input.reportKind || input.docKind || mapGenerationType(input.generationType)
   const pv = pipelineStagePromptVersion(input.promptVersion, 2)
+  const documentGuidelines = buildDocumentPromptGuidelines(input)
   if (isInterventionMode(input, 'suggestions')) {
     return buildInterventionSuggestionsPrompt(input, pv, 2, draftFromStage1)
   }
@@ -90,11 +94,12 @@ export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromSt
   const system = [
     `Você executa a ETAPA 2 (revisão BNCC e segurança pedagógica) do pipeline textual do Approf (${pv}).`,
     'Você recebe um RASCUNHO da etapa anterior. Revise e reescreva o texto completo.',
-    'Garanta coerencia com BNCC da Educação Infantil (0 a 5 anos), campos de experiencia e linguagem não clinica.',
+    'Revise a BNCC apenas quando o tipo de documento pedir; não force códigos, teoria ou citações longas.',
     'Mantenha formato profissional, leitura leve e objetiva, sem linguagem academica exagerada.',
     'Remova ou neutralize qualquer comparacao entre crianças, diagnostico ou conclusao clinica, e linguagem julgadora.',
     'Mantenha apenas observacoes pedagogicas e descritivas.',
     'Preserve fatos e intencoes do rascunho; não invente novos fatos.',
+    ...documentGuidelines.system,
     'Responda APENAS com o texto final revisado (sem prefacio, sem comentarios meta, sem markdown de explicacao).',
   ].join('\n')
 
@@ -118,6 +123,7 @@ export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromSt
 export function buildStage3FinalRefinementPrompt(input: BuildPromptInput, textFromStage2: string): PedagogicalPrompt {
   const kind = input.reportKind || input.docKind || mapGenerationType(input.generationType)
   const pv = pipelineStagePromptVersion(input.promptVersion, 3)
+  const documentGuidelines = buildDocumentPromptGuidelines(input)
   if (isInterventionMode(input, 'suggestions')) {
     return buildInterventionSuggestionsPrompt(input, pv, 3, textFromStage2)
   }
@@ -131,6 +137,7 @@ export function buildStage3FinalRefinementPrompt(input: BuildPromptInput, textFr
     'Personalize levemente quando fizer sentido (sem inventar dados) para leitura pela professora e familias.',
     'Mantenha todas as regras: Educação Infantil 0-5 anos, BNCC, sem diagnostico clinico, sem comparacao entre crianças, sem linguagem julgadora.',
     'Entregue em formato final curto e pratico: secoes claras, paragrafos curtos e linguagem natural.',
+    ...documentGuidelines.system,
     'A professora podera editar depois: o texto deve estar pronto para uso e sem tom robotizado.',
     'Responda APENAS com o texto final (sem prefacio, sem comentarios meta).',
   ].join('\n')
@@ -161,6 +168,7 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
   const attachments = formatAttachments(input.attachments)
   const selectedAnnotations = formatAnnotations(input.selectedAnnotations)
   const requiredStructure = buildRequiredStructureInstructions(input)
+  const documentGuidelines = buildDocumentPromptGuidelines(input)
 
   return [
     `TIPO DE DOCUMENTO: ${kind}`,
@@ -202,6 +210,7 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     '- Use paragrafos curtos, linguagem natural e objetiva, sem excesso de teoria.',
     '- Evite repeticoes, floreios e texto longo sem necessidade.',
     '- Inclua apenas informações pedagogicamente úteis para professora, escola e família.',
+    ...documentGuidelines.user.map((item) => `- ${item}`),
     ...(requiredStructure.length
       ? [
           '',
@@ -210,6 +219,73 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
         ]
       : []),
   ].join('\n')
+}
+
+function buildDocumentPromptGuidelines(input: BuildPromptInput) {
+  const type = input.generationType
+  const system: string[] = []
+  const user: string[] = []
+
+  if (type === 'class_diary') {
+    system.push(
+      'Este documento é um diário de bordo coletivo: não transforme em relatório individual.',
+      'Não mencione BNCC no texto final. Use 1 a 3 parágrafos curtos, sem títulos acadêmicos.',
+      'Tom: professora experiente registrando a rotina do dia com leveza, objetividade e humanidade.',
+    )
+    user.push('Tamanho final: 1 a 3 parágrafos, sem lista longa e sem linguagem acadêmica.')
+  } else if (type === 'development_report' || type === 'general_report') {
+    system.push(
+      'Este relatório é individual, médio e empático. Valorize avanços, interesses, participação e pontos de continuidade.',
+      'A BNCC pode aparecer de modo contextual e discreto, nunca como bloco dominante ou lista teórica.',
+      'Evite conclusões fechadas; prefira observou-se, percebe-se, vem demonstrando, segue em acompanhamento.',
+    )
+    user.push('Tamanho final: relatório médio, com seções curtas e linguagem compreensível para escola e família.')
+  } else if (type === 'weekly_planning') {
+    system.push(
+      'Este documento é um planejamento semanal prático, escaneável e aplicável na rotina.',
+      'Use BNCC de forma objetiva nos campos/intencionalidades, sem texto teórico longo.',
+      'Organize por dias ou blocos da semana, com objetivos, propostas, materiais e observação.',
+    )
+    user.push('Tamanho final: planejamento de leitura rápida, com listas úteis e sem parágrafos extensos.')
+  } else if (type === 'daily_lesson_plan') {
+    system.push(
+      'Este documento é um plano de aula diário, direto e operacional.',
+      'Priorize objetivo, tempo, materiais, desenvolvimento, adaptação e observação.',
+      'Use BNCC apenas como referência pedagógica breve, sem dominar o documento.',
+    )
+    user.push('Tamanho final: curto a médio, pronto para a professora aplicar no dia.')
+  } else if (type === 'pedagogical_project') {
+    system.push(
+      'Este documento é um projeto pedagógico específico, com estrutura própria e linguagem institucional simples.',
+      'Inclua justificativa, objetivos, etapas, propostas, registros, culminância opcional e avaliação processual.',
+      'Use BNCC como sustentação pedagógica contextual, sem parecer artigo acadêmico.',
+    )
+    user.push('Tamanho final: estruturado, objetivo e completo o suficiente para apresentar à coordenação.')
+  } else if (type === 'specialist_referral' || type === 'specialist_report') {
+    system.push(
+      'Este documento é um encaminhamento para especialista: formal, objetivo e sem diagnóstico.',
+      'Use apenas comportamentos observáveis, frequência/contexto quando informado e estratégias já tentadas.',
+      'Não use termos clínicos como suspeita, transtorno, laudo, déficit, TEA, TDAH ou diagnóstico.',
+      'BNCC não deve aparecer como seção central; o foco é registro escolar observável.',
+    )
+    user.push('Tamanho final: formal e objetivo, sem afirmar causa, hipótese clínica ou diagnóstico.')
+  } else if (type === 'parents_meeting_record') {
+    system.push(
+      'Este documento é ata/registro de reunião de pais: simples, objetivo e fiel ao que foi informado.',
+      'Não use BNCC nem linguagem acadêmica. Organize pauta, observações, combinados e encaminhamentos.',
+      'Evite expor outras crianças e preserve tom respeitoso com a família.',
+    )
+    user.push('Tamanho final: curto, com formato de registro de reunião e combinados claros.')
+  } else if (type === 'portfolio_text') {
+    system.push(
+      'Este documento é portfólio textual: narrativa pedagógica com evidências, memória de percurso e tom afetivo-profissional.',
+      'Valorize produções, falas, brincadeiras, descobertas e avanços sem transformar em relatório clínico.',
+      'BNCC pode aparecer de forma discreta, conectada às experiências observadas.',
+    )
+    user.push('Tamanho final: narrativa média, com evidências e linguagem sensível, sem exagero acadêmico.')
+  }
+
+  return { system, user }
 }
 
 function formatAnnotations(annotations?: Array<{ date?: string; label?: string; text?: string }>) {
@@ -242,6 +318,18 @@ function mapGenerationType(generationType: AiGenerationType) {
   switch (generationType) {
     case 'development_report':
       return 'Relatório de desenvolvimento'
+    case 'class_diary':
+      return 'Diário de bordo'
+    case 'weekly_planning':
+      return 'Planejamento semanal'
+    case 'daily_lesson_plan':
+      return 'Plano de aula diário'
+    case 'pedagogical_project':
+      return 'Projeto pedagógico específico'
+    case 'specialist_referral':
+      return 'Encaminhamento para especialista'
+    case 'parents_meeting_record':
+      return 'Registro de reunião de pais'
     case 'planning':
       return 'Planejamento pedagógico'
     case 'portfolio_text':
@@ -267,7 +355,11 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
     ]
   }
 
-  if (input.generationType === 'planning') {
+  if (
+    input.generationType === 'planning'
+    || input.generationType === 'weekly_planning'
+    || input.generationType === 'daily_lesson_plan'
+  ) {
     return [
       'Tema',
       'Objetivo',
@@ -285,6 +377,33 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
       'Desenvolvimento nos Campos de Experiencia da BNCC',
       'Conquistas e pontos de atenção em linguagem construtiva',
       'Observações finais',
+    ]
+  }
+
+  if (input.generationType === 'pedagogical_project') {
+    return [
+      'Justificativa',
+      'Objetivos do projeto',
+      'Etapas de desenvolvimento',
+      'Avaliação e acompanhamento',
+    ]
+  }
+
+  if (input.generationType === 'specialist_referral' || input.generationType === 'specialist_report') {
+    return [
+      'Motivo do encaminhamento',
+      'Comportamentos observáveis na rotina',
+      'Estratégias pedagógicas já aplicadas',
+      'Solicitação de avaliação externa',
+    ]
+  }
+
+  if (input.generationType === 'parents_meeting_record') {
+    return [
+      'Pauta',
+      'Observações da reunião',
+      'Combinados',
+      'Encaminhamentos',
     ]
   }
 

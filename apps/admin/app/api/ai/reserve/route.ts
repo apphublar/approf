@@ -10,6 +10,12 @@ const CORS_HEADERS = {
 
 const GENERATION_TYPES = new Set<AiGenerationType>([
   'development_report',
+  'class_diary',
+  'weekly_planning',
+  'daily_lesson_plan',
+  'pedagogical_project',
+  'specialist_referral',
+  'parents_meeting_record',
   'general_report',
   'planning',
   'portfolio_text',

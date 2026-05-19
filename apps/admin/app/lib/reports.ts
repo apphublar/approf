@@ -158,6 +158,52 @@ export async function updateOwnerReport(input: {
   return data
 }
 
+export async function createOwnerReport(input: {
+  ownerId: string
+  studentId?: string | null
+  classId?: string | null
+  reportType: string
+  promptVersion?: string | null
+  body: string
+  status?: ReportStatus
+}) {
+  const supabase = createSupabaseServiceClient()
+  const { data, error } = await supabase
+    .from('reports')
+    .insert({
+      owner_id: input.ownerId,
+      student_id: input.studentId ?? null,
+      class_id: input.classId ?? null,
+      status: input.status ?? 'ready',
+      report_type: input.reportType,
+      prompt_version: input.promptVersion ?? null,
+      body: input.body,
+    })
+    .select(REPORT_SELECT_WITH_ARTIFACTS)
+    .single()
+
+  if (error && isMissingAiArtifactsColumn(error)) {
+    const fallback = await supabase
+      .from('reports')
+      .insert({
+        owner_id: input.ownerId,
+        student_id: input.studentId ?? null,
+        class_id: input.classId ?? null,
+        status: input.status ?? 'ready',
+        report_type: input.reportType,
+        prompt_version: input.promptVersion ?? null,
+        body: input.body,
+      })
+      .select(REPORT_SELECT_BASE)
+      .single()
+    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel criar documento.')
+    return withEmptyArtifacts(fallback.data)
+  }
+
+  if (error) throw toError(error, 'Nao foi possivel criar documento.')
+  return data
+}
+
 function applyListFilters(
   query: any,
   ownerId: string,

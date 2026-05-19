@@ -459,11 +459,18 @@ function findClassName(classId: string | null, classes: ReturnType<typeof useApp
 function formatReportType(type: string) {
   const labels: Record<string, string> = {
     development_report: 'Relatório de desenvolvimento',
-    planning: 'Planejamento',
+    class_diary: 'Diário de bordo',
+    weekly_planning: 'Planejamento semanal',
+    daily_lesson_plan: 'Plano de aula diário',
+    pedagogical_project: 'Projeto pedagógico específico',
     portfolio_text: 'Portfólio pedagógico',
     portfolio_image: 'Imagem de portfólio',
     generated_image: 'Imagem',
-    specialist_report: 'Encaminhamento',
+    specialist_referral: 'Encaminhamento para especialista',
+    specialist_report: 'Encaminhamento para especialista',
+    parents_meeting_record: 'Registro de reunião de pais',
+    manual_anamnesis: 'Ficha de anamnese',
+    planning: 'Planejamento',
     general_report: 'Relatório pedagógico',
   }
   return labels[type] ?? 'Documento'
@@ -504,7 +511,7 @@ function getTitle(filters: GeneratedDocumentsData) {
   if (filters.kind === 'documents') return 'Documentos'
   if (filters.reportType === 'portfolio_image' || filters.reportType === 'portfolio_text') return 'Portfólios'
   if (filters.reportType === 'development_report') return 'Relatórios'
-  if (filters.reportType === 'planning') return 'Planejamentos'
+  if (hasPlanningFilter(filters)) return 'Planejamentos'
   return 'Gerados'
 }
 
@@ -527,6 +534,19 @@ function getSubtitle(filters: GeneratedDocumentsData, classes: ReturnType<typeof
     heading: filters.kind === 'documents' ? 'Histórico de documentos gerados' : 'Histórico de gerados',
     body: 'Documentos, planejamentos, relatórios e imagens salvos ficam aqui para visualizar, editar, arquivar, recuperar ou marcar versão final.',
   }
+}
+
+function hasPlanningFilter(filters: GeneratedDocumentsData) {
+  const types = [
+    ...(filters.reportType ? [filters.reportType] : []),
+    ...(filters.reportTypes ?? []),
+  ]
+  return types.some((item) =>
+    item === 'planning'
+    || item === 'weekly_planning'
+    || item === 'daily_lesson_plan'
+    || item === 'pedagogical_project',
+  )
 }
 
 function isImageReport(doc: GeneratedDocument) {

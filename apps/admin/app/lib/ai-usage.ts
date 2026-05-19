@@ -2,11 +2,17 @@ import { createSupabaseServiceClient } from './supabase-server'
 
 export type AiGenerationType =
   | 'development_report'
-  | 'general_report'
-  | 'planning'
+  | 'class_diary'
+  | 'weekly_planning'
+  | 'daily_lesson_plan'
+  | 'pedagogical_project'
+  | 'specialist_referral'
+  | 'parents_meeting_record'
   | 'portfolio_text'
   | 'portfolio_image'
   | 'audio_transcription'
+  | 'general_report'
+  | 'planning'
   | 'specialist_report'
   | 'other'
 
@@ -81,6 +87,60 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     estimatedCostCents: 140,
     inputTokens: 10500,
     outputTokens: 5800,
+    imageCount: 0,
+  },
+  class_diary: {
+    provider: 'anthropic',
+    model: 'claude-text-2stage',
+    giztokens: toGizTokens(95),
+    estimatedCostCents: 95,
+    inputTokens: 6200,
+    outputTokens: 2600,
+    imageCount: 0,
+  },
+  weekly_planning: {
+    provider: 'anthropic',
+    model: 'claude-text-3stage',
+    giztokens: toGizTokens(165),
+    estimatedCostCents: 165,
+    inputTokens: 11800,
+    outputTokens: 7000,
+    imageCount: 0,
+  },
+  daily_lesson_plan: {
+    provider: 'anthropic',
+    model: 'claude-text-2stage',
+    giztokens: toGizTokens(120),
+    estimatedCostCents: 120,
+    inputTokens: 8600,
+    outputTokens: 4200,
+    imageCount: 0,
+  },
+  pedagogical_project: {
+    provider: 'anthropic',
+    model: 'claude-text-3stage',
+    giztokens: toGizTokens(190),
+    estimatedCostCents: 190,
+    inputTokens: 13200,
+    outputTokens: 7600,
+    imageCount: 0,
+  },
+  specialist_referral: {
+    provider: 'anthropic',
+    model: 'claude-text-2stage',
+    giztokens: toGizTokens(135),
+    estimatedCostCents: 135,
+    inputTokens: 9100,
+    outputTokens: 4600,
+    imageCount: 0,
+  },
+  parents_meeting_record: {
+    provider: 'anthropic',
+    model: 'claude-text-2stage',
+    giztokens: toGizTokens(105),
+    estimatedCostCents: 105,
+    inputTokens: 7200,
+    outputTokens: 3200,
     imageCount: 0,
   },
   general_report: {
@@ -295,6 +355,7 @@ export async function refundAiUsageReservation(input: {
 
 function getEntitlementType(generationType: AiGenerationType): EntitlementType | null {
   if (generationType === 'development_report') return 'development_report'
+  if (generationType === 'general_report') return 'development_report'
   if (generationType === 'portfolio_image') return 'portfolio_image'
   return null
 }
@@ -307,12 +368,14 @@ function getMonthPeriod(date: Date) {
 
 function getEntitlementCycle(generationType: AiGenerationType, date: Date) {
   if (generationType === 'development_report') return getYearPeriod(date)
+  if (generationType === 'general_report') return getYearPeriod(date)
   if (generationType === 'portfolio_image') return getMonthPeriodWithLabel(date)
   return null
 }
 
 function getIncludedEntitlementQuantity(generationType: AiGenerationType) {
   if (generationType === 'development_report') return 2
+  if (generationType === 'general_report') return 2
   if (generationType === 'portfolio_image') return 2
   return 0
 }
