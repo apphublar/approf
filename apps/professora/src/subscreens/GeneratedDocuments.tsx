@@ -414,7 +414,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
 
                 {error && (
                   <p className="mt-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
-                    Não foi possível concluir a criação. Tente novamente.
+                    {error}
                   </p>
                 )}
 

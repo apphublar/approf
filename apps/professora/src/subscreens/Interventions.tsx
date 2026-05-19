@@ -439,7 +439,7 @@ export default function InterventionsSubscreen() {
           <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
             error ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
           }`}>
-            {error ? 'Não foi possível concluir a criação. Tente novamente.' : usageMessage}
+            {error || usageMessage}
           </p>
         )}
         {error && (step === 'form' || step === 'feedback') && (

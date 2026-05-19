@@ -151,8 +151,12 @@ export async function POST(request: Request) {
 
     console.error('[ai/generate-text] erro interno', error)
 
+    const message = error instanceof Error && error.message.trim()
+      ? error.message.trim()
+      : 'Nao foi possivel concluir a geracao agora. Tente novamente em instantes.'
+
     return NextResponse.json(
-      { error: 'Nao foi possivel concluir a geracao agora. Tente novamente em instantes.' },
+      { error: message },
       { status: 500, headers: CORS_HEADERS },
     )
   }

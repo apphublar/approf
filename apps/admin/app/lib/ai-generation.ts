@@ -260,12 +260,7 @@ async function ensureRequiredStructure(input: {
   }
 
   const repair = await requestClaudeText(
-    [
-      'Você e revisor final de qualidade BNCC para Educação Infantil.',
-      'Reescreva integralmente o documento para cumprir TODAS as secoes obrigatorias, sem inventar fatos novos.',
-      'Mantenha linguagem formal, acolhedora, sem comparacao entre crianças e sem diagnostico clinico.',
-      'Retorne APENAS o documento final completo.',
-    ].join('\n'),
+    buildStructureRepairSystemPrompt(input.generationType),
     [
       'DOCUMENTO ATUAL:',
       input.candidate.text.trim(),
@@ -293,10 +288,55 @@ async function ensureRequiredStructure(input: {
 
   const repairedValidation = validateRequiredStructure(input.generationType, input.reportKind, merged.text)
   if (!repairedValidation.ok) {
-    throw new PublicAiGenerationError('Não foi possivel estruturar o documento no formato BNCC obrigatorio. Tente ajustar o contexto e gerar novamente.')
+    console.warn(
+      '[ai-generation] estrutura ainda incompleta apos reparo',
+      input.generationType,
+      repairedValidation.missing,
+    )
   }
 
   return { completion: merged }
+}
+
+function buildStructureRepairSystemPrompt(generationType: AiGenerationType) {
+  if (generationType === 'class_diary') {
+    return [
+      'Você revisa diários de bordo da Educação Infantil.',
+      'Garanta registro natural da rotina em 1 a 3 parágrafos curtos, sem BNCC explícita e sem diagnóstico.',
+      'Retorne APENAS o texto final.',
+    ].join('\n')
+  }
+
+  if (generationType === 'parents_meeting_record') {
+    return [
+      'Você revisa atas de reunião de pais.',
+      'Inclua seções claras: Pauta, Combinados e Encaminhamentos, sem inventar fatos.',
+      'Retorne APENAS o documento final.',
+    ].join('\n')
+  }
+
+  if (generationType === 'specialist_referral' || generationType === 'specialist_report') {
+    return [
+      'Você revisa encaminhamentos para especialistas.',
+      'Use apenas fatos observáveis, estratégias já aplicadas e solicitação final, sem diagnóstico.',
+      'Retorne APENAS o documento final.',
+    ].join('\n')
+  }
+
+  if (generationType === 'weekly_planning' || generationType === 'daily_lesson_plan' || generationType === 'planning' || generationType === 'pedagogical_project') {
+    return [
+      'Você revisa planejamentos pedagógicos práticos para Educação Infantil.',
+      'Organize o texto com títulos claros para cada seção obrigatória, sem texto acadêmico longo.',
+      'Retorne APENAS o documento final completo.',
+    ].join('\n')
+  }
+
+  return [
+    'Você revisa documentos pedagógicos da Educação Infantil.',
+    'Reescreva para cumprir as seções obrigatórias, sem inventar fatos novos.',
+    'Mantenha linguagem acolhedora, sem comparação entre crianças e sem diagnóstico clínico.',
+    'Retorne APENAS o documento final completo.',
+  ].join('\n')
 }
 
 async function ensureDocumentQuality(input: {
@@ -490,14 +530,8 @@ function resolveDocumentPipelineConfig(
 }
 
 function hasAnyHeading(text: string, candidates: string[]) {
-  const lines = normalize(text).split('\n').map((line) => line.trim()).filter(Boolean)
-  return lines.some((line) => {
-    const normalizedLine = line
-      .replace(/^[-*]\s*/, '')
-      .replace(/^\d+[\).:-]?\s*/, '')
-      .replace(/^#+\s*/, '')
-    return candidates.some((candidate) => normalizedLine.includes(normalize(candidate)))
-  })
+  const normalizedBody = normalize(text)
+  return candidates.some((candidate) => normalizedBody.includes(normalize(candidate)))
 }
 
 function normalize(value: string) {

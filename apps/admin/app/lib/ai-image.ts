@@ -47,10 +47,10 @@ interface GenerateStandaloneImageResult {
   reportId: string
 }
 
-const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2'
+const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-1'
 const DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL = 'gpt-image-1-mini'
 const DEFAULT_OPENAI_IMAGE_SIZE = '1024x1536'
-const DEFAULT_OPENAI_IMAGE_QUALITY = 'high'
+const DEFAULT_OPENAI_IMAGE_QUALITY = 'medium'
 const DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY = 'medium'
 const DEFAULT_OPENAI_IMAGE_COST_CENTS = 120
 const DEFAULT_OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD = 8
@@ -75,7 +75,7 @@ export async function generatePortfolioImage(
     size,
     quality,
     user: input.ownerId,
-    timeoutMs: 240000,
+    timeoutMs: 150000,
   })
 
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'portfolio')
@@ -301,38 +301,22 @@ function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: strin
     : 'Sem anexos visuais autorizados.'
 
   const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
-  return `Crie uma imagem unica de portfolio pedagogico de desenvolvimento para educacao infantil com qualidade profissional premium, semelhante a um material editorial/Canva profissional para escola.
+  return `Ilustracao de portfolio pedagogico (${formatLabel}, ${size}) para Educacao Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
 
-Direcao visual obrigatoria:
-- imagem no formato ${formatLabel}, tamanho ${size}, em alta qualidade, com acabamento profissional, limpo e pronto para compartilhar;
-- estilo pedagogico brasileiro, acolhedor, infantil, sofisticado e colorido em tons pastel;
-- layout de pagina unica, bem diagramado, com margens generosas, cards arredondados, icones consistentes e hierarquia visual clara;
-- usar composicao tipo portfolio escolar premium: titulo, identificacao, campos de experiencia BNCC, avancos, proximos passos e pequenos registros visuais;
-- incluir titulo grande e correto: "PORTFOLIO PEDAGOGICO DE DESENVOLVIMENTO";
-- incluir subtitulo correto: "EDUCACAO INFANTIL";
-- incluir nome da crianca: "${studentName}";
-- incluir turma: "${className}";
-- representar os campos da BNCC com icones/cores e textos curtos: "O eu, o outro e o nos", "Corpo, gestos e movimentos", "Tracos, sons, cores e formas", "Escuta, fala, pensamento e imaginacao", "Espacos, tempos, quantidades, relacoes e transformacoes";
-- criar areas "Avancos e conquistas" e "Proximos passos", com frases curtas e legiveis;
-- se houver pouca informacao, prefira menos texto e melhor acabamento visual, sem preencher com frases inventadas longas;
-- evitar texto pequeno demais, letras deformadas, erros ortograficos, blocos lotados, poluicao visual e excesso de elementos;
-- nao criar diagnosticos, comparacoes entre criancas, nota, ranking, selo de desempenho ou linguagem avaliativa;
-- nao representar outras criancas identificaveis;
-- nao usar marcas d'agua, logotipos externos, QR code, texto em ingles ou assinatura de IA.
+Texto visivel em portugues:
+- Titulo: PORTFOLIO PEDAGOGICO DE DESENVOLVIMENTO
+- Subtitulo: EDUCACAO INFANTIL
+- Crianca: ${studentName}
+- Turma: ${className}
+- Blocos curtos: campos de experiencia BNCC, Avancos e conquistas, Proximos passos
 
-Informacoes pedagogicas para preencher o painel:
+Regras: sem diagnostico, sem comparacao entre criancas, sem nota/ranking, sem marcas d'agua ou QR code, sem outras criancas identificaveis. Pouco texto, letras legiveis.
+
+Conteudo pedagogico:
 ${observations}
 
-Orientacao extra da professora:
-${extraContext || 'Valorizar conquistas, autonomia, linguagem, brincadeiras, interacoes e proximos passos.'}
-
-Anexos informados pela professora:
-${attachmentList}
-
-Importante:
-- Priorize qualidade visual e leitura. A imagem deve parecer feita por designer profissional para Educacao Infantil.
-- Todo texto visivel deve estar em portugues brasileiro, com grafia correta.
-- A imagem deve seguir a BNCC da Educacao Infantil (0 a 5 anos) sem parecer laudo clinico.`
+Extra: ${extraContext || 'Destacar conquistas e proximos passos da rotina.'}
+Anexos: ${attachmentList}`
 }
 
 function resolvePortfolioImageSize(summary: Record<string, unknown>) {
@@ -352,7 +336,7 @@ function resolvePortfolioImageQuality() {
 
 function resolvePortfolioImageFallbackModels(model: string) {
   const configured = process.env.OPENAI_IMAGE_FALLBACK_MODEL?.trim()
-  const fallbacks = configured ? [configured] : ['gpt-image-1']
+  const fallbacks = configured ? [configured] : ['gpt-image-2', 'gpt-image-1-mini']
   return fallbacks.filter((item) => item !== model)
 }
 

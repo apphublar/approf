@@ -208,6 +208,17 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   },
 }
 
+/** Fallback quando o enum do banco ainda não tem o tipo novo (migration pendente). */
+const GENERATION_TYPE_RPC_FALLBACK: Partial<Record<AiGenerationType, AiGenerationType>> = {
+  class_diary: 'general_report',
+  weekly_planning: 'planning',
+  daily_lesson_plan: 'planning',
+  pedagogical_project: 'planning',
+  specialist_referral: 'specialist_report',
+  parents_meeting_record: 'general_report',
+  audio_transcription: 'other',
+}
+
 export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUsageResult> {
   const supabase = createSupabaseServiceClient()
   const baseEstimate = PRICING[input.generationType] ?? PRICING.other
@@ -237,13 +248,15 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
   const entitlementCycle = getEntitlementCycle(input.generationType, new Date())
   const entitlementIncludedQuantity = getIncludedEntitlementQuantity(input.generationType)
 
-  const { data, error } = await supabase.rpc('reserve_ai_usage_atomic', {
+  const rpcParams = {
     p_owner_id: input.ownerId,
-    p_generation_type: input.generationType,
     p_class_id: input.classId ?? null,
     p_student_id: input.studentId ?? null,
     p_prompt_version: input.promptVersion ?? 'bncc-v1',
-    p_request_summary: input.requestSummary ?? {},
+    p_request_summary: {
+      ...(input.requestSummary ?? {}),
+      requestedGenerationType: input.generationType,
+    },
     p_provider: estimate.provider,
     p_model: estimate.model,
     p_estimated_cost_cents: estimate.estimatedCostCents,
@@ -260,7 +273,29 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
     p_semester_cycle_start: entitlementCycle?.start ?? null,
     p_semester_cycle_end: entitlementCycle?.end ?? null,
     p_semester_included_quantity: entitlementIncludedQuantity,
+  }
+
+  let rpcGenerationType: AiGenerationType = input.generationType
+  let { data, error } = await supabase.rpc('reserve_ai_usage_atomic', {
+    ...rpcParams,
+    p_generation_type: rpcGenerationType,
   })
+
+  if (error && isInvalidGenerationTypeError(error)) {
+    const fallbackType = GENERATION_TYPE_RPC_FALLBACK[input.generationType]
+    if (fallbackType) {
+      console.warn(
+        `[ai-usage] tipo ${input.generationType} indisponivel no banco; reservando como ${fallbackType}`,
+      )
+      rpcGenerationType = fallbackType
+      const retry = await supabase.rpc('reserve_ai_usage_atomic', {
+        ...rpcParams,
+        p_generation_type: rpcGenerationType,
+      })
+      data = retry.data
+      error = retry.error
+    }
+  }
 
   if (error) {
     throw toError(error, 'Nao foi possivel reservar uso de IA.')
@@ -401,6 +436,15 @@ function formatDate(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function isInvalidGenerationTypeError(error: unknown) {
+  const message = error instanceof Error
+    ? error.message
+    : error && typeof error === 'object' && 'message' in error
+      ? String((error as { message?: unknown }).message ?? '')
+      : String(error ?? '')
+  return /invalid input value for enum|ai_generation_type/i.test(message)
 }
 
 function toError(error: unknown, fallbackMessage: string) {

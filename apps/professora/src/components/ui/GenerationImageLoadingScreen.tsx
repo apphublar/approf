@@ -13,9 +13,9 @@ export default function GenerationImageLoadingScreen() {
 
   useEffect(() => {
     const timers = [
-      window.setTimeout(() => setActiveStep(1), 12000),
-      window.setTimeout(() => setActiveStep(2), 36000),
-      window.setTimeout(() => setActiveStep(3), 78000),
+      window.setTimeout(() => setActiveStep(1), 5000),
+      window.setTimeout(() => setActiveStep(2), 15000),
+      window.setTimeout(() => setActiveStep(3), 35000),
     ]
     return () => timers.forEach((timer) => window.clearTimeout(timer))
   }, [])
