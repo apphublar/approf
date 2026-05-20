@@ -197,10 +197,17 @@ export interface GeneratedDocument {
   ai_artifacts?: {
     kind?: string
     imageDataUrl?: string
+    originalUrl?: string
+    mediumUrl?: string
+    thumbnailUrl?: string
     prompt?: string
     model?: string
     size?: string
     quality?: string
+    fileSize?: number
+    mimeType?: string
+    width?: number
+    height?: number
   } | null
   is_final_version: boolean
   created_at: string

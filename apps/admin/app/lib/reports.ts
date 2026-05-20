@@ -17,6 +17,7 @@ export interface ReportListFilters {
   studentId?: string
   classId?: string
   limit?: number
+  offset?: number
   compact?: boolean
 }
 
@@ -217,7 +218,16 @@ function applyListFilters(
   if (filters.reportType) scopedQuery = scopedQuery.eq('report_type', filters.reportType)
   if (filters.studentId) scopedQuery = scopedQuery.eq('student_id', filters.studentId)
   if (filters.classId) scopedQuery = scopedQuery.eq('class_id', filters.classId)
-  if (filters.limit && Number.isFinite(filters.limit)) scopedQuery = scopedQuery.limit(Math.max(1, Math.min(filters.limit, 200)))
+  const boundedLimit = filters.limit && Number.isFinite(filters.limit)
+    ? Math.max(1, Math.min(filters.limit, 200))
+    : undefined
+  const boundedOffset = filters.offset && Number.isFinite(filters.offset)
+    ? Math.max(0, Math.floor(filters.offset))
+    : 0
+
+  if (typeof boundedLimit === 'number') {
+    scopedQuery = scopedQuery.range(boundedOffset, boundedOffset + boundedLimit - 1)
+  }
 
   return scopedQuery
 }

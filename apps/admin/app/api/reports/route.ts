@@ -23,6 +23,8 @@ export async function GET(request: Request) {
     const classId = searchParams.get('classId')?.trim() || undefined
     const limitRaw = Number(searchParams.get('limit'))
     const limit = Number.isFinite(limitRaw) ? limitRaw : undefined
+    const offsetRaw = Number(searchParams.get('offset'))
+    const offset = Number.isFinite(offsetRaw) ? offsetRaw : undefined
     const compact = searchParams.get('compact') === '1'
 
     const reports = await listOwnerReports(ownerId, {
@@ -31,6 +33,7 @@ export async function GET(request: Request) {
       studentId,
       classId,
       limit,
+      offset,
       compact,
     })
 

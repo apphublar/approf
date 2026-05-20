@@ -7,6 +7,7 @@ interface ListReportsFilters {
   studentId?: string
   classId?: string
   limit?: number
+  offset?: number
   compact?: boolean
 }
 
@@ -19,12 +20,18 @@ interface UpdateReportInput {
 
 export async function listReports(filters: ListReportsFilters = {}) {
   const response = await callReportsApi<{ reports: GeneratedDocument[] }>(`/api/reports${buildQuery(filters)}`, { method: 'GET' })
-  return response.reports as GeneratedDocument[]
+  const reports = response.reports as GeneratedDocument[]
+  reports.forEach((report) => setReportCache(report.id, report))
+  return reports
 }
 
 export async function getReportById(reportId: string) {
+  const cached = reportCache.get(reportId)
+  if (cached) return cached
   const response = await callReportsApi<{ report: GeneratedDocument }>(`/api/reports/${reportId}`, { method: 'GET' })
-  return response.report as GeneratedDocument
+  const report = response.report as GeneratedDocument
+  setReportCache(reportId, report)
+  return report
 }
 
 export async function updateReport(reportId: string, input: UpdateReportInput) {
@@ -33,7 +40,29 @@ export async function updateReport(reportId: string, input: UpdateReportInput) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   })
-  return response.report as GeneratedDocument
+  const report = response.report as GeneratedDocument
+  setReportCache(reportId, report)
+  return report
+}
+
+export function getCachedReportById(reportId: string) {
+  return reportCache.get(reportId) ?? null
+}
+
+export async function prefetchReportsByIds(reportIds: string[]) {
+  const uniqueIds = Array.from(new Set(reportIds.filter(Boolean)))
+  if (!uniqueIds.length) return
+  await Promise.all(
+    uniqueIds.map(async (id) => {
+      if (reportCache.has(id)) return
+      try {
+        const response = await callReportsApi<{ report: GeneratedDocument }>(`/api/reports/${id}`, { method: 'GET' })
+        setReportCache(id, response.report as GeneratedDocument)
+      } catch {
+        // Falha de prefetch não deve interromper navegação.
+      }
+    }),
+  )
 }
 
 export async function createReportShareLink(reportId: string) {
@@ -52,6 +81,7 @@ function buildQuery(filters: ListReportsFilters) {
   if (filters.studentId) params.set('studentId', filters.studentId)
   if (filters.classId) params.set('classId', filters.classId)
   if (typeof filters.limit === 'number') params.set('limit', String(filters.limit))
+  if (typeof filters.offset === 'number') params.set('offset', String(filters.offset))
   if (filters.compact) params.set('compact', '1')
   const query = params.toString()
   return query ? `?${query}` : ''
@@ -94,4 +124,15 @@ async function callReportsApi<T>(path: string, init: RequestInit): Promise<T> {
   }
 
   return payload as T
+}
+
+const REPORT_CACHE_LIMIT = 120
+const reportCache = new Map<string, GeneratedDocument>()
+
+function setReportCache(id: string, report: GeneratedDocument) {
+  reportCache.set(id, report)
+  if (reportCache.size <= REPORT_CACHE_LIMIT) return
+  const oldestKey = reportCache.keys().next().value as string | undefined
+  if (!oldestKey) return
+  reportCache.delete(oldestKey)
 }

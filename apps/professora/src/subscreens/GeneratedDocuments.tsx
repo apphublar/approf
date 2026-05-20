@@ -1,10 +1,11 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, Download, Eye, FileText, Image as ImageIcon, Plus, Search, Share2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
-import { getReportById, listReports } from '@/services/reports'
+import { getCachedReportById, listReports, prefetchReportsByIds } from '@/services/reports'
 import { generateImage } from '@/services/ai-usage'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument } from '@/types'
+import { getImageVariants, prefetchImageVariants, type ImageVariants } from '@/utils/image-performance'
 
 interface GeneratedDocumentsData {
   reportType?: string
@@ -17,6 +18,7 @@ interface GeneratedDocumentsData {
 
 type PeriodFilter = 'month' | 'all'
 type ArchiveFilter = 'active' | 'archived'
+const PAGE_SIZE = 24
 
 export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen, openSubscreen } = useNavStore()
@@ -27,35 +29,59 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   const [period, setPeriod] = useState<PeriodFilter>('month')
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active')
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [description, setDescription] = useState('')
   const [creating, setCreating] = useState(false)
   const [imageDetailsById, setImageDetailsById] = useState<Record<string, { imageDataUrl?: string; prompt?: string; quality?: string }>>({})
+  const [imageVariantsById, setImageVariantsById] = useState<Record<string, ImageVariants>>({})
   const isImagesMode = filters.kind === 'images'
 
-  async function loadDocuments() {
-    setLoading(true)
+  async function loadDocuments(reset = false) {
+    if (reset) {
+      setLoading(true)
+      setPage(0)
+      setHasMore(true)
+    } else {
+      setLoadingMore(true)
+    }
     try {
       const items = await listReports({
-        limit: 80,
+        limit: PAGE_SIZE,
+        offset: reset ? 0 : page * PAGE_SIZE,
         studentId: filters.studentId,
         classId: filters.classId,
         compact: true,
       })
-      setDocuments(sortFocusedFirst(items.filter((item) => item.report_type !== 'manual_anamnesis'), filters.focusReportId))
-      setImageDetailsById({})
+      const filtered = items.filter((item) => item.report_type !== 'manual_anamnesis')
+      setHasMore(filtered.length === PAGE_SIZE)
+      setPage((current) => (reset ? 1 : current + 1))
+      setDocuments((current) => {
+        const merged = reset ? filtered : dedupeById([...current, ...filtered])
+        return sortFocusedFirst(merged, filters.focusReportId)
+      })
+      if (reset) {
+        setImageDetailsById({})
+        setImageVariantsById({})
+      }
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível carregar documentos.')
     } finally {
-      setLoading(false)
+      if (reset) {
+        setLoading(false)
+      } else {
+        setLoadingMore(false)
+      }
     }
   }
 
   useEffect(() => {
-    loadDocuments()
+    loadDocuments(true)
       .catch(() => undefined)
   }, [filters.classId, filters.focusReportId, filters.studentId])
 
@@ -93,25 +119,18 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
     if (!imageIds.length) return
     let canceled = false
 
-    Promise.all(
-      imageIds.map(async (id) => {
-        try {
-          const report = await getReportById(id)
-          return {
-            id,
-            imageDataUrl: report.ai_artifacts?.imageDataUrl,
-            prompt: report.ai_artifacts?.prompt,
-            quality: report.ai_artifacts?.quality,
-          }
-        } catch {
-          return { id }
-        }
-      }),
-    ).then((items) => {
+    prefetchReportsByIds(imageIds).then(() => {
       if (canceled) return
       setImageDetailsById((current) => {
         const next = { ...current }
-        items.forEach((item) => { next[item.id] = item })
+        imageIds.forEach((id) => {
+          const report = getCachedReportById(id)
+          next[id] = {
+            imageDataUrl: report?.ai_artifacts?.imageDataUrl,
+            prompt: report?.ai_artifacts?.prompt,
+            quality: report?.ai_artifacts?.quality,
+          }
+        })
         return next
       })
     })
@@ -120,6 +139,44 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
       canceled = true
     }
   }, [isImagesMode, visibleDocuments, imageDetailsById])
+
+  useEffect(() => {
+    if (!isImagesMode) return
+    const candidates = visibleDocuments
+      .filter((doc) => isImageReport(doc))
+      .slice(0, 12)
+      .map((doc) => ({
+        id: doc.id,
+        source: imageDetailsById[doc.id]?.imageDataUrl
+          ?? doc.ai_artifacts?.thumbnailUrl
+          ?? doc.ai_artifacts?.mediumUrl
+          ?? doc.ai_artifacts?.imageDataUrl,
+      }))
+      .filter((item) => Boolean(item.source) && !imageVariantsById[item.id]) as Array<{ id: string; source: string }>
+
+    if (!candidates.length) return
+    let canceled = false
+    Promise.all(
+      candidates.map(async (item) => {
+        prefetchImageVariants(item.source, item.id)
+        const variants = await getImageVariants(item.source, item.id)
+        return { id: item.id, variants }
+      }),
+    ).then((results) => {
+      if (canceled) return
+      setImageVariantsById((current) => {
+        const next = { ...current }
+        results.forEach((result) => {
+          next[result.id] = result.variants
+        })
+        return next
+      })
+    }).catch(() => undefined)
+
+    return () => {
+      canceled = true
+    }
+  }, [isImagesMode, visibleDocuments, imageDetailsById, imageVariantsById])
 
   const title = getTitle(filters)
   const subtitle = getSubtitle(filters, classes)
@@ -149,7 +206,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
       setMessage('Imagem criada com sucesso.')
       setIsCreateOpen(false)
       setDescription('')
-      await loadDocuments()
+      await loadDocuments(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível criar a imagem. Tente novamente.')
     } finally {
@@ -158,7 +215,10 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   }
 
   function downloadImage(doc: GeneratedDocument) {
-    const imageDataUrl = imageDetailsById[doc.id]?.imageDataUrl ?? doc.ai_artifacts?.imageDataUrl
+    const imageDataUrl = imageVariantsById[doc.id]?.originalUrl
+      ?? imageDetailsById[doc.id]?.imageDataUrl
+      ?? doc.ai_artifacts?.originalUrl
+      ?? doc.ai_artifacts?.imageDataUrl
     if (!imageDataUrl) return
     const anchor = window.document.createElement('a')
     anchor.href = imageDataUrl
@@ -169,7 +229,10 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   }
 
   async function shareImage(doc: GeneratedDocument) {
-    const imageDataUrl = imageDetailsById[doc.id]?.imageDataUrl ?? doc.ai_artifacts?.imageDataUrl
+    const imageDataUrl = imageVariantsById[doc.id]?.mediumUrl
+      ?? imageDetailsById[doc.id]?.imageDataUrl
+      ?? doc.ai_artifacts?.mediumUrl
+      ?? doc.ai_artifacts?.imageDataUrl
     if (!imageDataUrl || !navigator.share) return
     try {
       const file = dataUrlToFile(imageDataUrl, `imagem-${new Date(doc.created_at).getTime()}.png`)
@@ -187,6 +250,17 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
     } catch {
       // ignora cancelamento
     }
+  }
+
+  function openDocument(doc: GeneratedDocument) {
+    const cached = getCachedReportById(doc.id)
+    if (!cached) {
+      void prefetchReportsByIds([doc.id])
+    }
+    openSubscreen('document-detail', {
+      reportId: doc.id,
+      preloadedReport: cached,
+    })
   }
 
   return (
@@ -298,9 +372,14 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
               <div key={doc.id} className="bg-white rounded-app p-4 border border-border shadow-card">
                 {(imageDetailsById[doc.id]?.imageDataUrl || doc.ai_artifacts?.imageDataUrl) && (
                   <img
-                    src={imageDetailsById[doc.id]?.imageDataUrl ?? doc.ai_artifacts?.imageDataUrl}
+                    src={
+                      imageVariantsById[doc.id]?.thumbnailUrl
+                      ?? imageDetailsById[doc.id]?.imageDataUrl
+                      ?? doc.ai_artifacts?.thumbnailUrl
+                      ?? doc.ai_artifacts?.imageDataUrl
+                    }
                     alt="Imagem gerada"
-                    className="w-full h-[190px] object-cover rounded-app-sm border border-border"
+                    className="w-full h-[190px] object-cover rounded-app-sm border border-border bg-cream"
                     loading="lazy"
                     decoding="async"
                   />
@@ -314,7 +393,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                 </p>
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   <button
-                    onClick={() => openSubscreen('document-detail', { reportId: doc.id })}
+                    onClick={() => openDocument(doc)}
                     className="rounded-app-sm border border-gp bg-gbg py-2 text-[11px] font-bold text-gd flex items-center justify-center gap-1"
                   >
                     <Eye size={13} />
@@ -345,7 +424,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
             {visibleDocuments.map((doc) => (
               <button
                 key={doc.id}
-                onClick={() => openSubscreen('document-detail', { reportId: doc.id })}
+                onClick={() => openDocument(doc)}
                 className="w-full bg-white rounded-app p-4 border border-border shadow-card flex items-start gap-3 text-left active:scale-[.98] transition-transform"
               >
                 <div className="w-10 h-10 rounded-[12px] bg-gbg text-gm flex items-center justify-center flex-shrink-0">
@@ -365,7 +444,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                   </p>
                   {isImageReport(doc) && doc.ai_artifacts?.imageDataUrl && (
                     <img
-                      src={doc.ai_artifacts.imageDataUrl}
+                    src={imageVariantsById[doc.id]?.thumbnailUrl ?? doc.ai_artifacts.imageDataUrl}
                       alt="Imagem de portfólio gerada"
                       className="w-full max-h-[120px] object-cover rounded-app-sm border border-border mt-3"
                       loading="lazy"
@@ -381,6 +460,16 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
               </button>
             ))}
           </div>
+        )}
+
+        {!loading && !error && hasMore && (
+          <button
+            onClick={() => loadDocuments(false)}
+            disabled={loadingMore}
+            className="w-full mb-8 rounded-app-sm border border-gp bg-gbg px-3 py-3 text-[12px] font-bold text-gd disabled:opacity-60"
+          >
+            {loadingMore ? 'Carregando mais...' : 'Carregar mais histórico'}
+          </button>
         )}
       </div>
 
@@ -496,6 +585,15 @@ function sortFocusedFirst(items: GeneratedDocument[], focusReportId?: string) {
     if (a.id === focusReportId) return -1
     if (b.id === focusReportId) return 1
     return 0
+  })
+}
+
+function dedupeById(items: GeneratedDocument[]) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false
+    seen.add(item.id)
+    return true
   })
 }
 

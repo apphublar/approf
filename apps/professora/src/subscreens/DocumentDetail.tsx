@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Bold, ChevronLeft, Download, FileText, Italic, List, Pencil, Printer, Share2, Type } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
-import { createReportShareLink, getReportById, updateReport } from '@/services/reports'
+import { createReportShareLink, getCachedReportById, getReportById, updateReport } from '@/services/reports'
 import { generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument, ReportStatus } from '@/types'
+import { getImageVariants, type ImageVariants } from '@/utils/image-performance'
 
 interface DocumentDetailSubscreenProps {
   data?: unknown
@@ -16,15 +17,20 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   const reportId = typeof data === 'object' && data && 'reportId' in data
     ? String((data as { reportId?: string }).reportId ?? '')
     : ''
+  const preloadedReport = typeof data === 'object' && data && 'preloadedReport' in data
+    ? ((data as { preloadedReport?: GeneratedDocument | null }).preloadedReport ?? null)
+    : null
+  const initialReport = preloadedReport ?? (reportId ? getCachedReportById(reportId) : null)
 
-  const [document, setDocument] = useState<GeneratedDocument | null>(null)
-  const [draft, setDraft] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [document, setDocument] = useState<GeneratedDocument | null>(initialReport)
+  const [draft, setDraft] = useState(() => toEditorHtml(initialReport?.body ?? ''))
+  const [loading, setLoading] = useState(!initialReport)
   const [saving, setSaving] = useState(false)
   const [generatingImage, setGeneratingImage] = useState(false)
   const [editingImagePrompt, setEditingImagePrompt] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [imageVariants, setImageVariants] = useState<ImageVariants | null>(null)
   const editorRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -35,7 +41,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     }
 
     let active = true
-    setLoading(true)
+    if (!preloadedReport) setLoading(true)
     getReportById(reportId)
       .then((item) => {
         if (!active) return
@@ -54,7 +60,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     return () => {
       active = false
     }
-  }, [reportId])
+  }, [reportId, preloadedReport])
 
   const studentName = useMemo(() => {
     if (!document?.student_id) return null
@@ -70,12 +76,30 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     return classes.find((item) => item.id === document.class_id)?.name ?? null
   }, [document?.class_id, classes])
 
-  const [imagePrompt, setImagePrompt] = useState('')
+  const [imagePrompt, setImagePrompt] = useState(() => getImagePrompt(initialReport))
   const isImageDocument = document?.report_type === 'portfolio_image'
     || document?.report_type === 'generated_image'
     || document?.ai_artifacts?.kind === 'portfolio_image'
     || document?.ai_artifacts?.kind === 'generated_image'
   const hasChanges = document ? draft !== toEditorHtml(document.body ?? '') : false
+
+  useEffect(() => {
+    if (!document) return
+    const sourceUrl = document.ai_artifacts?.mediumUrl
+      ?? document.ai_artifacts?.imageDataUrl
+      ?? document.ai_artifacts?.thumbnailUrl
+    if (!sourceUrl) return
+    let active = true
+    getImageVariants(sourceUrl, document.id)
+      .then((variants) => {
+        if (!active) return
+        setImageVariants(variants)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [document])
 
   function goBack() {
     if (hasChanges) {
@@ -285,13 +309,18 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
               {isImageDocument && document.ai_artifacts?.imageDataUrl && (
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <img
-                    src={document.ai_artifacts.imageDataUrl}
+                    src={imageVariants?.mediumUrl ?? document.ai_artifacts.mediumUrl ?? document.ai_artifacts.imageDataUrl}
                     alt="Imagem gerada"
-                    className="w-full rounded-app-sm border border-border bg-cream"
+                    className="w-full max-h-[78vh] object-contain rounded-app-sm border border-border bg-cream"
+                    loading="eager"
+                    decoding="async"
                   />
+                  {!imageVariants?.mediumUrl && (
+                    <p className="text-[11px] text-muted mt-2">Carregando imagem otimizada...</p>
+                  )}
                   <div className="grid grid-cols-2 gap-2 mt-3">
                     <button
-                      onClick={() => downloadBlob(dataUrlToBlob(document.ai_artifacts?.imageDataUrl ?? ''), 'portfolio.png')}
+                      onClick={() => downloadBlob(dataUrlToBlob(imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl ?? ''), 'portfolio.png')}
                       className="rounded-app-sm border border-gp bg-gbg py-3 text-[12px] font-bold text-gd flex items-center justify-center gap-2"
                     >
                       <Download size={14} />
@@ -487,7 +516,8 @@ function formatStatus(status: ReportStatus) {
   }
 }
 
-function getImagePrompt(document: GeneratedDocument) {
+function getImagePrompt(document: GeneratedDocument | null) {
+  if (!document) return ''
   if (typeof document.ai_artifacts?.prompt === 'string' && document.ai_artifacts.prompt.trim()) {
     return document.ai_artifacts.prompt.trim()
   }
