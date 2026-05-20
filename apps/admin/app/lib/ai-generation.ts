@@ -179,21 +179,35 @@ export async function generatePedagogicalText(
       generationType: promptInput.generationType,
       model: resolveOpenAiHumanizeModel(),
     })
-    const s3Initial = await requestOpenAiHumanizationText({
-      system: stage3Prompt.system,
-      user: stage3Prompt.user,
-      model: resolveOpenAiHumanizeModel(),
-      maxTokens: 2000,
-      temperature: 0.35,
-    })
-    console.log('[AI-GENERATION] Etapa 3 concluída (humanização GPT):', {
-      requestId,
-      logId: input.logId,
-      model: s3Initial.model,
-      inputTokens: s3Initial.inputTokens,
-      outputTokens: s3Initial.outputTokens,
-      estimatedCostCents: s3Initial.estimatedCostCents,
-    })
+    let s3Initial: TextCompletion
+    try {
+      s3Initial = await requestOpenAiHumanizationText({
+        system: stage3Prompt.system,
+        user: stage3Prompt.user,
+        model: resolveOpenAiHumanizeModel(),
+        maxTokens: 2000,
+        temperature: 0.35,
+      })
+      console.log('[AI-GENERATION] Etapa 3 concluída (humanização GPT):', {
+        requestId,
+        logId: input.logId,
+        model: s3Initial.model,
+        inputTokens: s3Initial.inputTokens,
+        outputTokens: s3Initial.outputTokens,
+        estimatedCostCents: s3Initial.estimatedCostCents,
+      })
+    } catch (humanizeError) {
+      console.warn('[AI-GENERATION] Humanização GPT indisponível; seguindo com texto revisado do Sonnet.', {
+        requestId,
+        logId: input.logId,
+        generationType: promptInput.generationType,
+        error: sanitizeInternalLogError(humanizeError),
+      })
+      s3Initial = {
+        ...s2,
+        model: `${s2.model}-humanize-fallback`,
+      }
+    }
 
     console.log('[AI-GENERATION] Validação de estrutura iniciada:', {
       requestId,
