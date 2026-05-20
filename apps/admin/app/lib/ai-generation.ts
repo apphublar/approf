@@ -888,21 +888,31 @@ async function requestOpenAiHumanizationText(options: RequestOpenAiHumanizationO
     throw new PublicAiGenerationError('Servico de IA indisponivel no momento. Tente novamente em instantes.')
   }
 
+  const requestPayload: {
+    model: string
+    max_completion_tokens: number
+    messages: Array<{ role: 'system' | 'user'; content: string }>
+    temperature?: number
+  } = {
+    model: options.model,
+    max_completion_tokens: options.maxTokens ?? 1800,
+    messages: [
+      { role: 'system', content: options.system },
+      { role: 'user', content: options.user },
+    ],
+  }
+  const normalizedModel = options.model.toLowerCase()
+  if (!normalizedModel.startsWith('gpt-5')) {
+    requestPayload.temperature = options.temperature ?? 0.35
+  }
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: options.model,
-      temperature: options.temperature ?? 0.35,
-      max_completion_tokens: options.maxTokens ?? 1800,
-      messages: [
-        { role: 'system', content: options.system },
-        { role: 'user', content: options.user },
-      ],
-    }),
+    body: JSON.stringify(requestPayload),
   })
 
   const payload = (await response.json().catch(() => null)) as {
