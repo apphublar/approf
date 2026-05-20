@@ -144,6 +144,7 @@ export async function generateStandaloneImage(
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'standalone')
   const body = buildPersistedStandaloneImageBody({
     prompt,
+    model: generated.model,
     size,
     quality,
   })
@@ -156,7 +157,7 @@ export async function generateStandaloneImage(
     imageDataUrl,
     artifact: {
       prompt,
-      model,
+      model: generated.model,
       size,
       quality,
     },
@@ -175,7 +176,7 @@ export async function generateStandaloneImage(
     imageDataUrl,
     prompt,
     provider: 'openai',
-    model,
+    model: generated.model,
     size,
     quality,
     inputTokens: generated.inputTokens,
@@ -400,11 +401,13 @@ ${input.prompt}`
 
 function buildPersistedStandaloneImageBody(input: {
   prompt: string
+  model: string
   size: string
   quality: string
 }) {
   return `Imagem criada com sucesso.
 
+Modelo: ${input.model}
 Tamanho: ${input.size}
 Qualidade: ${input.quality}
 

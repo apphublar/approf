@@ -2,6 +2,7 @@
 import { useNavStore, useAppStore } from '@/store'
 import type { TimelineEvent, TimelineEventType } from '@/types'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
+import AnnotationCard from '@/components/ui/AnnotationCard'
 
 const EVENT_STYLE: Record<TimelineEventType, { label: string; bg: string; fg: string }> = {
   evolucao: { label: 'Evolução', bg: '#D8F3DC', fg: '#2D6A4F' },
@@ -181,6 +182,33 @@ export default function StudentProfileSubscreen() {
           <Sparkles size={16} strokeWidth={2} />
           Gerar relatório
         </button>
+
+        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Histórico de anotações</p>
+            <span className="text-[11px] text-muted">{studentAnns.length} registro(s)</span>
+          </div>
+          {studentAnns.length === 0 ? (
+            <p className="text-[12px] text-muted leading-[1.6]">
+              Ainda não há anotações dessa criança. Use o botão de nota para começar.
+            </p>
+          ) : (
+            <>
+              {studentAnns.slice(0, 6).map((annotation) => (
+                <AnnotationCard
+                  key={annotation.id}
+                  annotation={annotation}
+                  onClick={() => openSubscreen('new-annotation', { annotationId: annotation.id })}
+                />
+              ))}
+              {studentAnns.length > 6 && (
+                <p className="text-[11px] text-muted mt-1">
+                  Mostrando as 6 mais recentes. Abra em Anotações para ver o histórico completo.
+                </p>
+              )}
+            </>
+          )}
+        </div>
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
           <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Gerados da criança</p>

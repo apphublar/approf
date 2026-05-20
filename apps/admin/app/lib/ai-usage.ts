@@ -232,9 +232,9 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
   },
   portfolio_image: {
     provider: 'openai',
-    model: 'gpt-image-2',
-    giztokens: toGizTokens(120),
-    estimatedCostCents: 120,
+    model: resolvePortfolioImageEstimateModel(),
+    giztokens: toGizTokens(resolvePortfolioImageEstimateCostCents()),
+    estimatedCostCents: resolvePortfolioImageEstimateCostCents(),
     inputTokens: 1200,
     outputTokens: 0,
     imageCount: 1,
@@ -530,6 +530,16 @@ function clampNonNegativeInt(value: number) {
 
 function toGizTokens(costCents: number) {
   return clampNonNegativeInt(costCents * GIZTOKENS_PER_COST_CENT)
+}
+
+function resolvePortfolioImageEstimateCostCents() {
+  const fromEnv = Number(process.env.OPENAI_IMAGE_ESTIMATED_COST_CENTS ?? process.env.OPENAI_IMAGE_COST_CENTS)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
+  return 80
+}
+
+function resolvePortfolioImageEstimateModel() {
+  return process.env.OPENAI_IMAGE_MODEL?.trim() || 'gpt-image-1'
 }
 
 async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, monthEnd: string) {
