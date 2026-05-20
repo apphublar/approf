@@ -897,7 +897,7 @@ async function requestOpenAiHumanizationText(options: RequestOpenAiHumanizationO
     body: JSON.stringify({
       model: options.model,
       temperature: options.temperature ?? 0.35,
-      max_tokens: options.maxTokens ?? 1800,
+      max_completion_tokens: options.maxTokens ?? 1800,
       messages: [
         { role: 'system', content: options.system },
         { role: 'user', content: options.user },
