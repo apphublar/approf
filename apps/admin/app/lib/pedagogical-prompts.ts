@@ -18,6 +18,23 @@ export interface BuildPromptInput {
   blankContext?: string
   extraContext?: string
   objective?: string
+  planningPeriod?: string
+  intentionality?: string[]
+  resources?: string
+  duration?: string
+  justification?: string
+  methodology?: string
+  assessment?: string[]
+  finalConsiderations?: string
+  selectedMilestones?: Array<{ date?: string; label?: string; text?: string }>
+  includeDayAnnotations?: boolean
+  meetingDate?: string
+  meetingDuration?: string
+  meetingOpening?: string
+  meetingAgenda?: string
+  meetingGeneralInfo?: string
+  meetingAgreements?: string
+  meetingClosing?: string
   theme?: string
   diaryDate?: string
   diaryTheme?: string
@@ -186,13 +203,32 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     `ESCOPO DE HISTÓRICO: ${input.historyScope === 'student' ? 'desta criança' : 'deste modelo'}`,
     `CAMPOS BNCC: ${bncc}`,
     `TEMA: ${input.theme?.trim() || 'Não informado'}`,
+    `ESCOLHA DIARIO/SEMANAL: ${input.planningPeriod?.trim() || 'Não informado'}`,
+    `INTENCIONALIDADE / DIREITOS: ${input.intentionality?.join(', ') || 'Não informado'}`,
+    `RECURSOS: ${input.resources?.trim() || 'Não informado'}`,
+    `DURACAO DO PROJETO: ${input.duration?.trim() || 'Não informado'}`,
+    `JUSTIFICATIVA DO PROJETO: ${input.justification?.trim() || 'Não informado'}`,
+    `METODOLOGIA: ${input.methodology?.trim() || 'Não informado'}`,
+    `AVALIACAO / REGISTRO: ${input.assessment?.join(', ') || 'Não informado'}`,
+    `CONSIDERACOES FINAIS: ${input.finalConsiderations?.trim() || 'Não informado'}`,
     `DATA DO DIÁRIO: ${input.diaryDate?.trim() || 'Não informado'}`,
     `TEMA DO DIÁRIO: ${input.diaryTheme?.trim() || 'Não informado'}`,
     `OBJETIVO: ${input.objective?.trim() || 'Não informado'}`,
+    `PUXAR ANOTACOES DO DIARIO: ${input.includeDayAnnotations === false ? 'não' : 'sim'}`,
+    `DATA DA REUNIAO: ${input.meetingDate?.trim() || 'Não informado'}`,
+    `DURACAO DA REUNIAO: ${input.meetingDuration?.trim() || 'Não informado'}`,
+    `ABERTURA DA REUNIAO: ${input.meetingOpening?.trim() || 'Não informado'}`,
+    `PAUTA DA REUNIAO: ${input.meetingAgenda?.trim() || 'Não informado'}`,
+    `INFORMACOES GERAIS DA TURMA: ${input.meetingGeneralInfo?.trim() || 'Não informado'}`,
+    `COMBINADOS GERAIS: ${input.meetingAgreements?.trim() || 'Não informado'}`,
+    `ENCERRAMENTO DA REUNIAO: ${input.meetingClosing?.trim() || 'Não informado'}`,
     `USAR ANOTACOES: ${input.useAnnotations === false ? 'não' : 'sim'}`,
     '',
     'ANOTACOES SELECIONADAS:',
     selectedAnnotations || '- Nenhuma anotação enviada.',
+    '',
+    'MARCOS IMPORTANTES SELECIONADOS:',
+    formatAnnotations(input.selectedMilestones) || '- Nenhum marco selecionado.',
     '',
     'INFORMAÇÕES PARA DESCONSIDERAR:',
     input.ignoredNotes?.trim() || '- Nenhuma informação.',

@@ -1,5 +1,5 @@
-﻿import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, FileText, FileUp, Sparkles, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronLeft, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
 import { updateReport } from '@/services/reports'
@@ -11,11 +11,16 @@ interface PedagogicalGeneratorProps {
   data?: unknown
 }
 
-interface Attachment {
-  id: string
-  name: string
-  size: number
-}
+type PlanningPeriod = 'diario' | 'semanal'
+
+const RIGHTS = [
+  'Conviver',
+  'Brincar',
+  'Participar',
+  'Explorar',
+  'Expressar',
+  'Conhecer-se',
+]
 
 const BNCC_FIELDS = [
   'O eu, o outro e o nos',
@@ -25,23 +30,30 @@ const BNCC_FIELDS = [
   'Espacos, tempos, quantidades, relacoes e transformacoes',
 ]
 
+const DURATIONS = ['15 dias', '1 mes', '2 meses', 'Bimestre', 'Semestre']
+const ASSESSMENT_OPTIONS = ['Observacao', 'Fotos', 'Portfolio', 'Roda de conversa', 'Registros escritos']
+
 export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGeneratorProps) {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const { classes, userId } = useAppStore()
   const docKind = typeof data === 'object' && data && 'docKind' in data
     ? String((data as { docKind?: string }).docKind)
-    : 'Documento pedagógico'
+    : 'Planejamento (Diário ou Semanal)'
   const normalizedDocKind = normalizeText(docKind)
-  const isSpecificProject = normalizedDocKind.includes('projeto pedagogico')
+  const isProject = normalizedDocKind.includes('projeto pedagogico')
+  const title = isProject ? 'Projeto Pedagógico' : 'Planejamento'
 
-  const [ageGroup, setAgeGroup] = useState('4 a 5 anos')
-  const [selectedClass, setSelectedClass] = useState(classes[0]?.name ?? '')
+  const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id ?? '')
+  const [planningPeriod, setPlanningPeriod] = useState<PlanningPeriod>('semanal')
   const [theme, setTheme] = useState('')
+  const [rights, setRights] = useState<string[]>(RIGHTS)
   const [objective, setObjective] = useState('')
+  const [resources, setResources] = useState('')
+  const [duration, setDuration] = useState(DURATIONS[1])
+  const [justification, setJustification] = useState('')
   const [bnccFields, setBnccFields] = useState<string[]>([BNCC_FIELDS[0]])
-  const [extraContext, setExtraContext] = useState('')
-  const [useAnnotations, setUseAnnotations] = useState(true)
-  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [methodology, setMethodology] = useState('')
+  const [assessment, setAssessment] = useState<string[]>(['Observacao'])
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
   const [savedContent, setSavedContent] = useState('')
@@ -52,54 +64,110 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   const [usageMessage, setUsageMessage] = useState('')
   const [usageError, setUsageError] = useState('')
   const [draftMessage, setDraftMessage] = useState('')
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const loadedDraftRef = useRef(false)
   const draftKey = `approf:draft:planning:${userId}:${docKind}`
 
-  const canGenerate = theme.trim().length >= 4 && objective.trim().length >= 12
-  const generationRequirementHint = getPlanningRequirementHint({
-    docKind,
-    themeLength: theme.trim().length,
-    objectiveLength: objective.trim().length,
+  const selectedClass = classes.find((item) => item.id === selectedClassId) ?? classes[0]
+  const selectedClassName = selectedClass?.name ?? ''
+
+  const canGenerate = isProject
+    ? Boolean(
+        selectedClassId
+        && theme.trim().length >= 3
+        && duration.trim()
+        && justification.trim().length >= 20
+        && bnccFields.length
+        && objective.trim().length >= 4
+        && rights.length
+        && methodology.trim().length >= 20
+        && resources.trim().length >= 3
+        && assessment.length,
+      )
+    : Boolean(
+        selectedClassId
+        && theme.trim().length >= 3
+        && rights.length
+        && objective.trim().length >= 4
+        && resources.trim().length >= 3,
+      )
+
+  const generationRequirementHint = getRequirementHint({
+    isProject,
+    theme,
+    objective,
+    resources,
+    justification,
+    methodology,
+    rightsCount: rights.length,
+    bnccCount: bnccFields.length,
+    assessmentCount: assessment.length,
   })
-  const selectedClassData = classes.find((item) => item.name === selectedClass)
-  const resolvedAgeGroup = selectedClassData?.ageGroup || ageGroup
   const generationViewKey = generated ? 'result' : generating ? 'loading' : 'form'
 
   useEffect(() => {
+    if (loadedDraftRef.current) return
     const draft = loadDraft<{
-      ageGroup: string
-      selectedClass: string
+      selectedClassId: string
+      planningPeriod: PlanningPeriod
       theme: string
+      rights: string[]
       objective: string
+      resources: string
+      duration: string
+      justification: string
       bnccFields: string[]
-      extraContext: string
-      useAnnotations: boolean
+      methodology: string
+      assessment: string[]
     }>(draftKey)
-    if (!draft) return
-    setAgeGroup(draft.ageGroup || '4 a 5 anos')
-    setSelectedClass(draft.selectedClass || classes[0]?.name || '')
-    setTheme(draft.theme || '')
-    setObjective(draft.objective || '')
-    setBnccFields(draft.bnccFields?.length ? draft.bnccFields : [BNCC_FIELDS[0]])
-    setExtraContext(draft.extraContext || '')
-    setUseAnnotations(Boolean(draft.useAnnotations))
-    setDraftMessage('Rascunho recuperado')
+    if (draft) {
+      setSelectedClassId(draft.selectedClassId || classes[0]?.id || '')
+      setPlanningPeriod(draft.planningPeriod || 'semanal')
+      setTheme(draft.theme || '')
+      setRights(draft.rights?.length ? draft.rights : RIGHTS)
+      setObjective(draft.objective || '')
+      setResources(draft.resources || '')
+      setDuration(draft.duration || DURATIONS[1])
+      setJustification(draft.justification || '')
+      setBnccFields(draft.bnccFields?.length ? draft.bnccFields : [BNCC_FIELDS[0]])
+      setMethodology(draft.methodology || '')
+      setAssessment(draft.assessment?.length ? draft.assessment : ['Observacao'])
+      setDraftMessage('Rascunho recuperado')
+    }
+    loadedDraftRef.current = true
   }, [classes, draftKey])
 
   useEffect(() => {
+    if (!loadedDraftRef.current) return
     const timeout = window.setTimeout(() => {
       saveDraft(draftKey, {
-        ageGroup,
-        selectedClass,
+        selectedClassId,
+        planningPeriod,
         theme,
+        rights,
         objective,
+        resources,
+        duration,
+        justification,
         bnccFields,
-        extraContext,
-        useAnnotations,
+        methodology,
+        assessment,
       })
     }, 350)
     return () => window.clearTimeout(timeout)
-  }, [ageGroup, bnccFields, draftKey, extraContext, objective, selectedClass, theme, useAnnotations])
+  }, [
+    assessment,
+    bnccFields,
+    draftKey,
+    duration,
+    justification,
+    methodology,
+    objective,
+    planningPeriod,
+    resources,
+    rights,
+    selectedClassId,
+    theme,
+  ])
 
   useEffect(() => {
     if (!draftMessage) return
@@ -107,32 +175,11 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     return () => window.clearTimeout(timeout)
   }, [draftMessage])
 
-  function handleFiles(files: FileList | null) {
-    if (!files?.length) return
-    const selected = Array.from(files).map((file) => ({
-      id: `${file.name}-${file.size}-${file.lastModified}`,
-      name: file.name,
-      size: file.size,
-    }))
-    setAttachments((current) => {
-      const ids = new Set(current.map((item) => item.id))
-      return [...current, ...selected.filter((item) => !ids.has(item.id))]
-    })
-  }
-
-  function removeAttachment(id: string) {
-    setAttachments((current) => current.filter((item) => item.id !== id))
-  }
-
-  function toggleBnccField(field: string) {
-    setBnccFields((current) => {
-      if (current.includes(field)) {
-        const next = current.filter((item) => item !== field)
-        return next.length ? next : current
-      }
-
-      return [...current, field]
-    })
+  function toggleValue(value: string, setter: (next: string[]) => void, current: string[]) {
+    const next = current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value]
+    setter(next)
   }
 
   async function generate() {
@@ -146,20 +193,32 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     setEditingDocument(false)
 
     try {
+      const generationType = isProject
+        ? 'pedagogical_project'
+        : planningPeriod === 'diario'
+          ? 'daily_lesson_plan'
+          : 'weekly_planning'
       const result = await generateAiTextDocument({
-        generationType: resolvePlanningGenerationType(docKind),
-        classId: selectedClassData?.id ?? null,
-        promptVersion: 'professora-planning-v1',
+        generationType,
+        classId: selectedClass?.id ?? null,
+        promptVersion: isProject ? 'projeto-pedagogico-v2' : 'planejamento-v2',
         requestSummary: {
-          docKind,
-          className: selectedClassData?.name ?? selectedClass,
-          ageGroup: isSpecificProject ? undefined : resolvedAgeGroup,
+          docKind: isProject ? 'Projeto Pedagógico' : 'Planejamento',
+          planningPeriod,
+          className: selectedClassName,
+          ageGroup: selectedClass?.ageGroup ?? null,
           theme,
+          intentionality: rights,
+          direitosAprendizagem: rights,
           objective,
+          bnccCodes: objective,
+          resources,
+          duration,
+          justification,
           bnccFields,
-          extraContext,
-          useAnnotations,
-          attachments,
+          methodology,
+          assessment,
+          avaliacaoRegistro: assessment.join(', '),
         },
       })
 
@@ -224,15 +283,18 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   }
 
   const preview = createPreview({
-    docKind,
-    ageGroup: resolvedAgeGroup,
-    selectedClass,
+    isProject,
+    planningPeriod,
+    selectedClassName,
     theme,
+    rights,
     objective,
+    resources,
+    duration,
+    justification,
     bnccFields,
-    extraContext,
-    useAnnotations,
-    attachments,
+    methodology,
+    assessment,
   })
 
   function handleBack() {
@@ -250,8 +312,10 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1">
-          <span className="font-serif text-[18px] text-gd block">{docKind}</span>
-          <span className="text-[11px] text-muted">Documento pedagógico para educação infantil de 0 a 5 anos.</span>
+          <span className="font-serif text-[18px] text-gd block">{title}</span>
+          <span className="text-[11px] text-muted">
+            {isProject ? 'Projeto pedagógico com todos os campos obrigatórios.' : 'Escolha diário ou semanal e preencha os campos do planejamento.'}
+          </span>
         </div>
       </div>
 
@@ -260,173 +324,168 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
           generating ? (
             <GenerationDocumentLoadingScreen variant="planning" />
           ) : (
-          <div className="py-5">
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-[14px] bg-gbg border border-gp flex items-center justify-center">
-                  <Sparkles size={22} color="#4F8341" strokeWidth={1.7} />
-                </div>
-                <div className="flex-1">
-                  <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
-                  <p className="text-[12px] text-muted leading-snug">Informe o contexto principal. Orientações extras e anexos são opcionais.</p>
-                </div>
-              </div>
-            </div>
+            <div className="py-5">
+              <IntroCard isProject={isProject} />
 
-            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Turma</label>
-            <select
-              className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
-              value={selectedClass}
-              onChange={(event) => setSelectedClass(event.target.value)}
-            >
-              {classes.map((item) => (
-                <option key={item.id} value={item.name}>{item.name}</option>
-              ))}
-            </select>
+              <FieldLabel>Turma</FieldLabel>
+              <select
+                className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
+                value={selectedClassId}
+                onChange={(event) => setSelectedClassId(event.target.value)}
+              >
+                {classes.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
 
-            {!isSpecificProject && resolvedAgeGroup && (
-              <p className="mb-4 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[12px] leading-[1.5] text-gd">
-                Faixa etária da turma: {resolvedAgeGroup}
-              </p>
-            )}
+              {!isProject ? (
+                <>
+                  <FieldLabel>Escolha</FieldLabel>
+                  <div className="grid grid-cols-2 gap-2 mt-2 mb-4">
+                    <button
+                      onClick={() => setPlanningPeriod('diario')}
+                      className={`rounded-app-sm border px-3 py-3 text-left ${planningPeriod === 'diario' ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'}`}
+                    >
+                      <span className="block text-[13px] font-bold">Diário</span>
+                      <span className="block text-[11px] mt-1">Plano para um dia</span>
+                    </button>
+                    <button
+                      onClick={() => setPlanningPeriod('semanal')}
+                      className={`rounded-app-sm border px-3 py-3 text-left ${planningPeriod === 'semanal' ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'}`}
+                    >
+                      <span className="block text-[13px] font-bold">Semanal</span>
+                      <span className="block text-[11px] mt-1">Planejamento da semana</span>
+                    </button>
+                  </div>
 
-            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Tema</label>
-            <input
-              className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
-              placeholder="Ex: Animais da fazenda, Horta escolar, Cores e misturas, Minha família..."
-              value={theme}
-              onChange={(event) => setTheme(event.target.value)}
-            />
+                  <TextInput
+                    label="Tema"
+                    value={theme}
+                    onChange={setTheme}
+                    placeholder="Ex: Animais da fazenda, Cores e misturas, Minha família..."
+                  />
 
-            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Objetivo pedagógico</label>
-            <textarea
-              className="w-full min-h-[104px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none leading-[1.6]"
-              placeholder="Ex: Desenvolver a consciência corporal por meio de brincadeiras de movimento, exploração de materiais e rodas de conversa..."
-              value={objective}
-              onChange={(event) => setObjective(event.target.value)}
-            />
+                  <Checklist
+                    label="Intencionalidade"
+                    hint="Quais direitos serão o foco do planejamento."
+                    options={RIGHTS}
+                    selected={rights}
+                    onToggle={(value) => toggleValue(value, setRights, rights)}
+                  />
 
-            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Campos BNCC</label>
-            <div className="flex flex-col gap-2 mt-2 mb-4">
-              {BNCC_FIELDS.map((item) => (
-                <button
-                  key={item}
-                  onClick={() => toggleBnccField(item)}
-                  className={`w-full rounded-app-sm border px-3 py-3 text-left text-[13px] font-bold ${
-                    bnccFields.includes(item)
-                      ? 'bg-gbg border-gp text-gd'
-                      : 'bg-white border-border text-muted'
-                  }`}
-                >
-                  {bnccFields.includes(item) ? '[x] ' : '+ '}
-                  {item}
-                </button>
-              ))}
-            </div>
+                  <TextArea
+                    label="Objetivos"
+                    value={objective}
+                    onChange={setObjective}
+                    placeholder="Liste os códigos BNCC que serão trabalhados. Ex: EI02EF01, EI03ET01, EI02CG02..."
+                    rows={3}
+                  />
 
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
-                Base do planejamento
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setUseAnnotations(true)}
-                  className={`rounded-app-sm border px-3 py-3 text-left ${
-                    useAnnotations ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
-                  }`}
-                >
-                  <span className="block text-[13px] font-bold">Usar anotações</span>
-                  <span className="block text-[11px] mt-1">Ideias já registradas</span>
-                </button>
-                <button
-                  onClick={() => setUseAnnotations(false)}
-                  className={`rounded-app-sm border px-3 py-3 text-left ${
-                    !useAnnotations ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
-                  }`}
-                >
-                  <span className="block text-[13px] font-bold">Começar do zero</span>
-                  <span className="block text-[11px] mt-1">Somente este contexto</span>
-                </button>
-              </div>
-            </div>
+                  <TextArea
+                    label="Recursos"
+                    value={resources}
+                    onChange={setResources}
+                    placeholder="Materiais que precisam ser providenciados para a semana. Ex: tinta guache, papel A3, rolos de papelão, livros, brinquedos..."
+                    rows={4}
+                  />
+                </>
+              ) : (
+                <>
+                  <TextInput
+                    label="Tema"
+                    value={theme}
+                    onChange={setTheme}
+                    placeholder="O título ou assunto do projeto. Ex: Horta Escolar, Água e Vida, O Mundo dos Insetos..."
+                  />
 
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                Orientação extra
-              </label>
-              <textarea
-                className="w-full min-h-[104px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                placeholder="Descreva alguma orientação específica para a IA: materiais que prefere usar, cuidados com a turma, estilo do texto ou pontos que não podem faltar..."
-                value={extraContext}
-                onChange={(event) => setExtraContext(event.target.value)}
-              />
-            </div>
+                  <FieldLabel>Duração</FieldLabel>
+                  <select
+                    className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
+                    value={duration}
+                    onChange={(event) => setDuration(event.target.value)}
+                  >
+                    {DURATIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
 
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-[12px] bg-gbg flex items-center justify-center text-gm flex-shrink-0">
-                  <FileUp size={18} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[13px] font-bold text-ink">Anexos de apoio</p>
-                  <p className="text-[11px] text-muted leading-[1.5] mt-1">Você pode anexar mais de um arquivo ou gerar sem anexar nada.</p>
-                  {attachments.length > 0 && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      {attachments.map((item) => (
-                        <div key={item.id} className="bg-cream rounded-app-sm px-3 py-2 flex items-center gap-2">
-                          <FileText size={16} className="text-gm flex-shrink-0" />
-                          <p className="text-[12px] font-bold text-ink truncate flex-1">{item.name}</p>
-                          <button onClick={() => removeAttachment(item.id)} className="w-7 h-7 rounded-full bg-white text-muted flex items-center justify-center">
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,.pdf,.doc,.docx,.txt"
-                className="hidden"
-                onChange={(event) => handleFiles(event.target.files)}
-              />
-              <button onClick={() => fileInputRef.current?.click()} className="w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white">
-                + Anexar arquivo
-              </button>
-            </div>
+                  <TextArea
+                    label="Justificativa"
+                    value={justification}
+                    onChange={setJustification}
+                    placeholder="Explique o porquê de realizar esse projeto agora e indique quais campos da BNCC serão trabalhados."
+                    rows={4}
+                  />
 
-            <button
-              onClick={generate}
-              disabled={!canGenerate || generating}
-              className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <><Sparkles size={18} /> Gerar documento</>
-            </button>
-            {!canGenerate && generationRequirementHint && (
-              <p className="mt-3 rounded-app-sm border border-[#F1D58B] bg-[#FFF8DC] px-3 py-2 text-[12px] leading-[1.5] text-[#6B5300]">
-                {generationRequirementHint}
-              </p>
-            )}
-            {(usageError || usageMessage) && (
-              <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
-                usageError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
-              }`}>
-                {usageError || usageMessage}
-              </p>
-            )}
-            {usageError && (
+                  <Checklist
+                    label="Campos da BNCC"
+                    hint="Selecione os campos que aparecem na justificativa do projeto."
+                    options={BNCC_FIELDS}
+                    selected={bnccFields}
+                    onToggle={(value) => toggleValue(value, setBnccFields, bnccFields)}
+                  />
+
+                  <TextArea
+                    label="Objetivo geral"
+                    value={objective}
+                    onChange={setObjective}
+                    placeholder="Informe os códigos da BNCC. Ex: EI03ET01, EI02EF03, EI03CG01..."
+                    rows={3}
+                  />
+
+                  <Checklist
+                    label="Objetivo específico"
+                    hint="Indique quais direitos estão sendo garantidos."
+                    options={RIGHTS}
+                    selected={rights}
+                    onToggle={(value) => toggleValue(value, setRights, rights)}
+                  />
+
+                  <TextArea
+                    label="Metodologia"
+                    value={methodology}
+                    onChange={setMethodology}
+                    placeholder="Descreva como será feito: o passo a passo, como o tema será apresentado, quais experiências serão propostas e como o projeto será encerrado."
+                    rows={5}
+                  />
+
+                  <TextArea
+                    label="Recursos"
+                    value={resources}
+                    onChange={setResources}
+                    placeholder="Materiais necessários. Ex: sementes, terra, vasos, regadores, lupas, livros, tintas, papéis diversos..."
+                    rows={4}
+                  />
+
+                  <Checklist
+                    label="Avaliação"
+                    hint="Como será registrado o processo."
+                    options={ASSESSMENT_OPTIONS}
+                    selected={assessment}
+                    onToggle={(value) => toggleValue(value, setAssessment, assessment)}
+                  />
+                </>
+              )}
+
               <button
                 onClick={generate}
-                className="mt-2 w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold"
+                disabled={!canGenerate || generating}
+                className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                Tentar novamente
+                <><Sparkles size={18} /> Gerar documento</>
               </button>
-            )}
-            {draftMessage && <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>}
-          </div>
+              {!canGenerate && generationRequirementHint && (
+                <p className="mt-3 rounded-app-sm border border-[#F1D58B] bg-[#FFF8DC] px-3 py-2 text-[12px] leading-[1.5] text-[#6B5300]">
+                  {generationRequirementHint}
+                </p>
+              )}
+              {(usageError || usageMessage) && (
+                <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
+                  usageError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
+                }`}>
+                  {usageError || usageMessage}
+                </p>
+              )}
+              {draftMessage && <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>}
+            </div>
           )
         ) : (
           <div className="py-4">
@@ -491,305 +550,182 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   )
 }
 
-function createPreview(input: {
-  docKind: string
-  ageGroup: string
-  selectedClass: string
-  theme: string
-  objective: string
-  bnccFields: string[]
-  extraContext: string
-  useAnnotations: boolean
-  attachments: Attachment[]
+function IntroCard({ isProject }: { isProject: boolean }) {
+  return (
+    <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-[14px] bg-gbg border border-gp flex items-center justify-center">
+          <Sparkles size={22} color="#4F8341" strokeWidth={1.7} />
+        </div>
+        <div className="flex-1">
+          <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
+          <p className="text-[12px] text-muted leading-snug">
+            {isProject
+              ? 'Preencha os campos do projeto pedagógico conforme sua estrutura.'
+              : 'Preencha os campos do planejamento diário ou semanal.'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: string }) {
+  return <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">{children}</label>
+}
+
+function TextInput(props: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
 }) {
-  const normalizedDocKind = normalizeText(input.docKind)
-  const ageLine = normalizedDocKind.includes('projeto pedagogico')
-    ? ''
-    : `Faixa etária: ${input.ageGroup}\n`
-  const base = `DOCUMENTO GERADO
-Tipo: ${input.docKind}
-Turma: ${input.selectedClass || 'Não informada'}
-${ageLine}Tema: ${input.theme || '-'}
-Campos BNCC: ${input.bnccFields.join(', ')}
-Base: ${input.useAnnotations ? 'anotações e ideias registradas pela professora' : 'documento iniciado do zero'}
+  return (
+    <>
+      <FieldLabel>{props.label}</FieldLabel>
+      <input
+        className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
+        placeholder={props.placeholder}
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+    </>
+  )
+}
 
-OBJETIVO
+function TextArea(props: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  rows: number
+}) {
+  return (
+    <>
+      <FieldLabel>{props.label}</FieldLabel>
+      <textarea
+        className="w-full resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none leading-[1.6]"
+        style={{ minHeight: props.rows * 30 }}
+        placeholder={props.placeholder}
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+    </>
+  )
+}
 
+function Checklist(props: {
+  label: string
+  hint: string
+  options: string[]
+  selected: string[]
+  onToggle: (value: string) => void
+}) {
+  return (
+    <div className="mb-4">
+      <FieldLabel>{props.label}</FieldLabel>
+      <p className="text-[12px] text-muted leading-[1.5] mt-1 mb-2">{props.hint}</p>
+      <div className="flex flex-col gap-2">
+        {props.options.map((item) => {
+          const selected = props.selected.includes(item)
+          return (
+            <button
+              key={item}
+              onClick={() => props.onToggle(item)}
+              className={`w-full rounded-app-sm border px-3 py-3 text-left text-[13px] font-bold ${
+                selected ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'
+              }`}
+            >
+              {selected ? '[x] ' : '[ ] '}
+              {item}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function createPreview(input: {
+  isProject: boolean
+  planningPeriod: PlanningPeriod
+  selectedClassName: string
+  theme: string
+  rights: string[]
+  objective: string
+  resources: string
+  duration: string
+  justification: string
+  bnccFields: string[]
+  methodology: string
+  assessment: string[]
+}) {
+  if (input.isProject) {
+    return `PROJETO PEDAGOGICO
+Turma: ${input.selectedClassName || '-'}
+
+TEMA
+${input.theme || '-'}
+
+DURACAO
+${input.duration || '-'}
+
+JUSTIFICATIVA
+${input.justification || '-'}
+Campos da BNCC: ${input.bnccFields.join(', ') || '-'}
+
+OBJETIVO GERAL
 ${input.objective || '-'}
 
-ORIENTACAO DA PROFESSORA
+OBJETIVO ESPECIFICO
+Direitos garantidos: ${input.rights.join(', ') || '-'}
 
-${input.extraContext.trim() || 'Nenhuma orientacao extra informada.'}`
+METODOLOGIA
+${input.methodology || '-'}
 
-  if (input.docKind === 'Planejamento anual') {
-    return `${base}
+RECURSOS
+${input.resources || '-'}
 
-PLANEJAMENTO ANUAL
-
-Intencionalidade:
-Definir diretrizes gerais para o ano letivo, articulando BNCC, campos de experiencia, direitos de aprendizagem e Projeto Politico Pedagógico da escola.
-
-Eixos do ano:
-- convivencia, brincadeira e participacao;
-- exploracao do corpo, dos espacos e dos materiais;
-- comunicacao, escuta, fala, imaginação e expressao;
-- autonomia, cuidado, vinculos e pertencimento;
-- acompanhamento continuo do desenvolvimento infantil.
-
-Organização por períodos:
-- acolhimento e adaptacao;
-- projetos e sequencias tematicas;
-- experiencias com literatura, musica, movimento e artes;
-- registros pedagogicos e comunicacao com familias;
-- retomadas e avaliação processual sem carater classificatorio.
-
-Indicadores de acompanhamento:
-Observar trajetorias individuais e coletivas, sem comparacao entre crianças, registrando avancos, interesses, desafios e necessidades de apoio.${formatAttachments(input.attachments)}`
+AVALIACAO
+${input.assessment.join(', ') || '-'}`
   }
 
-  if (input.docKind === 'Planejamento semestral') {
-    return `${base}
+  return `PLANEJAMENTO ${input.planningPeriod === 'diario' ? 'DIARIO' : 'SEMANAL'}
+Turma: ${input.selectedClassName || '-'}
 
-PLANEJAMENTO SEMESTRAL
+TEMA
+${input.theme || '-'}
 
-Objetivo geral:
-Organizar objetivos de aprendizagem, campos de experiencia e propostas centrais para o semestre, mantendo flexibilidade para os interesses da turma.
+INTENCIONALIDADE
+Direitos em foco: ${input.rights.join(', ') || '-'}
 
-Campos de experiencia selecionados:
-${input.bnccFields.map((field) => `- ${field}`).join('\n')}
+OBJETIVOS
+${input.objective || '-'}
 
-Projetos e sequencias:
-- tema central: ${input.theme || 'a definir'};
-- experiencias de investigacao, brincadeira e expressao;
-- propostas de linguagem, movimento, arte, musica e convivencia;
-- momentos de cuidado, autonomia e socializacao.
-
-Acompanhamento:
-- registros diários e semanais;
-- portfólio e evidências de produções;
-- relatórios de desenvolvimento quando necessario;
-- comunicacao cuidadosa com as familias.
-
-Avaliação processual:
-Acompanhar o desenvolvimento por meio de observacao e registros, sem classificacao, promocao ou comparacao entre crianças.${formatAttachments(input.attachments)}`
-  }
-
-  if (input.docKind === 'Planejamento mensal' || input.docKind === 'Planejamento quinzenal') {
-    const period = input.docKind === 'Planejamento mensal' ? 'mes' : 'quinzena'
-    return `${base}
-
-${input.docKind.toUpperCase()}
-
-Foco do ${period}:
-${input.objective || 'Organizar propostas conectadas aos interesses da turma e aos campos de experiencia selecionados.'}
-
-Unidades tematicas ou projeto:
-- tema: ${input.theme || 'a definir'};
-- perguntas disparadoras;
-- materiais e espacos;
-- experiencias em pequenos e grandes grupos;
-- registros esperados da professora.
-
-Sequencia de experiencias:
-1. sensibilizacao e levantamento de interesses;
-2. exploracao com corpo, sentidos e materiais;
-3. brincadeiras, historias, musicas e rodas;
-4. producoes, fotografias privadas ou registros;
-5. retomada, escuta das crianças e planejamento dos proximos passos.
-
-Recursos:
-- livros, musicas, imagens e objetos reais;
-- materiais não estruturados e seguros;
-- registros da rotina e anotações ja feitas pela professora.
-
-Acompanhamento:
-Observar participacao, interacoes, linguagem, autonomia, movimento e bem-estar da turma.${formatAttachments(input.attachments)}`
-  }
-
-  if (normalizedDocKind.includes('semanal')) {
-    return `${base}
-
-SEMANARIO PEDAGOGICO
-
-Organizacao da semana:
-
-Dia 1 - Acolhimento e investigacao inicial
-- roda breve de conversa;
-- apresentacao de objeto, imagem, musica ou historia;
-- escuta das hipoteses e interesses das crianças.
-
-Dia 2 - Exploracao sensorial
-- materiais simples, seguros e adequados à faixa etária;
-- livre exploracao com acompanhamento atento;
-- registro de falas, gestos e descobertas.
-
-Dia 3 - Movimento e brincadeira
-- brincadeira orientada em pequenos grupos;
-- proposta corporal, musical ou simbolica;
-- observacao de interacoes e autonomia.
-
-Dia 4 - Expressao e registro
-- desenho, pintura, colagem, foto privada ou relato oral;
-- valorizacao do processo, não do resultado final;
-- registro pedagógico para relatórios futuros.
-
-Dia 5 - Retomada e fechamento
-- conversa sobre o que foi vivido;
-- musica, historia ou combinados da rotina;
-- anotação dos proximos interesses percebidos.
-
-OBSERVACAO
-
-As propostas devem respeitar o tempo da criança pequena, sem comparacoes e sem exigencia de desempenho escolar formal.${formatAttachments(input.attachments)}`
-  }
-
-  if (normalizedDocKind.includes('diario') || normalizedDocKind.includes('plano de aula')) {
-    return `${base}
-
-PLANO DE AULA DIÁRIO
-
-Objetivo específico:
-${input.objective || 'Definir uma experiência significativa e adequada à faixa etária.'}
-
-Tempo estimado:
-Organizar conforme a rotina da turma, respeitando sono, alimentacao, higiene, brincadeira livre e tempos de transicao.
-
-Materiais:
-- materiais simples, seguros e acessiveis;
-- recursos sensoriais, livros, musicas ou objetos relacionados ao tema;
-- camera apenas para registro privado autorizado.
-
-Desenvolvimento:
-1. acolhimento e apresentacao do convite;
-2. exploracao livre com observacao atenta;
-3. mediacao da professora com perguntas simples;
-4. registro das falas, gestos, producoes ou interacoes;
-5. fechamento breve com retomada do que foi vivido.
-
-Estrategias metodologicas:
-- brincar, conviver, participar, explorar, expressar e conhecer-se;
-- escuta ativa;
-- respeito aos diferentes ritmos;
-- adaptacoes para necessidades individuais.
-
-Avaliação:
-Registro descritivo do envolvimento, das descobertas e das interacoes, sem nota, classificacao ou comparacao.${formatAttachments(input.attachments)}`
-  }
-
-  if (normalizedDocKind.includes('projeto pedagogico')) {
-    return `${base}
-
-PROJETO PEDAGOGICO ESPECIFICO
-
-Justificativa:
-O projeto nasce do tema "${input.theme || 'informado'}" e busca transformar interesses da turma em experiencias investigativas, brincantes e documentadas.
-
-Objetivos:
-- ampliar repertorios de linguagem, movimento, arte e convivencia;
-- favorecer pesquisa, curiosidade e expressao;
-- integrar campos de experiencia da BNCC;
-- produzir registros pedagogicos para acompanhamento e comunicacao com familias.
-
-Etapas:
-1. escuta inicial e levantamento de hipoteses;
-2. exploracoes, rodas, historias, musicas e brincadeiras;
-3. atividades com materiais diversos;
-4. producoes e registros;
-5. socializacao do percurso vivido.
-
-Resultados esperados:
-Documentar descobertas, interacoes, avancos e interesses sem transformar o projeto em produto final obrigatorio.
-
-Avaliação:
-Observação contínua, diário de bordo, portfólio, fotos privadas autorizadas e relatórios pedagógicos quando necessário.${formatAttachments(input.attachments)}`
-  }
-
-  if (input.docKind === 'Atividade Tematica') {
-    return `${base}
-
-ATIVIDADE TEMATICA
-
-Nome: Descobrindo ${input.theme || 'o tema'}
-
-Materiais:
-- objetos do cotidiano;
-- folhas grandes ou cartolina;
-- giz de cera, tinta ou materiais sensoriais;
-- musica ou historia relacionada.
-
-Como conduzir:
-1. Apresente o tema em roda, com linguagem simples.
-2. Convide as crianças a explorar materiais com o corpo e os sentidos.
-3. Registre falas espontaneas e pequenas descobertas.
-4. Finalize valorizando o percurso de cada criança.
-
-Intencionalidade: favorecer exploracao, linguagem oral, convivencia e autonomia.${formatAttachments(input.attachments)}`
-  }
-
-  if (input.docKind === 'Roda de Conversa') {
-    return `${base}
-
-RODA DE CONVERSA
-
-Abertura:
-- acolher as crianças pelo nome;
-- apresentar um objeto, imagem ou musica relacionada ao tema.
-
-Perguntas disparadoras:
-- O que voces perceberam?
-- Quem ja viu algo parecido?
-- Como esse objeto/situacao faz a gente se sentir?
-
-Conducao:
-- respeitar falas curtas;
-- acolher silencio e gestos;
-- evitar corrigir a criança de forma expositiva;
-- registrar frases espontaneas para relatórios futuros.
-
-Fechamento:
-- retomar uma descoberta coletiva;
-- cantar uma musica breve ou combinar a proxima exploracao.${formatAttachments(input.attachments)}`
-  }
-
-  return `${base}
-
-TEXTO PEDAGOGICO
-
-Este documento organiza o contexto informado pela professora em linguagem acolhedora, adequada a educação infantil de 0 a 5 anos, considerando a rotina, os vinculos, as brincadeiras e o desenvolvimento integral da criança.${formatAttachments(input.attachments)}`
+RECURSOS
+${input.resources || '-'}`
 }
 
-function formatAttachments(attachments: Attachment[]) {
-  if (!attachments.length) return ''
-  return `\n\nANEXOS CONSIDERADOS\n\n${attachments.map((item) => `- ${item.name}`).join('\n')}`
-}
-
-function resolvePlanningGenerationType(docKind: string) {
-  const normalized = normalizeText(docKind)
-  if (normalized.includes('semanal')) return 'weekly_planning' as const
-  if (normalized.includes('diario') || normalized.includes('plano de aula')) return 'daily_lesson_plan' as const
-  if (normalized.includes('projeto pedagogico')) return 'pedagogical_project' as const
-  return 'weekly_planning' as const
-}
-
-function getPlanningRequirementHint(input: {
-  docKind: string
-  themeLength: number
-  objectiveLength: number
+function getRequirementHint(input: {
+  isProject: boolean
+  theme: string
+  objective: string
+  resources: string
+  justification: string
+  methodology: string
+  rightsCount: number
+  bnccCount: number
+  assessmentCount: number
 }) {
-  if (input.themeLength < 4) {
-    return input.docKind === 'Projeto pedagógico específico'
-      ? 'Informe o tema central do projeto para organizar as etapas.'
-      : 'Informe o tema principal do planejamento.'
-  }
-
-  if (input.objectiveLength < 12) {
-    return input.docKind === 'Plano de aula diário'
-      ? 'Escreva o objetivo da experiência do dia com um pouco mais de detalhe.'
-      : input.docKind === 'Projeto pedagógico específico'
-        ? 'Descreva o objetivo do projeto com um pouco mais de detalhe.'
-        : 'Descreva o objetivo pedagógico da semana com um pouco mais de detalhe.'
-  }
-
+  if (input.theme.trim().length < 3) return 'Informe o tema do documento.'
+  if (!input.rightsCount) return 'Selecione ao menos um direito de aprendizagem.'
+  if (input.objective.trim().length < 4) return 'Informe os objetivos ou códigos BNCC.'
+  if (input.resources.trim().length < 3) return 'Informe os recursos necessários.'
+  if (!input.isProject) return ''
+  if (input.justification.trim().length < 20) return 'Escreva a justificativa do projeto com mais detalhes.'
+  if (!input.bnccCount) return 'Selecione ao menos um campo da BNCC.'
+  if (input.methodology.trim().length < 20) return 'Descreva a metodologia com o passo a passo.'
+  if (!input.assessmentCount) return 'Selecione como o processo será avaliado ou registrado.'
   return ''
 }
 

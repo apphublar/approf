@@ -21,18 +21,12 @@ const AI_SECTIONS = [
   },
 ] as const
 
-const PLANNING_PERIODS = [
-  { title: 'Planejamento semanal', desc: 'Semanário com rotina, cuidado e brincadeira.' },
-  { title: 'Plano de aula diário', desc: 'Atividades do dia, objetivos, materiais e avaliação.' },
-] as const
-
 type AiAction = (typeof AI_SECTIONS)[number]['actions'][number]
 type SectionTitle = (typeof AI_SECTIONS)[number]['title']
 
 export default function AiPedagogicaSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const [query, setQuery] = useState('')
-  const [choosingPlanningPeriod, setChoosingPlanningPeriod] = useState(false)
 
   const visibleSections = useMemo(() => {
     const normalizedQuery = normalizeText(query)
@@ -48,20 +42,15 @@ export default function AiPedagogicaSubscreen() {
       .filter((section) => section.actions.length > 0)
   }, [query])
 
-  const totalDocuments = AI_SECTIONS.reduce((sum, section) => sum + section.actions.length, 0) + PLANNING_PERIODS.length - 1
+  const totalDocuments = AI_SECTIONS.reduce((sum, section) => sum + section.actions.length, 0)
 
   function handleBack() {
-    if (choosingPlanningPeriod) {
-      setChoosingPlanningPeriod(false)
-      return
-    }
-
     closeSubscreen()
   }
 
   function handleAction(action: AiAction) {
     if (action.flow === 'planning') {
-      setChoosingPlanningPeriod(true)
+      openSubscreen('pedagogical-generator', { docKind: action.title })
       return
     }
 
@@ -83,62 +72,12 @@ export default function AiPedagogicaSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <span className="font-serif text-[18px] text-gd flex-1">
-          {choosingPlanningPeriod ? 'Planejamento' : 'Planejamentos e Relatórios'}
+          Planejamentos e Relatórios
         </span>
       </div>
 
       <div className="scroll-area px-[18px]">
-        {choosingPlanningPeriod ? (
-          <div className="py-5">
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-[14px] bg-gbg border border-gp flex items-center justify-center text-gm">
-                  <FileText size={21} />
-                </div>
-                <div className="flex-1">
-                  <h2 className="font-serif text-[20px] text-gd">Escolha o tipo</h2>
-                  <p className="text-[12px] text-muted leading-snug mt-1">
-                    Selecione o modelo de planejamento que deseja gerar.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => openSubscreen('generated-documents', { reportTypes: ['weekly_planning', 'daily_lesson_plan', 'pedagogical_project', 'planning'] })}
-              className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
-            >
-              <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
-                <FileText size={18} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-ink leading-tight">Histórico de planejamentos</p>
-                <p className="text-[11px] text-muted leading-snug mt-1">Veja, edite e acompanhe planejamentos já gerados.</p>
-              </div>
-                  <ChevronRight size={18} className="text-muted flex-shrink-0" />
-            </button>
-
-            <div className="flex flex-col gap-[11px]">
-              {PLANNING_PERIODS.map((period) => (
-                <button
-                  key={period.title}
-                  onClick={() => openSubscreen('pedagogical-generator', { docKind: period.title })}
-                  className="bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform"
-                >
-                  <div className="w-[48px] h-[48px] rounded-[13px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
-                    <FileText size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-[14px] font-bold text-ink leading-tight">{period.title}</h3>
-                    <p className="text-[11px] text-muted leading-snug mt-1">{period.desc}</p>
-                  </div>
-                  <ChevronRight size={18} className="text-muted flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <>
+        <>
             <div className="rounded-app p-5 mt-[14px] mb-[16px] text-white" style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}>
               <p className="text-[12px] opacity-70 mb-1">Assistente pedagógica</p>
               <h2 className="font-serif text-[22px] mb-2">O que você precisa hoje?</h2>
@@ -225,8 +164,7 @@ export default function AiPedagogicaSubscreen() {
                 Lucas, Sofia e Valentina já têm anotações suficientes para gerar uma primeira versão de relatório.
               </p>
             </div>
-          </>
-        )}
+        </>
       </div>
     </div>
   )

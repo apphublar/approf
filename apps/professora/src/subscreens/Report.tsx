@@ -88,6 +88,16 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [bnccFields, setBnccFields] = useState<string[]>([])
   const [objective, setObjective] = useState('')
   const [evaluationPeriod, setEvaluationPeriod] = useState('')
+  const [finalConsiderations, setFinalConsiderations] = useState('')
+  const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>([])
+  const [includeDayAnnotations, setIncludeDayAnnotations] = useState(true)
+  const [meetingDate, setMeetingDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [meetingDuration, setMeetingDuration] = useState('1h30')
+  const [meetingOpening, setMeetingOpening] = useState('')
+  const [meetingAgenda, setMeetingAgenda] = useState('')
+  const [meetingGeneralInfo, setMeetingGeneralInfo] = useState('')
+  const [meetingAgreements, setMeetingAgreements] = useState('')
+  const [meetingClosing, setMeetingClosing] = useState('')
   const [livingReport, setLivingReport] = useState(false)
   const [latestReportId, setLatestReportId] = useState('')
   const [latestReportBody, setLatestReportBody] = useState('')
@@ -102,6 +112,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     [annotations, selectedStudentId, selectedStudent?.name],
   )
   const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
+  const milestoneAnnotations = useMemo(() => {
+    const filtered = studentAnnotations.filter((annotation) => {
+      const text = normalize(`${annotation.label} ${annotation.text}`)
+      return text.includes('marco') || text.includes('evolucao') || text.includes('portfolio') || text.includes('conquista')
+    })
+    return filtered.length ? filtered : studentAnnotations
+  }, [studentAnnotations])
+  const selectedMilestones = milestoneAnnotations.filter((annotation) => selectedMilestoneIds.includes(annotation.id))
   const firstName = selectedStudent?.name.split(' ')[0] ?? 'A criança'
   const isPortfolio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
   const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
@@ -110,7 +128,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const isPlanning = isPlanningKind(reportKind) && !isParentsMeeting
   const isAnamnesis = reportKind === 'Ficha de anamnese'
   const supportsLivingReport = isDevelopmentReport
-  const needsBnccFields = isPlanning || isDevelopmentReport
+  const needsBnccFields = isPlanning
   const needsAgeGroup = isPlanning
   const needsObjective = isPlanning
   const needsEvaluationPeriod = isDevelopmentReport
@@ -118,17 +136,22 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const isSpecialistReferral = currentReportType === 'specialist_referral' || currentReportType === 'specialist_report'
   const hasContentBase = isClassDiary
     ? diaryRawText.trim().length >= 20
+    : isPortfolio
+      ? selectedMilestones.length > 0 || extraContext.trim().length >= 10 || attachments.length > 0
     : isParentsMeeting
-      ? blankContext.trim().length >= 20 || extraContext.trim().length >= 20
+      ? meetingAgenda.trim().length >= 10
     : mode === 'blank'
       ? blankContext.trim().length >= 20
       : selectedAnnotations.length > 0 || extraContext.trim().length >= 20
   const hasRequiredBnccInput = !needsBnccFields || ((!needsAgeGroup || ageGroup.trim().length > 0) && bnccFields.length > 0)
   const hasRequiredObjective = !needsObjective || objective.trim().length >= 10
   const hasRequiredPeriod = !needsEvaluationPeriod || evaluationPeriod.trim().length >= 5
+  const hasRequiredDevelopmentFields = !isDevelopmentReport || finalConsiderations.trim().length >= 10
+  const hasRequiredMeetingFields = !isParentsMeeting
+    || Boolean(meetingDate && meetingDuration && meetingOpening.trim().length >= 10 && meetingAgenda.trim().length >= 10 && meetingGeneralInfo.trim().length >= 10 && meetingAgreements.trim().length >= 10 && meetingClosing.trim().length >= 10)
   const canGenerate = isAnamnesis
     ? true
-    : hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod
+    : hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod && hasRequiredDevelopmentFields && hasRequiredMeetingFields
   const generationRequirementHint = getGenerationRequirementHint({
     isAnamnesis,
     isClassDiary,
@@ -142,6 +165,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     hasRequiredBnccInput,
     hasRequiredObjective,
     hasRequiredPeriod,
+    hasRequiredDevelopmentFields,
+    hasRequiredMeetingFields,
   })
   const generationViewKey = generated ? 'result' : generating ? 'loading' : 'form'
   const voiceAnnotations = useMemo(
@@ -163,6 +188,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setBnccFields([])
     setObjective('')
     setEvaluationPeriod('')
+    setFinalConsiderations('')
+    setSelectedMilestoneIds([])
+    setIncludeDayAnnotations(true)
     setLivingReport(false)
     setLatestReportId('')
     setLatestReportBody('')
@@ -192,6 +220,16 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       bnccFields: string[]
       objective: string
       evaluationPeriod: string
+      finalConsiderations: string
+      selectedMilestoneIds: string[]
+      includeDayAnnotations: boolean
+      meetingDate: string
+      meetingDuration: string
+      meetingOpening: string
+      meetingAgenda: string
+      meetingGeneralInfo: string
+      meetingAgreements: string
+      meetingClosing: string
       livingReport: boolean
     }>(key)
     if (draft) {
@@ -212,6 +250,16 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       setBnccFields(draft.bnccFields || [])
       setObjective(draft.objective || '')
       setEvaluationPeriod(draft.evaluationPeriod || '')
+      setFinalConsiderations(draft.finalConsiderations || '')
+      setSelectedMilestoneIds(draft.selectedMilestoneIds || [])
+      setIncludeDayAnnotations(draft.includeDayAnnotations !== false)
+      setMeetingDate(draft.meetingDate || new Date().toISOString().slice(0, 10))
+      setMeetingDuration(draft.meetingDuration || '1h30')
+      setMeetingOpening(draft.meetingOpening || '')
+      setMeetingAgenda(draft.meetingAgenda || '')
+      setMeetingGeneralInfo(draft.meetingGeneralInfo || '')
+      setMeetingAgreements(draft.meetingAgreements || '')
+      setMeetingClosing(draft.meetingClosing || '')
       setLivingReport(Boolean(draft.livingReport))
       setDraftMessage('Rascunho recuperado')
     }
@@ -239,6 +287,16 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         bnccFields,
         objective,
         evaluationPeriod,
+        finalConsiderations,
+        selectedMilestoneIds,
+        includeDayAnnotations,
+        meetingDate,
+        meetingDuration,
+        meetingOpening,
+        meetingAgenda,
+        meetingGeneralInfo,
+        meetingAgreements,
+        meetingClosing,
         livingReport,
       })
     }, 350)
@@ -252,15 +310,25 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     diaryTheme,
     evaluationPeriod,
     extraContext,
+    finalConsiderations,
     historyScope,
+    includeDayAnnotations,
     ignoredNotes,
     livingReport,
+    meetingAgenda,
+    meetingAgreements,
+    meetingClosing,
+    meetingDate,
+    meetingDuration,
+    meetingGeneralInfo,
+    meetingOpening,
     mode,
     objective,
     portfolioImageFormat,
     portfolioOutput,
     selectedAnnotationIds,
     selectedClassId,
+    selectedMilestoneIds,
     selectedStudentId,
   ])
 
@@ -269,6 +337,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     const timeout = window.setTimeout(() => setDraftMessage(''), 3500)
     return () => window.clearTimeout(timeout)
   }, [draftMessage])
+
+  useEffect(() => {
+    if (!isPortfolio || selectedMilestoneIds.length > 0) return
+    setSelectedMilestoneIds(milestoneAnnotations.slice(0, 5).map((annotation) => annotation.id))
+  }, [isPortfolio, milestoneAnnotations, selectedMilestoneIds.length])
 
   useEffect(() => {
     if (!supportsLivingReport || !selectedStudent?.id) return
@@ -297,16 +370,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   useEffect(() => {
     if (assistantMode !== 'parents-meeting') return
     setMode('blank')
-    setBlankContext((current) =>
-      current.trim()
-        ? current
-        : 'Planejar uma reunião de pais com abertura acolhedora, pauta principal, informações gerais da turma, combinados com as famílias, espaço para anotações e encerramento.',
-    )
-    setExtraContext((current) =>
-      current.trim()
-        ? current
-        : 'Não citar nomes de crianças. Falar da turma como grupo e manter um tom acolhedor, objetivo e profissional.',
-    )
+    setMeetingOpening((current) => current || 'Receber os pais, apresentar o objetivo do encontro e criar um ambiente acolhedor.')
+    setMeetingClosing((current) => current || 'Agradecer a presença das famílias e reforçar a parceria com a escola.')
   }, [assistantMode])
 
   const mockReport = createReportPreview({
@@ -325,6 +390,16 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     diaryDate,
     diaryTheme,
     diaryRawText,
+    finalConsiderations,
+    selectedMilestones,
+    includeDayAnnotations,
+    meetingDate,
+    meetingDuration,
+    meetingOpening,
+    meetingAgenda,
+    meetingGeneralInfo,
+    meetingAgreements,
+    meetingClosing,
   })
 
   function handleBack() {
@@ -399,6 +474,16 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
           diaryDate,
           diaryTheme,
           diaryRawText,
+          finalConsiderations,
+          selectedMilestones,
+          includeDayAnnotations,
+          meetingDate,
+          meetingDuration,
+          meetingOpening,
+          meetingAgenda,
+          meetingGeneralInfo,
+          meetingAgreements,
+          meetingClosing,
         })
         const manualReport = await createManualReport({
           reportType: 'manual_anamnesis',
@@ -435,9 +520,23 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         bnccFields,
         objective: objective || null,
         evaluationPeriod: evaluationPeriod || null,
+        finalConsiderations: finalConsiderations || null,
+        selectedMilestones: selectedMilestones.map((annotation) => ({
+          date: annotation.date,
+          label: annotation.label,
+          text: annotation.text,
+        })),
+        includeDayAnnotations,
         diaryDate: isClassDiary ? diaryDate : null,
         diaryTheme: isClassDiary ? (diaryTheme || null) : null,
         diaryRawText: isClassDiary ? diaryRawText : null,
+        meetingDate: isParentsMeeting ? meetingDate : null,
+        meetingDuration: isParentsMeeting ? meetingDuration : null,
+        meetingOpening: isParentsMeeting ? meetingOpening : null,
+        meetingAgenda: isParentsMeeting ? meetingAgenda : null,
+        meetingGeneralInfo: isParentsMeeting ? meetingGeneralInfo : null,
+        meetingAgreements: isParentsMeeting ? meetingAgreements : null,
+        meetingClosing: isParentsMeeting ? meetingClosing : null,
         assistantMode: assistantMode || null,
         livingReport,
         voiceAnnotationsCount: voiceAnnotations.length,
@@ -641,6 +740,20 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                         value={diaryRawText}
                         onChange={(event) => setDiaryRawText(event.target.value)}
                       />
+                      <button
+                        onClick={() => setIncludeDayAnnotations((current) => !current)}
+                        className={`w-full rounded-app-sm border px-3 py-3 text-left mt-4 ${
+                          includeDayAnnotations ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'
+                        }`}
+                      >
+                        <span className="block text-[13px] font-bold">
+                          {includeDayAnnotations ? '[x] ' : '[ ] '}
+                          Puxar anotações
+                        </span>
+                        <span className="block text-[11px] mt-1">
+                          Incluir registros do dia como contexto do diário.
+                        </span>
+                      </button>
                     </>
                   )}
                 </>
@@ -664,10 +777,86 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               )}
             </div>
 
-            {!isClassDiary && !isAnamnesis && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
+            {isDevelopmentReport && !isAnamnesis && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
-                  Dados BNCC obrigatorios
+                  Informações da criança e professora
+                </p>
+                <div className="space-y-2 text-[13px] text-ink leading-[1.5]">
+                  <p><strong>Criança:</strong> {selectedStudent?.name ?? '-'}</p>
+                  <p><strong>Turma:</strong> {selectedStudent?.className ?? '-'}</p>
+                  <p><strong>Professora:</strong> dados da conta da professora</p>
+                </div>
+              </div>
+            )}
+
+            {isParentsMeeting && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
+                  Estrutura da reunião
+                </p>
+                <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                  Data
+                </label>
+                <input
+                  type="date"
+                  className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
+                  value={meetingDate}
+                  onChange={(event) => setMeetingDate(event.target.value)}
+                />
+                <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                  Duração estimada
+                </label>
+                <select
+                  className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
+                  value={meetingDuration}
+                  onChange={(event) => setMeetingDuration(event.target.value)}
+                >
+                  <option value="1h">1h</option>
+                  <option value="1h30">1h30</option>
+                  <option value="2h">2h</option>
+                </select>
+                <MeetingTextArea
+                  label="Abertura (10 min)"
+                  value={meetingOpening}
+                  onChange={setMeetingOpening}
+                  placeholder="Como receber os pais e criar um ambiente acolhedor no início da reunião."
+                />
+                <MeetingTextArea
+                  label="Pauta da reunião"
+                  value={meetingAgenda}
+                  onChange={setMeetingAgenda}
+                  placeholder="Liste os itens da pauta e, se quiser, o tempo sugerido para cada um."
+                />
+                <MeetingTextArea
+                  label="Informações gerais da turma"
+                  value={meetingGeneralInfo}
+                  onChange={setMeetingGeneralInfo}
+                  placeholder="Baseado nas suas anotações: como a turma está coletivamente, conquistas do período e próximos passos. Não cite nomes de crianças."
+                />
+                <MeetingTextArea
+                  label="Combinados gerais"
+                  value={meetingAgreements}
+                  onChange={setMeetingAgreements}
+                  placeholder="Sugestões de rotina e parceria com as famílias."
+                />
+                <div className="rounded-app-sm border border-dashed border-border bg-cream px-3 py-3 mb-4">
+                  <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Espaço para anotações durante a reunião</p>
+                  <p className="text-[12px] text-muted mt-1">O documento gerado terá um campo em branco para a professora usar na hora.</p>
+                </div>
+                <MeetingTextArea
+                  label="Encerramento (5 min)"
+                  value={meetingClosing}
+                  onChange={setMeetingClosing}
+                  placeholder="Como fechar a reunião, agradecer a presença e reforçar a parceria com as famílias."
+                />
+              </div>
+            )}
+
+            {!isClassDiary && !isParentsMeeting && !isAnamnesis && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
+                  {isDevelopmentReport ? 'Período avaliado' : 'Dados BNCC obrigatorios'}
                 </p>
 
                 {needsBnccFields && (
@@ -747,6 +936,40 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
+            {isDevelopmentReport && !isAnamnesis && (
+              <>
+                <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                  <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
+                    Introdução
+                  </p>
+                  <p className="text-[12px] text-muted leading-[1.6]">
+                    O relatório deve informar que a professora usou os documentos norteadores para o desenvolvimento do relatório: BNCC, PPP (Projeto Político Pedagógico) e Currículo da Cidade.
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                  <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                    Considerações finais
+                  </label>
+                  <textarea
+                    className="w-full min-h-[104px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
+                    placeholder="Escreva uma mensagem final de incentivo e parceria com a família."
+                    value={finalConsiderations}
+                    onChange={(event) => setFinalConsiderations(event.target.value)}
+                  />
+                </div>
+
+                <div className="bg-white rounded-app p-4 border border-gp shadow-card mb-4" style={{ background: '#F0FAF4' }}>
+                  <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-gd mb-2">
+                    Orientação
+                  </p>
+                  <p className="text-[12px] text-soft leading-[1.6]">
+                    O que não pode faltar no texto: para estar alinhado à BNCC, o relatório deve transparecer que a criança teve seus Direitos de Aprendizagem garantidos: ela brincou, conviveu, participou, explorou, expressou-se e conheceu-se.
+                  </p>
+                </div>
+              </>
+            )}
+
             {supportsLivingReport && !isAnamnesis && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
@@ -778,7 +1001,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isAnamnesis && (
+            {!isClassDiary && !isParentsMeeting && !isPortfolio && !isAnamnesis && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Base do documento
@@ -861,7 +1084,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isAnamnesis && (
+            {!isClassDiary && !isParentsMeeting && !isPortfolio && !isAnamnesis && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                 Histórico
@@ -894,7 +1117,48 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
-            {!isClassDiary && !isAnamnesis && (mode === 'annotations' ? (
+            {isPortfolio && !isAnamnesis && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-[13px] font-bold text-ink">Marcos importantes</p>
+                    <p className="text-[11px] text-muted">{selectedMilestones.length} de {milestoneAnnotations.length} selecionados</p>
+                  </div>
+                </div>
+                <p className="text-[12px] text-muted leading-[1.6] mb-3">
+                  Selecione os marcos que deseja que apareçam no portfólio.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {milestoneAnnotations.length ? milestoneAnnotations.map((annotation) => (
+                    <button
+                      key={annotation.id}
+                      onClick={() => setSelectedMilestoneIds((current) =>
+                        current.includes(annotation.id)
+                          ? current.filter((item) => item !== annotation.id)
+                          : [...current, annotation.id],
+                      )}
+                      className={`rounded-app-sm border px-3 py-3 text-left ${
+                        selectedMilestoneIds.includes(annotation.id)
+                          ? 'bg-gbg border-gp'
+                          : 'bg-cream border-border'
+                      }`}
+                    >
+                      <span className="block text-[12px] font-bold text-ink">
+                        {selectedMilestoneIds.includes(annotation.id) ? '[x] ' : '[ ] '}
+                        {annotation.label} - {annotation.date}
+                      </span>
+                      <span className="block text-[11px] text-muted leading-[1.5] mt-1">{annotation.text}</span>
+                    </button>
+                  )) : (
+                    <p className="text-[12px] text-muted leading-[1.6]">
+                      Nenhum marco registrado ainda para esta criança.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!isClassDiary && !isParentsMeeting && !isPortfolio && !isAnamnesis && (mode === 'annotations' ? (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
@@ -1011,27 +1275,32 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             ) : null}
 
+            {!isParentsMeeting && !isAnamnesis && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                Orientação adicional
+                {isPortfolio ? 'Campo de observação' : 'Orientação adicional'}
               </label>
               <textarea
                 className="w-full min-h-[118px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                placeholder="Ex.: destacar a adaptação nas últimas semanas, evitar linguagem muito técnica e incluir encaminhamentos para a família..."
+                placeholder={isPortfolio
+                  ? 'Algo que você queira acrescentar sobre o desenvolvimento desta criança ou sobre as fotos anexadas.'
+                  : 'Ex.: destacar a adaptação nas últimas semanas, evitar linguagem muito técnica e incluir encaminhamentos para a família...'}
                 value={extraContext}
                 onChange={(event) => setExtraContext(event.target.value)}
               />
             </div>
+            )}
 
+            {isPortfolio && !isAnamnesis && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-[12px] bg-gbg flex items-center justify-center text-gm flex-shrink-0">
                   <FileUp size={18} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-[13px] font-bold text-ink">Anexos complementares</p>
+                  <p className="text-[13px] font-bold text-ink">Opção de anexar foto</p>
                   <p className="text-[11px] text-muted leading-[1.5] mt-1">
-                    Você pode anexar mais de um arquivo ou gerar sem anexar nada.
+                    Anexe fotos das produções ou registros da criança para compor o portfólio.
                   </p>
                   {attachments.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
@@ -1068,9 +1337,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white"
               >
-                + Anexar imagem ou documento
+                + Anexar foto
               </button>
             </div>
+            )}
 
             <button
               onClick={generate}
@@ -1192,6 +1462,27 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   )
 }
 
+function MeetingTextArea(props: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  return (
+    <>
+      <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+        {props.label}
+      </label>
+      <textarea
+        className="w-full min-h-[94px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] text-ink outline-none leading-[1.6]"
+        placeholder={props.placeholder}
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+    </>
+  )
+}
+
 function matchesStudent(annotation: Annotation, studentId: string, studentName?: string) {
   if (annotation.studentId && annotation.studentId === studentId) return true
   if (studentName && annotation.studentName === studentName) return true
@@ -1228,6 +1519,16 @@ function createReportPreview(input: {
   diaryDate: string
   diaryTheme: string
   diaryRawText: string
+  finalConsiderations: string
+  selectedMilestones: Annotation[]
+  includeDayAnnotations: boolean
+  meetingDate: string
+  meetingDuration: string
+  meetingOpening: string
+  meetingAgenda: string
+  meetingGeneralInfo: string
+  meetingAgreements: string
+  meetingClosing: string
 }) {
   const annotationBlock = input.selectedAnnotations.length
     ? input.selectedAnnotations.map((annotation) => `- ${annotation.date} | ${annotation.label}: ${annotation.text}`).join('\n')
@@ -1280,30 +1581,28 @@ Documento gerado a partir das informações autorizadas pela professora.`
   }
 
   if (input.reportKind === 'Registro de reunião de pais' || input.reportKind === 'Planejamento de Reunião dos Pais') {
-    return `${header}
+    return `PLANEJAMENTO DE REUNIÃO — ${input.className}
+Data: ${input.meetingDate || '__ / __ / ____'}   Duração estimada: ${input.meetingDuration || '1h30'}
 
-PLANEJAMENTO DE REUNIÃO DE PAIS
+ABERTURA (10 min)
+${input.meetingOpening.trim() || 'Como receber os pais e criar ambiente acolhedor.'}
 
-Abertura:
-Receber as famílias com acolhimento, apresentar o objetivo do encontro e combinar uma escuta respeitosa.
+PAUTA DA REUNIÃO
+${input.meetingAgenda.trim() || '1. [item da pauta] — tempo sugerido'}
 
-Pauta:
-- apresentação do período e trabalhos realizados;
-- adaptação, rotina, autonomia e convivência da turma;
-- combinados sobre materiais, comunicação e participação das famílias;
-- dúvidas e sugestões.
+INFORMAÇÕES GERAIS DA TURMA
+${input.meetingGeneralInfo.trim() || 'Baseado nas suas anotações: como a turma está coletivamente, conquistas do período e próximos passos.'}
 
-Informações gerais da turma:
-Falar sempre da turma como grupo, sem citar nomes de crianças ou expor situações individuais.
+COMBINADOS GERAIS
+${input.meetingAgreements.trim() || 'Sugestões de rotina e parceria com as famílias.'}
 
-Combinados gerais:
-Registrar orientações de rotina, parceria escola-família, próximos passos e formas de comunicação.
-
-Espaço para anotações:
+ESPAÇO PARA ANOTAÇÕES DURANTE A REUNIÃO
+________________________________________
+________________________________________
 ________________________________________
 
-Encerramento:
-Agradecer a presença das famílias e reforçar a parceria com a escola.${formatAttachments(input.attachments)}
+ENCERRAMENTO (5 min)
+${input.meetingClosing.trim() || 'Como fechar a reunião.'}
 
 Documento gerado a partir das informações autorizadas pela professora.`
   }
@@ -1320,6 +1619,8 @@ Tema do dia: ${input.diaryTheme || 'Não informado'}
 Anotação original da professora:
 ${input.diaryRawText.trim() || '-'}
 
+Puxar anotações: ${input.includeDayAnnotations ? 'sim' : 'não'}
+
 Versão organizada:
 A turma participou com envolvimento nas propostas do dia, com destaque para momentos de interação coletiva e exploração dos materiais apresentados. Ao longo da rotina, observou-se participação ativa em rodas, brincadeiras e combinados, favorecendo convivência, comunicação e autonomia.
 
@@ -1329,10 +1630,16 @@ Documento gerado a partir das informações autorizadas pela professora.`
   }
 
   if (input.reportKind === 'Portfólio pedagógico' || input.reportKind === 'Portfólio') {
+    const milestones = input.selectedMilestones.length
+      ? input.selectedMilestones.map((annotation) => `- ${annotation.date} | ${annotation.label}: ${annotation.text}`).join('\n')
+      : '- Nenhum marco selecionado.'
     if (input.portfolioOutput === 'image') {
       return `${header}
 
 PORTFÓLIO VISUAL COM CHATGPT
+
+MARCOS IMPORTANTES
+${milestones}
 
 Objetivo da imagem:
 Gerar uma capa ou painel visual para o portfólio pedagógico de ${input.firstName}, usando apenas informações e anexos autorizados pela professora.
@@ -1356,6 +1663,9 @@ Imagem preparada a partir das informações autorizadas pela professora.`
     return `${header}
 
 PORTFÓLIO PEDAGÓGICO
+
+MARCOS IMPORTANTES
+${milestones}
 
 Apresentação:
 Este portfólio organiza evidências da jornada de ${input.firstName} na educação infantil, reunindo registros de experiências, produções, falas, brincadeiras e momentos significativos.
@@ -1416,6 +1726,9 @@ Documento gerado a partir das informações autorizadas pela professora.`
 
 RELATÓRIO DE DESENVOLVIMENTO
 
+Introdução:
+Este relatório foi elaborado com base nos documentos norteadores: BNCC, PPP (Projeto Político Pedagógico) e Currículo da Cidade.
+
 Síntese do percurso:
 ${input.firstName} vem construindo sua jornada de desenvolvimento de forma única, com registros que ajudam a compreender sua rotina, suas conquistas, seus interesses e os pontos que ainda precisam de acompanhamento.
 
@@ -1434,7 +1747,10 @@ Aspectos em acompanhamento:
 Devem ser descritos com linguagem cuidadosa, indicando possibilidades de apoio, experiências futuras e continuidade entre escola e família.
 
 Encaminhamentos:
-Manter observações frequentes, registrar novas evoluções e alinhar com a família quando houver pontos que precisem de continuidade entre escola e casa.${formatAttachments(input.attachments)}
+Manter observações frequentes, registrar novas evoluções e alinhar com a família quando houver pontos que precisem de continuidade entre escola e casa.
+
+Considerações finais:
+${input.finalConsiderations.trim() || '-'}${formatAttachments(input.attachments)}
 
 Documento gerado a partir das informações autorizadas pela professora.`
 }
@@ -1596,12 +1912,17 @@ function getGenerationRequirementHint(input: {
   hasRequiredBnccInput: boolean
   hasRequiredObjective: boolean
   hasRequiredPeriod: boolean
+  hasRequiredDevelopmentFields: boolean
+  hasRequiredMeetingFields: boolean
 }) {
   if (input.isAnamnesis) return ''
   if (input.isClassDiary && input.diaryRawLength < 20) {
     return 'Escreva um relato breve do dia da turma para criar um diário mais fiel.'
   }
-  if (input.mode === 'blank' && input.blankContextLength < 20) {
+  if (input.isParentsMeeting && !input.hasRequiredMeetingFields) {
+    return 'Preencha abertura, pauta, informações gerais, combinados e encerramento da reunião.'
+  }
+  if (input.mode === 'blank' && input.blankContextLength < 20 && !input.isParentsMeeting) {
     return input.isSpecialistReferral
       ? 'Descreva o motivo do encaminhamento e os comportamentos observados na rotina.'
       : input.isParentsMeeting
@@ -1612,6 +1933,7 @@ function getGenerationRequirementHint(input: {
     return 'Selecione pelo menos uma anotação ou escreva uma orientação adicional com o contexto principal.'
   }
   if (!input.hasRequiredPeriod) return 'Informe o período de avaliação para contextualizar o relatório.'
+  if (!input.hasRequiredDevelopmentFields) return 'Escreva as considerações finais do relatório.'
   if (!input.hasRequiredBnccInput) return 'Complete os campos pedagógicos obrigatórios antes de gerar.'
   if (!input.hasRequiredObjective) return 'Informe o objetivo pedagógico com um pouco mais de detalhe.'
   return ''
