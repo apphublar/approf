@@ -20,11 +20,17 @@ const CORS_HEADERS = {
 
 const TEXT_GENERATION_TYPES = new Set<AiGenerationType>([
   'development_report',
+  'classroom_journal',
   'class_diary',
+  'planning_weekly',
   'weekly_planning',
+  'planning_daily',
   'daily_lesson_plan',
+  'planning_project',
   'pedagogical_project',
+  'planning_meeting',
   'specialist_referral',
+  'parents_meeting',
   'parents_meeting_record',
   'general_report',
   'planning',
@@ -43,6 +49,7 @@ export async function POST(request: Request) {
   let reservedEstimatedCostCents = 0
   let generatedReportId: string | undefined
   let ownerIdForRollback: string | undefined
+  const requestId = crypto.randomUUID()
 
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
@@ -53,6 +60,21 @@ export async function POST(request: Request) {
     const promptVersion = typeof body.promptVersion === 'string' && body.promptVersion.trim()
       ? body.promptVersion.trim()
       : 'bncc-v1'
+
+    console.log('[GENERATE-TEXT] Request recebido:', {
+      requestId,
+      generationType,
+      userId: ownerId,
+      temAluno: typeof body.studentId === 'string',
+      temTurma: typeof body.classId === 'string',
+      timestamp: new Date().toISOString(),
+    })
+
+    console.log('[GENERATE-TEXT] Reservando uso de IA:', {
+      requestId,
+      generationType,
+      promptVersion,
+    })
 
     const reservation = await reserveAiUsage({
       ownerId,
@@ -66,11 +88,26 @@ export async function POST(request: Request) {
 
     const reservedLogId = reservation.logId
     if (!reservation.allowed || !reservedLogId) {
+      console.warn('[GENERATE-TEXT] Reserva negada:', {
+        requestId,
+        generationType,
+        reason: reservation.reason,
+        hasWallet: Boolean(reservation.wallet),
+        hasEntitlement: Boolean(reservation.entitlement),
+      })
       return NextResponse.json(reservation, { status: 402, headers: CORS_HEADERS })
     }
 
     logId = reservedLogId
     reservedEstimatedCostCents = reservation.estimate?.estimatedCostCents ?? 0
+
+    console.log('[GENERATE-TEXT] Reserva aprovada:', {
+      requestId,
+      generationType,
+      logId: reservedLogId,
+      chargeSource: reservation.chargeSource,
+      estimatedCostCents: reservedEstimatedCostCents,
+    })
 
     const generated = await generatePedagogicalText({
       ownerId,
@@ -80,8 +117,28 @@ export async function POST(request: Request) {
       promptVersion,
       requestSummary,
       logId: reservedLogId,
+      requestId,
     })
     generatedReportId = generated.reportId
+
+    console.log('[GENERATE-TEXT] Texto gerado e relatório salvo:', {
+      requestId,
+      generationType,
+      logId: reservedLogId,
+      reportId: generated.reportId,
+      provider: generated.provider,
+      model: generated.model,
+      pipeline: generated.pipeline,
+      inputTokens: generated.inputTokens,
+      outputTokens: generated.outputTokens,
+      actualCostCents: generated.actualCostCents,
+    })
+
+    console.log('[GENERATE-TEXT] Finalizando reserva:', {
+      requestId,
+      logId: reservedLogId,
+      reportId: generated.reportId,
+    })
 
     await completeAiUsageReservation({
       logId: reservedLogId,
@@ -95,6 +152,13 @@ export async function POST(request: Request) {
       },
     })
     reservationCompleted = true
+
+    console.log('[GENERATE-TEXT] Geração concluída:', {
+      requestId,
+      generationType,
+      logId: reservedLogId,
+      reportId: generated.reportId,
+    })
 
     return NextResponse.json(
       {
@@ -115,23 +179,42 @@ export async function POST(request: Request) {
     if (logId && !reservationCompleted) {
       if (generatedReportId && ownerIdForRollback) {
         try {
+          console.warn('[GENERATE-TEXT] Limpando artefatos parciais:', {
+            requestId,
+            logId,
+            reportId: generatedReportId,
+          })
           await rollbackGeneratedArtifacts({
             reportId: generatedReportId,
             ownerId: ownerIdForRollback,
           })
         } catch (rollbackError) {
-          console.error('[ai/generate-text] falha ao limpar artefatos parciais', rollbackError)
+          console.error('[GENERATE-TEXT] Falha ao limpar artefatos parciais:', {
+            requestId,
+            logId,
+            reportId: generatedReportId,
+            error: sanitizeLogError(rollbackError),
+          })
         }
       }
 
       try {
+        console.warn('[GENERATE-TEXT] Estornando reserva após falha:', {
+          requestId,
+          logId,
+          reservedEstimatedCostCents,
+        })
         await refundAiUsageReservation({
           logId,
           reason: error instanceof Error ? error.message : 'Falha na geracao textual.',
           reservedCostCentsOverride: reservedEstimatedCostCents,
         })
       } catch (refundError) {
-        console.error('[ai/generate-text] falha ao estornar reserva de IA', refundError)
+        console.error('[GENERATE-TEXT] Falha ao estornar reserva de IA:', {
+          requestId,
+          logId,
+          error: sanitizeLogError(refundError),
+        })
       }
     }
 
@@ -149,7 +232,13 @@ export async function POST(request: Request) {
       )
     }
 
-    console.error('[ai/generate-text] erro interno', error)
+    console.error('[GENERATE-TEXT] Erro:', {
+      requestId,
+      logId,
+      generatedReportId,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined,
+    })
 
     const message = error instanceof Error && error.message.trim()
       ? error.message.trim()
@@ -160,6 +249,18 @@ export async function POST(request: Request) {
       { status: 500, headers: CORS_HEADERS },
     )
   }
+}
+
+function sanitizeLogError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 3),
+    }
+  }
+
+  return { message: String(error) }
 }
 
 function parseGenerationType(value: unknown): AiGenerationType {

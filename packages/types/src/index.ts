@@ -42,3 +42,5 @@ export interface PrivacyStoragePath {
   bucket: 'child-photos' | 'report-exports' | 'material-files'
   path: string
 }
+
+export * from './documents'

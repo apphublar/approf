@@ -4,31 +4,19 @@ import { useNavStore } from '@/store'
 
 const AI_SECTIONS = [
   {
-    title: 'Relatórios pedagógicos',
-    actions: [
-      { title: 'Relatório de desenvolvimento', desc: 'Acompanhamento das aprendizagens sem caráter classificatório.', icon: 'chart', flow: 'report' },
-      { title: 'Diário de bordo', desc: 'Registro pedagógico coletivo da rotina e experiências da turma.', icon: 'text', flow: 'report' },
-      { title: 'Portfólio pedagógico', desc: 'Evidências, produções, fotos e relatos da jornada.', icon: 'portfolio', flow: 'report' },
-    ],
-  },
-  {
     title: 'Planejamentos',
     actions: [
-      { title: 'Planejamento', desc: 'Modelos práticos de planejamento semanal e plano de aula diário.', icon: 'plan', flow: 'planning' },
+      { title: 'Planejamento (Diário ou Semanal)', desc: 'Organize o que será feito na rotina pedagógica.', icon: 'plan', flow: 'planning' },
+      { title: 'Projeto Pedagógico', desc: 'Projeto temático com objetivos, etapas, atividades e avaliação.', icon: 'portfolio', flow: 'generator' },
+      { title: 'Planejamento de Reunião dos Pais', desc: 'Pauta, combinados e encaminhamentos para encontro com as famílias.', icon: 'text', flow: 'report' },
     ],
   },
   {
-    title: 'Especialistas e encaminhamentos',
+    title: 'Relatórios',
     actions: [
-      { title: 'Encaminhamento para especialista', desc: 'Documento conciso justificando avaliação externa.', icon: 'care', flow: 'report' },
-    ],
-  },
-  {
-    title: 'Documentação complementar',
-    actions: [
-      { title: 'Projeto pedagógico específico', desc: 'Projeto temático com objetivos, atividades e avaliação.', icon: 'portfolio', flow: 'generator' },
-      { title: 'Ficha de anamnese', desc: 'Histórico, hábitos, rotina e contexto familiar.', icon: 'text', flow: 'report' },
-      { title: 'Registro de reunião de pais', desc: 'Pauta, combinados e encaminhamentos com a família.', icon: 'text', flow: 'report' },
+      { title: 'Relatório de Desenvolvimento', desc: 'Documente aprendizagens, avanços e próximos passos.', icon: 'chart', flow: 'report' },
+      { title: 'Portfólio', desc: 'Evidências, produções, fotos e relatos da jornada.', icon: 'portfolio', flow: 'report' },
+      { title: 'Diário de Bordo', desc: 'Registro pedagógico da rotina e experiências vividas.', icon: 'text', flow: 'report' },
     ],
   },
 ] as const
@@ -80,7 +68,7 @@ export default function AiPedagogicaSubscreen() {
     if (action.flow === 'report') {
       openSubscreen('report', {
         reportKind: action.title,
-        assistantMode: action.title === 'Registro de reunião de pais' ? 'parents-meeting' : undefined,
+        assistantMode: action.title === 'Planejamento de Reunião dos Pais' ? 'parents-meeting' : undefined,
       })
       return
     }
@@ -95,7 +83,7 @@ export default function AiPedagogicaSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <span className="font-serif text-[18px] text-gd flex-1">
-          {choosingPlanningPeriod ? 'Planejamento' : 'Relatórios e Planejamentos'}
+          {choosingPlanningPeriod ? 'Planejamento' : 'Planejamentos e Relatórios'}
         </span>
       </div>
 
@@ -155,7 +143,7 @@ export default function AiPedagogicaSubscreen() {
               <p className="text-[12px] opacity-70 mb-1">Assistente pedagógica</p>
               <h2 className="font-serif text-[22px] mb-2">O que você precisa hoje?</h2>
               <p className="text-[13px] opacity-80 leading-[1.6]">
-                {totalDocuments} modelos para relatórios, planejamentos, especialistas e documentação da educação infantil.
+                {totalDocuments} modelos para planejar a rotina e documentar o que aconteceu.
               </p>
             </div>
 
@@ -192,10 +180,7 @@ export default function AiPedagogicaSubscreen() {
                     {section.title}
                   </p>
                   <button
-                    onClick={() => openSubscreen('generated-documents', {
-                      reportTypes: getSectionReportTypes(section.title),
-                      kind: section.title === 'Relatórios pedagógicos' ? 'all' : 'documents',
-                    })}
+                    onClick={() => openSubscreen('generated-documents', { reportTypes: getSectionReportTypes(section.title) })}
                     className="text-[11px] font-bold text-gm"
                   >
                     Histórico
@@ -226,7 +211,7 @@ export default function AiPedagogicaSubscreen() {
                 <Sparkles size={22} className="text-gm mx-auto mb-2" />
                 <p className="text-[13px] font-bold text-ink">Nenhum modelo encontrado</p>
                 <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-                  Tente buscar por relatório, planejamento, especialista ou documentação.
+                  Tente buscar por planejamento, relatório, portfólio ou diário.
                 </p>
               </div>
             )}
@@ -256,11 +241,7 @@ function normalizeText(value: string) {
 }
 
 function getSectionReportTypes(sectionTitle: SectionTitle) {
-  if (sectionTitle === 'Relatórios pedagógicos') return ['development_report', 'class_diary', 'portfolio_text', 'portfolio_image']
-  if (sectionTitle === 'Planejamentos') return ['weekly_planning', 'daily_lesson_plan', 'pedagogical_project']
-  if (sectionTitle === 'Especialistas e encaminhamentos') return ['specialist_referral']
-  if (sectionTitle === 'Documentação complementar') return ['parents_meeting_record', 'general_report', 'other']
+  if (sectionTitle === 'Planejamentos') return ['weekly_planning', 'daily_lesson_plan', 'pedagogical_project', 'parents_meeting_record']
+  if (sectionTitle === 'Relatórios') return ['development_report', 'class_diary', 'portfolio_text', 'portfolio_image']
   return undefined
 }
-
-

@@ -1,5 +1,7 @@
 ﻿import type { AiGenerationType } from './ai-usage'
 
+import { FORBIDDEN_PEDAGOGICAL_WORDS } from '@approf/types'
+
 export interface BuildPromptInput {
   generationType: AiGenerationType
   promptVersion: string
@@ -67,6 +69,7 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
     'Nunca compare crianças entre si.',
     'Nunca realize diagnostico medico, clinico ou psicologico.',
     'Não invente fatos: use apenas o contexto fornecido.',
+    `Evite em todos os documentos estas expressoes: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
     'Transforme as informações da professora: preserve detalhes relevantes, organize melhor, corrija a escrita e humanize sem apagar o que foi informado.',
     ...documentGuidelines.system,
     'A saida desta etapa e um rascunho que sera revisado nas etapas seguintes; não precisa estar perfeita, mas deve ser completa e estruturada.',
@@ -99,6 +102,7 @@ export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromSt
     'Remova ou neutralize qualquer comparacao entre crianças, diagnostico ou conclusao clinica, e linguagem julgadora.',
     'Mantenha apenas observacoes pedagogicas e descritivas.',
     'Preserve fatos e intencoes do rascunho; não invente novos fatos.',
+    `Remova linguagem artificial ou bacharelesca, especialmente: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
     ...documentGuidelines.system,
     'Responda APENAS com o texto final revisado (sem prefacio, sem comentarios meta, sem markdown de explicacao).',
   ].join('\n')
@@ -136,6 +140,7 @@ export function buildStage3FinalRefinementPrompt(input: BuildPromptInput, textFr
     'Você recebe um texto já revisado pedagogicamente. Melhore fluidez, clareza e tom humano e acolhedor.',
     'Personalize levemente quando fizer sentido (sem inventar dados) para leitura pela professora e familias.',
     'Mantenha todas as regras: Educação Infantil 0-5 anos, BNCC, sem diagnostico clinico, sem comparacao entre crianças, sem linguagem julgadora.',
+    `Se aparecer alguma destas expressoes, substitua por linguagem natural: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
     'Entregue em formato final curto e pratico: secoes claras, paragrafos curtos e linguagem natural.',
     ...documentGuidelines.system,
     'A professora podera editar depois: o texto deve estar pronto para uso e sem tom robotizado.',
@@ -236,6 +241,7 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
   } else if (type === 'development_report' || type === 'general_report') {
     system.push(
       'Este relatório é individual, médio e empático. Valorize avanços, interesses, participação e pontos de continuidade.',
+      'A introdução deve mencionar naturalmente que o relatório considera BNCC, PPP e Currículo da Cidade.',
       'A BNCC pode aparecer de modo contextual e discreto, nunca como bloco dominante ou lista teórica.',
       'Evite conclusões fechadas; prefira observou-se, percebe-se, vem demonstrando, segue em acompanhamento.',
     )
@@ -271,11 +277,11 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
     user.push('Tamanho final: formal e objetivo, sem afirmar causa, hipótese clínica ou diagnóstico.')
   } else if (type === 'parents_meeting_record') {
     system.push(
-      'Este documento é ata/registro de reunião de pais: simples, objetivo e fiel ao que foi informado.',
-      'Não use BNCC nem linguagem acadêmica. Organize pauta, observações, combinados e encaminhamentos.',
-      'Evite expor outras crianças e preserve tom respeitoso com a família.',
+      'Este documento é um planejamento de reunião de pais: acolhedor, objetivo e prático para conduzir a reunião.',
+      'Não use BNCC nem linguagem acadêmica. Organize abertura, pauta, informações gerais da turma, combinados e encerramento.',
+      'Não cite nomes de crianças. Fale da turma como grupo e preserve dados sensíveis.',
     )
-    user.push('Tamanho final: curto, com formato de registro de reunião e combinados claros.')
+    user.push('Tamanho final: curto, com roteiro de reunião, tempos estimados e espaço para anotações.')
   } else if (type === 'portfolio_text') {
     system.push(
       'Este documento é portfólio textual: narrativa pedagógica com evidências, memória de percurso e tom afetivo-profissional.',
@@ -329,7 +335,7 @@ function mapGenerationType(generationType: AiGenerationType) {
     case 'specialist_referral':
       return 'Encaminhamento para especialista'
     case 'parents_meeting_record':
-      return 'Registro de reunião de pais'
+      return 'Planejamento de reunião de pais'
     case 'planning':
       return 'Planejamento pedagógico'
     case 'portfolio_text':
@@ -400,10 +406,12 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
 
   if (input.generationType === 'parents_meeting_record') {
     return [
-      'Pauta',
-      'Observações da reunião',
-      'Combinados',
-      'Encaminhamentos',
+      'Abertura acolhedora',
+      'Pauta da reunião com tempos estimados',
+      'Informações gerais da turma sem citar nomes de crianças',
+      'Combinados gerais com as famílias',
+      'Espaço para anotações',
+      'Encerramento',
     ]
   }
 
@@ -565,5 +573,3 @@ function normalize(value: string) {
     .toLowerCase()
     .trim()
 }
-
-

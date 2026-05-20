@@ -192,7 +192,7 @@ function formatGenerationType(value: string) {
     daily_lesson_plan: 'Plano de aula diário',
     pedagogical_project: 'Projeto pedagógico específico',
     specialist_referral: 'Encaminhamento para especialista',
-    parents_meeting_record: 'Registro de reunião de pais',
+    parents_meeting_record: 'Planejamento de reunião de pais',
     manual_anamnesis: 'Ficha de anamnese (manual)',
     general_report: 'Relatório geral',
     planning: 'Planejamento',
@@ -239,4 +239,3 @@ function findStudentName(studentId: string | null, classes: ReturnType<typeof us
   }
   return null
 }
-

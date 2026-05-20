@@ -7,6 +7,12 @@ import {
   buildStage3FinalRefinementPrompt,
   pipelineStagePromptVersion,
 } from './pedagogical-prompts'
+import {
+  DOCUMENT_MODELS,
+  DOCUMENT_WORD_LIMITS,
+  FORBIDDEN_PEDAGOGICAL_WORDS,
+  toCanonicalDocumentGenerationType,
+} from '@approf/types'
 
 interface GeneratePedagogicalTextInput {
   ownerId: string
@@ -16,6 +22,7 @@ interface GeneratePedagogicalTextInput {
   promptVersion: string
   requestSummary?: Record<string, unknown>
   logId: string
+  requestId?: string
 }
 
 /** Metadados de uma etapa do pipeline (persistidos em ai_generation_logs.result_summary). */
@@ -48,9 +55,9 @@ interface GeneratePedagogicalTextResult {
 
 export class PublicAiGenerationError extends Error {}
 
-const DEFAULT_ANTHROPIC_TEXT_MODEL = 'claude-sonnet-4-20250514'
+const DEFAULT_ANTHROPIC_HAIKU_MODEL = 'claude-haiku-4-5-20251001'
+const DEFAULT_ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-6'
 const DEFAULT_OPENAI_INTERVENTIONS_MODEL = 'gpt-4o-mini'
-const HAIKU_MODEL = 'claude-3-5-haiku-20241022'
 
 interface DocumentPipelineConfig {
   stages: 1 | 2 | 3
@@ -60,24 +67,36 @@ interface DocumentPipelineConfig {
   refineModel?: string
 }
 
-function resolveAnthropicTextModelFallback(): string {
-  const fromEnv = process.env.ANTHROPIC_TEXT_MODEL?.trim()
-  return fromEnv || DEFAULT_ANTHROPIC_TEXT_MODEL
+function resolveHaikuModelId(): string {
+  return process.env.ANTHROPIC_HAIKU_MODEL?.trim()
+    || process.env.ANTHROPIC_DRAFT_MODEL?.trim()
+    || DEFAULT_ANTHROPIC_HAIKU_MODEL
+}
+
+function resolveSonnetModelId(): string {
+  return process.env.ANTHROPIC_SONNET_MODEL?.trim()
+    || process.env.ANTHROPIC_TEXT_MODEL?.trim()
+    || process.env.ANTHROPIC_REVIEW_MODEL?.trim()
+    || DEFAULT_ANTHROPIC_SONNET_MODEL
+}
+
+function resolveModelAlias(alias: 'haiku' | 'sonnet'): string {
+  return alias === 'haiku' ? resolveHaikuModelId() : resolveSonnetModelId()
 }
 
 function resolveDraftModelId(): string {
   const v = process.env.ANTHROPIC_DRAFT_MODEL?.trim()
-  return v || resolveAnthropicTextModelFallback()
+  return v || resolveHaikuModelId()
 }
 
 function resolveReviewModelId(): string {
   const v = process.env.ANTHROPIC_REVIEW_MODEL?.trim()
-  return v || resolveAnthropicTextModelFallback()
+  return v || resolveSonnetModelId()
 }
 
 function resolveRefineModelId(): string {
   const v = process.env.ANTHROPIC_REFINE_MODEL?.trim()
-  return v || resolveAnthropicTextModelFallback()
+  return v || resolveSonnetModelId()
 }
 
 export async function generatePedagogicalText(
@@ -85,6 +104,7 @@ export async function generatePedagogicalText(
 ): Promise<GeneratePedagogicalTextResult> {
   const summary = input.requestSummary ?? {}
   const promptInput = buildPromptInputFromSummary(input, summary)
+  const requestId = input.requestId ?? input.logId
 
   if (isInterventionMode(promptInput.interventionMode)) {
     return generateInterventionWithOpenAi(input, promptInput)
@@ -102,40 +122,112 @@ export async function generatePedagogicalText(
   let reportId: string | null = null
 
   try {
+    console.log('[AI-GENERATION] Pipeline iniciado:', {
+      requestId,
+      logId: input.logId,
+      generationType: promptInput.generationType,
+      requestedGenerationType: input.generationType,
+      pipeline: pipelineConfig.pipelineName,
+      stages: pipelineConfig.stages,
+      hasStudentId: Boolean(input.studentId),
+      hasClassId: Boolean(input.classId),
+    })
+
     const stage1Prompt = buildStage1DraftPrompt(promptInput)
+    console.log('[AI-GENERATION] Etapa 1 iniciada:', {
+      requestId,
+      logId: input.logId,
+      generationType: promptInput.generationType,
+      model: pipelineConfig.draftModel,
+    })
     const s1 = await runPipelineStage(1, stage1Prompt.system, stage1Prompt.user, {
       model: pipelineConfig.draftModel,
       maxTokens: 2200,
       temperature: 0.35,
+    }, { requestId, logId: input.logId, generationType: promptInput.generationType })
+    console.log('[AI-GENERATION] Etapa 1 concluída:', {
+      requestId,
+      logId: input.logId,
+      model: s1.model,
+      inputTokens: s1.inputTokens,
+      outputTokens: s1.outputTokens,
+      estimatedCostCents: s1.estimatedCostCents,
     })
 
     const stage2Prompt = buildStage2BnccReviewPrompt(promptInput, s1.text)
+    console.log('[AI-GENERATION] Etapa 2 iniciada:', {
+      requestId,
+      logId: input.logId,
+      generationType: promptInput.generationType,
+      model: pipelineConfig.reviewModel,
+    })
     const s2 = await runPipelineStage(2, stage2Prompt.system, stage2Prompt.user, {
       model: pipelineConfig.reviewModel,
       maxTokens: 2400,
       temperature: 0.2,
+    }, { requestId, logId: input.logId, generationType: promptInput.generationType })
+    console.log('[AI-GENERATION] Etapa 2 concluída:', {
+      requestId,
+      logId: input.logId,
+      model: s2.model,
+      inputTokens: s2.inputTokens,
+      outputTokens: s2.outputTokens,
+      estimatedCostCents: s2.estimatedCostCents,
     })
 
     const stage3Prompt = pipelineConfig.stages === 3
       ? buildStage3FinalRefinementPrompt(promptInput, s2.text)
       : null
+    if (pipelineConfig.stages === 3) {
+      console.log('[AI-GENERATION] Etapa 3 iniciada:', {
+        requestId,
+        logId: input.logId,
+        generationType: promptInput.generationType,
+        model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
+      })
+    }
     const s3Initial = pipelineConfig.stages === 3
       ? await runPipelineStage(3, stage3Prompt!.system, stage3Prompt!.user, {
           model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
           maxTokens: 2000,
           temperature: 0.45,
-        })
+        }, { requestId, logId: input.logId, generationType: promptInput.generationType })
       : s2
+    if (pipelineConfig.stages === 3) {
+      console.log('[AI-GENERATION] Etapa 3 concluída:', {
+        requestId,
+        logId: input.logId,
+        model: s3Initial.model,
+        inputTokens: s3Initial.inputTokens,
+        outputTokens: s3Initial.outputTokens,
+        estimatedCostCents: s3Initial.estimatedCostCents,
+      })
+    }
+
+    console.log('[AI-GENERATION] Validação de estrutura iniciada:', {
+      requestId,
+      logId: input.logId,
+      generationType: promptInput.generationType,
+    })
     const structured = await ensureRequiredStructure({
       generationType: promptInput.generationType,
       reportKind: promptInput.reportKind ?? promptInput.docKind,
       candidate: s3Initial,
       model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
+      requestId,
+      logId: input.logId,
+    })
+    console.log('[AI-GENERATION] Validação de qualidade iniciada:', {
+      requestId,
+      logId: input.logId,
+      generationType: promptInput.generationType,
     })
     const qualityChecked = await ensureDocumentQuality({
       generationType: promptInput.generationType,
       candidate: structured.completion,
       model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
+      requestId,
+      logId: input.logId,
     })
     const s3 = qualityChecked.completion
 
@@ -160,11 +252,27 @@ export async function generatePedagogicalText(
       ? s1.actualCostCents + s2.actualCostCents + s3.actualCostCents
       : s1.actualCostCents + s3.actualCostCents
 
+    console.log('[AI-GENERATION] Persistência do relatório iniciada:', {
+      requestId,
+      logId: input.logId,
+      generationType: input.generationType,
+    })
     reportId = await persistGeneratedReport(input, s3.text)
     if (!reportId) {
       throw new PublicAiGenerationError('Não foi possivel salvar o relatório gerado. Tente novamente.')
     }
+    console.log('[AI-GENERATION] Relatório persistido:', {
+      requestId,
+      logId: input.logId,
+      reportId,
+      generationType: input.generationType,
+    })
 
+    console.log('[AI-GENERATION] Persistência de uso iniciada:', {
+      requestId,
+      logId: input.logId,
+      reportId,
+    })
     await persistUsage(
       reportId,
       input.ownerId,
@@ -176,6 +284,14 @@ export async function generatePedagogicalText(
       outputTokens,
       actualCostCents,
     )
+    console.log('[AI-GENERATION] Uso persistido:', {
+      requestId,
+      logId: input.logId,
+      reportId,
+      inputTokens,
+      outputTokens,
+      actualCostCents,
+    })
 
     return {
       text: s3.text,
@@ -190,6 +306,13 @@ export async function generatePedagogicalText(
       pipelineStages,
     }
   } catch (error) {
+    console.error('[AI-GENERATION] Pipeline falhou:', {
+      requestId,
+      logId: input.logId,
+      reportId,
+      generationType: input.generationType,
+      error: sanitizeInternalLogError(error),
+    })
     if (reportId) {
       await rollbackGeneratedArtifacts({ reportId, ownerId: input.ownerId })
     }
@@ -253,11 +376,25 @@ async function ensureRequiredStructure(input: {
   reportKind?: string
   candidate: Awaited<ReturnType<typeof requestClaudeText>>
   model: string
+  requestId: string
+  logId: string
 }) {
   const validation = validateRequiredStructure(input.generationType, input.reportKind, input.candidate.text)
   if (validation.ok) {
+    console.log('[AI-GENERATION] Estrutura aprovada:', {
+      requestId: input.requestId,
+      logId: input.logId,
+      generationType: input.generationType,
+    })
     return { completion: input.candidate }
   }
+
+  console.warn('[AI-GENERATION] Estrutura precisa de reparo:', {
+    requestId: input.requestId,
+    logId: input.logId,
+    generationType: input.generationType,
+    missing: validation.missing,
+  })
 
   const repair = await requestClaudeText(
     buildStructureRepairSystemPrompt(input.generationType),
@@ -289,10 +426,20 @@ async function ensureRequiredStructure(input: {
   const repairedValidation = validateRequiredStructure(input.generationType, input.reportKind, merged.text)
   if (!repairedValidation.ok) {
     console.warn(
-      '[ai-generation] estrutura ainda incompleta apos reparo',
-      input.generationType,
-      repairedValidation.missing,
+      '[AI-GENERATION] Estrutura ainda incompleta após reparo',
+      {
+        requestId: input.requestId,
+        logId: input.logId,
+        generationType: input.generationType,
+        missing: repairedValidation.missing,
+      },
     )
+  } else {
+    console.log('[AI-GENERATION] Estrutura reparada:', {
+      requestId: input.requestId,
+      logId: input.logId,
+      generationType: input.generationType,
+    })
   }
 
   return { completion: merged }
@@ -309,8 +456,9 @@ function buildStructureRepairSystemPrompt(generationType: AiGenerationType) {
 
   if (generationType === 'parents_meeting_record') {
     return [
-      'Você revisa atas de reunião de pais.',
-      'Inclua seções claras: Pauta, Combinados e Encaminhamentos, sem inventar fatos.',
+      'Você revisa planejamentos de reunião de pais.',
+      'Inclua seções claras: Abertura, Pauta, Informações gerais da turma, Combinados, Espaço para anotações e Encerramento.',
+      'Não cite nomes de crianças; fale da turma como grupo.',
       'Retorne APENAS o documento final.',
     ].join('\n')
   }
@@ -343,11 +491,26 @@ async function ensureDocumentQuality(input: {
   generationType: AiGenerationType
   candidate: Awaited<ReturnType<typeof requestClaudeText>>
   model: string
+  requestId: string
+  logId: string
 }) {
   const validation = validateDocumentQuality(input.generationType, input.candidate.text)
   if (validation.ok) {
+    console.log('[AI-GENERATION] Qualidade aprovada:', {
+      requestId: input.requestId,
+      logId: input.logId,
+      generationType: input.generationType,
+    })
     return { completion: input.candidate }
   }
+
+  console.warn('[AI-GENERATION] Qualidade precisa de reparo:', {
+    requestId: input.requestId,
+    logId: input.logId,
+    generationType: input.generationType,
+    issueCount: validation.issues.length,
+    issues: validation.issues,
+  })
 
   const repair = await requestClaudeText(
     [
@@ -406,9 +569,12 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
 
   if (generationType === 'parents_meeting_record') {
     const missing = [
+      !hasAnyHeading(text, ['abertura']) && 'Abertura',
       !hasAnyHeading(text, ['pauta']) && 'Pauta',
+      !hasAnyHeading(text, ['informacoes gerais', 'informações gerais', 'turma']) && 'Informações gerais da turma',
       !hasAnyHeading(text, ['combinados']) && 'Combinados',
-      !hasAnyHeading(text, ['encaminhamentos']) && 'Encaminhamentos',
+      !hasAnyHeading(text, ['anotacoes', 'anotações']) && 'Espaço para anotações',
+      !hasAnyHeading(text, ['encerramento']) && 'Encerramento',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
   }
@@ -457,6 +623,7 @@ function validateDocumentQuality(generationType: AiGenerationType, text: string)
     'suspeita de',
     'incapaz',
     'problema de comportamento',
+    ...FORBIDDEN_PEDAGOGICAL_WORDS,
   ]
   const forbiddenMatches = forbidden.filter((term) => normalized.includes(term))
   if (forbiddenMatches.length) {
@@ -494,6 +661,12 @@ function validateDocumentQuality(generationType: AiGenerationType, text: string)
     issues.push('Reduzir o projeto pedagógico para estrutura objetiva, sem texto acadêmico extenso.')
   }
 
+  const canonicalType = toCanonicalDocumentGenerationType(generationType)
+  const wordLimit = canonicalType ? DOCUMENT_WORD_LIMITS[canonicalType] : 0
+  if (wordLimit > 0 && words > Math.ceil(wordLimit * 1.25)) {
+    issues.push(`Reduzir o documento para mais perto de ${wordLimit} palavras, preservando os detalhes importantes.`)
+  }
+
   return { ok: issues.length === 0, issues }
 }
 
@@ -501,11 +674,30 @@ function resolveDocumentPipelineConfig(
   generationType: AiGenerationType,
   models: { draft: string; review: string; refine: string },
 ): DocumentPipelineConfig {
+  const canonicalType = toCanonicalDocumentGenerationType(generationType)
+  const modelPlan = canonicalType ? DOCUMENT_MODELS[canonicalType] : null
+
+  if (modelPlan) {
+    const configuredStages: 1 | 2 | 3 = modelPlan.review === null
+      ? 1
+      : modelPlan.refine === null
+        ? 2
+        : 3
+
+    return {
+      stages: configuredStages === 1 ? 2 : configuredStages,
+      pipelineName: `claude-text-${configuredStages === 1 ? '2-stage' : `${configuredStages}-stage`}`,
+      draftModel: resolveModelAlias(modelPlan.draft),
+      reviewModel: modelPlan.review ? resolveModelAlias(modelPlan.review) : resolveModelAlias(modelPlan.draft),
+      refineModel: modelPlan.refine ? resolveModelAlias(modelPlan.refine) : undefined,
+    }
+  }
+
   if (generationType === 'class_diary' || generationType === 'parents_meeting_record' || generationType === 'specialist_referral' || generationType === 'specialist_report' || generationType === 'daily_lesson_plan') {
     return {
       stages: 2,
       pipelineName: 'claude-text-2-stage',
-      draftModel: HAIKU_MODEL,
+      draftModel: resolveHaikuModelId(),
       reviewModel: models.refine,
     }
   }
@@ -514,7 +706,7 @@ function resolveDocumentPipelineConfig(
     return {
       stages: 3,
       pipelineName: 'claude-text-3-stage',
-      draftModel: HAIKU_MODEL,
+      draftModel: resolveHaikuModelId(),
       reviewModel: models.review,
       refineModel: models.refine,
     }
@@ -565,11 +757,17 @@ async function runPipelineStage(
   system: string,
   user: string,
   opts: { model: string; maxTokens: number; temperature: number },
+  logContext?: { requestId: string; logId: string; generationType: AiGenerationType },
 ) {
   try {
     return await requestClaudeText(system, user, opts)
   } catch (error) {
-    console.error(`[ai-generation] falha na etapa ${stageNumber} do pipeline Claude`, error)
+    console.error(`[AI-GENERATION] Falha na etapa ${stageNumber} do pipeline Claude`, {
+      ...logContext,
+      stage: stageNumber,
+      model: opts.model,
+      error: sanitizeInternalLogError(error),
+    })
     throw error
   }
 }
@@ -649,6 +847,18 @@ async function requestClaudeText(system: string, user: string, options: RequestC
     estimatedCostCents,
     actualCostCents: estimatedCostCents,
   }
+}
+
+function sanitizeInternalLogError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 5),
+    }
+  }
+
+  return { message: String(error) }
 }
 
 async function requestOpenAiInterventionText(options: RequestOpenAiInterventionOptions) {
@@ -759,6 +969,13 @@ function resolveLegacyGenerationType(
 ): AiGenerationType {
   const normalizedReportKind = normalize(reportKind ?? '')
   const normalizedDocKind = normalize(docKind ?? '')
+
+  if (generationType === 'classroom_journal') return 'class_diary'
+  if (generationType === 'planning_daily') return 'daily_lesson_plan'
+  if (generationType === 'planning_weekly') return 'weekly_planning'
+  if (generationType === 'planning_project') return 'pedagogical_project'
+  if (generationType === 'planning_meeting') return 'parents_meeting_record'
+  if (generationType === 'parents_meeting') return 'parents_meeting_record'
 
   if (generationType === 'planning') {
     if (normalizedDocKind.includes('plano de aula')) return 'daily_lesson_plan'
@@ -1005,4 +1222,3 @@ function toError(error: unknown, fallback: string) {
   }
   return new Error(fallback)
 }
-

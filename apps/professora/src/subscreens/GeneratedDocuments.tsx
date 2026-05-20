@@ -468,7 +468,7 @@ function formatReportType(type: string) {
     generated_image: 'Imagem',
     specialist_referral: 'Encaminhamento para especialista',
     specialist_report: 'Encaminhamento para especialista',
-    parents_meeting_record: 'Registro de reunião de pais',
+    parents_meeting_record: 'Planejamento de reunião de pais',
     manual_anamnesis: 'Ficha de anamnese',
     planning: 'Planejamento',
     general_report: 'Relatório pedagógico',
@@ -618,5 +618,4 @@ function dataUrlToFile(dataUrl: string, filename: string) {
   const bytes = Uint8Array.from(atob(content ?? ''), (character) => character.charCodeAt(0))
   return new File([bytes], filename, { type: mime })
 }
-
 

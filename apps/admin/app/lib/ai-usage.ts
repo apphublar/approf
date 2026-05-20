@@ -2,11 +2,17 @@ import { createSupabaseServiceClient } from './supabase-server'
 
 export type AiGenerationType =
   | 'development_report'
+  | 'classroom_journal'
   | 'class_diary'
+  | 'planning_weekly'
   | 'weekly_planning'
+  | 'planning_daily'
   | 'daily_lesson_plan'
+  | 'planning_project'
   | 'pedagogical_project'
+  | 'planning_meeting'
   | 'specialist_referral'
+  | 'parents_meeting'
   | 'parents_meeting_record'
   | 'portfolio_text'
   | 'portfolio_image'
@@ -98,6 +104,15 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     outputTokens: 2600,
     imageCount: 0,
   },
+  classroom_journal: {
+    provider: 'anthropic',
+    model: 'claude-text-2stage',
+    giztokens: toGizTokens(95),
+    estimatedCostCents: 95,
+    inputTokens: 6200,
+    outputTokens: 2600,
+    imageCount: 0,
+  },
   weekly_planning: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
@@ -105,6 +120,15 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     estimatedCostCents: 165,
     inputTokens: 11800,
     outputTokens: 7000,
+    imageCount: 0,
+  },
+  planning_weekly: {
+    provider: 'anthropic',
+    model: 'claude-text-2stage',
+    giztokens: toGizTokens(115),
+    estimatedCostCents: 115,
+    inputTokens: 8200,
+    outputTokens: 3800,
     imageCount: 0,
   },
   daily_lesson_plan: {
@@ -116,7 +140,25 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     outputTokens: 4200,
     imageCount: 0,
   },
+  planning_daily: {
+    provider: 'anthropic',
+    model: 'claude-text-2stage',
+    giztokens: toGizTokens(95),
+    estimatedCostCents: 95,
+    inputTokens: 6400,
+    outputTokens: 3000,
+    imageCount: 0,
+  },
   pedagogical_project: {
+    provider: 'anthropic',
+    model: 'claude-text-3stage',
+    giztokens: toGizTokens(190),
+    estimatedCostCents: 190,
+    inputTokens: 13200,
+    outputTokens: 7600,
+    imageCount: 0,
+  },
+  planning_project: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
     giztokens: toGizTokens(190),
@@ -141,6 +183,24 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     estimatedCostCents: 105,
     inputTokens: 7200,
     outputTokens: 3200,
+    imageCount: 0,
+  },
+  planning_meeting: {
+    provider: 'anthropic',
+    model: 'claude-text-2stage',
+    giztokens: toGizTokens(105),
+    estimatedCostCents: 105,
+    inputTokens: 7200,
+    outputTokens: 3200,
+    imageCount: 0,
+  },
+  parents_meeting: {
+    provider: 'anthropic',
+    model: 'claude-text-1stage',
+    giztokens: toGizTokens(75),
+    estimatedCostCents: 75,
+    inputTokens: 3600,
+    outputTokens: 1800,
     imageCount: 0,
   },
   general_report: {
@@ -210,6 +270,12 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
 
 /** Fallback quando o enum do banco ainda não tem o tipo novo (migration pendente). */
 const GENERATION_TYPE_RPC_FALLBACK: Partial<Record<AiGenerationType, AiGenerationType>> = {
+  classroom_journal: 'class_diary',
+  planning_daily: 'daily_lesson_plan',
+  planning_weekly: 'weekly_planning',
+  planning_project: 'pedagogical_project',
+  planning_meeting: 'parents_meeting_record',
+  parents_meeting: 'parents_meeting_record',
   class_diary: 'general_report',
   weekly_planning: 'planning',
   daily_lesson_plan: 'planning',

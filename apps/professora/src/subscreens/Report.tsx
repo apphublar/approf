@@ -103,13 +103,13 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   )
   const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
   const firstName = selectedStudent?.name.split(' ')[0] ?? 'A criança'
-  const isPortfolio = reportKind === 'Portfólio pedagógico'
-  const isPlanning = isPlanningKind(reportKind)
-  const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento'
-  const isClassDiary = reportKind === 'Diário de bordo'
-  const isParentsMeeting = reportKind === 'Registro de reunião de pais'
+  const isPortfolio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
+  const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
+  const isClassDiary = reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo'
+  const isParentsMeeting = reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais'
+  const isPlanning = isPlanningKind(reportKind) && !isParentsMeeting
   const isAnamnesis = reportKind === 'Ficha de anamnese'
-  const supportsLivingReport = isDevelopmentReport || isParentsMeeting
+  const supportsLivingReport = isDevelopmentReport
   const needsBnccFields = isPlanning || isDevelopmentReport
   const needsAgeGroup = isPlanning
   const needsObjective = isPlanning
@@ -118,6 +118,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const isSpecialistReferral = currentReportType === 'specialist_referral' || currentReportType === 'specialist_report'
   const hasContentBase = isClassDiary
     ? diaryRawText.trim().length >= 20
+    : isParentsMeeting
+      ? blankContext.trim().length >= 20 || extraContext.trim().length >= 20
     : mode === 'blank'
       ? blankContext.trim().length >= 20
       : selectedAnnotations.length > 0 || extraContext.trim().length >= 20
@@ -294,18 +296,23 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
   useEffect(() => {
     if (assistantMode !== 'parents-meeting') return
-    setMode('annotations')
+    setMode('blank')
+    setBlankContext((current) =>
+      current.trim()
+        ? current
+        : 'Planejar uma reunião de pais com abertura acolhedora, pauta principal, informações gerais da turma, combinados com as famílias, espaço para anotações e encerramento.',
+    )
     setExtraContext((current) =>
       current.trim()
         ? current
-        : 'Organizar a reunião em pauta, observações, combinados e encaminhamentos claros para família e escola.',
+        : 'Não citar nomes de crianças. Falar da turma como grupo e manter um tom acolhedor, objetivo e profissional.',
     )
   }, [assistantMode])
 
   const mockReport = createReportPreview({
     reportKind,
-    studentName: isClassDiary ? '-' : (selectedStudent?.name ?? '-'),
-    className: isClassDiary ? (selectedClass?.name ?? '-') : (selectedStudent?.className ?? '-'),
+    studentName: isClassDiary || isParentsMeeting ? '-' : (selectedStudent?.name ?? '-'),
+    className: isClassDiary || isParentsMeeting ? (selectedClass?.name ?? '-') : (selectedStudent?.className ?? '-'),
     firstName,
     mode,
     selectedAnnotations,
@@ -422,8 +429,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         portfolioImageFormat,
         historyScope,
         mode,
-        studentName: isClassDiary ? null : (selectedStudent?.name ?? null),
-        className: isClassDiary ? (selectedClass?.name ?? null) : (selectedStudent?.className ?? null),
+        studentName: isClassDiary || isParentsMeeting ? null : (selectedStudent?.name ?? null),
+        className: isClassDiary || isParentsMeeting ? (selectedClass?.name ?? null) : (selectedStudent?.className ?? null),
         ageGroup: ageGroup || null,
         bnccFields,
         objective: objective || null,
@@ -453,15 +460,15 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       const result = generationType === 'portfolio_image'
         ? await generateAiPortfolioImage({
             generationType,
-            classId: isClassDiary ? (selectedClass?.id ?? null) : (selectedStudent?.classId ?? null),
-            studentId: isClassDiary ? null : (selectedStudent?.id ?? null),
+            classId: isClassDiary || isParentsMeeting ? (selectedClass?.id ?? null) : (selectedStudent?.classId ?? null),
+            studentId: isClassDiary || isParentsMeeting ? null : (selectedStudent?.id ?? null),
             promptVersion: 'portfolio-image-v1',
             requestSummary,
           })
         : await generateAiTextDocument({
             generationType,
-            classId: isClassDiary ? (selectedClass?.id ?? null) : (selectedStudent?.classId ?? null),
-            studentId: isClassDiary ? null : (selectedStudent?.id ?? null),
+            classId: isClassDiary || isParentsMeeting ? (selectedClass?.id ?? null) : (selectedStudent?.classId ?? null),
+            studentId: isClassDiary || isParentsMeeting ? null : (selectedStudent?.id ?? null),
             promptVersion: 'professora-report-v1',
             requestSummary,
           })
@@ -582,12 +589,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                       ? 'Selecione a criança e crie a ficha base. Depois você pode editar os campos com calma.'
                       : isClassDiary
                       ? 'Preencha rapidamente os dados do dia da turma para gerar o diário.'
+                      : isParentsMeeting
+                      ? 'Selecione a turma e descreva a pauta para planejar a reunião.'
                       : 'Escolha a criança. Orientações extras e anexos são opcionais.'}
                   </p>
                 </div>
               </div>
 
-              {isClassDiary ? (
+              {isClassDiary || isParentsMeeting ? (
                 <>
                   <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
                     Turma
@@ -603,33 +612,37 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                       </option>
                     ))}
                   </select>
-                  <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
-                    Data
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
-                    value={diaryDate}
-                    onChange={(event) => setDiaryDate(event.target.value)}
-                  />
-                  <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
-                    Tema do dia (opcional)
-                  </label>
-                  <input
-                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
-                    placeholder="Ex: Coordenacao motora, musica, socializacao..."
-                    value={diaryTheme}
-                    onChange={(event) => setDiaryTheme(event.target.value)}
-                  />
-                  <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
-                    Relato da professora
-                  </label>
-                  <textarea
-                    className="w-full min-h-[150px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                    placeholder="Descreva como foi o dia da turma, as atividades realizadas, participacao das crianças e momentos importantes."
-                    value={diaryRawText}
-                    onChange={(event) => setDiaryRawText(event.target.value)}
-                  />
+                  {isClassDiary && (
+                    <>
+                      <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                        Data
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                        value={diaryDate}
+                        onChange={(event) => setDiaryDate(event.target.value)}
+                      />
+                      <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                        Tema do dia (opcional)
+                      </label>
+                      <input
+                        className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                        placeholder="Ex: coordenação motora, música, socialização, brincadeiras no parque..."
+                        value={diaryTheme}
+                        onChange={(event) => setDiaryTheme(event.target.value)}
+                      />
+                      <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                        Relato da professora
+                      </label>
+                      <textarea
+                        className="w-full min-h-[150px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
+                        placeholder="Conte como foi o dia da turma: quais atividades aconteceram, quem se destacou, que situações chamaram sua atenção e quais conquistas ou desafios apareceram."
+                        value={diaryRawText}
+                        onChange={(event) => setDiaryRawText(event.target.value)}
+                      />
+                    </>
+                  )}
                 </>
               ) : (
                 <>
@@ -848,7 +861,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isAnamnesis && (
+            {!isClassDiary && !isParentsMeeting && !isAnamnesis && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                 Histórico
@@ -956,11 +969,13 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             ) : (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                  Descrição completa para gerar do zero
+                  {isParentsMeeting ? 'Pauta principal' : 'Descrição completa para gerar do zero'}
                 </label>
                 <textarea
                   className="w-full min-h-[180px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                  placeholder="Descreva a rotina, evoluções, pontos de atenção, interações, autonomia, linguagem, família, encaminhamentos e o tom desejado para o documento..."
+                  placeholder={isParentsMeeting
+                    ? 'Ex: Apresentação do bimestre e trabalhos realizados, adaptação da turma, combinados sobre rotina e materiais, dúvidas e sugestões das famílias...'
+                    : 'Descreva a rotina, evoluções, pontos de atenção, interações, autonomia, linguagem, família, encaminhamentos e o tom desejado para o documento...'}
                   value={blankContext}
                   onChange={(event) => setBlankContext(event.target.value)}
                 />
@@ -1152,7 +1167,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               Arquivar
             </button>
 
-            {!isClassDiary && selectedStudent?.id && (
+            {!isClassDiary && !isParentsMeeting && selectedStudent?.id && (
               <button
                 onClick={() => openSubscreen('generated-documents', { studentId: selectedStudent.id })}
                 className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2"
@@ -1184,13 +1199,13 @@ function matchesStudent(annotation: Annotation, studentId: string, studentName?:
 }
 
 function getReportGenerationType(reportKind: string, portfolioOutput: PortfolioOutput): AiGenerationType {
-  if (reportKind === 'Relatório de desenvolvimento') return 'development_report'
-  if (reportKind === 'Diário de bordo') return 'class_diary'
+  if (reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento') return 'development_report'
+  if (reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo') return 'class_diary'
   if (reportKind === 'Planejamento semanal') return 'weekly_planning'
   if (reportKind === 'Plano de aula diário') return 'daily_lesson_plan'
-  if (reportKind === 'Projeto pedagógico específico') return 'pedagogical_project'
-  if (reportKind === 'Registro de reunião de pais') return 'parents_meeting_record'
-  if (reportKind === 'Portfólio pedagógico') {
+  if (reportKind === 'Projeto pedagógico específico' || reportKind === 'Projeto Pedagógico') return 'pedagogical_project'
+  if (reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais') return 'parents_meeting_record'
+  if (reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio') {
     return portfolioOutput === 'image' ? 'portfolio_image' : 'portfolio_text'
   }
   if (isSpecialistReport(reportKind) || reportKind === 'Rel. Atipico') return 'specialist_referral'
@@ -1264,33 +1279,36 @@ As informações devem apoiar o acolhimento, a segurança e o planejamento de ex
 Documento gerado a partir das informações autorizadas pela professora.`
   }
 
-  if (input.reportKind === 'Registro de reunião de pais') {
+  if (input.reportKind === 'Registro de reunião de pais' || input.reportKind === 'Planejamento de Reunião dos Pais') {
     return `${header}
 
-REGISTRO DE REUNIÃO DE PAIS
+PLANEJAMENTO DE REUNIÃO DE PAIS
+
+Abertura:
+Receber as famílias com acolhimento, apresentar o objetivo do encontro e combinar uma escuta respeitosa.
 
 Pauta:
-- acolhimento da família;
-- apresentação dos registros pedagógicos;
-- rotina, desenvolvimento, autonomia e interações;
-- combinados entre escola e família.
+- apresentação do período e trabalhos realizados;
+- adaptação, rotina, autonomia e convivência da turma;
+- combinados sobre materiais, comunicação e participação das famílias;
+- dúvidas e sugestões.
 
-Observações compartilhadas:
-Registrar com linguagem objetiva o que foi apresentado, preservando a privacidade da criança e mantendo foco em fatos observados na rotina escolar.
+Informações gerais da turma:
+Falar sempre da turma como grupo, sem citar nomes de crianças ou expor situações individuais.
 
-Combinados:
-- estratégias que serão mantidas pela escola;
-- possibilidades de continuidade em casa;
-- comunicações futuras;
-- responsabilidades e prazos, quando houver.
+Combinados gerais:
+Registrar orientações de rotina, parceria escola-família, próximos passos e formas de comunicação.
 
-Encaminhamentos:
-Formalizar próximos passos, necessidade de novo encontro ou acompanhamento da coordenação. O registro não deve expor outras crianças nem criar comparações.${formatAttachments(input.attachments)}
+Espaço para anotações:
+________________________________________
+
+Encerramento:
+Agradecer a presença das famílias e reforçar a parceria com a escola.${formatAttachments(input.attachments)}
 
 Documento gerado a partir das informações autorizadas pela professora.`
   }
 
-  if (input.reportKind === 'Diário de bordo') {
+  if (input.reportKind === 'Diário de bordo' || input.reportKind === 'Diário de Bordo') {
     return `${header}
 
 DIÁRIO DE BORDO PEDAGÓGICO
@@ -1310,7 +1328,7 @@ O registro indica continuidade positiva do percurso pedagógico da turma, com op
 Documento gerado a partir das informações autorizadas pela professora.`
   }
 
-  if (input.reportKind === 'Portfólio pedagógico') {
+  if (input.reportKind === 'Portfólio pedagógico' || input.reportKind === 'Portfólio') {
     if (input.portfolioOutput === 'image') {
       return `${header}
 
@@ -1558,7 +1576,7 @@ function formatPortfolioImageFormat(value: PortfolioImageFormat) {
 }
 
 function resolveDocumentLoadingVariant(reportKind: string) {
-  if (reportKind === 'Diário de bordo') return 'diary'
+  if (reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo') return 'diary'
   if (reportKind.toLowerCase().includes('planejamento') || reportKind.toLowerCase().includes('plano')) return 'planning'
   if (reportKind.toLowerCase().includes('interven')) return 'intervention'
   if (reportKind.toLowerCase().includes('relat')) return 'report'
@@ -1598,5 +1616,3 @@ function getGenerationRequirementHint(input: {
   if (!input.hasRequiredObjective) return 'Informe o objetivo pedagógico com um pouco mais de detalhe.'
   return ''
 }
-
-

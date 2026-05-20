@@ -105,7 +105,7 @@ function formatReportType(type: string) {
     daily_lesson_plan: 'Plano de aula diário',
     pedagogical_project: 'Projeto pedagógico específico',
     specialist_referral: 'Relatório para especialista',
-    parents_meeting_record: 'Registro de reunião de pais',
+    parents_meeting_record: 'Planejamento de reunião de pais',
     manual_anamnesis: 'Ficha de anamnese',
     planning: 'Planejamento',
     portfolio_text: 'Portfólio pedagógico',

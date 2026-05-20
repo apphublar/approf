@@ -25,15 +25,14 @@ const BNCC_FIELDS = [
   'Espacos, tempos, quantidades, relacoes e transformacoes',
 ]
 
-const AGE_GROUPS = ['0 a 1 ano', '1 a 2 anos', '2 a 3 anos', '3 a 4 anos', '4 a 5 anos']
-
 export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGeneratorProps) {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const { classes, userId } = useAppStore()
   const docKind = typeof data === 'object' && data && 'docKind' in data
     ? String((data as { docKind?: string }).docKind)
     : 'Documento pedagógico'
-  const isSpecificProject = docKind === 'Projeto pedagógico específico'
+  const normalizedDocKind = normalizeText(docKind)
+  const isSpecificProject = normalizedDocKind.includes('projeto pedagogico')
 
   const [ageGroup, setAgeGroup] = useState('4 a 5 anos')
   const [selectedClass, setSelectedClass] = useState(classes[0]?.name ?? '')
@@ -63,6 +62,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     objectiveLength: objective.trim().length,
   })
   const selectedClassData = classes.find((item) => item.name === selectedClass)
+  const resolvedAgeGroup = selectedClassData?.ageGroup || ageGroup
   const generationViewKey = generated ? 'result' : generating ? 'loading' : 'form'
 
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
         requestSummary: {
           docKind,
           className: selectedClassData?.name ?? selectedClass,
-          ageGroup: isSpecificProject ? undefined : ageGroup,
+          ageGroup: isSpecificProject ? undefined : resolvedAgeGroup,
           theme,
           objective,
           bnccFields,
@@ -225,7 +225,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
   const preview = createPreview({
     docKind,
-    ageGroup,
+    ageGroup: resolvedAgeGroup,
     selectedClass,
     theme,
     objective,
@@ -251,7 +251,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
         </button>
         <div className="flex-1">
           <span className="font-serif text-[18px] text-gd block">{docKind}</span>
-          <span className="text-[11px] text-muted">Geração visual para educação infantil de 0 a 5 anos.</span>
+          <span className="text-[11px] text-muted">Documento pedagógico para educação infantil de 0 a 5 anos.</span>
         </div>
       </div>
 
@@ -284,29 +284,16 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
               ))}
             </select>
 
-            {!isSpecificProject && (
-              <>
-            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Faixa etária</label>
-                <div className="flex gap-2 overflow-x-auto scrollbar-none mt-2 mb-4 pb-1">
-                  {AGE_GROUPS.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setAgeGroup(item)}
-                      className={`px-3 py-2 rounded-full text-xs font-bold border whitespace-nowrap ${
-                        ageGroup === item ? 'bg-gm border-gm text-white' : 'bg-white border-border text-muted'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </>
+            {!isSpecificProject && resolvedAgeGroup && (
+              <p className="mb-4 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[12px] leading-[1.5] text-gd">
+                Faixa etária da turma: {resolvedAgeGroup}
+              </p>
             )}
 
             <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Tema</label>
             <input
               className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
-              placeholder="Ex: animais do jardim, cores, acolhimento, movimento..."
+              placeholder="Ex: Animais da fazenda, Horta escolar, Cores e misturas, Minha família..."
               value={theme}
               onChange={(event) => setTheme(event.target.value)}
             />
@@ -314,7 +301,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
             <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Objetivo pedagógico</label>
             <textarea
               className="w-full min-h-[104px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none leading-[1.6]"
-              placeholder="Ex.: estimular linguagem oral, exploração sensorial, autonomia e socialização..."
+              placeholder="Ex: Desenvolver a consciência corporal por meio de brincadeiras de movimento, exploração de materiais e rodas de conversa..."
               value={objective}
               onChange={(event) => setObjective(event.target.value)}
             />
@@ -369,7 +356,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
               </label>
               <textarea
                 className="w-full min-h-[104px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                placeholder="Ex.: usar materiais simples, incluir brincadeira de roda e adaptar para turma agitada..."
+                placeholder="Descreva alguma orientação específica para a IA: materiais que prefere usar, cuidados com a turma, estilo do texto ou pontos que não podem faltar..."
                 value={extraContext}
                 onChange={(event) => setExtraContext(event.target.value)}
               />
@@ -515,7 +502,8 @@ function createPreview(input: {
   useAnnotations: boolean
   attachments: Attachment[]
 }) {
-  const ageLine = input.docKind === 'Projeto pedagógico específico'
+  const normalizedDocKind = normalizeText(input.docKind)
+  const ageLine = normalizedDocKind.includes('projeto pedagogico')
     ? ''
     : `Faixa etária: ${input.ageGroup}\n`
   const base = `DOCUMENTO GERADO
@@ -618,7 +606,7 @@ Acompanhamento:
 Observar participacao, interacoes, linguagem, autonomia, movimento e bem-estar da turma.${formatAttachments(input.attachments)}`
   }
 
-  if (input.docKind === 'Planejamento semanal') {
+  if (normalizedDocKind.includes('semanal')) {
     return `${base}
 
 SEMANARIO PEDAGOGICO
@@ -655,7 +643,7 @@ OBSERVACAO
 As propostas devem respeitar o tempo da criança pequena, sem comparacoes e sem exigencia de desempenho escolar formal.${formatAttachments(input.attachments)}`
   }
 
-  if (input.docKind === 'Plano de aula diário') {
+  if (normalizedDocKind.includes('diario') || normalizedDocKind.includes('plano de aula')) {
     return `${base}
 
 PLANO DE AULA DIÁRIO
@@ -688,7 +676,7 @@ Avaliação:
 Registro descritivo do envolvimento, das descobertas e das interacoes, sem nota, classificacao ou comparacao.${formatAttachments(input.attachments)}`
   }
 
-  if (input.docKind === 'Projeto pedagógico específico') {
+  if (normalizedDocKind.includes('projeto pedagogico')) {
     return `${base}
 
 PROJETO PEDAGOGICO ESPECIFICO
@@ -776,9 +764,10 @@ function formatAttachments(attachments: Attachment[]) {
 }
 
 function resolvePlanningGenerationType(docKind: string) {
-  if (docKind === 'Planejamento semanal') return 'weekly_planning' as const
-  if (docKind === 'Plano de aula diário') return 'daily_lesson_plan' as const
-  if (docKind === 'Projeto pedagógico específico') return 'pedagogical_project' as const
+  const normalized = normalizeText(docKind)
+  if (normalized.includes('semanal')) return 'weekly_planning' as const
+  if (normalized.includes('diario') || normalized.includes('plano de aula')) return 'daily_lesson_plan' as const
+  if (normalized.includes('projeto pedagogico')) return 'pedagogical_project' as const
   return 'weekly_planning' as const
 }
 
@@ -804,4 +793,10 @@ function getPlanningRequirementHint(input: {
   return ''
 }
 
-
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
