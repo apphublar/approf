@@ -3,7 +3,6 @@ import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
 import { listReports, updateReport } from '@/services/reports'
-import { createManualReport } from '@/services/reports-create'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
@@ -126,7 +125,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const isClassDiary = reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo'
   const isParentsMeeting = reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais'
   const isPlanning = isPlanningKind(reportKind) && !isParentsMeeting
-  const isAnamnesis = reportKind === 'Ficha de anamnese'
   const supportsLivingReport = isDevelopmentReport
   const needsBnccFields = isPlanning
   const needsAgeGroup = isPlanning
@@ -149,11 +147,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const hasRequiredDevelopmentFields = !isDevelopmentReport || finalConsiderations.trim().length >= 10
   const hasRequiredMeetingFields = !isParentsMeeting
     || Boolean(meetingDate && meetingDuration && meetingOpening.trim().length >= 10 && meetingAgenda.trim().length >= 10 && meetingGeneralInfo.trim().length >= 10 && meetingAgreements.trim().length >= 10 && meetingClosing.trim().length >= 10)
-  const canGenerate = isAnamnesis
-    ? true
-    : hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod && hasRequiredDevelopmentFields && hasRequiredMeetingFields
+  const canGenerate = hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod && hasRequiredDevelopmentFields && hasRequiredMeetingFields
   const generationRequirementHint = getGenerationRequirementHint({
-    isAnamnesis,
     isClassDiary,
     isSpecialistReferral,
     isParentsMeeting,
@@ -268,6 +263,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
   useEffect(() => {
     if (!loadedDraftRef.current || !draftKeyRef.current) return
+    if (generated || generating) return
     const timeout = window.setTimeout(() => {
       saveDraft(draftKeyRef.current, {
         selectedStudentId,
@@ -311,6 +307,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     evaluationPeriod,
     extraContext,
     finalConsiderations,
+    generated,
+    generating,
     historyScope,
     includeDayAnnotations,
     ignoredNotes,
@@ -339,11 +337,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   }, [draftMessage])
 
   useEffect(() => {
-    if (!isPortfolio || selectedMilestoneIds.length > 0) return
-    setSelectedMilestoneIds(milestoneAnnotations.slice(0, 5).map((annotation) => annotation.id))
-  }, [isPortfolio, milestoneAnnotations, selectedMilestoneIds.length])
-
-  useEffect(() => {
     if (!supportsLivingReport || !selectedStudent?.id) return
     let active = true
     setLoadingLatest(true)
@@ -370,8 +363,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   useEffect(() => {
     if (assistantMode !== 'parents-meeting') return
     setMode('blank')
-    setMeetingOpening((current) => current || 'Receber os pais, apresentar o objetivo do encontro e criar um ambiente acolhedor.')
-    setMeetingClosing((current) => current || 'Agradecer a presença das famílias e reforçar a parceria com a escola.')
   }, [assistantMode])
 
   const mockReport = createReportPreview({
@@ -445,6 +436,30 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setAttachments((current) => current.filter((item) => item.id !== id))
   }
 
+  function resetReportFormAfterGeneration() {
+    setSelectedAnnotationIds([])
+    setIgnoredNotes('')
+    setBlankContext('')
+    setExtraContext('')
+    setAttachments([])
+    setDiaryTheme('')
+    setDiaryRawText('')
+    setAgeGroup('')
+    setBnccFields([])
+    setObjective('')
+    setEvaluationPeriod('')
+    setFinalConsiderations('')
+    setSelectedMilestoneIds([])
+    setIncludeDayAnnotations(true)
+    setMeetingOpening('')
+    setMeetingAgenda('')
+    setMeetingGeneralInfo('')
+    setMeetingAgreements('')
+    setMeetingClosing('')
+    setLivingReport(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   async function generate() {
     if (!canGenerate) return
     setUsageError('')
@@ -457,57 +472,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setEditingDocument(false)
 
     try {
-      if (isAnamnesis) {
-        const manualBody = createReportPreview({
-          reportKind,
-          studentName: selectedStudent?.name ?? '-',
-          className: selectedStudent?.className ?? selectedClass?.name ?? '-',
-          firstName,
-          mode,
-          selectedAnnotations,
-          ignoredNotes,
-          blankContext,
-          extraContext,
-          attachments,
-          portfolioOutput,
-          portfolioImageFormat,
-          diaryDate,
-          diaryTheme,
-          diaryRawText,
-          finalConsiderations,
-          selectedMilestones,
-          includeDayAnnotations,
-          meetingDate,
-          meetingDuration,
-          meetingOpening,
-          meetingAgenda,
-          meetingGeneralInfo,
-          meetingAgreements,
-          meetingClosing,
-        })
-        const manualReport = await createManualReport({
-          reportType: 'manual_anamnesis',
-          studentId: selectedStudent?.id ?? null,
-          classId: selectedStudent?.classId ?? null,
-          promptVersion: 'manual-anamnesis-v1',
-          body: manualBody,
-        })
-        setUsageMessage('Ficha criada sem consumo de GizTokens.')
-        setSavedContent(manualReport.body ?? manualBody)
-        setEditableContent(manualReport.body ?? manualBody)
-        setReportId(manualReport.id)
-        setGeneratedImageUrl('')
-        window.setTimeout(() => {
-          celebrateAiGeneration()
-          setGenerating(false)
-          setGenerated(true)
-        }, 450)
-        if (draftKeyRef.current) {
-          clearDraft(draftKeyRef.current)
-        }
-        return
-      }
-
       const requestSummary = {
         reportKind,
         portfolioOutput,
@@ -615,6 +579,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       if (draftKeyRef.current) {
         clearDraft(draftKeyRef.current)
       }
+      resetReportFormAfterGeneration()
     } catch (error) {
       setGenerating(false)
       setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar agora.')
@@ -682,11 +647,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   <Sparkles size={22} color="#4F8341" strokeWidth={1.7} />
                 </div>
                 <div className="flex-1">
-                  <h2 className="font-serif text-[20px] text-gd">{isAnamnesis ? 'Antes de criar' : 'Antes de gerar'}</h2>
+                  <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
                   <p className="text-[12px] text-muted leading-snug">
-                    {isAnamnesis
-                      ? 'Selecione a criança e crie a ficha base. Depois você pode editar os campos com calma.'
-                      : isClassDiary
+                    {isClassDiary
                       ? 'Preencha rapidamente os dados do dia da turma para gerar o diário.'
                       : isParentsMeeting
                       ? 'Selecione a turma e descreva a pauta para planejar a reunião.'
@@ -777,7 +740,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               )}
             </div>
 
-            {isDevelopmentReport && !isAnamnesis && (
+            {isDevelopmentReport && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Informações da criança e professora
@@ -853,7 +816,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isAnamnesis && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
+            {!isClassDiary && !isParentsMeeting && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   {isDevelopmentReport ? 'Período avaliado' : 'Dados BNCC obrigatorios'}
@@ -936,7 +899,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {isDevelopmentReport && !isAnamnesis && (
+            {isDevelopmentReport && (
               <>
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
@@ -970,7 +933,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </>
             )}
 
-            {supportsLivingReport && !isAnamnesis && (
+            {supportsLivingReport && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
                   Relatório vivo
@@ -1001,7 +964,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfolio && !isAnamnesis && (
+            {!isClassDiary && !isParentsMeeting && !isPortfolio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Base do documento
@@ -1056,7 +1019,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {isPortfolio && !isAnamnesis && (
+            {isPortfolio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Tipo de portfólio
@@ -1084,7 +1047,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfolio && !isAnamnesis && (
+            {!isClassDiary && !isParentsMeeting && !isPortfolio && !isDevelopmentReport && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                 Histórico
@@ -1117,7 +1080,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
-            {isPortfolio && !isAnamnesis && (
+            {isPortfolio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
@@ -1158,7 +1121,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfolio && !isAnamnesis && (mode === 'annotations' ? (
+            {!isClassDiary && !isParentsMeeting && !isPortfolio && (mode === 'annotations' ? (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
@@ -1264,18 +1227,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {isAnamnesis ? (
-              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
-                  Ficha manual
-                </p>
-                <p className="text-[12px] text-muted leading-[1.6]">
-                  Esta ficha é criada em formato manual e editável, sem uso de IA e sem consumo de GizTokens.
-                </p>
-              </div>
-            ) : null}
-
-            {!isParentsMeeting && !isAnamnesis && (
+            {!isParentsMeeting && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
                 {isPortfolio ? 'Campo de observação' : 'Orientação adicional'}
@@ -1291,7 +1243,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
-            {isPortfolio && !isAnamnesis && (
+            {isPortfolio && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-[12px] bg-gbg flex items-center justify-center text-gm flex-shrink-0">
@@ -1347,7 +1299,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               disabled={!canGenerate || generating}
               className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <><Sparkles size={18} /> {isAnamnesis ? 'Criar ficha' : isClassDiary ? 'Gerar diário' : 'Gerar documento'}</>
+              <><Sparkles size={18} /> {isClassDiary ? 'Gerar diário' : 'Gerar documento'}</>
             </button>
             {!canGenerate && generationRequirementHint && (
               <p className="mt-3 rounded-app-sm border border-[#F1D58B] bg-[#FFF8DC] px-3 py-2 text-[12px] leading-[1.5] text-[#6B5300]">
@@ -1395,7 +1347,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 </div>
               ) : editingDocument ? (
                 <textarea
-                  className="w-full min-h-[320px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 text-[13px] text-ink outline-none leading-[1.65]"
+                  className="w-full min-h-[520px] resize-y bg-white rounded-app-sm border border-border px-5 py-5 text-[14px] text-ink outline-none leading-[1.8] font-serif shadow-inner"
                   value={editableContent}
                   onChange={(event) => setEditableContent(event.target.value)}
                 />
@@ -1432,6 +1384,13 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 Editar
               </button>
             )}
+
+            <button
+              onClick={() => exportAbntDocument(editableContent || savedContent || mockReport, reportKind)}
+              className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2"
+            >
+              Exportar documento ABNT
+            </button>
 
             <button onClick={archiveDocument} className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2">
               Arquivar
@@ -1550,35 +1509,6 @@ ${sourceBlock}
 ORIENTAÇÃO ADICIONAL DA PROFESSORA
 
 ${input.extraContext.trim() || 'Nenhuma orientação adicional foi incluída antes da geração.'}`
-
-  if (input.reportKind === 'Ficha de anamnese') {
-    return `${header}
-
-FICHA DE ANAMNESE
-
-Identificacao e contexto familiar:
-- dados da criança, responsáveis e contatos;
-- composição familiar e rotina em casa;
-- pessoas de referência e vínculos importantes;
-- entrada na escola e histórico de adaptação.
-
-Histórico de saúde e desenvolvimento:
-- gestação, nascimento e marcos do desenvolvimento informados pela família;
-- acompanhamentos médicos ou terapêuticos, quando houver;
-- alergias, medicações, restrições e cuidados específicos;
-- sono, alimentacao, higiene e autonomia.
-
-Hábitos e rotina:
-- horários, preferências, medos, interesses e objetos de apego;
-- formas de comunicação usadas pela criança;
-- brincadeiras preferidas;
-- situações que acalmam ou desorganizam.
-
-Observações pedagógicas:
-As informações devem apoiar o acolhimento, a segurança e o planejamento de experiências respeitosas para ${input.firstName}, sempre com acesso restrito e uso pedagógico autorizado.${formatAttachments(input.attachments)}
-
-Documento gerado a partir das informações autorizadas pela professora.`
-  }
 
   if (input.reportKind === 'Registro de reunião de pais' || input.reportKind === 'Planejamento de Reunião dos Pais') {
     return `PLANEJAMENTO DE REUNIÃO — ${input.className}
@@ -1885,6 +1815,54 @@ function normalize(value: string) {
     .trim()
 }
 
+function exportAbntDocument(content: string, title: string) {
+  const filename = normalize(title)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'documento'
+  const paragraphs = content
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+    .join('')
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4; margin: 3cm 2cm 2cm 3cm; }
+    body { color: #000; font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.5; text-align: justify; }
+    h1 { font-size: 14pt; text-align: center; text-transform: uppercase; margin: 0 0 24pt; }
+    p { margin: 0 0 12pt; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  ${paragraphs}
+</body>
+</html>`
+  const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${filename}.doc`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[char] ?? char
+  })
+}
+
 function formatPortfolioImageFormat(value: PortfolioImageFormat) {
   if (value === 'landscape') return 'paisagem'
   if (value === 'square') return 'quadrado'
@@ -1900,7 +1878,6 @@ function resolveDocumentLoadingVariant(reportKind: string) {
 }
 
 function getGenerationRequirementHint(input: {
-  isAnamnesis: boolean
   isClassDiary: boolean
   isSpecialistReferral: boolean
   isParentsMeeting: boolean
@@ -1915,7 +1892,6 @@ function getGenerationRequirementHint(input: {
   hasRequiredDevelopmentFields: boolean
   hasRequiredMeetingFields: boolean
 }) {
-  if (input.isAnamnesis) return ''
   if (input.isClassDiary && input.diaryRawLength < 20) {
     return 'Escreva um relato breve do dia da turma para criar um diário mais fiel.'
   }

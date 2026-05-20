@@ -39,7 +39,6 @@ const REPORT_MODELS: ModelOption[] = [
   { id: 'portfolio', label: 'Portfólio pedagógico', desc: 'Evidências, produções, fotos e jornada individual.', scope: 'child' },
   { id: 'especialista', label: 'Relatório para especialista', desc: 'Neuropediatra, fono, TO, psicólogo ou psicopedagogo.', scope: 'child' },
   { id: 'encaminhamento', label: 'Encaminhamento pedagógico', desc: 'Registro para orientar família ou especialista.', scope: 'child' },
-  { id: 'anamnese', label: 'Ficha de anamnese', desc: 'Informações iniciais e contexto da criança.', scope: 'child' },
   { id: 'reuniao-pais', label: 'Registro de reunião de pais', desc: 'Pontos tratados com a família.', scope: 'child' },
 ]
 
@@ -1110,6 +1109,5 @@ function normalizeText(value: string) {
     .toLowerCase()
     .trim()
 }
-
 
 

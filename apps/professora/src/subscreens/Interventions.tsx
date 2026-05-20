@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
-import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
+import { generateAiTextDocument } from '@/services/ai-usage'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 import type {
@@ -23,11 +23,11 @@ export default function InterventionsSubscreen() {
   const [selectedStudentId, setSelectedStudentId] = useState(activeStudentId ?? allStudents[0]?.id ?? '')
   const selectedStudent = allStudents.find((student) => student.id === selectedStudentId) ?? allStudents[0]
   const [observation, setObservation] = useState('')
+  const [generatedObservation, setGeneratedObservation] = useState('')
   const [step, setStep] = useState<Step>('form')
   const [generating, setGenerating] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState('')
-  const [usageMessage, setUsageMessage] = useState('')
   const [suggestions, setSuggestions] = useState<InterventionSuggestion[]>([])
   const [chosenSuggestion, setChosenSuggestion] = useState<InterventionSuggestion | null>(null)
   const [teacherReturn, setTeacherReturn] = useState('')
@@ -47,8 +47,8 @@ export default function InterventionsSubscreen() {
   useEffect(() => {
     setStep('form')
     setObservation('')
+    setGeneratedObservation('')
     setError('')
-    setUsageMessage('')
     setSuggestions([])
     setChosenSuggestion(null)
     setTeacherReturn('')
@@ -76,6 +76,7 @@ export default function InterventionsSubscreen() {
   }, [draftKey])
 
   useEffect(() => {
+    if (step !== 'form' && step !== 'feedback') return
     const timeout = window.setTimeout(() => {
       saveDraft(draftKey, {
         selectedStudentId,
@@ -99,7 +100,6 @@ export default function InterventionsSubscreen() {
 
     setGenerating(true)
     setError('')
-    setUsageMessage('')
     setSuggestions([])
     setChosenSuggestion(null)
     setFollowupSuggestions([])
@@ -131,8 +131,10 @@ export default function InterventionsSubscreen() {
         return
       }
       setSuggestions(parsedSuggestions)
-      setUsageMessage(formatAiUsageMessage(result))
+      setGeneratedObservation(observation.trim())
       setStep('suggestions')
+      setObservation('')
+      clearDraft(draftKey)
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : 'Não foi possível gerar sugestões agora.')
     } finally {
@@ -159,7 +161,7 @@ export default function InterventionsSubscreen() {
       classId: selectedStudent.classId,
       className: selectedStudent.className,
       createdAt: new Date().toISOString(),
-      observationInitial: observation.trim(),
+      observationInitial: generatedObservation || observation.trim(),
       suggestions,
       chosenIntervention: chosenSuggestion,
       status: 'pendente',
@@ -173,7 +175,6 @@ export default function InterventionsSubscreen() {
 
     setAnalyzing(true)
     setError('')
-    setUsageMessage('')
 
     try {
       const result = await generateAiTextDocument({
@@ -184,7 +185,7 @@ export default function InterventionsSubscreen() {
         requestSummary: {
           interventionMode: 'feedback_analysis',
           studentName: selectedStudent.name,
-          observationInitial: observation,
+          observationInitial: generatedObservation || observation,
           interventionChosen: chosenSuggestion,
           teacherReturn,
           returnChoice,
@@ -206,7 +207,7 @@ export default function InterventionsSubscreen() {
         classId: selectedStudent.classId,
         className: selectedStudent.className,
         createdAt: new Date().toISOString(),
-        observationInitial: observation.trim(),
+        observationInitial: generatedObservation || observation.trim(),
         suggestions,
         chosenIntervention: chosenSuggestion,
         teacherReturn: teacherReturn.trim(),
@@ -236,8 +237,11 @@ export default function InterventionsSubscreen() {
 
       setAnalysisText(parsed.analysisText)
       setFollowupSuggestions(returnChoice === 'houve_avanco' ? [] : parsed.recommendedSuggestions)
-      setUsageMessage(formatAiUsageMessage(result))
       setStep('analysis')
+      setObservation('')
+      setGeneratedObservation('')
+      setTeacherReturn('')
+      setReturnChoice('houve_avanco')
       clearDraft(draftKey)
     } catch (analysisError) {
       setError(analysisError instanceof Error ? analysisError.message : 'Não foi possível analisar o retorno agora.')
@@ -340,7 +344,7 @@ export default function InterventionsSubscreen() {
           <div className="bg-white rounded-app border border-border shadow-card p-4">
             <p className="text-[12px] text-muted mb-2">{selectedStudent?.name}</p>
             <h3 className="text-[16px] font-bold text-gd">{chosenSuggestion.title}</h3>
-            <p className="text-[12px] text-ink mt-3"><strong>Observação inicial:</strong> {observation}</p>
+            <p className="text-[12px] text-ink mt-3"><strong>Observação inicial:</strong> {generatedObservation || observation}</p>
             <p className="text-[12px] text-ink mt-3"><strong>Objetivo pedagógico:</strong> {chosenSuggestion.objective}</p>
             <p className="text-[12px] text-ink mt-3"><strong>Como aplicar:</strong> {chosenSuggestion.howToApply}</p>
             <p className="text-[12px] text-ink mt-3"><strong>O que observar:</strong> {chosenSuggestion.whatToObserve}</p>
@@ -435,11 +439,9 @@ export default function InterventionsSubscreen() {
           </div>
         )}
 
-        {(error || usageMessage) && (
-          <p className={`mt-3 rounded-app-sm border px-3 py-2 text-[12px] leading-[1.5] ${
-            error ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'
-          }`}>
-            {error || usageMessage}
+        {error && (
+          <p className="mt-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] leading-[1.5] text-red-700">
+            {error}
           </p>
         )}
         {error && (step === 'form' || step === 'feedback') && (
@@ -560,4 +562,3 @@ function formatStatus(status: InterventionHistoryItem['status']) {
   if (status === 'em_acompanhamento') return 'Em acompanhamento'
   return 'Concluída'
 }
-

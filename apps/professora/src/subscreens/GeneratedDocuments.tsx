@@ -44,7 +44,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
         classId: filters.classId,
         compact: true,
       })
-      setDocuments(sortFocusedFirst(items, filters.focusReportId))
+      setDocuments(sortFocusedFirst(items.filter((item) => item.report_type !== 'manual_anamnesis'), filters.focusReportId))
       setImageDetailsById({})
       setError('')
     } catch (err) {
@@ -469,7 +469,6 @@ function formatReportType(type: string) {
     specialist_referral: 'Encaminhamento para especialista',
     specialist_report: 'Encaminhamento para especialista',
     parents_meeting_record: 'Planejamento de reunião de pais',
-    manual_anamnesis: 'Ficha de anamnese',
     planning: 'Planejamento',
     general_report: 'Relatório pedagógico',
   }
@@ -618,4 +617,3 @@ function dataUrlToFile(dataUrl: string, filename: string) {
   const bytes = Uint8Array.from(atob(content ?? ''), (character) => character.charCodeAt(0))
   return new File([bytes], filename, { type: mime })
 }
-

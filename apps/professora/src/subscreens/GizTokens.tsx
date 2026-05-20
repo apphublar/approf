@@ -193,7 +193,6 @@ function formatGenerationType(value: string) {
     pedagogical_project: 'Projeto pedagógico específico',
     specialist_referral: 'Encaminhamento para especialista',
     parents_meeting_record: 'Planejamento de reunião de pais',
-    manual_anamnesis: 'Ficha de anamnese (manual)',
     general_report: 'Relatório geral',
     planning: 'Planejamento',
     portfolio_text: 'Portfólio em texto',

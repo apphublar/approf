@@ -457,7 +457,6 @@ function formatReportType(type: string) {
     case 'specialist_referral': return 'Relatório para especialista'
     case 'specialist_report': return 'Relatório para especialista'
     case 'parents_meeting_record': return 'Planejamento de reunião de pais'
-    case 'manual_anamnesis': return 'Ficha de anamnese'
     case 'general_report': return 'Relatório pedagógico'
     default: return type
   }

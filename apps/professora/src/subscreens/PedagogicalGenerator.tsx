@@ -46,14 +46,14 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id ?? '')
   const [planningPeriod, setPlanningPeriod] = useState<PlanningPeriod>('semanal')
   const [theme, setTheme] = useState('')
-  const [rights, setRights] = useState<string[]>(RIGHTS)
+  const [rights, setRights] = useState<string[]>([])
   const [objective, setObjective] = useState('')
   const [resources, setResources] = useState('')
-  const [duration, setDuration] = useState(DURATIONS[1])
+  const [duration, setDuration] = useState('')
   const [justification, setJustification] = useState('')
-  const [bnccFields, setBnccFields] = useState<string[]>([BNCC_FIELDS[0]])
+  const [bnccFields, setBnccFields] = useState<string[]>([])
   const [methodology, setMethodology] = useState('')
-  const [assessment, setAssessment] = useState<string[]>(['Observacao'])
+  const [assessment, setAssessment] = useState<string[]>([])
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
   const [savedContent, setSavedContent] = useState('')
@@ -96,6 +96,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     theme,
     objective,
     resources,
+    duration,
     justification,
     methodology,
     rightsCount: rights.length,
@@ -123,14 +124,14 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
       setSelectedClassId(draft.selectedClassId || classes[0]?.id || '')
       setPlanningPeriod(draft.planningPeriod || 'semanal')
       setTheme(draft.theme || '')
-      setRights(draft.rights?.length ? draft.rights : RIGHTS)
+      setRights(draft.rights ?? [])
       setObjective(draft.objective || '')
       setResources(draft.resources || '')
-      setDuration(draft.duration || DURATIONS[1])
+      setDuration(draft.duration || '')
       setJustification(draft.justification || '')
-      setBnccFields(draft.bnccFields?.length ? draft.bnccFields : [BNCC_FIELDS[0]])
+      setBnccFields(draft.bnccFields ?? [])
       setMethodology(draft.methodology || '')
-      setAssessment(draft.assessment?.length ? draft.assessment : ['Observacao'])
+      setAssessment(draft.assessment ?? [])
       setDraftMessage('Rascunho recuperado')
     }
     loadedDraftRef.current = true
@@ -138,6 +139,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
   useEffect(() => {
     if (!loadedDraftRef.current) return
+    if (generated || generating) return
     const timeout = window.setTimeout(() => {
       saveDraft(draftKey, {
         selectedClassId,
@@ -159,6 +161,8 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     bnccFields,
     draftKey,
     duration,
+    generated,
+    generating,
     justification,
     methodology,
     objective,
@@ -239,10 +243,24 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
         setGenerated(true)
       }, 800)
       clearDraft(draftKey)
+      resetPlanningFormAfterGeneration()
     } catch (error) {
       setGenerating(false)
       setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar agora.')
     }
+  }
+
+  function resetPlanningFormAfterGeneration() {
+    setPlanningPeriod('semanal')
+    setTheme('')
+    setRights([])
+    setObjective('')
+    setResources('')
+    setDuration('')
+    setJustification('')
+    setBnccFields([])
+    setMethodology('')
+    setAssessment([])
   }
 
   async function saveDocument() {
@@ -404,6 +422,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                     value={duration}
                     onChange={(event) => setDuration(event.target.value)}
                   >
+                    <option value="">Selecione a duração</option>
                     {DURATIONS.map((item) => <option key={item} value={item}>{item}</option>)}
                   </select>
 
@@ -497,7 +516,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
             <div className="bg-white rounded-app p-5 border border-border shadow-card mb-4">
               {editingDocument ? (
                 <textarea
-                  className="w-full min-h-[320px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 text-[13px] text-ink outline-none leading-[1.65]"
+                  className="w-full min-h-[520px] resize-y bg-white rounded-app-sm border border-border px-5 py-5 text-[14px] text-ink outline-none leading-[1.8] font-serif shadow-inner"
                   value={editableContent}
                   onChange={(event) => setEditableContent(event.target.value)}
                 />
@@ -529,6 +548,13 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                 Editar
               </button>
             )}
+
+            <button
+              onClick={() => exportAbntDocument(editableContent || savedContent || preview, title)}
+              className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2"
+            >
+              Exportar documento ABNT
+            </button>
 
             <button onClick={archiveDocument} className="w-full py-[11px] rounded-app-sm border border-border bg-white text-muted text-sm font-bold mb-2">
               Arquivar
@@ -711,6 +737,7 @@ function getRequirementHint(input: {
   theme: string
   objective: string
   resources: string
+  duration: string
   justification: string
   methodology: string
   rightsCount: number
@@ -722,6 +749,7 @@ function getRequirementHint(input: {
   if (input.objective.trim().length < 4) return 'Informe os objetivos ou códigos BNCC.'
   if (input.resources.trim().length < 3) return 'Informe os recursos necessários.'
   if (!input.isProject) return ''
+  if (!input.duration.trim()) return 'Selecione a duração do projeto.'
   if (input.justification.trim().length < 20) return 'Escreva a justificativa do projeto com mais detalhes.'
   if (!input.bnccCount) return 'Selecione ao menos um campo da BNCC.'
   if (input.methodology.trim().length < 20) return 'Descreva a metodologia com o passo a passo.'
@@ -735,4 +763,52 @@ function normalizeText(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
+}
+
+function exportAbntDocument(content: string, title: string) {
+  const filename = normalizeText(title)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'documento'
+  const paragraphs = content
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+    .join('')
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4; margin: 3cm 2cm 2cm 3cm; }
+    body { color: #000; font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.5; text-align: justify; }
+    h1 { font-size: 14pt; text-align: center; text-transform: uppercase; margin: 0 0 24pt; }
+    p { margin: 0 0 12pt; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  ${paragraphs}
+</body>
+</html>`
+  const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${filename}.doc`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[char] ?? char
+  })
 }

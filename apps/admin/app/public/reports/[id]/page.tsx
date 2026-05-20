@@ -106,7 +106,6 @@ function formatReportType(type: string) {
     pedagogical_project: 'Projeto pedagógico específico',
     specialist_referral: 'Relatório para especialista',
     parents_meeting_record: 'Planejamento de reunião de pais',
-    manual_anamnesis: 'Ficha de anamnese',
     planning: 'Planejamento',
     portfolio_text: 'Portfólio pedagógico',
     portfolio_image: 'Portfólio pedagógico',
