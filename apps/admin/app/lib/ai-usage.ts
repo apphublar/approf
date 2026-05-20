@@ -556,6 +556,21 @@ function resolvePortfolioImageEstimateModel() {
   return process.env.OPENAI_IMAGE_MODEL?.trim() || 'gpt-image-1'
 }
 
+/** Politica mensal unica (reserva, finalizacao e tela de saldo). */
+export function getMonthlyWalletPolicy() {
+  const includedCostCents = resolveMonthlyIncludedCostCents()
+  const costLimitCents = resolveMonthlyCostLimitCents(includedCostCents)
+  const giztokensIncluded = toGizTokens(includedCostCents)
+  return {
+    giztokensPerCostCent: GIZTOKENS_PER_COST_CENT,
+    includedCostCents,
+    costLimitCents,
+    giztokensIncluded,
+    giztokensOverageLimit: toGizTokens(Math.max(0, costLimitCents - includedCostCents)),
+    includedCostAlertCents: includedCostCents,
+  }
+}
+
 async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, monthEnd: string) {
   const supabase = createSupabaseServiceClient()
   const { data: currentWallet, error: currentWalletError } = await supabase

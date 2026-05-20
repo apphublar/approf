@@ -48,7 +48,7 @@ export default function HomeScreen() {
     () => buildStudentsWithoutRecentNotes(annotations, classes).slice(0, 3),
     [annotations, classes],
   )
-  const giztokensRemaining = aiUsage?.wallet.giztokensRemaining ?? 6000
+  const giztokensRemaining = aiUsage?.wallet.giztokensRemaining ?? 8000
   const docsGenerated = aiUsage?.generatedDocumentsThisMonth ?? aiUsage?.generatedThisMonth ?? 0
   const imagesGenerated = aiUsage?.generatedImagesThisMonth ?? 0
 

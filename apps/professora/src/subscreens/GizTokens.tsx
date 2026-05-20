@@ -28,8 +28,8 @@ export default function GizTokensSubscreen() {
   }, [])
 
   const wallet = summary?.wallet
-  const remaining = wallet?.giztokensRemaining ?? 6000
-  const included = wallet?.giztokensIncluded ?? 6000
+  const remaining = wallet?.giztokensRemaining ?? 8000
+  const included = wallet?.giztokensIncluded ?? 8000
   const overageLimit = wallet?.giztokensOverageLimit ?? 2000
   const used = wallet?.giztokensUsed ?? 0
   const hardLimit = included + overageLimit
