@@ -107,6 +107,17 @@ Estado atual:
 4. Testar geracao ponta a ponta com professora autenticada.
 5. Validar se o provider/model retornado esta coerente com a cobranca estimada.
 
+### Regras De Custo E GizTokens (Transparencia)
+
+1. Reserva inicial usa custo estimado para garantir limite e evitar corrida.
+2. Finalizacao sempre regrava `actual_cost_cents` e ajusta `giztokens_charged` pelo valor final.
+3. Custos textuais (Claude/GPT) usam tokens retornados pelas APIs e tabela de preco por modelo.
+4. Custos de imagem usam `usage` quando disponivel; sem `usage`, usam custo estimado configuravel por ambiente.
+5. O saldo mensal por professora e configuravel por ambiente:
+   - `AI_MONTHLY_INCLUDED_COST_CENTS`
+   - `AI_MONTHLY_COST_LIMIT_CENTS`
+6. A cotacao usada no calculo e unica por ambiente: `AI_USD_TO_BRL`.
+
 ### P1 Recomendado
 
 1. Geracao de imagens pedagogicas via OpenAI, sempre server-side.

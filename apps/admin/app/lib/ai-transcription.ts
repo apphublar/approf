@@ -126,7 +126,7 @@ export function estimateTranscriptionCostCents(durationSeconds: number) {
 
   const centsFor30Seconds = resolveTranscriptionCostCentsFor30Seconds()
   const proportional = Math.round((normalizedDurationSeconds / MAX_AUDIO_SECONDS) * centsFor30Seconds)
-  return Math.max(1, proportional)
+  return Math.max(0, proportional)
 }
 
 function resolveTranscriptionCostCentsFor30Seconds() {

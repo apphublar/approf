@@ -502,7 +502,7 @@ function estimateOpenAiImageCostCents(
   const inputUsd = (normalizedInputTokens / 1_000_000) * resolveOpenAiImageInputUsdPerMillion(profile)
   const outputUsd = (normalizedOutputTokens / 1_000_000) * resolveOpenAiImageOutputUsdPerMillion(profile)
   const brl = (inputUsd + outputUsd) * resolveUsdToBrlRate()
-  return Math.max(1, Math.round(brl * 100))
+  return Math.max(0, Math.round(brl * 100))
 }
 
 function resolveOpenAiImageInputUsdPerMillion(profile: 'portfolio' | 'standalone') {

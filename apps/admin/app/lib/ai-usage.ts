@@ -75,8 +75,8 @@ interface ReserveAiUsageResult {
 }
 
 const GIZTOKENS_PER_COST_CENT = 10
-const MONTHLY_INCLUDED_COST_CENTS = 600
-const MONTHLY_COST_LIMIT_CENTS = 800
+const MONTHLY_INCLUDED_COST_CENTS = resolveMonthlyIncludedCostCents()
+const MONTHLY_COST_LIMIT_CENTS = resolveMonthlyCostLimitCents(MONTHLY_INCLUDED_COST_CENTS)
 const MONTHLY_GIZTOKENS_DEFAULT = MONTHLY_INCLUDED_COST_CENTS * GIZTOKENS_PER_COST_CENT
 const MONTHLY_GIZTOKEN_OVERAGE_LIMIT = (MONTHLY_COST_LIMIT_CENTS - MONTHLY_INCLUDED_COST_CENTS) * GIZTOKENS_PER_COST_CENT
 
@@ -532,6 +532,20 @@ function toGizTokens(costCents: number) {
   return clampNonNegativeInt(costCents * GIZTOKENS_PER_COST_CENT)
 }
 
+function resolveMonthlyIncludedCostCents() {
+  const fromEnv = Number(process.env.AI_MONTHLY_INCLUDED_COST_CENTS)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
+  return 800
+}
+
+function resolveMonthlyCostLimitCents(includedCostCents: number) {
+  const fromEnv = Number(process.env.AI_MONTHLY_COST_LIMIT_CENTS)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) {
+    return Math.max(Math.round(fromEnv), includedCostCents)
+  }
+  return Math.max(1000, includedCostCents)
+}
+
 function resolvePortfolioImageEstimateCostCents() {
   const fromEnv = Number(process.env.OPENAI_IMAGE_ESTIMATED_COST_CENTS ?? process.env.OPENAI_IMAGE_COST_CENTS)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
@@ -559,8 +573,14 @@ async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, 
 
   if (currentWallet) {
     return {
-      giztokensIncluded: clampNonNegativeInt(currentWallet.giztokens_included ?? MONTHLY_GIZTOKENS_DEFAULT),
-      includedCostLimitCents: clampNonNegativeInt(currentWallet.included_cost_limit_cents ?? MONTHLY_COST_LIMIT_CENTS),
+      giztokensIncluded: Math.max(
+        MONTHLY_GIZTOKENS_DEFAULT,
+        clampNonNegativeInt(currentWallet.giztokens_included ?? MONTHLY_GIZTOKENS_DEFAULT),
+      ),
+      includedCostLimitCents: Math.max(
+        MONTHLY_COST_LIMIT_CENTS,
+        clampNonNegativeInt(currentWallet.included_cost_limit_cents ?? MONTHLY_COST_LIMIT_CENTS),
+      ),
     }
   }
 

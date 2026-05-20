@@ -1087,21 +1087,21 @@ function estimateClaudeCostCents(model: string, inputTokens: number, outputToken
   let inputCostPerMillion: number
   let outputCostPerMillion: number
   if (m.includes('haiku')) {
-    inputCostPerMillion = 0.25
-    outputCostPerMillion = 1.25
+    inputCostPerMillion = resolveAnthropicHaikuInputUsdPerMillion()
+    outputCostPerMillion = resolveAnthropicHaikuOutputUsdPerMillion()
   } else if (m.includes('sonnet')) {
-    inputCostPerMillion = 3
-    outputCostPerMillion = 15
+    inputCostPerMillion = resolveAnthropicSonnetInputUsdPerMillion()
+    outputCostPerMillion = resolveAnthropicSonnetOutputUsdPerMillion()
   } else if (m.includes('opus')) {
-    inputCostPerMillion = 15
-    outputCostPerMillion = 75
+    inputCostPerMillion = resolveAnthropicOpusInputUsdPerMillion()
+    outputCostPerMillion = resolveAnthropicOpusOutputUsdPerMillion()
   } else {
-    inputCostPerMillion = 3
-    outputCostPerMillion = 15
+    inputCostPerMillion = resolveAnthropicSonnetInputUsdPerMillion()
+    outputCostPerMillion = resolveAnthropicSonnetOutputUsdPerMillion()
   }
   const usd = (inputTokens / 1_000_000) * inputCostPerMillion + (outputTokens / 1_000_000) * outputCostPerMillion
   const brlApprox = usd * resolveUsdToBrlRate()
-  return Math.max(1, Math.round(brlApprox * 100))
+  return Math.max(0, Math.round(brlApprox * 100))
 }
 
 function estimateOpenAiInterventionCostCents(inputTokens: number, outputTokens: number) {
@@ -1109,7 +1109,7 @@ function estimateOpenAiInterventionCostCents(inputTokens: number, outputTokens: 
   const outputUsdPerMillion = resolveOpenAiTextOutputUsdPerMillion()
   const usd = (inputTokens / 1_000_000) * inputUsdPerMillion + (outputTokens / 1_000_000) * outputUsdPerMillion
   const brlApprox = usd * resolveUsdToBrlRate()
-  return Math.max(1, Math.round(brlApprox * 100))
+  return Math.max(0, Math.round(brlApprox * 100))
 }
 
 function resolveUsdToBrlRate() {
@@ -1133,6 +1133,42 @@ function resolveOpenAiTextOutputUsdPerMillion() {
   const fromEnv = Number(process.env.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
   return 0.6
+}
+
+function resolveAnthropicHaikuInputUsdPerMillion() {
+  const fromEnv = Number(process.env.ANTHROPIC_HAIKU_INPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 0.25
+}
+
+function resolveAnthropicHaikuOutputUsdPerMillion() {
+  const fromEnv = Number(process.env.ANTHROPIC_HAIKU_OUTPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 1.25
+}
+
+function resolveAnthropicSonnetInputUsdPerMillion() {
+  const fromEnv = Number(process.env.ANTHROPIC_SONNET_INPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 3
+}
+
+function resolveAnthropicSonnetOutputUsdPerMillion() {
+  const fromEnv = Number(process.env.ANTHROPIC_SONNET_OUTPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 15
+}
+
+function resolveAnthropicOpusInputUsdPerMillion() {
+  const fromEnv = Number(process.env.ANTHROPIC_OPUS_INPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 15
+}
+
+function resolveAnthropicOpusOutputUsdPerMillion() {
+  const fromEnv = Number(process.env.ANTHROPIC_OPUS_OUTPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return 75
 }
 
 function asString(value: unknown) {
