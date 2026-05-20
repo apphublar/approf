@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from 'lucide-react'
 import type { Annotation } from '@/types'
 
 const BADGE_STYLES: Record<string, string> = {
@@ -13,18 +14,19 @@ const BADGE_STYLES: Record<string, string> = {
 export default function AnnotationCard({
   annotation,
   onClick,
+  onDelete,
 }: {
   annotation: Annotation
   onClick?: () => void
+  onDelete?: () => void
 }) {
   const badgeStyle = BADGE_STYLES[annotation.category] ?? BADGE_STYLES['evolucao']
   const scopeLabel = annotation.scope === 'personal' ? 'Pessoal' : null
   const transcribed = annotation.tags?.includes('Transcrição de áudio')
+  const hasActions = Boolean(onClick || onDelete)
+
   return (
-    <div
-      onClick={onClick}
-      className="bg-white rounded-app px-[15px] py-[13px] mb-[9px] border border-border shadow-card cursor-pointer active:scale-[.98] transition-transform"
-    >
+    <div className="bg-white rounded-app px-[15px] py-[13px] mb-[9px] border border-border shadow-card">
       <div className="flex items-center gap-[7px] mb-[5px]">
         <span className={`text-[10px] font-bold px-2 py-[3px] rounded-full ${badgeStyle}`}>
           {annotation.label}
@@ -43,6 +45,30 @@ export default function AnnotationCard({
         </span>
       )}
       <p className="text-[11px] text-muted mt-[5px]">{annotation.date}</p>
+      {hasActions && (
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
+          {onClick && (
+            <button
+              type="button"
+              onClick={onClick}
+              className="flex items-center gap-1.5 text-[12px] font-bold text-gm"
+            >
+              <Pencil size={13} />
+              Editar
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex items-center gap-1.5 text-[12px] font-bold text-[#C1440E] ml-auto"
+            >
+              <Trash2 size={13} />
+              Excluir
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -67,6 +67,24 @@ export async function loadSupabaseAnnotations(ownerId: string, classes: ClassDat
   )
 }
 
+export async function deleteSupabaseAnnotation(annotationId: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase nao esta configurado.')
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError) throw userError
+  const ownerId = userData.user?.id
+  if (!ownerId) throw new Error('Sessao nao encontrada.')
+
+  const { error } = await supabase
+    .from('annotations')
+    .delete()
+    .eq('id', annotationId)
+    .eq('owner_id', ownerId)
+
+  if (error) throw toError(error, 'Nao foi possivel excluir a anotacao.')
+}
+
 export async function createSupabaseAnnotation(input: AnnotationInput) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase nao esta configurado.')

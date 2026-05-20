@@ -1,6 +1,9 @@
-﻿import { ChevronLeft, ExternalLink, FileText, MoveRight, Pencil, Plus, Sparkles } from 'lucide-react'
+﻿import { useEffect, useState } from 'react'
+import { ChevronLeft, ExternalLink, FileText, MoveRight, Pencil, Plus, Sparkles } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import type { TimelineEvent, TimelineEventType } from '@/types'
+import { getAppDataMode } from '@/services/app-data'
+import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 
@@ -15,9 +18,16 @@ const EVENT_STYLE: Record<TimelineEventType, { label: string; bg: string; fg: st
   marco: { label: 'Marco especial', bg: '#FFE5D9', fg: '#C1440E' },
 }
 
+const ANNOTATION_PREVIEW_COUNT = 3
+
 export default function StudentProfileSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes, activeStudentId, activeClassId, annotations, attendanceRecords } = useAppStore()
+  const { classes, activeStudentId, activeClassId, annotations, attendanceRecords, removeAnnotation } = useAppStore()
+  const [showAllAnnotations, setShowAllAnnotations] = useState(false)
+
+  useEffect(() => {
+    setShowAllAnnotations(false)
+  }, [activeStudentId])
 
   const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
   const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
@@ -53,6 +63,28 @@ export default function StudentProfileSubscreen() {
   const totalPresences = Math.max(0, totalAttendanceCalls - totalAbsences)
   const attendanceRate = totalAttendanceCalls > 0 ? Math.round((totalPresences / totalAttendanceCalls) * 100) : 0
   const lastAbsences = absenceRecords.slice(0, 3)
+  const visibleAnnotations = showAllAnnotations
+    ? studentAnns
+    : studentAnns.slice(0, ANNOTATION_PREVIEW_COUNT)
+  const hasMoreAnnotations = studentAnns.length > ANNOTATION_PREVIEW_COUNT
+
+  async function handleDeleteAnnotation(annotationId: string) {
+    const confirmed = window.confirm('Deseja excluir esta anotação? Esta ação não pode ser desfeita.')
+    if (!confirmed) return
+
+    try {
+      if (getAppDataMode() === 'supabase') {
+        await deleteSupabaseAnnotation(annotationId)
+      }
+      removeAnnotation(annotationId)
+      if (showAllAnnotations && studentAnns.length <= ANNOTATION_PREVIEW_COUNT + 1) {
+        setShowAllAnnotations(false)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível excluir a anotação.'
+      window.alert(message)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
@@ -111,27 +143,19 @@ export default function StudentProfileSubscreen() {
           </div>
         </div>
 
-        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
-          <div className="rounded-app border border-[#D4EBC8] bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-16 h-16 rounded-full bg-gbg text-gd flex items-center justify-center text-[24px] font-bold flex-shrink-0">
-                P
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-ink tracking-[0.06em] uppercase">Presenças</p>
-                <p className="text-[15px] text-muted mt-1">{totalPresences} presenças · {totalAbsences} faltas</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[22px] font-bold text-gm leading-tight">{attendanceRate}%</p>
-                <p className="text-[13px] text-muted">presença</p>
-              </div>
+        <div className="bg-white rounded-app p-3 border border-border shadow-card mb-5">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-bold text-ink">Presenças</p>
+              <p className="text-[11px] text-muted">{totalPresences} presenças · {totalAbsences} faltas</p>
             </div>
-            <div className="h-4 rounded-full bg-cream border border-border mt-4 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gm transition-all"
-                style={{ width: `${attendanceRate}%` }}
-              />
+            <div className="text-right">
+              <span className="text-[15px] font-bold text-gm">{attendanceRate}%</span>
+              <span className="text-[10px] block text-muted">presença</span>
             </div>
+          </div>
+          <div className="h-2 rounded-full bg-cream overflow-hidden mt-3">
+            <div className="h-full rounded-full bg-gm transition-all" style={{ width: `${attendanceRate}%` }} />
           </div>
           {lastAbsences.length > 0 ? (
             <div className="mt-3 rounded-app-sm bg-cream border border-border p-3">
@@ -194,17 +218,22 @@ export default function StudentProfileSubscreen() {
             </p>
           ) : (
             <>
-              {studentAnns.slice(0, 6).map((annotation) => (
+              {visibleAnnotations.map((annotation) => (
                 <AnnotationCard
                   key={annotation.id}
                   annotation={annotation}
                   onClick={() => openSubscreen('new-annotation', { annotationId: annotation.id })}
+                  onDelete={() => handleDeleteAnnotation(annotation.id)}
                 />
               ))}
-              {studentAnns.length > 6 && (
-                <p className="text-[11px] text-muted mt-1">
-                  Mostrando as 6 mais recentes. Abra em Anotações para ver o histórico completo.
-                </p>
+              {hasMoreAnnotations && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllAnnotations((current) => !current)}
+                  className="w-full mt-1 py-2 text-[12px] font-bold text-gm"
+                >
+                  {showAllAnnotations ? 'Ver menos' : `Ver todas (${studentAnns.length})`}
+                </button>
               )}
             </>
           )}
@@ -218,7 +247,7 @@ export default function StudentProfileSubscreen() {
               className="rounded-app-sm border border-gp bg-gbg px-3 py-3 text-left text-gd"
             >
               <span className="block text-[13px] font-bold">Tudo</span>
-              <span className="block text-[11px] mt-1">Mês e histórico geral</span>
+              <span className="block text-[11px] mt-1">Histórico geral</span>
             </button>
             <button
               onClick={() => openSubscreen('generated-documents', { studentId: student.id, kind: 'documents' })}
