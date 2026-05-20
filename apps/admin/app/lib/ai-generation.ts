@@ -4,11 +4,9 @@ import type { BuildPromptInput } from './pedagogical-prompts'
 import {
   buildStage1DraftPrompt,
   buildStage2BnccReviewPrompt,
-  buildStage3FinalRefinementPrompt,
   pipelineStagePromptVersion,
 } from './pedagogical-prompts'
 import {
-  DOCUMENT_MODELS,
   DOCUMENT_WORD_LIMITS,
   FORBIDDEN_PEDAGOGICAL_WORDS,
   toCanonicalDocumentGenerationType,
@@ -28,7 +26,7 @@ interface GeneratePedagogicalTextInput {
 /** Metadados de uma etapa do pipeline (persistidos em ai_generation_logs.result_summary). */
 export interface PipelineStageMetadata {
   stage: 1 | 2 | 3
-  etapa: 'rascunho_pedagogico' | 'revisao_bncc_seguranca' | 'refinamento_final'
+  etapa: 'rascunho_pedagogico' | 'revisao_bncc_seguranca' | 'humanizacao_final'
   provider: string
   model: string
   promptVersion: string
@@ -55,16 +53,26 @@ interface GeneratePedagogicalTextResult {
 
 export class PublicAiGenerationError extends Error {}
 
+interface TextCompletion {
+  text: string
+  provider: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  estimatedCostCents: number
+  actualCostCents: number
+}
+
 const DEFAULT_ANTHROPIC_HAIKU_MODEL = 'claude-haiku-4-5-20251001'
 const DEFAULT_ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-6'
 const DEFAULT_OPENAI_INTERVENTIONS_MODEL = 'gpt-4o-mini'
+const DEFAULT_OPENAI_HUMANIZE_MODEL = 'gpt-5'
 
 interface DocumentPipelineConfig {
   stages: 1 | 2 | 3
   pipelineName: string
   draftModel: string
   reviewModel: string
-  refineModel?: string
 }
 
 function resolveHaikuModelId(): string {
@@ -80,10 +88,6 @@ function resolveSonnetModelId(): string {
     || DEFAULT_ANTHROPIC_SONNET_MODEL
 }
 
-function resolveModelAlias(alias: 'haiku' | 'sonnet'): string {
-  return alias === 'haiku' ? resolveHaikuModelId() : resolveSonnetModelId()
-}
-
 function resolveDraftModelId(): string {
   const v = process.env.ANTHROPIC_DRAFT_MODEL?.trim()
   return v || resolveHaikuModelId()
@@ -91,11 +95,6 @@ function resolveDraftModelId(): string {
 
 function resolveReviewModelId(): string {
   const v = process.env.ANTHROPIC_REVIEW_MODEL?.trim()
-  return v || resolveSonnetModelId()
-}
-
-function resolveRefineModelId(): string {
-  const v = process.env.ANTHROPIC_REFINE_MODEL?.trim()
   return v || resolveSonnetModelId()
 }
 
@@ -112,11 +111,9 @@ export async function generatePedagogicalText(
 
   const modelDraft = resolveDraftModelId()
   const modelReview = resolveReviewModelId()
-  const modelRefine = resolveRefineModelId()
   const pipelineConfig = resolveDocumentPipelineConfig(promptInput.generationType, {
     draft: modelDraft,
     review: modelReview,
-    refine: modelRefine,
   })
 
   let reportId: string | null = null
@@ -175,34 +172,28 @@ export async function generatePedagogicalText(
       estimatedCostCents: s2.estimatedCostCents,
     })
 
-    const stage3Prompt = pipelineConfig.stages === 3
-      ? buildStage3FinalRefinementPrompt(promptInput, s2.text)
-      : null
-    if (pipelineConfig.stages === 3) {
-      console.log('[AI-GENERATION] Etapa 3 iniciada:', {
-        requestId,
-        logId: input.logId,
-        generationType: promptInput.generationType,
-        model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
-      })
-    }
-    const s3Initial = pipelineConfig.stages === 3
-      ? await runPipelineStage(3, stage3Prompt!.system, stage3Prompt!.user, {
-          model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
-          maxTokens: 2000,
-          temperature: 0.45,
-        }, { requestId, logId: input.logId, generationType: promptInput.generationType })
-      : s2
-    if (pipelineConfig.stages === 3) {
-      console.log('[AI-GENERATION] Etapa 3 concluída:', {
-        requestId,
-        logId: input.logId,
-        model: s3Initial.model,
-        inputTokens: s3Initial.inputTokens,
-        outputTokens: s3Initial.outputTokens,
-        estimatedCostCents: s3Initial.estimatedCostCents,
-      })
-    }
+    const stage3Prompt = buildFinalHumanizationPrompt(promptInput, s2.text)
+    console.log('[AI-GENERATION] Etapa 3 iniciada (humanização GPT):', {
+      requestId,
+      logId: input.logId,
+      generationType: promptInput.generationType,
+      model: resolveOpenAiHumanizeModel(),
+    })
+    const s3Initial = await requestOpenAiHumanizationText({
+      system: stage3Prompt.system,
+      user: stage3Prompt.user,
+      model: resolveOpenAiHumanizeModel(),
+      maxTokens: 2000,
+      temperature: 0.35,
+    })
+    console.log('[AI-GENERATION] Etapa 3 concluída (humanização GPT):', {
+      requestId,
+      logId: input.logId,
+      model: s3Initial.model,
+      inputTokens: s3Initial.inputTokens,
+      outputTokens: s3Initial.outputTokens,
+      estimatedCostCents: s3Initial.estimatedCostCents,
+    })
 
     console.log('[AI-GENERATION] Validação de estrutura iniciada:', {
       requestId,
@@ -213,7 +204,7 @@ export async function generatePedagogicalText(
       generationType: promptInput.generationType,
       reportKind: promptInput.reportKind ?? promptInput.docKind,
       candidate: s3Initial,
-      model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
+      model: pipelineConfig.reviewModel,
       requestId,
       logId: input.logId,
     })
@@ -225,32 +216,21 @@ export async function generatePedagogicalText(
     const qualityChecked = await ensureDocumentQuality({
       generationType: promptInput.generationType,
       candidate: structured.completion,
-      model: pipelineConfig.refineModel ?? pipelineConfig.reviewModel,
+      model: pipelineConfig.reviewModel,
       requestId,
       logId: input.logId,
     })
     const s3 = qualityChecked.completion
 
-    const pipelineStages: PipelineStageMetadata[] = pipelineConfig.stages === 3
-      ? [
-          toStageMeta(input.promptVersion, 1, 'rascunho_pedagogico', s1),
-          toStageMeta(input.promptVersion, 2, 'revisao_bncc_seguranca', s2),
-          toStageMeta(input.promptVersion, 3, 'refinamento_final', s3),
-        ]
-      : [
-          toStageMeta(input.promptVersion, 1, 'rascunho_pedagogico', s1),
-          toStageMeta(input.promptVersion, 2, 'revisao_bncc_seguranca', s3),
-        ]
+    const pipelineStages: PipelineStageMetadata[] = [
+      toStageMeta(input.promptVersion, 1, 'rascunho_pedagogico', s1),
+      toStageMeta(input.promptVersion, 2, 'revisao_bncc_seguranca', s2),
+      toStageMeta(input.promptVersion, 3, 'humanizacao_final', s3),
+    ]
 
-    const inputTokens = pipelineConfig.stages === 3
-      ? s1.inputTokens + s2.inputTokens + s3.inputTokens
-      : s1.inputTokens + s3.inputTokens
-    const outputTokens = pipelineConfig.stages === 3
-      ? s1.outputTokens + s2.outputTokens + s3.outputTokens
-      : s1.outputTokens + s3.outputTokens
-    const actualCostCents = pipelineConfig.stages === 3
-      ? s1.actualCostCents + s2.actualCostCents + s3.actualCostCents
-      : s1.actualCostCents + s3.actualCostCents
+    const inputTokens = s1.inputTokens + s2.inputTokens + s3.inputTokens
+    const outputTokens = s1.outputTokens + s2.outputTokens + s3.outputTokens
+    const actualCostCents = s1.actualCostCents + s2.actualCostCents + s3.actualCostCents
 
     console.log('[AI-GENERATION] Persistência do relatório iniciada:', {
       requestId,
@@ -276,10 +256,8 @@ export async function generatePedagogicalText(
     await persistUsage(
       reportId,
       input.ownerId,
-      'anthropic',
-      pipelineConfig.stages === 3
-        ? `3stage:${s1.model}|${s2.model}|${s3.model}`
-        : `2stage:${s1.model}|${s3.model}`,
+      'hybrid',
+      `haiku-sonnet-gpt:${s1.model}|${s2.model}|${s3.model}`,
       inputTokens,
       outputTokens,
       actualCostCents,
@@ -295,9 +273,9 @@ export async function generatePedagogicalText(
 
     return {
       text: s3.text,
-      provider: 'anthropic',
+      provider: 'hybrid',
       model: s3.model,
-      pipeline: pipelineConfig.pipelineName,
+      pipeline: 'haiku-sonnet-gpt-humanized',
       promptVersion: input.promptVersion,
       inputTokens,
       outputTokens,
@@ -374,7 +352,7 @@ async function generateInterventionWithOpenAi(
 async function ensureRequiredStructure(input: {
   generationType: AiGenerationType
   reportKind?: string
-  candidate: Awaited<ReturnType<typeof requestClaudeText>>
+  candidate: TextCompletion
   model: string
   requestId: string
   logId: string
@@ -489,7 +467,7 @@ function buildStructureRepairSystemPrompt(generationType: AiGenerationType) {
 
 async function ensureDocumentQuality(input: {
   generationType: AiGenerationType
-  candidate: Awaited<ReturnType<typeof requestClaudeText>>
+  candidate: TextCompletion
   model: string
   requestId: string
   logId: string
@@ -671,53 +649,14 @@ function validateDocumentQuality(generationType: AiGenerationType, text: string)
 }
 
 function resolveDocumentPipelineConfig(
-  generationType: AiGenerationType,
-  models: { draft: string; review: string; refine: string },
+  _generationType: AiGenerationType,
+  models: { draft: string; review: string },
 ): DocumentPipelineConfig {
-  const canonicalType = toCanonicalDocumentGenerationType(generationType)
-  const modelPlan = canonicalType ? DOCUMENT_MODELS[canonicalType] : null
-
-  if (modelPlan) {
-    const configuredStages: 1 | 2 | 3 = modelPlan.review === null
-      ? 1
-      : modelPlan.refine === null
-        ? 2
-        : 3
-
-    return {
-      stages: configuredStages === 1 ? 2 : configuredStages,
-      pipelineName: `claude-text-${configuredStages === 1 ? '2-stage' : `${configuredStages}-stage`}`,
-      draftModel: resolveModelAlias(modelPlan.draft),
-      reviewModel: modelPlan.review ? resolveModelAlias(modelPlan.review) : resolveModelAlias(modelPlan.draft),
-      refineModel: modelPlan.refine ? resolveModelAlias(modelPlan.refine) : undefined,
-    }
-  }
-
-  if (generationType === 'class_diary' || generationType === 'parents_meeting_record' || generationType === 'specialist_referral' || generationType === 'specialist_report' || generationType === 'daily_lesson_plan') {
-    return {
-      stages: 2,
-      pipelineName: 'claude-text-2-stage',
-      draftModel: resolveHaikuModelId(),
-      reviewModel: models.refine,
-    }
-  }
-
-  if (generationType === 'weekly_planning' || generationType === 'pedagogical_project' || generationType === 'development_report' || generationType === 'portfolio_text') {
-    return {
-      stages: 3,
-      pipelineName: 'claude-text-3-stage',
-      draftModel: resolveHaikuModelId(),
-      reviewModel: models.review,
-      refineModel: models.refine,
-    }
-  }
-
   return {
     stages: 3,
-    pipelineName: 'claude-text-3-stage',
+    pipelineName: 'haiku-sonnet-gpt-humanized',
     draftModel: models.draft,
     reviewModel: models.review,
-    refineModel: models.refine,
   }
 }
 
@@ -737,7 +676,7 @@ function toStageMeta(
   basePromptVersion: string,
   stage: 1 | 2 | 3,
   etapa: PipelineStageMetadata['etapa'],
-  completion: Awaited<ReturnType<typeof requestClaudeText>>,
+  completion: TextCompletion,
 ): PipelineStageMetadata {
   return {
     stage,
@@ -788,6 +727,14 @@ interface RequestOpenAiInterventionOptions {
   system: string
   user: string
   model: string
+}
+
+interface RequestOpenAiHumanizationOptions {
+  system: string
+  user: string
+  model: string
+  maxTokens?: number
+  temperature?: number
 }
 
 async function requestClaudeText(system: string, user: string, options: RequestClaudeOptions) {
@@ -846,7 +793,7 @@ async function requestClaudeText(system: string, user: string, options: RequestC
     outputTokens,
     estimatedCostCents,
     actualCostCents: estimatedCostCents,
-  }
+  } satisfies TextCompletion
 }
 
 function sanitizeInternalLogError(error: unknown) {
@@ -918,6 +865,91 @@ async function requestOpenAiInterventionText(options: RequestOpenAiInterventionO
     inputTokens,
     outputTokens,
     actualCostCents: estimateOpenAiInterventionCostCents(inputTokens, outputTokens),
+  }
+}
+
+async function requestOpenAiHumanizationText(options: RequestOpenAiHumanizationOptions) {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new PublicAiGenerationError('Servico de IA indisponivel no momento. Tente novamente em instantes.')
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: options.model,
+      temperature: options.temperature ?? 0.35,
+      max_tokens: options.maxTokens ?? 1800,
+      messages: [
+        { role: 'system', content: options.system },
+        { role: 'user', content: options.user },
+      ],
+    }),
+  })
+
+  const payload = (await response.json().catch(() => null)) as {
+    choices?: Array<{ message?: { content?: string | null } }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
+    error?: { message?: string }
+    model?: string
+  } | null
+
+  if (!response.ok) {
+    console.error('[ai-generation] OpenAI HTTP', response.status, payload?.error?.message)
+    throw new PublicAiGenerationError('Não foi possivel humanizar o texto agora. Tente novamente em instantes.')
+  }
+
+  const text = payload?.choices?.[0]?.message?.content?.trim()
+  if (!text) {
+    throw new PublicAiGenerationError('A IA não retornou conteudo suficiente para humanização final.')
+  }
+
+  const inputTokens = payload?.usage?.prompt_tokens ?? 0
+  const outputTokens = payload?.usage?.completion_tokens ?? 0
+  const estimatedCostCents = estimateOpenAiHumanizeCostCents(inputTokens, outputTokens)
+  return {
+    text,
+    provider: 'openai',
+    model: payload?.model ?? options.model,
+    inputTokens,
+    outputTokens,
+    estimatedCostCents,
+    actualCostCents: estimatedCostCents,
+  } satisfies TextCompletion
+}
+
+function buildFinalHumanizationPrompt(input: BuildPromptInput, reviewedText: string) {
+  const kind = input.reportKind || input.docKind || input.generationType
+  const wordCount = reviewedText.trim().split(/\s+/).filter(Boolean).length
+  return {
+    system: [
+      'Você é uma professora experiente da educação infantil revisando um documento pedagógico já estruturado.',
+      'Sua função NÃO é reescrever completamente o texto.',
+      'Sua função é humanizar, simplificar, melhorar fluidez, deixar mais natural, acolhedor e objetivo.',
+      'Preserve acontecimentos reais, nomes importantes e observações da professora.',
+      'Reduza tom acadêmico, formalidade excessiva, frases robóticas e floreios desnecessários.',
+      'Não invente informações, não remova fatos relevantes e não adicione BNCC sem necessidade.',
+      'Mantenha a estrutura geral e os títulos do documento sempre que possível.',
+      'Se o texto já estiver enxuto, mantenha tamanho parecido ou levemente menor.',
+      'Entregue APENAS o texto final humanizado, sem comentários meta.',
+    ].join('\n'),
+    user: [
+      `TIPO DE DOCUMENTO: ${kind}`,
+      `TAMANHO DE REFERÊNCIA: ${wordCount} palavras`,
+      '',
+      'TEXTO REVISADO (base obrigatória):',
+      reviewedText.trim(),
+      '',
+      'AJUSTES OBRIGATÓRIOS:',
+      '- Preserve fatos, nomes e observações reais.',
+      '- Melhore naturalidade, clareza e acolhimento.',
+      '- Reduza excesso acadêmico e termos artificiais.',
+      '- Não aumente significativamente o tamanho do texto.',
+    ].join('\n'),
   }
 }
 
@@ -1112,6 +1144,14 @@ function estimateOpenAiInterventionCostCents(inputTokens: number, outputTokens: 
   return Math.max(0, Math.round(brlApprox * 100))
 }
 
+function estimateOpenAiHumanizeCostCents(inputTokens: number, outputTokens: number) {
+  const inputUsdPerMillion = resolveOpenAiHumanizeInputUsdPerMillion()
+  const outputUsdPerMillion = resolveOpenAiHumanizeOutputUsdPerMillion()
+  const usd = (inputTokens / 1_000_000) * inputUsdPerMillion + (outputTokens / 1_000_000) * outputUsdPerMillion
+  const brlApprox = usd * resolveUsdToBrlRate()
+  return Math.max(0, Math.round(brlApprox * 100))
+}
+
 function resolveUsdToBrlRate() {
   const fromEnv = Number(process.env.AI_USD_TO_BRL)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
@@ -1121,6 +1161,11 @@ function resolveUsdToBrlRate() {
 function resolveOpenAiInterventionsModel() {
   const fromEnv = process.env.OPENAI_INTERVENTIONS_MODEL?.trim()
   return fromEnv || DEFAULT_OPENAI_INTERVENTIONS_MODEL
+}
+
+function resolveOpenAiHumanizeModel() {
+  const fromEnv = process.env.OPENAI_HUMANIZE_MODEL?.trim()
+  return fromEnv || DEFAULT_OPENAI_HUMANIZE_MODEL
 }
 
 function resolveOpenAiTextInputUsdPerMillion() {
@@ -1133,6 +1178,18 @@ function resolveOpenAiTextOutputUsdPerMillion() {
   const fromEnv = Number(process.env.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
   return 0.6
+}
+
+function resolveOpenAiHumanizeInputUsdPerMillion() {
+  const fromEnv = Number(process.env.OPENAI_HUMANIZE_INPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return resolveOpenAiTextInputUsdPerMillion()
+}
+
+function resolveOpenAiHumanizeOutputUsdPerMillion() {
+  const fromEnv = Number(process.env.OPENAI_HUMANIZE_OUTPUT_COST_PER_MILLION_USD)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return resolveOpenAiTextOutputUsdPerMillion()
 }
 
 function resolveAnthropicHaikuInputUsdPerMillion() {

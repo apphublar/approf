@@ -2,9 +2,11 @@
 import { Plus, Search } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import AnnotationCard from '@/components/ui/AnnotationCard'
+import { getAppDataMode } from '@/services/app-data'
+import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
 
 export default function AnnotationsScreen() {
-  const { annotations } = useAppStore()
+  const { annotations, removeAnnotation } = useAppStore()
   const { openSubscreen } = useNavStore()
   const [query, setQuery] = useState('')
 
@@ -25,6 +27,21 @@ export default function AnnotationsScreen() {
 
   function openAnnotation(annotation: (typeof annotations)[number]) {
     openSubscreen('new-annotation', { annotationId: annotation.id })
+  }
+
+  async function handleDeleteAnnotation(annotationId: string) {
+    const confirmed = window.confirm('Deseja excluir esta anotação? Esta ação não pode ser desfeita.')
+    if (!confirmed) return
+
+    try {
+      if (getAppDataMode() === 'supabase') {
+        await deleteSupabaseAnnotation(annotationId)
+      }
+      removeAnnotation(annotationId)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível excluir a anotação.'
+      window.alert(message)
+    }
   }
 
   return (
@@ -62,6 +79,7 @@ export default function AnnotationsScreen() {
               key={annotation.id}
               annotation={annotation}
               onClick={() => openAnnotation(annotation)}
+              onDelete={() => handleDeleteAnnotation(annotation.id)}
             />
           ))
         )}
