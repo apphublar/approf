@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
 import { updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
+import { loadDocumentStyleSettings } from '@/utils/document-style'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 
 interface PedagogicalGeneratorProps {
@@ -197,6 +198,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     setEditingDocument(false)
 
     try {
+      const styleSettings = loadDocumentStyleSettings()
       const generationType = isProject
         ? 'pedagogical_project'
         : planningPeriod === 'diario'
@@ -223,6 +225,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
           methodology,
           assessment,
           avaliacaoRegistro: assessment.join(', '),
+          documentStyle: styleSettings,
         },
       })
 

@@ -1,6 +1,13 @@
-﻿import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, Search, Sparkles } from 'lucide-react'
+﻿import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { ChevronLeft, ChevronRight, FileText, Search, Settings2, Sparkles, Upload, X } from 'lucide-react'
 import { useNavStore } from '@/store'
+import {
+  DEFAULT_DOCUMENT_STYLE_SETTINGS,
+  fontFamilyLabel,
+  loadDocumentStyleSettings,
+  saveDocumentStyleSettings,
+  type DocumentStyleSettings,
+} from '@/utils/document-style'
 
 const AI_SECTIONS = [
   {
@@ -27,6 +34,9 @@ type SectionTitle = (typeof AI_SECTIONS)[number]['title']
 export default function AiPedagogicaSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const [query, setQuery] = useState('')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const visibleSections = useMemo(() => {
     const normalizedQuery = normalizeText(query)
@@ -65,6 +75,20 @@ export default function AiPedagogicaSubscreen() {
     openSubscreen('pedagogical-generator', { docKind: action.title })
   }
 
+  function updateSettings(next: Partial<DocumentStyleSettings>) {
+    const merged = { ...styleSettings, ...next }
+    setStyleSettings(merged)
+    saveDocumentStyleSettings(merged)
+  }
+
+  async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const dataUrl = await fileToDataUrl(file)
+    updateSettings({ schoolLogoDataUrl: dataUrl })
+    event.target.value = ''
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
@@ -96,6 +120,22 @@ export default function AiPedagogicaSubscreen() {
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-bold text-ink leading-tight">Ver gerados</p>
                 <p className="text-[11px] text-muted leading-snug mt-1">Histórico do mês e geral de tudo que foi criado.</p>
+              </div>
+              <ChevronRight size={18} className="text-muted flex-shrink-0" />
+            </button>
+
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
+            >
+              <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
+                <Settings2 size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold text-ink leading-tight">Configurações ABNT</p>
+                <p className="text-[11px] text-muted leading-snug mt-1">
+                  {fontFamilyLabel(styleSettings.fontFamily)} • {styleSettings.fontSizePt}pt • espaçamento {styleSettings.lineSpacing.toString().replace('.', ',')}
+                </p>
               </div>
               <ChevronRight size={18} className="text-muted flex-shrink-0" />
             </button>
@@ -166,6 +206,144 @@ export default function AiPedagogicaSubscreen() {
             </div>
         </>
       </div>
+
+      {settingsOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end">
+          <div className="w-full bg-white rounded-t-[22px] border-t border-border max-h-[88vh] overflow-auto stage-fade-in">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-serif text-[18px] text-gd">Normas ABNT e papel timbrado</p>
+                <button onClick={() => setSettingsOpen(false)} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Fonte padrão</p>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {(['arial', 'times-new-roman'] as const).map((family) => (
+                  <button
+                    key={family}
+                    onClick={() => updateSettings({ fontFamily: family })}
+                    className={`rounded-app-sm border px-3 py-2 text-[12px] font-bold ${
+                      styleSettings.fontFamily === family
+                        ? 'bg-gd text-white border-gd'
+                        : 'bg-white text-muted border-border'
+                    }`}
+                  >
+                    {fontFamilyLabel(family)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <label className="text-[12px] text-muted">
+                  Tamanho da fonte
+                  <input
+                    type="number"
+                    min={10}
+                    max={16}
+                    value={styleSettings.fontSizePt}
+                    onChange={(event) => updateSettings({ fontSizePt: Number(event.target.value) || 12 })}
+                    className="w-full mt-1 rounded-app-sm border border-border px-3 py-2 text-[13px] text-ink"
+                  />
+                </label>
+                <label className="text-[12px] text-muted">
+                  Recuo de parágrafo (cm)
+                  <input
+                    type="number"
+                    step={0.25}
+                    min={0}
+                    max={2.5}
+                    value={styleSettings.paragraphIndentCm}
+                    onChange={(event) => updateSettings({ paragraphIndentCm: Number(event.target.value) || 0 })}
+                    className="w-full mt-1 rounded-app-sm border border-border px-3 py-2 text-[13px] text-ink"
+                  />
+                </label>
+              </div>
+
+              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Espaçamento entre linhas</p>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {[1, 1.15, 1.5, 2].map((spacing) => (
+                  <button
+                    key={spacing}
+                    onClick={() => updateSettings({ lineSpacing: spacing })}
+                    className={`rounded-app-sm border px-2 py-2 text-[12px] font-bold ${
+                      styleSettings.lineSpacing === spacing
+                        ? 'bg-gd text-white border-gd'
+                        : 'bg-white text-muted border-border'
+                    }`}
+                  >
+                    {String(spacing).replace('.', ',')}
+                  </button>
+                ))}
+              </div>
+
+              <label className="flex items-center gap-2 mt-4 text-[12px] text-muted">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.justified}
+                  onChange={(event) => updateSettings({ justified: event.target.checked })}
+                />
+                Texto justificado por padrão
+              </label>
+
+              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-5">Papel timbrado</p>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full mt-2 rounded-app-sm border border-gp bg-gbg px-3 py-3 text-[12px] font-bold text-gd flex items-center justify-center gap-2"
+              >
+                <Upload size={14} />
+                {styleSettings.schoolLogoDataUrl ? 'Trocar logo da escola' : 'Enviar logo da escola'}
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+
+              {styleSettings.schoolLogoDataUrl && (
+                <div className="mt-3 rounded-app-sm border border-border bg-cream p-3">
+                  <img src={styleSettings.schoolLogoDataUrl} alt="Logo da escola" className="h-16 object-contain mx-auto" />
+                  <button
+                    onClick={() => updateSettings({ schoolLogoDataUrl: null, letterheadStyle: DEFAULT_DOCUMENT_STYLE_SETTINGS.letterheadStyle })}
+                    className="w-full mt-2 text-[11px] font-bold text-[#C1440E]"
+                  >
+                    Remover logo
+                  </button>
+                </div>
+              )}
+
+              {styleSettings.schoolLogoDataUrl && (
+                <>
+                  <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Estilo do timbre</p>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {[
+                      { key: 'minimal', label: 'Minimal' },
+                      { key: 'centered', label: 'Centralizado' },
+                      { key: 'watermark', label: 'Marca d’água' },
+                    ].map((option) => (
+                      <button
+                        key={option.key}
+                        onClick={() => updateSettings({ letterheadStyle: option.key as DocumentStyleSettings['letterheadStyle'] })}
+                        className={`rounded-app-sm border px-2 py-2 text-[11px] font-bold ${
+                          styleSettings.letterheadStyle === option.key
+                            ? 'bg-gd text-white border-gd'
+                            : 'bg-white text-muted border-border'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <button
+                onClick={() => setSettingsOpen(false)}
+                className="w-full mt-5 py-[12px] rounded-app-sm bg-gd text-white font-bold text-[13px]"
+              >
+                Salvar configurações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -182,4 +360,13 @@ function getSectionReportTypes(sectionTitle: SectionTitle) {
   if (sectionTitle === 'Planejamentos') return ['weekly_planning', 'daily_lesson_plan', 'pedagogical_project', 'parents_meeting_record']
   if (sectionTitle === 'Relatórios') return ['development_report', 'class_diary', 'portfolio_text', 'portfolio_image']
   return undefined
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error ?? new Error('Falha ao ler imagem.'))
+    reader.readAsDataURL(file)
+  })
 }

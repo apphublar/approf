@@ -27,7 +27,7 @@ export async function listReports(filters: ListReportsFilters = {}) {
 
 export async function getReportById(reportId: string) {
   const cached = reportCache.get(reportId)
-  if (cached) return cached
+  if (cached?.hydrated) return cached.report
   const response = await callReportsApi<{ report: GeneratedDocument }>(`/api/reports/${reportId}`, { method: 'GET' })
   const report = response.report as GeneratedDocument
   setReportCache(reportId, report)
@@ -46,7 +46,9 @@ export async function updateReport(reportId: string, input: UpdateReportInput) {
 }
 
 export function getCachedReportById(reportId: string) {
-  return reportCache.get(reportId) ?? null
+  const cached = reportCache.get(reportId)
+  if (!cached?.hydrated) return null
+  return cached.report
 }
 
 export async function prefetchReportsByIds(reportIds: string[]) {
@@ -54,7 +56,8 @@ export async function prefetchReportsByIds(reportIds: string[]) {
   if (!uniqueIds.length) return
   await Promise.all(
     uniqueIds.map(async (id) => {
-      if (reportCache.has(id)) return
+      const cached = reportCache.get(id)
+      if (cached?.hydrated) return
       try {
         const response = await callReportsApi<{ report: GeneratedDocument }>(`/api/reports/${id}`, { method: 'GET' })
         setReportCache(id, response.report as GeneratedDocument)
@@ -127,12 +130,25 @@ async function callReportsApi<T>(path: string, init: RequestInit): Promise<T> {
 }
 
 const REPORT_CACHE_LIMIT = 120
-const reportCache = new Map<string, GeneratedDocument>()
+const reportCache = new Map<string, { report: GeneratedDocument; hydrated: boolean }>()
 
 function setReportCache(id: string, report: GeneratedDocument) {
-  reportCache.set(id, report)
+  const hydrated = isHydratedReport(report)
+  const previous = reportCache.get(id)
+
+  if (!hydrated && previous?.hydrated) {
+    return
+  }
+
+  reportCache.set(id, { report, hydrated })
   if (reportCache.size <= REPORT_CACHE_LIMIT) return
   const oldestKey = reportCache.keys().next().value as string | undefined
   if (!oldestKey) return
   reportCache.delete(oldestKey)
+}
+
+function isHydratedReport(report: GeneratedDocument) {
+  const hasBody = typeof report.body === 'string' && report.body.trim().length > 0
+  const hasArtifacts = Boolean(report.ai_artifacts && typeof report.ai_artifacts === 'object')
+  return hasBody || hasArtifacts
 }

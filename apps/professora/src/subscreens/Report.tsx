@@ -5,6 +5,7 @@ import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument,
 import { listReports, updateReport } from '@/services/reports'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
+import { loadDocumentStyleSettings } from '@/utils/document-style'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { Annotation } from '@/types'
@@ -472,6 +473,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setEditingDocument(false)
 
     try {
+      const styleSettings = loadDocumentStyleSettings()
       const requestSummary = {
         reportKind,
         portfolioOutput,
@@ -517,6 +519,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
           type: item.type,
           size: item.size,
         })),
+        documentStyle: styleSettings,
       }
 
       const generationType = getReportGenerationType(reportKind, portfolioOutput)

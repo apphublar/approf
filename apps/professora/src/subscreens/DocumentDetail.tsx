@@ -6,6 +6,7 @@ import { generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument, ReportStatus } from '@/types'
 import { getImageVariants, type ImageVariants } from '@/utils/image-performance'
+import { fontFamilyCss, fontFamilyLabel, loadDocumentStyleSettings, type DocumentStyleSettings } from '@/utils/document-style'
 
 interface DocumentDetailSubscreenProps {
   data?: unknown
@@ -31,6 +32,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [imageVariants, setImageVariants] = useState<ImageVariants | null>(null)
+  const [styleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
   const editorRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -254,7 +256,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   function downloadWord() {
     if (!document) return
     const title = formatReportType(document.report_type)
-    const html = buildExportHtml(title, studentName, className, draft)
+    const html = buildExportHtml(title, studentName, className, draft, styleSettings, imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl)
     const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' })
     downloadBlob(blob, `${slugify(title)}.doc`)
   }
@@ -267,7 +269,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
       setError('Não foi possível abrir a janela de impressão.')
       return
     }
-    printWindow.document.write(buildExportHtml(title, studentName, className, draft))
+    printWindow.document.write(buildExportHtml(title, studentName, className, draft, styleSettings, imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl))
     printWindow.document.close()
     printWindow.focus()
     printWindow.print()
@@ -303,6 +305,9 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 <p className="text-[11px] text-muted mt-1">
                   {studentName ?? 'Sem crian\u00e7a'} {'\u2022'} {className ?? 'Sem turma'} {'\u2022'} {formatStatus(document.status)}
                   {document.is_final_version ? ' \u2022 Vers\u00e3o final' : ''}
+                </p>
+                <p className="text-[10px] text-muted mt-2">
+                  ABNT • Fonte {fontFamilyLabel(styleSettings.fontFamily)} {styleSettings.fontSizePt}pt • espaçamento {String(styleSettings.lineSpacing).replace('.', ',')}
                 </p>
               </div>
 
@@ -395,7 +400,13 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                     ref={editorRef}
                     contentEditable
                     suppressContentEditableWarning
-                    className="min-h-[420px] bg-white rounded-app-sm border border-border px-4 py-4 text-[13px] text-ink outline-none leading-[1.7] document-editor"
+                    className="min-h-[420px] bg-white rounded-app-sm border border-border px-4 py-4 text-ink outline-none document-editor"
+                    style={{
+                      fontFamily: fontFamilyCss(styleSettings.fontFamily),
+                      fontSize: `${styleSettings.fontSizePt}pt`,
+                      lineHeight: String(styleSettings.lineSpacing),
+                      textAlign: styleSettings.justified ? 'justify' : 'left',
+                    }}
                     dangerouslySetInnerHTML={{ __html: draft }}
                     onInput={(event) => setDraft((event.currentTarget as HTMLDivElement).innerHTML)}
                   />
@@ -411,30 +422,28 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
 
               <div className="flex flex-col gap-2 pb-6">
                 {!isImageDocument && (
-                  <>
-                    <button
-                      onClick={() => save('ready')}
-                      disabled={saving || !hasChanges}
-                      className="w-full py-[13px] rounded-app-sm bg-gd text-white font-bold text-sm border-none disabled:opacity-50"
-                    >
-                      {saving ? 'Salvando...' : 'Salvar'}
-                    </button>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button onClick={downloadPdf} className="py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-xs font-bold flex items-center justify-center gap-1">
-                        <Printer size={13} />
-                        PDF
-                      </button>
-                      <button onClick={downloadWord} className="py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-xs font-bold flex items-center justify-center gap-1">
-                        <FileText size={13} />
-                        Word
-                      </button>
-                      <button onClick={shareDocument} disabled={saving} className="py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">
-                        <Share2 size={13} />
-                        Link
-                      </button>
-                    </div>
-                  </>
+                  <button
+                    onClick={() => save('ready')}
+                    disabled={saving || !hasChanges}
+                    className="w-full py-[13px] rounded-app-sm bg-gd text-white font-bold text-sm border-none disabled:opacity-50"
+                  >
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </button>
                 )}
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={downloadPdf} className="py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-xs font-bold flex items-center justify-center gap-1">
+                    <Printer size={13} />
+                    PDF
+                  </button>
+                  <button onClick={downloadWord} className="py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-xs font-bold flex items-center justify-center gap-1">
+                    <FileText size={13} />
+                    Word
+                  </button>
+                  <button onClick={shareDocument} disabled={saving} className="py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">
+                    <Share2 size={13} />
+                    Link
+                  </button>
+                </div>
 
                 {document.report_type === 'development_report' && (
                   <button
@@ -543,7 +552,19 @@ function toEditorHtml(value: string) {
     .join('')
 }
 
-function buildExportHtml(title: string, studentName: string | null, className: string | null, bodyHtml: string) {
+function buildExportHtml(
+  title: string,
+  studentName: string | null,
+  className: string | null,
+  bodyHtml: string,
+  settings: DocumentStyleSettings,
+  imageDataUrl?: string,
+) {
+  const bodyContent = imageDataUrl
+    ? `<div class="image-wrap"><img src="${imageDataUrl}" alt="Imagem do documento" /></div>`
+    : bodyHtml
+  const logoDataUrl = settings.schoolLogoDataUrl
+  const letterheadClass = `letterhead-${settings.letterheadStyle}`
   return `<!doctype html>
 <html>
 <head>
@@ -551,20 +572,26 @@ function buildExportHtml(title: string, studentName: string | null, className: s
   <title>${escapeHtml(title)}</title>
   <style>
     @page { size: A4; margin: 2.5cm 2cm 2cm 3cm; }
-    body { font-family: Arial, sans-serif; color: #111; line-height: 1.5; font-size: 12pt; }
+    body { font-family: ${fontFamilyCss(settings.fontFamily)}; color: #111; line-height: ${settings.lineSpacing}; font-size: ${settings.fontSizePt}pt; }
     h1 { text-align: center; font-size: 14pt; text-transform: uppercase; margin: 0 0 24pt; }
     h2 { font-size: 12pt; text-transform: uppercase; margin: 18pt 0 8pt; }
-    p { margin: 0 0 12pt; text-align: justify; }
+    p { margin: 0 0 12pt; text-align: ${settings.justified ? 'justify' : 'left'}; text-indent: ${settings.paragraphIndentCm}cm; }
     .meta { margin-bottom: 18pt; font-size: 11pt; color: #333; }
+    .letterhead { margin-bottom: 16pt; ${settings.letterheadStyle === 'centered' ? 'text-align:center;' : 'display:flex;justify-content:flex-start;'} }
+    .letterhead img { max-height: 72px; object-fit: contain; }
+    .letterhead-watermark { position: fixed; top: 35%; left: 10%; width: 80%; opacity: .08; z-index: -1; }
+    .image-wrap img { width: 100%; max-height: 900px; object-fit: contain; border: 1px solid #ddd; }
   </style>
 </head>
 <body>
+  ${logoDataUrl && settings.letterheadStyle !== 'watermark' ? `<div class="letterhead ${letterheadClass}"><img src="${logoDataUrl}" alt="Logo da escola" /></div>` : ''}
+  ${logoDataUrl && settings.letterheadStyle === 'watermark' ? `<img class="letterhead-watermark" src="${logoDataUrl}" alt="" />` : ''}
   <h1>${escapeHtml(title)}</h1>
   <div class="meta">
     <p><strong>Criança:</strong> ${escapeHtml(studentName ?? 'Sem criança')}</p>
     <p><strong>Turma:</strong> ${escapeHtml(className ?? 'Sem turma')}</p>
   </div>
-  ${bodyHtml}
+  ${bodyContent}
 </body>
 </html>`
 }
