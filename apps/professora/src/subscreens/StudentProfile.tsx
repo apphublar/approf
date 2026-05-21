@@ -4,6 +4,7 @@ import { useNavStore, useAppStore } from '@/store'
 import type { TimelineEvent, TimelineEventType } from '@/types'
 import { getAppDataMode } from '@/services/app-data'
 import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
+import { listReports } from '@/services/reports'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 
@@ -24,6 +25,7 @@ export default function StudentProfileSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const { classes, activeStudentId, activeClassId, annotations, attendanceRecords, removeAnnotation } = useAppStore()
   const [showAllAnnotations, setShowAllAnnotations] = useState(false)
+  const [generatedCount, setGeneratedCount] = useState(0)
 
   useEffect(() => {
     setShowAllAnnotations(false)
@@ -53,8 +55,10 @@ export default function StudentProfileSubscreen() {
     attachmentKind: annotation.attachmentName ? 'file' : undefined,
   }))
   const timeline: TimelineEvent[] = student.timeline && student.timeline.length > 0 ? student.timeline : timelineFromAnnotations
-  const totalRecords = studentAnns.length
-  const totalMilestones = timeline.filter((event) => event.type === 'marco').length || timeline.length
+  const totalNotes = studentAnns.length
+  const totalMilestones = timeline.filter((event) => event.type === 'marco').length
+  const extraTimelineRecords = timeline.filter((event) => event.type !== 'marco').length
+  const totalRecords = totalNotes + totalMilestones + generatedCount + extraTimelineRecords
   const absenceRecords = attendanceRecords
     .filter((record) => record.classId === cls.id && !record.presentStudentIds.includes(student.id))
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -67,6 +71,20 @@ export default function StudentProfileSubscreen() {
     ? studentAnns
     : studentAnns.slice(0, ANNOTATION_PREVIEW_COUNT)
   const hasMoreAnnotations = studentAnns.length > ANNOTATION_PREVIEW_COUNT
+
+  useEffect(() => {
+    let active = true
+    listReports({ studentId: student.id, limit: 200, compact: true })
+      .then((reports) => {
+        if (active) setGeneratedCount(reports.length)
+      })
+      .catch(() => {
+        if (active) setGeneratedCount(0)
+      })
+    return () => {
+      active = false
+    }
+  }, [student.id])
 
   async function handleDeleteAnnotation(annotationId: string) {
     const confirmed = window.confirm('Deseja excluir esta anotação? Esta ação não pode ser desfeita.')
@@ -109,7 +127,7 @@ export default function StudentProfileSubscreen() {
               studentId: student.id,
               directStudentNote: true,
             },
-          })} className="text-[13px] font-bold text-gm">
+          })} className="subtle-attention text-[13px] font-bold text-gm">
             + Nota
           </button>
         </div>
@@ -133,7 +151,9 @@ export default function StudentProfileSubscreen() {
             <div className="flex-1">
               <h2 className="font-serif text-[22px]">{student.name}</h2>
               <p className="text-[12px] opacity-75 mt-1">{cls.shift} - {cls.school}</p>
-              {student.birthDate && <p className="text-[11px] opacity-65 mt-1">Nascimento: {formatBirthDate(student.birthDate)}</p>}
+              <p className="text-[11px] opacity-65 mt-1">
+                {student.birthDate ? `Nascimento: ${formatBirthDate(student.birthDate)} · ${formatStudentAge(student.age, student.ageMonths)}` : formatStudentAge(student.age, student.ageMonths)}
+              </p>
               <div className="flex gap-2 flex-wrap mt-3">
                 {student.tag && <span className="bg-white/18 text-white text-[10px] font-bold px-3 py-1 rounded-full">{student.tag}</span>}
                 <span className="bg-white/18 text-white text-[10px] font-bold px-3 py-1 rounded-full">{totalRecords} registros</span>
@@ -173,11 +193,10 @@ export default function StudentProfileSubscreen() {
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-[10px] mb-5">
+        <div className="grid grid-cols-2 gap-[10px] mb-5">
           {[
-            { n: totalRecords, l: 'Registros' },
-            { n: totalMilestones, l: 'Marcos' },
-            { n: student.age, l: 'Anos' },
+            { n: totalNotes, l: 'Total de Notas' },
+            { n: totalMilestones, l: 'Total de Marcos' },
           ].map((item) => (
             <div key={item.l} className="bg-white rounded-app p-3 text-center border border-border">
               <span className="block text-[20px] font-bold text-gd">{item.n}</span>
@@ -342,6 +361,13 @@ export default function StudentProfileSubscreen() {
 function formatBirthDate(value: string) {
   const [year, month, day] = value.split('-')
   return `${day}/${month}/${year}`
+}
+
+function formatStudentAge(years?: number, months?: number) {
+  const safeYears = typeof years === 'number' ? years : 0
+  const safeMonths = typeof months === 'number' ? months : 0
+  if (safeMonths > 0) return `${safeYears} anos e ${safeMonths} meses`
+  return `${safeYears} anos`
 }
 
 function formatAttendanceDate(value: string) {

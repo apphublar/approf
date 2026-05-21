@@ -26,6 +26,7 @@ import PendingSubscreen from '@/subscreens/Pending'
 import GizTokensSubscreen from '@/subscreens/GizTokens'
 import GeneratedDocumentsSubscreen from '@/subscreens/GeneratedDocuments'
 import InterventionsSubscreen from '@/subscreens/Interventions'
+import TeacherAccountSubscreen from '@/subscreens/TeacherAccount'
 
 export default function AppShell() {
   const { activeTab, subscreens } = useNavStore()
@@ -115,6 +116,7 @@ function renderSubscreen(screen: string, data?: unknown) {
     case 'document-detail': return <DocumentDetailSubscreen data={data} />
     case 'pending':         return <PendingSubscreen />
     case 'interventions':   return <InterventionsSubscreen />
+    case 'teacher-account': return <TeacherAccountSubscreen data={data} />
     default:                return null
   }
 }

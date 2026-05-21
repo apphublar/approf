@@ -251,7 +251,8 @@ export async function generatePedagogicalText(
       logId: input.logId,
       generationType: input.generationType,
     })
-    reportId = await persistGeneratedReport(input, s3.text)
+    const cleanText = cleanupGeneratedText(s3.text)
+    reportId = await persistGeneratedReport(input, cleanText)
     if (!reportId) {
       throw new PublicAiGenerationError('Não foi possivel salvar o relatório gerado. Tente novamente.')
     }
@@ -286,7 +287,7 @@ export async function generatePedagogicalText(
     })
 
     return {
-      text: s3.text,
+      text: cleanText,
       provider: 'hybrid',
       model: s3.model,
       pipeline: 'haiku-sonnet-gpt-humanized',
@@ -338,7 +339,8 @@ async function generateInterventionWithOpenAi(
     },
   ]
 
-  const reportId = await persistGeneratedReport(input, openAi.text)
+  const cleanText = cleanupGeneratedText(openAi.text)
+  const reportId = await persistGeneratedReport(input, cleanText)
   await persistUsage(
     reportId,
     input.ownerId,
@@ -350,7 +352,7 @@ async function generateInterventionWithOpenAi(
   )
 
   return {
-    text: openAi.text,
+    text: cleanText,
     provider: 'openai',
     model: openAi.model,
     pipeline: 'gpt-interventions',
@@ -684,6 +686,20 @@ function normalize(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+}
+
+function cleanupGeneratedText(value: string) {
+  return value
+    .replace(/\r\n/g, '\n')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[{}[\]]/g, '')
+    .replace(/"{2,}/g, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function toStageMeta(

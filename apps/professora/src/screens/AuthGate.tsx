@@ -4,6 +4,12 @@ import { Check, Loader2 } from 'lucide-react'
 import { requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
 import { loadTeacherWorkspace } from '@/services/supabase/classes'
 import { getSupabaseClient } from '@/services/supabase/client'
+import {
+  getTeacherAccountSnapshot,
+  isTeacherAccessBlocked,
+  onSubscriptionStateChange,
+} from '@/services/supabase/account'
+import TeacherAccountSubscreen from '@/subscreens/TeacherAccount'
 import { useAppStore, useOnboardingStore } from '@/store'
 
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
@@ -17,6 +23,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [passwordRecovery, setPasswordRecovery] = useState(() => hasPasswordRecoveryUrl())
   const [loadingSession, setLoadingSession] = useState(true)
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
+  const [checkingAccess, setCheckingAccess] = useState(false)
+  const [subscriptionBlocked, setSubscriptionBlocked] = useState(false)
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null)
   const hydrateWorkspace = useAppStore((state) => state.hydrateWorkspace)
   const setOnboardingCompleted = useOnboardingStore((state) => state.setCompleted)
@@ -42,6 +50,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_OUT') {
         setSession(null)
         setHydratedUserId(null)
+        setSubscriptionBlocked(false)
         return
       }
       setSession(nextSession)
@@ -73,7 +82,36 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       })
   }, [hydrateWorkspace, hydratedUserId, session?.user?.id, setOnboardingCompleted])
 
-  if (loadingSession || loadingWorkspace) {
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!userId) return
+
+    let active = true
+    async function refreshAccess() {
+      setCheckingAccess(true)
+      try {
+        const snapshot = await getTeacherAccountSnapshot()
+        if (!active) return
+        setSubscriptionBlocked(isTeacherAccessBlocked(snapshot.subscription?.status ?? null))
+      } catch {
+        if (!active) return
+        setSubscriptionBlocked(false)
+      } finally {
+        if (active) setCheckingAccess(false)
+      }
+    }
+
+    void refreshAccess()
+    const unsubscribe = onSubscriptionStateChange(() => {
+      void refreshAccess()
+    })
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [session?.user?.id])
+
+  if (loadingSession || loadingWorkspace || checkingAccess) {
     return (
       <div className="absolute inset-0 chalk-bg flex items-center justify-center px-6">
         <div className="auth-loading-wrap">
@@ -100,6 +138,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         onPasswordResetComplete={() => setPasswordRecovery(false)}
       />
     )
+  }
+
+  if (subscriptionBlocked) {
+    return <TeacherAccountSubscreen data={{ forcedMode: true }} />
   }
 
   return children

@@ -1,4 +1,5 @@
 ﻿import type { ReactNode } from 'react'
+import { UserRound } from 'lucide-react'
 import type { Tab } from '@/types'
 import { useNavStore, useAppStore } from '@/store'
 
@@ -90,7 +91,7 @@ export default function BottomNav() {
       <div className="px-2 flex items-center justify-center">
         <button
           onClick={() => openSubscreen('new-annotation')}
-          className="w-[52px] h-[52px] rounded-full bg-gm text-white border-none shadow-fab flex items-center justify-center -mt-5"
+          className="subtle-attention w-[52px] h-[52px] rounded-full bg-gm text-white border-none shadow-fab flex items-center justify-center -mt-5"
           aria-label="Nova anotação"
         >
           <svg viewBox="0 0 24 24" className="w-6 h-6" stroke="currentColor" fill="none" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
@@ -125,6 +126,15 @@ export default function BottomNav() {
             </button>
           )
         })}
+        <button
+          onClick={() => openSubscreen('teacher-account')}
+          className="flex-1 flex flex-col items-center gap-[3px] py-[9px] pb-[11px] border-none bg-transparent cursor-pointer transition-colors text-muted"
+          style={{ fontFamily: '"DM Sans", sans-serif', fontSize: 11, fontWeight: 700, letterSpacing: '0.01em' }}
+        >
+          <UserRound size={20} />
+          <span>Conta</span>
+          <span className="w-1 h-1 rounded-full bg-gl -mt-[1px]" style={{ opacity: 0, transition: 'opacity 0.2s' }} />
+        </button>
       </div>
     </nav>
   )

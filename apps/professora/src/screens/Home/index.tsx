@@ -241,7 +241,7 @@ export default function HomeScreen() {
         <div className="px-[18px]">
           <button
             onClick={() => openSubscreen('interventions')}
-            className="w-full rounded-app p-4 mt-[14px] mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
+            className="subtle-attention w-full rounded-app p-4 mt-[14px] mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
             style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}
           >
             <div className="flex items-center gap-3">
@@ -258,7 +258,7 @@ export default function HomeScreen() {
 
           <button
             onClick={() => openSubscreen('ai')}
-            className="w-full rounded-app p-4 mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
+            className="subtle-attention w-full rounded-app p-4 mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
             style={{ background: 'linear-gradient(135deg,#4F8341,#83C451)' }}
           >
             <div className="flex items-center gap-3">

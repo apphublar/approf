@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Bold, ChevronLeft, Download, FileText, Italic, List, Pencil, Printer, Share2, Type } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, Download, FileText, Pencil, Printer, Share2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { createReportShareLink, getCachedReportById, getReportById, updateReport } from '@/services/reports'
 import { generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument, ReportStatus } from '@/types'
 import { getImageVariants, type ImageVariants } from '@/utils/image-performance'
-import { fontFamilyCss, fontFamilyLabel, loadDocumentStyleSettings, type DocumentStyleSettings } from '@/utils/document-style'
+import { fontFamilyCss, fontFamilyLabel, loadDocumentStyleSettings, textAlignLabel, type DocumentStyleSettings } from '@/utils/document-style'
 
 interface DocumentDetailSubscreenProps {
   data?: unknown
@@ -14,7 +14,7 @@ interface DocumentDetailSubscreenProps {
 
 export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscreenProps) {
   const { closeSubscreen } = useNavStore()
-  const { classes } = useAppStore()
+  const { classes, userName, schoolName } = useAppStore()
   const reportId = typeof data === 'object' && data && 'reportId' in data
     ? String((data as { reportId?: string }).reportId ?? '')
     : ''
@@ -222,12 +222,6 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     }
   }
 
-  function runEditorCommand(command: string, value?: string) {
-    editorRef.current?.focus()
-    window.document.execCommand(command, false, value)
-    setDraft(editorRef.current?.innerHTML ?? '')
-  }
-
   async function shareDocument() {
     if (!document) return
     const title = formatReportType(document.report_type)
@@ -256,7 +250,16 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   function downloadWord() {
     if (!document) return
     const title = formatReportType(document.report_type)
-    const html = buildExportHtml(title, studentName, className, draft, styleSettings, imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl)
+    const html = buildExportHtml(
+      title,
+      studentName,
+      className,
+      draft,
+      styleSettings,
+      imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl,
+      userName,
+      schoolName,
+    )
     const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' })
     downloadBlob(blob, `${slugify(title)}.doc`)
   }
@@ -269,7 +272,18 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
       setError('Não foi possível abrir a janela de impressão.')
       return
     }
-    printWindow.document.write(buildExportHtml(title, studentName, className, draft, styleSettings, imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl))
+    printWindow.document.write(
+      buildExportHtml(
+        title,
+        studentName,
+        className,
+        draft,
+        styleSettings,
+        imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl,
+        userName,
+        schoolName,
+      ),
+    )
     printWindow.document.close()
     printWindow.focus()
     printWindow.print()
@@ -307,7 +321,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                   {document.is_final_version ? ' \u2022 Vers\u00e3o final' : ''}
                 </p>
                 <p className="text-[10px] text-muted mt-2">
-                  ABNT • Fonte {fontFamilyLabel(styleSettings.fontFamily)} {styleSettings.fontSizePt}pt • espaçamento {String(styleSettings.lineSpacing).replace('.', ',')}
+                  ABNT • Fonte {fontFamilyLabel(styleSettings.fontFamily)} {styleSettings.fontSizePt}pt • {textAlignLabel(styleSettings.textAlign)}
                 </p>
               </div>
 
@@ -390,12 +404,6 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                     </label>
                     <span className="text-[10px] text-muted">BNCC EI + padrão formal ABNT</span>
                   </div>
-                  <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2 mb-3">
-                    <EditorButton label="Título" icon={<Type size={14} />} onClick={() => runEditorCommand('formatBlock', 'h2')} />
-                    <EditorButton label="Negrito" icon={<Bold size={14} />} onClick={() => runEditorCommand('bold')} />
-                    <EditorButton label="Itálico" icon={<Italic size={14} />} onClick={() => runEditorCommand('italic')} />
-                    <EditorButton label="Lista" icon={<List size={14} />} onClick={() => runEditorCommand('insertUnorderedList')} />
-                  </div>
                   <div
                     ref={editorRef}
                     contentEditable
@@ -405,7 +413,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                       fontFamily: fontFamilyCss(styleSettings.fontFamily),
                       fontSize: `${styleSettings.fontSizePt}pt`,
                       lineHeight: String(styleSettings.lineSpacing),
-                      textAlign: styleSettings.justified ? 'justify' : 'left',
+                      textAlign: styleSettings.textAlign,
                     }}
                     dangerouslySetInnerHTML={{ __html: draft }}
                     onInput={(event) => setDraft((event.currentTarget as HTMLDivElement).innerHTML)}
@@ -500,20 +508,6 @@ function formatReportType(type: string) {
   }
 }
 
-function EditorButton({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onClick}
-      className="px-3 py-2 rounded-app-sm border border-border bg-cream text-muted text-[11px] font-bold flex items-center gap-1 whitespace-nowrap"
-    >
-      {icon}
-      {label}
-    </button>
-  )
-}
-
 function formatStatus(status: ReportStatus) {
   switch (status) {
     case 'draft': return 'Rascunho'
@@ -559,6 +553,8 @@ function buildExportHtml(
   bodyHtml: string,
   settings: DocumentStyleSettings,
   imageDataUrl?: string,
+  teacherName?: string,
+  schoolName?: string,
 ) {
   const bodyContent = imageDataUrl
     ? `<div class="image-wrap"><img src="${imageDataUrl}" alt="Imagem do documento" /></div>`
@@ -573,14 +569,15 @@ function buildExportHtml(
   <style>
     @page { size: A4; margin: 2.5cm 2cm 2cm 3cm; }
     body { font-family: ${fontFamilyCss(settings.fontFamily)}; color: #111; line-height: ${settings.lineSpacing}; font-size: ${settings.fontSizePt}pt; }
-    h1 { text-align: center; font-size: 14pt; text-transform: uppercase; margin: 0 0 24pt; }
-    h2 { font-size: 12pt; text-transform: uppercase; margin: 18pt 0 8pt; }
-    p { margin: 0 0 12pt; text-align: ${settings.justified ? 'justify' : 'left'}; text-indent: ${settings.paragraphIndentCm}cm; }
+    h1 { text-align: center; font-size: 14pt; text-transform: uppercase; margin: 0 0 24pt; font-weight: ${settings.boldTitles ? 700 : 500}; }
+    h2 { font-size: 12pt; text-transform: uppercase; margin: 18pt 0 8pt; font-weight: ${settings.boldTitles ? 700 : 500}; }
+    p { margin: 0 0 12pt; text-align: ${settings.textAlign}; text-indent: ${settings.paragraphIndentCm}cm; }
     .meta { margin-bottom: 18pt; font-size: 11pt; color: #333; }
     .letterhead { margin-bottom: 16pt; ${settings.letterheadStyle === 'centered' ? 'text-align:center;' : 'display:flex;justify-content:flex-start;'} }
     .letterhead img { max-height: 72px; object-fit: contain; }
     .letterhead-watermark { position: fixed; top: 35%; left: 10%; width: 80%; opacity: .08; z-index: -1; }
     .image-wrap img { width: 100%; max-height: 900px; object-fit: contain; border: 1px solid #ddd; }
+    .sheet-footer { position: fixed; left: 0; right: 0; bottom: .7cm; font-size: 10pt; color: #555; display: flex; justify-content: space-between; padding: 0 2cm 0 3cm; }
   </style>
 </head>
 <body>
@@ -592,6 +589,10 @@ function buildExportHtml(
     <p><strong>Turma:</strong> ${escapeHtml(className ?? 'Sem turma')}</p>
   </div>
   ${bodyContent}
+  <div class="sheet-footer">
+    <span>${escapeHtml(teacherName ?? 'Professora')}</span>
+    <span>${escapeHtml(schoolName ?? 'Escola')}</span>
+  </div>
 </body>
 </html>`
 }

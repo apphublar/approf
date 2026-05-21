@@ -26,6 +26,7 @@ export type Subscreen =
   | 'document-detail'
   | 'pending'
   | 'interventions'
+  | 'teacher-account'
 
 export type FeatureKey = 'community'
 

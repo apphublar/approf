@@ -1371,6 +1371,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               Histórico de gerados
             </button>
 
+            <button
+              onClick={() => reportId && openSubscreen('document-detail', { reportId })}
+              disabled={!reportId}
+              className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2 disabled:opacity-60"
+            >
+              Visualizar como documento
+            </button>
+
             {editingDocument ? (
               <button
                 onClick={saveDocument}

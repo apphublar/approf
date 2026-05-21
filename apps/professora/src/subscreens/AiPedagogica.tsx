@@ -1,11 +1,12 @@
 ﻿import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { ChevronLeft, ChevronRight, FileText, Search, Settings2, Sparkles, Upload, X } from 'lucide-react'
-import { useNavStore } from '@/store'
+import { useAppStore, useNavStore } from '@/store'
 import {
   DEFAULT_DOCUMENT_STYLE_SETTINGS,
   fontFamilyLabel,
   loadDocumentStyleSettings,
   saveDocumentStyleSettings,
+  textAlignLabel,
   type DocumentStyleSettings,
 } from '@/utils/document-style'
 
@@ -33,6 +34,7 @@ type SectionTitle = (typeof AI_SECTIONS)[number]['title']
 
 export default function AiPedagogicaSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
+  const { userName, schoolName } = useAppStore()
   const [query, setQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
@@ -134,7 +136,7 @@ export default function AiPedagogicaSubscreen() {
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-bold text-ink leading-tight">Configurações ABNT</p>
                 <p className="text-[11px] text-muted leading-snug mt-1">
-                  {fontFamilyLabel(styleSettings.fontFamily)} • {styleSettings.fontSizePt}pt • espaçamento {styleSettings.lineSpacing.toString().replace('.', ',')}
+                  {fontFamilyLabel(styleSettings.fontFamily)} • {styleSettings.fontSizePt}pt • {textAlignLabel(styleSettings.textAlign)}
                 </p>
               </div>
               <ChevronRight size={18} className="text-muted flex-shrink-0" />
@@ -278,13 +280,30 @@ export default function AiPedagogicaSubscreen() {
                 ))}
               </div>
 
+              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Alinhamento padrão do corpo</p>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {(['left', 'justify', 'center', 'right'] as const).map((align) => (
+                  <button
+                    key={align}
+                    onClick={() => updateSettings({ textAlign: align })}
+                    className={`rounded-app-sm border px-2 py-2 text-[11px] font-bold ${
+                      styleSettings.textAlign === align
+                        ? 'bg-gd text-white border-gd'
+                        : 'bg-white text-muted border-border'
+                    }`}
+                  >
+                    {textAlignLabel(align)}
+                  </button>
+                ))}
+              </div>
+
               <label className="flex items-center gap-2 mt-4 text-[12px] text-muted">
                 <input
                   type="checkbox"
-                  checked={styleSettings.justified}
-                  onChange={(event) => updateSettings({ justified: event.target.checked })}
+                  checked={styleSettings.boldTitles}
+                  onChange={(event) => updateSettings({ boldTitles: event.target.checked })}
                 />
-                Texto justificado por padrão
+                Títulos em negrito
               </label>
 
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-5">Papel timbrado</p>
@@ -333,6 +352,35 @@ export default function AiPedagogicaSubscreen() {
                   </div>
                 </>
               )}
+
+              <div className="mt-5 rounded-app-sm border border-border bg-cream p-3">
+                <p className="text-[11px] font-bold text-ink mb-2">Prévia do papel</p>
+                <div className="rounded-[10px] bg-white border border-border h-[220px] px-4 py-3 relative overflow-hidden">
+                  {styleSettings.schoolLogoDataUrl && styleSettings.letterheadStyle === 'watermark' && (
+                    <img
+                      src={styleSettings.schoolLogoDataUrl}
+                      alt=""
+                      className="absolute inset-0 m-auto w-[70%] opacity-10 object-contain"
+                    />
+                  )}
+                  {styleSettings.schoolLogoDataUrl && styleSettings.letterheadStyle !== 'watermark' && (
+                    <div className={styleSettings.letterheadStyle === 'centered' ? 'flex justify-center' : 'flex justify-start'}>
+                      <img src={styleSettings.schoolLogoDataUrl} alt="Logo da escola" className="h-10 object-contain" />
+                    </div>
+                  )}
+                  <div className="mt-3 space-y-2">
+                    <div className="h-2 bg-[#E9E9E9] rounded w-[88%]" />
+                    <div className="h-2 bg-[#ECECEC] rounded w-[80%]" />
+                    <div className="h-2 bg-[#F0F0F0] rounded w-[84%]" />
+                    <div className="h-2 bg-[#ECECEC] rounded w-[72%]" />
+                  </div>
+                  <div className="absolute bottom-3 left-4 right-4 text-[10px] text-muted flex justify-between">
+                    <span>{userName || 'Nome da professora'}</span>
+                    <span>{schoolName || 'Nome da escola'}</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted mt-2">Rodapé automático com professora e escola em todas as páginas exportadas.</p>
+              </div>
 
               <button
                 onClick={() => setSettingsOpen(false)}

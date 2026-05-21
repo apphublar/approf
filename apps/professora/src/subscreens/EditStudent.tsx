@@ -6,8 +6,6 @@ import { updateSupabaseStudent } from '@/services/supabase/students'
 import { birthDateInputToIso, formatBirthDateInput, isoToBirthDateInput } from '@/utils/date'
 import { getAdjustedPhotoStyle, parsePhotoAdjustment, serializePhotoAdjustment } from '@/utils/photo'
 
-const TAGS = ['Sem tag', 'TEA', 'TDAH', 'Acompanhamento', 'Adaptação']
-
 function calculateAgeParts(birthDate: string) {
   if (!birthDate) return { years: 0, months: 0 }
   const birth = new Date(`${birthDate}T00:00:00`)
@@ -35,7 +33,6 @@ export default function EditStudentSubscreen() {
 
   const [name, setName] = useState(student?.name ?? '')
   const [birthDateInput, setBirthDateInput] = useState(() => isoToBirthDateInput(student?.birthDate))
-  const [tag, setTag] = useState(student?.tag ?? TAGS[0])
   const [generalNotes, setGeneralNotes] = useState(student?.generalNotes ?? '')
   const [photoName, setPhotoName] = useState(student?.photoUrl ? 'Foto atual marcada como privada' : null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -86,7 +83,7 @@ export default function EditStudentSubscreen() {
       age: age.years,
       ageMonths: age.months,
       birthDate: birthDate || undefined,
-      tag: tag === 'Sem tag' ? null : tag,
+      tag: student.tag ?? null,
       generalNotes: generalNotes.trim() || undefined,
       photoUrl: displayedPhotoUrl,
       photoPosition: serializePhotoAdjustment({ x: photoPositionX, y: photoPositionY, zoom: photoZoom }),
@@ -182,21 +179,6 @@ export default function EditStudentSubscreen() {
           value={birthDateInput}
           onChange={(event) => setBirthDateInput(formatBirthDateInput(event.target.value))}
         />
-
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Marcador pedagógico</label>
-        <div className="flex gap-2 overflow-x-auto scrollbar-none mt-2 mb-4 pb-1">
-          {TAGS.map((item) => (
-            <button
-              key={item}
-              onClick={() => setTag(item)}
-              className={`px-3 py-2 rounded-full text-xs font-bold border whitespace-nowrap ${
-                tag === item ? 'bg-gm border-gm text-white' : 'bg-white border-border text-muted'
-              }`}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
 
         <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Observações gerais</label>
         <textarea

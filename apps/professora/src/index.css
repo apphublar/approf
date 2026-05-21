@@ -163,6 +163,21 @@ input, textarea, select, button {
 .auth-loading-dots span:nth-child(2) { animation-delay: 0.15s; }
 .auth-loading-dots span:nth-child(3) { animation-delay: 0.3s; }
 
+@keyframes subtleAttentionPulse {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 8px 18px rgba(27, 67, 50, 0.08);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 12px 24px rgba(79, 131, 65, 0.18);
+  }
+}
+
+.subtle-attention {
+  animation: subtleAttentionPulse 2.6s ease-in-out infinite;
+}
+
 .age-range-input {
   appearance: none;
   background: transparent;
