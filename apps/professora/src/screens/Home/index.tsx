@@ -7,6 +7,7 @@ import {
   FolderClosed,
   Hourglass,
   Lightbulb,
+  Menu,
   MoreVertical,
   NotebookPen,
   PenLine,
@@ -160,6 +161,20 @@ export default function HomeScreen() {
 
         {/* Top-right actions â€” always same size, same row */}
         <div className="absolute top-3 right-4 z-10 flex items-center gap-[10px]">
+          <button
+            onClick={() => openSubscreen('teacher-account')}
+            className="rounded-full border-none flex items-center justify-center"
+            style={{
+              width: 36, height: 36,
+              background: 'rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.85)',
+              border: '1px solid rgba(255,255,255,0.22)',
+            }}
+            aria-label="Abrir conta"
+          >
+            <Menu size={17} />
+          </button>
+
           {/* Note options only when viewing note slide */}
           {currentViewedNote && (
             <div className="relative">

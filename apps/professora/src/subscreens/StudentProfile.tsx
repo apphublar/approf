@@ -56,7 +56,9 @@ export default function StudentProfileSubscreen() {
   }))
   const timeline: TimelineEvent[] = student.timeline && student.timeline.length > 0 ? student.timeline : timelineFromAnnotations
   const totalNotes = studentAnns.length
-  const totalMilestones = timeline.filter((event) => event.type === 'marco').length
+  const totalMilestones = timeline.filter(
+    (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
+  ).length
   const extraTimelineRecords = timeline.filter((event) => event.type !== 'marco').length
   const totalRecords = totalNotes + totalMilestones + generatedCount + extraTimelineRecords
   const absenceRecords = attendanceRecords
@@ -195,8 +197,8 @@ export default function StudentProfileSubscreen() {
 
         <div className="grid grid-cols-2 gap-[10px] mb-5">
           {[
-            { n: totalNotes, l: 'Total de Notas' },
-            { n: totalMilestones, l: 'Total de Marcos' },
+            { n: totalNotes, l: 'Notas' },
+            { n: totalMilestones, l: 'Marcos' },
           ].map((item) => (
             <div key={item.l} className="bg-white rounded-app p-3 text-center border border-border">
               <span className="block text-[20px] font-bold text-gd">{item.n}</span>

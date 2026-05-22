@@ -16,7 +16,6 @@ const EVENT_TYPES: { id: TimelineEventType; label: string; desc: string }[] = [
   { id: 'marco', label: 'Marco especial', desc: 'Momento importante da jornada.' },
 ]
 
-const QUICK_TAGS = ['Linguagem', 'Autonomia', 'Acolhimento', 'Brincadeira', 'Movimento', 'Musicalização', 'Rotina', 'Família']
 const MAX_ATTACHMENT_SIZE_MB = 10
 const ACCEPTED_ATTACHMENT_TYPES = [
   'image/',
@@ -32,10 +31,9 @@ export default function NewTimelineEventSubscreen() {
   const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
   const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
 
-  const [type, setType] = useState<TimelineEventType>('evolucao')
+  const [type, setType] = useState<TimelineEventType>('marco')
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
-  const [tags, setTags] = useState<string[]>([])
   const [attachmentName, setAttachmentName] = useState<string | null>(null)
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null)
@@ -52,10 +50,6 @@ export default function NewTimelineEventSubscreen() {
   if (!cls || !student) return null
 
   const canSave = title.trim().length >= 2 && text.trim().length >= 5
-
-  function toggleTag(tag: string) {
-    setTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag])
-  }
 
   function selectFile(files: FileList | null) {
     const file = files?.[0]
@@ -88,7 +82,7 @@ export default function NewTimelineEventSubscreen() {
             type,
             title: title.trim(),
             text: text.trim(),
-            tags,
+            tags: [],
             attachmentFile,
           })
         : {
@@ -97,7 +91,7 @@ export default function NewTimelineEventSubscreen() {
             title: title.trim(),
             text: text.trim(),
             date: 'Hoje',
-            tags,
+            tags: [],
             attachmentName,
             attachmentUrl: attachmentPreviewUrl,
             attachmentKind: attachmentPreviewUrl ? 'image' : attachmentName ? 'file' : undefined,
@@ -156,21 +150,6 @@ export default function NewTimelineEventSubscreen() {
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
-
-        <p className="text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">Tags rápidas</p>
-        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2 mb-4">
-          {QUICK_TAGS.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => toggleTag(tag)}
-              className={`px-3 py-2 rounded-full text-xs font-bold border whitespace-nowrap ${
-                tags.includes(tag) ? 'bg-gm border-gm text-white' : 'bg-white border-border text-muted'
-              }`}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
           <div className="flex items-start gap-3">

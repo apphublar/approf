@@ -1,12 +1,11 @@
 ﻿import { useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { ChevronLeft, ChevronRight, FileText, Search, Settings2, Sparkles, Upload, X } from 'lucide-react'
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronLeft, ChevronRight, FileText, Search, Settings2, Sparkles, Upload, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import {
   DEFAULT_DOCUMENT_STYLE_SETTINGS,
   fontFamilyLabel,
   loadDocumentStyleSettings,
   saveDocumentStyleSettings,
-  textAlignLabel,
   type DocumentStyleSettings,
 } from '@/utils/document-style'
 
@@ -134,9 +133,9 @@ export default function AiPedagogicaSubscreen() {
                 <Settings2 size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-ink leading-tight">Configurações ABNT</p>
+                <p className="text-[13px] font-bold text-ink leading-tight">Edição e Formatação</p>
                 <p className="text-[11px] text-muted leading-snug mt-1">
-                  {fontFamilyLabel(styleSettings.fontFamily)} • {styleSettings.fontSizePt}pt • {textAlignLabel(styleSettings.textAlign)}
+                  {fontFamilyLabel(styleSettings.fontFamily)} • {styleSettings.fontSizePt}pt • alinhamento configurado
                 </p>
               </div>
               <ChevronRight size={18} className="text-muted flex-shrink-0" />
@@ -214,7 +213,7 @@ export default function AiPedagogicaSubscreen() {
           <div className="w-full bg-white rounded-t-[22px] border-t border-border max-h-[88vh] overflow-auto stage-fade-in">
             <div className="p-5">
               <div className="flex items-center justify-between mb-4">
-                <p className="font-serif text-[18px] text-gd">Normas ABNT e papel timbrado</p>
+                <p className="font-serif text-[18px] text-gd">Edição e Formatação</p>
                 <button onClick={() => setSettingsOpen(false)} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted">
                   <X size={16} />
                 </button>
@@ -282,17 +281,23 @@ export default function AiPedagogicaSubscreen() {
 
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Alinhamento padrão do corpo</p>
               <div className="grid grid-cols-4 gap-2 mt-2">
-                {(['left', 'justify', 'center', 'right'] as const).map((align) => (
+                {([
+                  { id: 'left', icon: AlignLeft },
+                  { id: 'justify', icon: AlignJustify },
+                  { id: 'center', icon: AlignCenter },
+                  { id: 'right', icon: AlignRight },
+                ] as const).map((alignOption) => (
                   <button
-                    key={align}
-                    onClick={() => updateSettings({ textAlign: align })}
-                    className={`rounded-app-sm border px-2 py-2 text-[11px] font-bold ${
-                      styleSettings.textAlign === align
+                    key={alignOption.id}
+                    onClick={() => updateSettings({ textAlign: alignOption.id })}
+                    className={`rounded-app-sm border px-2 py-2 flex items-center justify-center ${
+                      styleSettings.textAlign === alignOption.id
                         ? 'bg-gd text-white border-gd'
                         : 'bg-white text-muted border-border'
                     }`}
+                    aria-label={`Alinhar ${alignOption.id}`}
                   >
-                    {textAlignLabel(align)}
+                    <alignOption.icon size={16} />
                   </button>
                 ))}
               </div>
