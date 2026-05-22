@@ -147,6 +147,7 @@ export default function HomeScreen() {
                   giztokens={giztokensRemaining}
                   documents={docsGenerated}
                   images={imagesGenerated}
+                  onOpenAccount={() => openSubscreen('teacher-account')}
                   onOpenGizTokens={() => openSubscreen('giztokens')}
                   onOpenAnnotations={() => setTab('annotations')}
                   onOpenDocuments={() => openSubscreen('generated-documents', { kind: 'documents' })}
@@ -161,20 +162,6 @@ export default function HomeScreen() {
 
         {/* Top-right actions â€” always same size, same row */}
         <div className="absolute top-3 right-4 z-10 flex items-center gap-[10px]">
-          <button
-            onClick={() => openSubscreen('teacher-account')}
-            className="rounded-full border-none flex items-center justify-center"
-            style={{
-              width: 36, height: 36,
-              background: 'rgba(255,255,255,0.12)',
-              color: 'rgba(255,255,255,0.85)',
-              border: '1px solid rgba(255,255,255,0.22)',
-            }}
-            aria-label="Abrir conta"
-          >
-            <Menu size={17} />
-          </button>
-
           {/* Note options only when viewing note slide */}
           {currentViewedNote && (
             <div className="relative">
@@ -456,6 +443,7 @@ function MainSlide({
   giztokens,
   documents,
   images,
+  onOpenAccount,
   onOpenGizTokens,
   onOpenAnnotations,
   onOpenDocuments,
@@ -466,6 +454,7 @@ function MainSlide({
   giztokens: number
   documents: number
   images: number
+  onOpenAccount: () => void
   onOpenGizTokens: () => void
   onOpenAnnotations: () => void
   onOpenDocuments: () => void
@@ -481,6 +470,19 @@ function MainSlide({
   ]
   return (
     <div className="relative z-10">
+      <button
+        onClick={onOpenAccount}
+        className="rounded-full border-none flex items-center justify-center mb-2"
+        style={{
+          width: 36, height: 36,
+          background: 'rgba(255,255,255,0.12)',
+          color: 'rgba(255,255,255,0.85)',
+          border: '1px solid rgba(255,255,255,0.22)',
+        }}
+        aria-label="Abrir conta"
+      >
+        <Menu size={17} />
+      </button>
       <p className="font-chalk text-base" style={{ color: 'rgba(255,255,255,0.55)' }}>{greeting},</p>
       <h1 className="font-chalk text-white text-[34px] font-bold leading-[1.05] mb-[5px] break-words pr-12">{name}</h1>
       <div className="w-[52%] h-[2px] rounded-sm mb-4" style={{ background: 'rgba(255,255,255,0.15)' }} />

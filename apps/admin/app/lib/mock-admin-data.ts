@@ -21,6 +21,7 @@ export const dashboardMetrics = [
 export const adminSections = [
   { href: '/', label: 'Dashboard', icon: ShieldCheck },
   { href: '/professoras', label: 'Professoras', icon: Users },
+  { href: '/verificacoes', label: 'Verificacoes', icon: UserRoundCheck },
   { href: '/assinaturas', label: 'Assinaturas', icon: CreditCard },
   { href: '/materiais', label: 'Materiais', icon: FileText },
   { href: '/liberacoes', label: 'Liberacoes', icon: KeyRound },
