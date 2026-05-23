@@ -57,6 +57,8 @@ export interface TeacherAccountSnapshot {
 }
 
 const SUBSCRIPTION_EVENT = 'approf-subscription-state-change'
+const ACCOUNT_CACHE_MAX_AGE_MS = 60_000
+let teacherAccountCache: { value: TeacherAccountSnapshot; fetchedAt: number } | null = null
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   app: {
     relatoriosPendentes: true,
@@ -75,7 +77,14 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   },
 }
 
-export async function getTeacherAccountSnapshot(): Promise<TeacherAccountSnapshot> {
+export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boolean }): Promise<TeacherAccountSnapshot> {
+  if (!options?.forceRefresh && teacherAccountCache) {
+    const age = Date.now() - teacherAccountCache.fetchedAt
+    if (age <= ACCOUNT_CACHE_MAX_AGE_MS) {
+      return teacherAccountCache.value
+    }
+  }
+
   const response = await callAccountApi<{
     profile: {
       id: string
@@ -98,7 +107,7 @@ export async function getTeacherAccountSnapshot(): Promise<TeacherAccountSnapsho
   }>('/api/account', { method: 'GET' })
 
   if (!response.profile?.id) throw new Error('Sessao nao encontrada.')
-  return {
+  const snapshot: TeacherAccountSnapshot = {
     userId: response.profile.id,
     fullName: response.profile.full_name ?? 'Professora',
     email: response.profile.email ?? '',
@@ -121,6 +130,20 @@ export async function getTeacherAccountSnapshot(): Promise<TeacherAccountSnapsho
       documents: Array.isArray(item.documents) ? item.documents : [],
     })),
   }
+  teacherAccountCache = { value: snapshot, fetchedAt: Date.now() }
+  return snapshot
+}
+
+export function getCachedTeacherAccountSnapshot() {
+  return teacherAccountCache?.value ?? null
+}
+
+export async function preloadTeacherAccountSnapshot() {
+  try {
+    await getTeacherAccountSnapshot()
+  } catch {
+    // Silent preload failure: menu can still load normally.
+  }
 }
 
 export async function updateTeacherProfile(input: {
@@ -141,6 +164,7 @@ export async function updateTeacherProfile(input: {
       notificationPreferences: input.notificationPreferences,
     }),
   })
+  teacherAccountCache = null
 }
 
 export async function updateTeacherPassword(input: {
@@ -197,6 +221,7 @@ export async function cancelTeacherSubscription() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'cancel' }),
   })
+  teacherAccountCache = null
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(SUBSCRIPTION_EVENT))
   }
@@ -244,10 +269,12 @@ export async function submitTeacherVerificationRequest(input: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   })
+  teacherAccountCache = null
 }
 
 export async function logoutTeacher() {
   const supabase = getSupabaseClient()
+  teacherAccountCache = null
   if (!supabase) return
   await supabase.auth.signOut()
 }

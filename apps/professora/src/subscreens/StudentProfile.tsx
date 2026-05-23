@@ -298,7 +298,12 @@ export default function StudentProfileSubscreen() {
         <div className="flex items-center justify-between mb-[10px]">
           <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Timeline de evolução</p>
           <button
-            onClick={() => openSubscreen('new-timeline-event')}
+            onClick={() =>
+              openSubscreen('new-timeline-event', {
+                classId: cls.id,
+                studentId: student.id,
+              })
+            }
             className="flex items-center gap-1 text-[12px] font-bold text-gm"
           >
             <Plus size={14} />

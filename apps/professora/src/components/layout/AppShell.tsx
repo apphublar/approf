@@ -109,7 +109,7 @@ function renderSubscreen(screen: string, data?: unknown) {
     case 'edit-student':    return <EditStudentSubscreen />
     case 'find-child':      return <FindChildSubscreen />
     case 'transfer-student': return <TransferStudentSubscreen />
-    case 'new-timeline-event': return <NewTimelineEventSubscreen />
+    case 'new-timeline-event': return <NewTimelineEventSubscreen data={data} />
     case 'pedagogical-generator': return <PedagogicalGeneratorSubscreen data={data} />
     case 'documents':       return <DocumentsSubscreen data={data} />
     case 'generated-documents': return <GeneratedDocumentsSubscreen data={data} />

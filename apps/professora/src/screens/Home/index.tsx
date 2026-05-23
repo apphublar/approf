@@ -23,6 +23,7 @@ import { toTitleCaseName } from '@/utils/text'
 import type { BoardNote } from '@/types'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
+import { getCachedTeacherAccountSnapshot, preloadTeacherAccountSnapshot } from '@/services/supabase/account'
 
 const QUICK_ACCESS = [
   { label: 'Anotações', desc: 'Registre o dia a dia da turma', icon: NotebookPen, bg: '#D8F3DC', tab: 'annotations' as const, sub: null },
@@ -82,9 +83,19 @@ export default function HomeScreen() {
     }
   }, [activeTab, subscreens.length])
 
+  useEffect(() => {
+    if (activeTab !== 'home') return
+    void preloadTeacherAccountSnapshot()
+  }, [activeTab])
+
   function handleQuickAccess(tab: typeof QUICK_ACCESS[number]['tab'], sub: typeof QUICK_ACCESS[number]['sub']) {
     if (tab) setTab(tab)
     else if (sub) openSubscreen(sub)
+  }
+
+  function openTeacherAccount() {
+    const cachedSnapshot = getCachedTeacherAccountSnapshot()
+    openSubscreen('teacher-account', cachedSnapshot ? { initialSnapshot: cachedSnapshot } : undefined)
   }
 
   // Current note being viewed (null if on main slide)
@@ -159,13 +170,13 @@ export default function HomeScreen() {
           ))}
         </div>
 
-        {/* Top-right actions â€” always same size, same row */}
-        <div className="absolute top-3 right-4 z-10 flex items-center gap-[10px]">
+        <div className="absolute top-3 left-4 z-10">
           <button
-            onClick={() => openSubscreen('teacher-account')}
+            onClick={openTeacherAccount}
             className="rounded-full border-none flex items-center justify-center"
             style={{
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               background: 'rgba(255,255,255,0.12)',
               color: 'rgba(255,255,255,0.85)',
               border: '1px solid rgba(255,255,255,0.22)',
@@ -174,7 +185,10 @@ export default function HomeScreen() {
           >
             <Menu size={17} />
           </button>
+        </div>
 
+        {/* Top-right actions â€” always same size, same row */}
+        <div className="absolute top-3 right-4 z-10 flex items-center gap-[10px]">
           {/* Note options only when viewing note slide */}
           {currentViewedNote && (
             <div className="relative">

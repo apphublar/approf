@@ -25,11 +25,21 @@ const ACCEPTED_ATTACHMENT_TYPES = [
   'text/plain',
 ]
 
-export default function NewTimelineEventSubscreen() {
+export default function NewTimelineEventSubscreen({
+  data,
+}: {
+  data?: { classId?: string; studentId?: string } | unknown
+}) {
   const { closeSubscreen } = useNavStore()
   const { classes, activeClassId, activeStudentId, addTimelineEvent } = useAppStore()
-  const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
-  const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
+  const frameData =
+    data && typeof data === 'object'
+      ? (data as { classId?: string; studentId?: string })
+      : undefined
+  const classId = frameData?.classId ?? activeClassId
+  const studentId = frameData?.studentId ?? activeStudentId
+  const cls = classes.find((item) => item.id === classId) ?? classes[0]
+  const student = cls?.students.find((item) => item.id === studentId) ?? cls?.students[0]
 
   const [type, setType] = useState<TimelineEventType>('marco')
   const [title, setTitle] = useState('')

@@ -3,7 +3,6 @@ import { BadgeCheck, Camera, ChevronLeft, Eye, EyeOff, LogOut, ShieldAlert, Shie
 import { useNavStore } from '@/store'
 import {
   cancelTeacherSubscription,
-  DEFAULT_NOTIFICATION_PREFERENCES,
   getTeacherAccountSnapshot,
   isTeacherAccessBlocked,
   logoutTeacher,
@@ -12,7 +11,6 @@ import {
   updateTeacherProfile,
   uploadTeacherAvatar,
   uploadTeacherVerificationDocuments,
-  type NotificationPreferences,
   type TeacherAccountSnapshot,
 } from '@/services/supabase/account'
 
@@ -21,8 +19,12 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const forcedMode = typeof data === 'object' && data && 'forcedMode' in data
     ? Boolean((data as { forcedMode?: boolean }).forcedMode)
     : false
-  const [snapshot, setSnapshot] = useState<TeacherAccountSnapshot | null>(null)
-  const [loading, setLoading] = useState(true)
+  const initialSnapshot =
+    typeof data === 'object' && data && 'initialSnapshot' in data
+      ? ((data as { initialSnapshot?: TeacherAccountSnapshot }).initialSnapshot ?? null)
+      : null
+  const [snapshot, setSnapshot] = useState<TeacherAccountSnapshot | null>(initialSnapshot)
+  const [loading, setLoading] = useState(!initialSnapshot)
   const [saving, setSaving] = useState(false)
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [error, setError] = useState('')
@@ -31,7 +33,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -46,18 +47,25 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
   async function refreshAccount() {
-    const account = await getTeacherAccountSnapshot()
+    const account = await getTeacherAccountSnapshot({ forceRefresh: true })
     setSnapshot(account)
     setFullName(account.fullName)
     setPhone(account.phone ?? '')
     setEmail(account.email ?? '')
     setAvatarUrl(account.avatarUrl ?? null)
-    setNotificationPreferences(account.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFERENCES)
   }
 
   useEffect(() => {
+    if (!initialSnapshot) return
+    setFullName(initialSnapshot.fullName)
+    setPhone(initialSnapshot.phone ?? '')
+    setEmail(initialSnapshot.email ?? '')
+    setAvatarUrl(initialSnapshot.avatarUrl ?? null)
+  }, [initialSnapshot])
+
+  useEffect(() => {
     let active = true
-    setLoading(true)
+    if (!initialSnapshot) setLoading(true)
     refreshAccount()
       .catch((err) => {
         if (!active) return
@@ -69,7 +77,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     return () => {
       active = false
     }
-  }, [])
+  }, [initialSnapshot])
 
   const blocked = useMemo(() => isTeacherAccessBlocked(snapshot?.subscription?.status ?? null), [snapshot])
   const isProfileVerified = useMemo(
@@ -152,16 +160,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       setError(err instanceof Error ? err.message : 'Não foi possível atualizar sua foto.')
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function saveNotificationPreferences(next: NotificationPreferences) {
-    setNotificationPreferences(next)
-    setError('')
-    try {
-      await updateTeacherProfile({ notificationPreferences: next })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível salvar preferências.')
     }
   }
 
@@ -358,98 +356,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             </div>
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Preferências de notificações</p>
-
-              <PreferenceToggle
-                label="Relatórios pendentes"
-                checked={notificationPreferences.app.relatoriosPendentes}
-                onChange={(checked) =>
-                  void saveNotificationPreferences({
-                    ...notificationPreferences,
-                    app: { ...notificationPreferences.app, relatoriosPendentes: checked },
-                  })
-                }
-              />
-              <PreferenceToggle
-                label="Sugestões da IA"
-                checked={notificationPreferences.app.sugestoesIA}
-                onChange={(checked) =>
-                  void saveNotificationPreferences({
-                    ...notificationPreferences,
-                    app: { ...notificationPreferences.app, sugestoesIA: checked },
-                  })
-                }
-              />
-              <PreferenceToggle
-                label="Streak em risco"
-                checked={notificationPreferences.app.streakRisco}
-                onChange={(checked) =>
-                  void saveNotificationPreferences({
-                    ...notificationPreferences,
-                    app: { ...notificationPreferences.app, streakRisco: checked },
-                  })
-                }
-              />
-              <PreferenceToggle
-                label="Novidades do Approf"
-                checked={notificationPreferences.app.novidades}
-                onChange={(checked) =>
-                  void saveNotificationPreferences({
-                    ...notificationPreferences,
-                    app: { ...notificationPreferences.app, novidades: checked },
-                  })
-                }
-              />
-
-              <PreferenceToggle
-                label="Resumo semanal por e-mail"
-                checked={notificationPreferences.email.resumoSemanal}
-                onChange={(checked) =>
-                  void saveNotificationPreferences({
-                    ...notificationPreferences,
-                    email: { ...notificationPreferences.email, resumoSemanal: checked },
-                  })
-                }
-              />
-              <PreferenceToggle label="Avisos de pagamento por e-mail" checked={true} onChange={() => undefined} disabled />
-
-              <PreferenceToggle
-                label="Horário de silêncio"
-                checked={notificationPreferences.silencio.ativo}
-                onChange={(checked) =>
-                  void saveNotificationPreferences({
-                    ...notificationPreferences,
-                    silencio: { ...notificationPreferences.silencio, ativo: checked },
-                  })
-                }
-              />
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <input
-                  type="time"
-                  value={notificationPreferences.silencio.inicio}
-                  onChange={(event) =>
-                    void saveNotificationPreferences({
-                      ...notificationPreferences,
-                      silencio: { ...notificationPreferences.silencio, inicio: event.target.value },
-                    })
-                  }
-                  className="rounded-app-sm border border-border px-2 py-2 text-[12px]"
-                />
-                <input
-                  type="time"
-                  value={notificationPreferences.silencio.fim}
-                  onChange={(event) =>
-                    void saveNotificationPreferences({
-                      ...notificationPreferences,
-                      silencio: { ...notificationPreferences.silencio, fim: event.target.value },
-                    })
-                  }
-                  className="rounded-app-sm border border-border px-2 py-2 text-[12px]"
-                />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck size={15} className="text-gm" />
                 <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Verificação de perfil</p>
@@ -569,23 +475,4 @@ function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return 'PR'
   return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
-}
-
-function PreferenceToggle({
-  label,
-  checked,
-  onChange,
-  disabled,
-}: {
-  label: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-  disabled?: boolean
-}) {
-  return (
-    <label className="flex items-center justify-between text-[12px] text-muted py-1.5">
-      <span>{label}</span>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
-    </label>
-  )
 }

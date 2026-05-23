@@ -281,7 +281,6 @@ export const useAppStore = create<AppStore>()(
                     student.id === studentId
                       ? {
                           ...student,
-                          annotationCount: student.annotationCount + 1,
                           timeline: [event, ...(student.timeline ?? [])],
                         }
                       : student,
