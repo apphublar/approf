@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, LogOut, ShieldCheck, Wallet } from 'lucide-react'
+import { BadgeCheck, Camera, ChevronLeft, Eye, EyeOff, LogOut, ShieldAlert, ShieldCheck, Wallet } from 'lucide-react'
 import { useNavStore } from '@/store'
 import {
   cancelTeacherSubscription,
+  DEFAULT_NOTIFICATION_PREFERENCES,
   getTeacherAccountSnapshot,
   isTeacherAccessBlocked,
   logoutTeacher,
   submitTeacherVerificationRequest,
+  updateTeacherPassword,
   updateTeacherProfile,
+  uploadTeacherAvatar,
   uploadTeacherVerificationDocuments,
+  type NotificationPreferences,
   type TeacherAccountSnapshot,
 } from '@/services/supabase/account'
 
@@ -25,6 +29,19 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [message, setMessage] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [biometricEnabled, setBiometricEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('approf:biometric-enabled') === '1'
+  })
   const [verificationNotes, setVerificationNotes] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
@@ -33,6 +50,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     setSnapshot(account)
     setFullName(account.fullName)
     setPhone(account.phone ?? '')
+    setEmail(account.email ?? '')
+    setAvatarUrl(account.avatarUrl ?? null)
+    setNotificationPreferences(account.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFERENCES)
   }
 
   useEffect(() => {
@@ -52,6 +72,14 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   }, [])
 
   const blocked = useMemo(() => isTeacherAccessBlocked(snapshot?.subscription?.status ?? null), [snapshot])
+  const isProfileVerified = useMemo(
+    () => (snapshot?.verifications ?? []).some((item) => item.status === 'approved'),
+    [snapshot],
+  )
+  const verificationPending = useMemo(
+    () => (snapshot?.verifications ?? []).some((item) => item.status === 'pending'),
+    [snapshot],
+  )
 
   async function saveProfile() {
     if (!snapshot) return
@@ -59,8 +87,11 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     setError('')
     try {
       await updateTeacherProfile({ fullName: fullName.trim(), phone: phone.trim() || null })
+      if (email.trim() !== (snapshot.email ?? '').trim()) {
+        await updateTeacherProfile({ email: email.trim() })
+      }
       await refreshAccount()
-      setMessage('Cadastro atualizado com sucesso.')
+      setMessage('Cadastro atualizado com sucesso. Se o e-mail mudou, confirme no novo endereço.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar seu cadastro.')
     } finally {
@@ -79,6 +110,58 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       setError(err instanceof Error ? err.message : 'Não foi possível cancelar a assinatura.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function savePassword() {
+    if (!snapshot) return
+    if (newPassword !== confirmPassword) {
+      setError('A confirmação da nova senha não confere.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      await updateTeacherPassword({
+        email: snapshot.email,
+        currentPassword,
+        newPassword,
+      })
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setMessage('Senha atualizada com sucesso.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar a senha.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAvatarUpload(file?: File | null) {
+    if (!file) return
+    setSaving(true)
+    setError('')
+    try {
+      const uploadedUrl = await uploadTeacherAvatar(file)
+      await updateTeacherProfile({ avatarUrl: uploadedUrl })
+      setAvatarUrl(uploadedUrl)
+      await refreshAccount()
+      setMessage('Foto de perfil atualizada.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar sua foto.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveNotificationPreferences(next: NotificationPreferences) {
+    setNotificationPreferences(next)
+    setError('')
+    try {
+      await updateTeacherProfile({ notificationPreferences: next })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar preferências.')
     }
   }
 
@@ -139,6 +222,48 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
           <div className="bg-white rounded-app p-4 border border-red-200 text-[12px] text-red-700">{error || 'Conta indisponível.'}</div>
         ) : (
           <>
+            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Perfil da professora</p>
+              <div className="flex items-center gap-3">
+                <label className="w-12 h-12 rounded-full bg-gbg border border-gp flex items-center justify-center text-gd font-bold overflow-hidden cursor-pointer">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Foto da professora" className="w-full h-full object-cover" />
+                  ) : (
+                    initialsFromName(snapshot.fullName)
+                  )}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={(event) => void handleAvatarUpload(event.target.files?.[0])}
+                  />
+                </label>
+                <div className="flex-1">
+                  <p className="text-[14px] font-bold text-ink">{snapshot.fullName}</p>
+                  <p className="text-[11px] text-muted">Professora florescente</p>
+                  <div className="mt-1 inline-flex items-center gap-1.5">
+                    {isProfileVerified ? (
+                      <>
+                        <BadgeCheck size={14} className="text-gm" />
+                        <span className="text-[11px] text-gm font-bold">Perfil verificado</span>
+                      </>
+                    ) : verificationPending ? (
+                      <>
+                        <ShieldAlert size={14} className="text-[#856404]" />
+                        <span className="text-[11px] text-[#856404] font-bold">Verificação em análise</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={14} className="text-muted" />
+                        <span className="text-[11px] text-muted font-bold">Perfil não verificado</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <Camera size={15} className="text-muted" />
+              </div>
+            </div>
+
             {blocked && (
               <div className="bg-[#FFF3CD] border border-[#F2D58B] rounded-app p-4 mb-4">
                 <p className="text-[13px] font-bold text-[#856404]">Acesso restrito por assinatura</p>
@@ -154,9 +279,67 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               <input value={fullName} onChange={(event) => setFullName(event.target.value)} className="w-full mt-1 mb-3 rounded-app-sm border border-border px-3 py-2 text-[13px]" />
               <label className="text-[11px] text-muted">Telefone</label>
               <input value={phone} onChange={(event) => setPhone(event.target.value)} className="w-full mt-1 mb-3 rounded-app-sm border border-border px-3 py-2 text-[13px]" />
-              <p className="text-[11px] text-muted">E-mail: {snapshot.email}</p>
+              <label className="text-[11px] text-muted">E-mail</label>
+              <input value={email} onChange={(event) => setEmail(event.target.value)} className="w-full mt-1 mb-3 rounded-app-sm border border-border px-3 py-2 text-[13px]" />
               <button onClick={saveProfile} disabled={saving} className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50">
                 {saving ? 'Salvando...' : 'Salvar cadastro'}
+              </button>
+            </div>
+
+            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Senha e segurança</p>
+              <label className="text-[11px] text-muted">Senha atual</label>
+              <div className="relative mt-1 mb-3">
+                <input
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  className="w-full rounded-app-sm border border-border px-3 py-2 pr-10 text-[13px]"
+                />
+                <button type="button" onClick={() => setShowCurrentPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted">
+                  {showCurrentPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <label className="text-[11px] text-muted">Nova senha</label>
+              <div className="relative mt-1 mb-3">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  className="w-full rounded-app-sm border border-border px-3 py-2 pr-10 text-[13px]"
+                />
+                <button type="button" onClick={() => setShowNewPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted">
+                  {showNewPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <label className="text-[11px] text-muted">Confirmar nova senha</label>
+              <div className="relative mt-1 mb-3">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  className="w-full rounded-app-sm border border-border px-3 py-2 pr-10 text-[13px]"
+                />
+                <button type="button" onClick={() => setShowConfirmPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted">
+                  {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <label className="flex items-center justify-between mt-1 text-[12px] text-muted">
+                <span>Desbloqueio biométrico</span>
+                <input
+                  type="checkbox"
+                  checked={biometricEnabled}
+                  onChange={(event) => {
+                    const next = event.target.checked
+                    setBiometricEnabled(next)
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('approf:biometric-enabled', next ? '1' : '0')
+                    }
+                  }}
+                />
+              </label>
+              <button onClick={savePassword} disabled={saving} className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50">
+                {saving ? 'Salvando...' : 'Atualizar senha'}
               </button>
             </div>
 
@@ -172,6 +355,98 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               <button onClick={requestCancellation} disabled={saving || blocked} className="w-full mt-3 py-2 rounded-app-sm border border-[#C1440E] text-[#C1440E] text-[12px] font-bold disabled:opacity-50">
                 {blocked ? 'Assinatura já restrita' : 'Cancelar assinatura'}
               </button>
+            </div>
+
+            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Preferências de notificações</p>
+
+              <PreferenceToggle
+                label="Relatórios pendentes"
+                checked={notificationPreferences.app.relatoriosPendentes}
+                onChange={(checked) =>
+                  void saveNotificationPreferences({
+                    ...notificationPreferences,
+                    app: { ...notificationPreferences.app, relatoriosPendentes: checked },
+                  })
+                }
+              />
+              <PreferenceToggle
+                label="Sugestões da IA"
+                checked={notificationPreferences.app.sugestoesIA}
+                onChange={(checked) =>
+                  void saveNotificationPreferences({
+                    ...notificationPreferences,
+                    app: { ...notificationPreferences.app, sugestoesIA: checked },
+                  })
+                }
+              />
+              <PreferenceToggle
+                label="Streak em risco"
+                checked={notificationPreferences.app.streakRisco}
+                onChange={(checked) =>
+                  void saveNotificationPreferences({
+                    ...notificationPreferences,
+                    app: { ...notificationPreferences.app, streakRisco: checked },
+                  })
+                }
+              />
+              <PreferenceToggle
+                label="Novidades do Approf"
+                checked={notificationPreferences.app.novidades}
+                onChange={(checked) =>
+                  void saveNotificationPreferences({
+                    ...notificationPreferences,
+                    app: { ...notificationPreferences.app, novidades: checked },
+                  })
+                }
+              />
+
+              <PreferenceToggle
+                label="Resumo semanal por e-mail"
+                checked={notificationPreferences.email.resumoSemanal}
+                onChange={(checked) =>
+                  void saveNotificationPreferences({
+                    ...notificationPreferences,
+                    email: { ...notificationPreferences.email, resumoSemanal: checked },
+                  })
+                }
+              />
+              <PreferenceToggle label="Avisos de pagamento por e-mail" checked={true} onChange={() => undefined} disabled />
+
+              <PreferenceToggle
+                label="Horário de silêncio"
+                checked={notificationPreferences.silencio.ativo}
+                onChange={(checked) =>
+                  void saveNotificationPreferences({
+                    ...notificationPreferences,
+                    silencio: { ...notificationPreferences.silencio, ativo: checked },
+                  })
+                }
+              />
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <input
+                  type="time"
+                  value={notificationPreferences.silencio.inicio}
+                  onChange={(event) =>
+                    void saveNotificationPreferences({
+                      ...notificationPreferences,
+                      silencio: { ...notificationPreferences.silencio, inicio: event.target.value },
+                    })
+                  }
+                  className="rounded-app-sm border border-border px-2 py-2 text-[12px]"
+                />
+                <input
+                  type="time"
+                  value={notificationPreferences.silencio.fim}
+                  onChange={(event) =>
+                    void saveNotificationPreferences({
+                      ...notificationPreferences,
+                      silencio: { ...notificationPreferences.silencio, fim: event.target.value },
+                    })
+                  }
+                  className="rounded-app-sm border border-border px-2 py-2 text-[12px]"
+                />
+              </div>
             </div>
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
@@ -244,6 +519,13 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               <LogOut size={15} />
               Sair do aplicativo
             </button>
+
+            <div className="mb-8 text-center">
+              <p className="text-[11px] text-muted">Approf v1.0.0</p>
+              <p className="text-[11px] text-muted mt-1">
+                <a href="#" className="underline">Termos de uso</a> · <a href="#" className="underline">Privacidade</a>
+              </p>
+            </div>
           </>
         )}
       </div>
@@ -281,4 +563,29 @@ function formatProvider(provider?: string) {
   if (provider === 'stripe') return 'Stripe'
   if (provider === 'manual') return 'Manual'
   return provider
+}
+
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return 'PR'
+  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
+}
+
+function PreferenceToggle({
+  label,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <label className="flex items-center justify-between text-[12px] text-muted py-1.5">
+      <span>{label}</span>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
+    </label>
+  )
 }

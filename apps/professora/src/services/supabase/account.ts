@@ -19,11 +19,31 @@ export interface TeacherVerificationRequest {
   updated_at: string
 }
 
+export interface NotificationPreferences {
+  app: {
+    relatoriosPendentes: boolean
+    sugestoesIA: boolean
+    streakRisco: boolean
+    novidades: boolean
+  }
+  email: {
+    resumoSemanal: boolean
+    pagamento: boolean
+  }
+  silencio: {
+    ativo: boolean
+    inicio: string
+    fim: string
+  }
+}
+
 export interface TeacherAccountSnapshot {
   userId: string
   fullName: string
   email: string
   phone: string | null
+  avatarUrl: string | null
+  notificationPreferences: NotificationPreferences
   schools: Array<{ id: string; name: string; city: string | null; state: string | null }>
   subscription: {
     id: string
@@ -37,10 +57,34 @@ export interface TeacherAccountSnapshot {
 }
 
 const SUBSCRIPTION_EVENT = 'approf-subscription-state-change'
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  app: {
+    relatoriosPendentes: true,
+    sugestoesIA: true,
+    streakRisco: true,
+    novidades: false,
+  },
+  email: {
+    resumoSemanal: true,
+    pagamento: true,
+  },
+  silencio: {
+    ativo: true,
+    inicio: '22:00',
+    fim: '06:00',
+  },
+}
 
 export async function getTeacherAccountSnapshot(): Promise<TeacherAccountSnapshot> {
   const response = await callAccountApi<{
-    profile: { id: string; full_name: string; email: string; phone: string | null } | null
+    profile: {
+      id: string
+      full_name: string
+      email: string
+      phone: string | null
+      avatar_url?: string | null
+      notification_preferences?: NotificationPreferences
+    } | null
     schools: Array<{ id: string; name: string; city: string | null; state: string | null }>
     subscription: {
       id: string
@@ -59,6 +103,8 @@ export async function getTeacherAccountSnapshot(): Promise<TeacherAccountSnapsho
     fullName: response.profile.full_name ?? 'Professora',
     email: response.profile.email ?? '',
     phone: response.profile.phone ?? null,
+    avatarUrl: response.profile.avatar_url ?? null,
+    notificationPreferences: sanitizeNotificationPreferences(response.profile.notification_preferences),
     schools: response.schools ?? [],
     subscription: response.subscription
       ? {
@@ -77,15 +123,72 @@ export async function getTeacherAccountSnapshot(): Promise<TeacherAccountSnapsho
   }
 }
 
-export async function updateTeacherProfile(input: { fullName?: string; phone?: string | null }) {
+export async function updateTeacherProfile(input: {
+  fullName?: string
+  phone?: string | null
+  email?: string
+  avatarUrl?: string | null
+  notificationPreferences?: NotificationPreferences
+}) {
   await callAccountApi('/api/account', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       fullName: input.fullName,
       phone: input.phone,
+      email: input.email,
+      avatarUrl: input.avatarUrl,
+      notificationPreferences: input.notificationPreferences,
     }),
   })
+}
+
+export async function updateTeacherPassword(input: {
+  currentPassword: string
+  newPassword: string
+  email: string
+}) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase nao configurado.')
+
+  if (!input.currentPassword.trim()) throw new Error('Informe a senha atual.')
+  if (input.newPassword.trim().length < 8) {
+    throw new Error('A nova senha precisa ter no mínimo 8 caracteres.')
+  }
+  if (!/[0-9]/.test(input.newPassword) || !/[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|]/.test(input.newPassword)) {
+    throw new Error('A nova senha precisa ter ao menos 1 número e 1 caractere especial.')
+  }
+
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: input.email,
+    password: input.currentPassword,
+  })
+  if (signInError) throw new Error('Senha atual incorreta.')
+
+  const { error } = await supabase.auth.updateUser({ password: input.newPassword })
+  if (error) throw error
+}
+
+export async function uploadTeacherAvatar(file: File) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase nao configurado.')
+
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError) throw authError
+  const userId = authData.user?.id
+  if (!userId) throw new Error('Sessao nao encontrada.')
+
+  const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  const path = `${userId}/avatar-${Date.now()}.${extension}`
+  const { error } = await supabase.storage.from('avatars').upload(path, file, {
+    cacheControl: '3600',
+    upsert: true,
+    contentType: file.type || 'image/jpeg',
+  })
+  if (error) throw toError(error, 'Nao foi possivel enviar o avatar.')
+
+  const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path)
+  return publicData.publicUrl
 }
 
 export async function cancelTeacherSubscription() {
@@ -202,6 +305,27 @@ function sanitizeFileName(fileName: string, fallbackExtension: string) {
     .toLowerCase()
   if (!sanitized) return `arquivo.${fallbackExtension}`
   return sanitized.includes('.') ? sanitized : `${sanitized}.${fallbackExtension}`
+}
+
+function sanitizeNotificationPreferences(value?: NotificationPreferences): NotificationPreferences {
+  const candidate = value ?? DEFAULT_NOTIFICATION_PREFERENCES
+  return {
+    app: {
+      relatoriosPendentes: candidate.app?.relatoriosPendentes ?? true,
+      sugestoesIA: candidate.app?.sugestoesIA ?? true,
+      streakRisco: candidate.app?.streakRisco ?? true,
+      novidades: candidate.app?.novidades ?? false,
+    },
+    email: {
+      resumoSemanal: candidate.email?.resumoSemanal ?? true,
+      pagamento: true,
+    },
+    silencio: {
+      ativo: candidate.silencio?.ativo ?? true,
+      inicio: candidate.silencio?.inicio ?? '22:00',
+      fim: candidate.silencio?.fim ?? '06:00',
+    },
+  }
 }
 
 function toError(error: unknown, fallback: string) {

@@ -33,6 +33,12 @@ export async function PATCH(request: Request) {
     await updateTeacherProfile(ownerId, {
       fullName: typeof body.fullName === 'string' ? body.fullName : undefined,
       phone: typeof body.phone === 'string' || body.phone === null ? (body.phone as string | null) : undefined,
+      email: typeof body.email === 'string' ? body.email : undefined,
+      avatarUrl: typeof body.avatarUrl === 'string' || body.avatarUrl === null ? (body.avatarUrl as string | null) : undefined,
+      notificationPreferences:
+        body.notificationPreferences && typeof body.notificationPreferences === 'object' && !Array.isArray(body.notificationPreferences)
+          ? (body.notificationPreferences as Record<string, unknown>)
+          : undefined,
     })
     const account = await getTeacherAccountData(ownerId)
     return NextResponse.json(account, { status: 200, headers: CORS_HEADERS })

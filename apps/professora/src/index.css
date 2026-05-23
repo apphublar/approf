@@ -166,18 +166,18 @@ input, textarea, select, button {
 @keyframes subtleAttentionPulse {
   0%, 100% {
     transform: translateY(0) scale(1);
-    box-shadow: 0 8px 18px rgba(27, 67, 50, 0.14);
+    box-shadow: 0 8px 18px rgba(27, 67, 50, 0.1);
     filter: brightness(1);
   }
   50% {
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 16px 30px rgba(79, 131, 65, 0.35);
-    filter: brightness(1.08);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(79, 131, 65, 0.2);
+    filter: brightness(1.04);
   }
 }
 
 .subtle-attention {
-  animation: subtleAttentionPulse 1.7s ease-in-out infinite;
+  animation: subtleAttentionPulse 2.1s ease-in-out infinite;
   will-change: transform, box-shadow, filter;
 }
 

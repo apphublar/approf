@@ -17,7 +17,7 @@ export async function getTeacherAccountData(ownerId: string) {
   const [profileResult, schoolsResult, subscriptionResult, verificationsResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id,full_name,email,phone')
+      .select('id,full_name,email,phone,avatar_url,notification_preferences')
       .eq('id', ownerId)
       .maybeSingle(),
     supabase
@@ -54,12 +54,28 @@ export async function getTeacherAccountData(ownerId: string) {
   }
 }
 
-export async function updateTeacherProfile(ownerId: string, input: { fullName?: string; phone?: string | null }) {
+export async function updateTeacherProfile(ownerId: string, input: {
+  fullName?: string
+  phone?: string | null
+  email?: string
+  avatarUrl?: string | null
+  notificationPreferences?: Record<string, unknown>
+}) {
   const supabase = createSupabaseServiceClient()
   const patch = {
     ...(typeof input.fullName === 'string' ? { full_name: input.fullName.trim() } : {}),
     ...(input.phone !== undefined ? { phone: input.phone?.trim() || null } : {}),
+    ...(typeof input.email === 'string' ? { email: input.email.trim() } : {}),
+    ...(input.avatarUrl !== undefined ? { avatar_url: input.avatarUrl } : {}),
+    ...(input.notificationPreferences ? { notification_preferences: input.notificationPreferences } : {}),
     updated_at: new Date().toISOString(),
+  }
+
+  if (typeof input.email === 'string' && input.email.trim()) {
+    const { error: authUpdateError } = await supabase.auth.admin.updateUserById(ownerId, {
+      email: input.email.trim(),
+    })
+    if (authUpdateError) throw authUpdateError
   }
 
   const { error } = await supabase.from('profiles').update(patch).eq('id', ownerId)
