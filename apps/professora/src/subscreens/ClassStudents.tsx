@@ -6,6 +6,7 @@ import { saveSupabaseAttendanceRecord } from '@/services/supabase/attendance'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { listReports } from '@/services/reports'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
+import { getStudentAttendanceSummary } from '@/utils/attendance'
 import type { AttendanceRecord, Student } from '@/types'
 type ClassTool = 'students' | 'attendance' | 'calendar' | 'report'
 
@@ -13,7 +14,7 @@ const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
 export default function ClassStudentsSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes, activeClassId, setActiveStudent, attendanceRecords, saveAttendanceRecord, upsertAttendanceRecord, annotations } = useAppStore()
+  const { classes, activeClassId, setActiveClass, setActiveStudent, attendanceRecords, saveAttendanceRecord, upsertAttendanceRecord, annotations } = useAppStore()
   const [query, setQuery] = useState('')
   const [activeTool, setActiveTool] = useState<ClassTool>('students')
   const [attendanceDate, setAttendanceDate] = useState(getTodayKey())
@@ -76,6 +77,7 @@ export default function ClassStudentsSubscreen() {
   const selectedCalendarRecord = attendanceByDate.get(selectedCalendarDate)
 
   function openStudent(id: string) {
+    setActiveClass(cls.id)
     setActiveStudent(id)
     openSubscreen('student-profile')
   }
@@ -518,11 +520,14 @@ function buildAttendanceReport(students: Student[], records: AttendanceRecord[])
 
   return students
     .map((student) => {
-      const presences = records.filter((record) => record.presentStudentIds.includes(student.id)).length
-      const absences = records.length - presences
-      const rate = Math.round((presences / records.length) * 100)
+      const summary = getStudentAttendanceSummary(student, records)
 
-      return { student, presences, absences, rate }
+      return {
+        student,
+        presences: summary.presences,
+        absences: summary.absenceCount,
+        rate: summary.rate,
+      }
     })
     .sort((a, b) => b.absences - a.absences || b.presences - a.presences || a.student.name.localeCompare(b.student.name))
 }
@@ -605,4 +610,3 @@ function normalizeText(value: string) {
     .toLowerCase()
     .trim()
 }
-

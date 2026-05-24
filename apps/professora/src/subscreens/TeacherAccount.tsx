@@ -31,7 +31,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -47,7 +46,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     setFullName(account.fullName)
     setPhone(account.phone ?? '')
     setEmail(account.email ?? '')
-    setAvatarUrl(account.avatarUrl ?? null)
   }
 
   useEffect(() => {
@@ -55,7 +53,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     setFullName(initialSnapshot.fullName)
     setPhone(initialSnapshot.phone ?? '')
     setEmail(initialSnapshot.email ?? '')
-    setAvatarUrl(initialSnapshot.avatarUrl ?? null)
   }, [initialSnapshot])
 
   useEffect(() => {
@@ -216,18 +213,12 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
           <>
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Perfil da professora</p>
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-full bg-gbg border border-gp flex items-center justify-center text-gd font-bold overflow-hidden">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Foto da professora" className="w-full h-full object-cover" />
-                  ) : (
-                    initialsFromName(snapshot.fullName)
-                  )}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-bold text-ink truncate">{snapshot.fullName}</p>
+                  <p className="text-[11px] text-muted mt-1">Professora</p>
                 </div>
-                <div className="flex-1">
-                  <p className="text-[14px] font-bold text-ink">{snapshot.fullName}</p>
-                  <p className="text-[11px] text-muted">Perfil profissional</p>
-                  <div className="mt-1 inline-flex items-center gap-1.5">
+                <div className="inline-flex items-center gap-1.5 flex-shrink-0">
                     {isProfileVerified ? (
                       <>
                         <BadgeCheck size={14} className="text-gm" />
@@ -245,7 +236,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                       </>
                     )}
                   </div>
-                </div>
               </div>
             </div>
 
@@ -466,10 +456,4 @@ function formatSubscriptionPlan(plan?: string | null, status?: string | null) {
   if (['annual', 'anual', 'yearly', 'ano'].includes(normalized)) return 'Anual'
   if (['trial', 'teste'].includes(normalized)) return 'Plano teste'
   return plan
-}
-
-function initialsFromName(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (!parts.length) return 'PR'
-  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
 }

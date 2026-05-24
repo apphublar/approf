@@ -6,6 +6,7 @@ import { getAppDataMode } from '@/services/app-data'
 import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
 import { listReports } from '@/services/reports'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
+import { getStudentAttendanceSummary } from '@/utils/attendance'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 
 const EVENT_STYLE: Record<TimelineEventType, { label: string; bg: string; fg: string }> = {
@@ -31,7 +32,11 @@ export default function StudentProfileSubscreen() {
     setShowAllAnnotations(false)
   }, [activeStudentId])
 
-  const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
+  const activeClass = classes.find((item) => item.id === activeClassId)
+  const classWithActiveStudent = classes.find((item) => item.students.some((student) => student.id === activeStudentId))
+  const cls = activeClass?.students.some((student) => student.id === activeStudentId)
+    ? activeClass
+    : classWithActiveStudent ?? activeClass ?? classes[0]
   const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
   if (!student || !cls) return null
 
@@ -61,18 +66,14 @@ export default function StudentProfileSubscreen() {
   )
   const totalMilestones = timelineMilestones.length
   const totalRecords = totalNotes + totalMilestones + generatedCount
-  const enrollmentDate = student.enrolledAt ? toDateKey(student.enrolledAt) : null
-  const validAttendanceRecords = attendanceRecords
-    .filter((record) => record.classId === cls.id)
-    .filter((record) => isWeekdayDateKey(record.date))
-    .filter((record) => !enrollmentDate || record.date >= enrollmentDate)
-  const absenceRecords = validAttendanceRecords
-    .filter((record) => !record.presentStudentIds.includes(student.id))
-    .sort((a, b) => b.date.localeCompare(a.date))
-  const totalAttendanceCalls = validAttendanceRecords.length
-  const totalAbsences = absenceRecords.length
-  const totalPresences = Math.max(0, totalAttendanceCalls - totalAbsences)
-  const attendanceRate = totalAttendanceCalls > 0 ? Math.round((totalPresences / totalAttendanceCalls) * 100) : 0
+  const attendanceSummary = getStudentAttendanceSummary(
+    student,
+    attendanceRecords.filter((record) => record.classId === cls.id),
+  )
+  const totalAttendanceCalls = attendanceSummary.totalCalls
+  const totalAbsences = attendanceSummary.absenceCount
+  const totalPresences = attendanceSummary.presences
+  const attendanceRate = attendanceSummary.rate
   const visibleAnnotations = showAllAnnotations
     ? studentAnns
     : studentAnns.slice(0, ANNOTATION_PREVIEW_COUNT)
@@ -377,22 +378,3 @@ function normalizeText(value: string) {
     .toLowerCase()
     .trim()
 }
-
-function isWeekdayDateKey(dateKey: string) {
-  const date = new Date(`${dateKey}T00:00:00`)
-  const day = date.getDay()
-  return day >= 1 && day <= 5
-}
-
-function toDateKey(value: string) {
-  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
-    return value.slice(0, 10)
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
