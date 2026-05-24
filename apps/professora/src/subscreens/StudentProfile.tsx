@@ -61,10 +61,15 @@ export default function StudentProfileSubscreen() {
   )
   const totalMilestones = timelineMilestones.length
   const totalRecords = totalNotes + totalMilestones + generatedCount
-  const absenceRecords = attendanceRecords
-    .filter((record) => record.classId === cls.id && !record.presentStudentIds.includes(student.id))
+  const enrollmentDate = student.enrolledAt ? toDateKey(student.enrolledAt) : null
+  const validAttendanceRecords = attendanceRecords
+    .filter((record) => record.classId === cls.id)
+    .filter((record) => isWeekdayDateKey(record.date))
+    .filter((record) => !enrollmentDate || record.date >= enrollmentDate)
+  const absenceRecords = validAttendanceRecords
+    .filter((record) => !record.presentStudentIds.includes(student.id))
     .sort((a, b) => b.date.localeCompare(a.date))
-  const totalAttendanceCalls = attendanceRecords.filter((record) => record.classId === cls.id).length
+  const totalAttendanceCalls = validAttendanceRecords.length
   const totalAbsences = absenceRecords.length
   const totalPresences = Math.max(0, totalAttendanceCalls - totalAbsences)
   const attendanceRate = totalAttendanceCalls > 0 ? Math.round((totalPresences / totalAttendanceCalls) * 100) : 0
@@ -371,5 +376,23 @@ function normalizeText(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
+}
+
+function isWeekdayDateKey(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00`)
+  const day = date.getDay()
+  return day >= 1 && day <= 5
+}
+
+function toDateKey(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10)
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 

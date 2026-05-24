@@ -4,13 +4,14 @@ import { toTitleCaseName } from '@/utils/text'
 import { getSupabaseClient } from './client'
 
 const DEFAULT_PHOTO_POSITION = '50% 50% 120%'
-const STUDENT_SELECT = 'id, full_name, birth_date, photo_path, notes_private, support_tags'
-const STUDENT_SELECT_WITH_POSITION = 'id, full_name, birth_date, photo_path, photo_position, notes_private, support_tags'
+const STUDENT_SELECT = 'id, full_name, birth_date, photo_path, notes_private, support_tags, created_at'
+const STUDENT_SELECT_WITH_POSITION = 'id, full_name, birth_date, photo_path, photo_position, notes_private, support_tags, created_at'
 
 type SupabaseStudentRow = {
   id: string
   full_name: string
   birth_date: string | null
+  created_at?: string | null
   photo_path: string | null
   photo_position?: string | null
   notes_private: string | null
@@ -165,6 +166,7 @@ export async function mapSupabaseStudent(student: SupabaseStudentRow): Promise<S
     id: student.id,
     childCode: `CRI-${student.id.slice(0, 8).toUpperCase()}`,
     name: toTitleCaseName(student.full_name),
+    enrolledAt: student.created_at ?? undefined,
     age: age.years,
     ageMonths: age.months,
     birthDate: student.birth_date ?? undefined,

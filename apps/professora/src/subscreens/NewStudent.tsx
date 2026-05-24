@@ -243,6 +243,7 @@ function createLocalStudent(input: {
     id: `student-${Date.now()}`,
     childCode: createChildCode(input.name),
     name: input.name,
+    enrolledAt: new Date().toISOString(),
     age: age.years,
     ageMonths: age.months,
     birthDate: input.birthDate || undefined,

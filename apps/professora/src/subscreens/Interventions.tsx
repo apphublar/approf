@@ -32,6 +32,7 @@ export default function InterventionsSubscreen() {
   const [chosenSuggestion, setChosenSuggestion] = useState<InterventionSuggestion | null>(null)
   const [teacherReturn, setTeacherReturn] = useState('')
   const [returnChoice, setReturnChoice] = useState<InterventionReturnChoice>('houve_avanco')
+  const [analysisReturnChoice, setAnalysisReturnChoice] = useState<InterventionReturnChoice>('houve_avanco')
   const [analysisText, setAnalysisText] = useState('')
   const [followupSuggestions, setFollowupSuggestions] = useState<InterventionSuggestion[]>([])
   const [activeInterventionId, setActiveInterventionId] = useState('')
@@ -56,6 +57,7 @@ export default function InterventionsSubscreen() {
     setFollowupSuggestions([])
     setActiveInterventionId('')
     setReturnChoice('houve_avanco')
+    setAnalysisReturnChoice('houve_avanco')
   }, [selectedStudentId])
 
   useEffect(() => {
@@ -236,6 +238,7 @@ export default function InterventionsSubscreen() {
       }
 
       setAnalysisText(parsed.analysisText)
+      setAnalysisReturnChoice(returnChoice)
       setFollowupSuggestions(returnChoice === 'houve_avanco' ? [] : parsed.recommendedSuggestions)
       setStep('analysis')
       setObservation('')
@@ -407,10 +410,10 @@ export default function InterventionsSubscreen() {
           <div className="bg-white rounded-app border border-border shadow-card p-4">
             <p className="text-[14px] font-bold text-gd mb-2">Análise pedagógica</p>
             <p className="text-[12px] text-soft leading-[1.6] whitespace-pre-wrap">{analysisText}</p>
-            {returnChoice === 'houve_avanco' && (
+            {analysisReturnChoice === 'houve_avanco' && (
               <p className="mt-3 text-[12px] font-bold text-gd">Evolução registrada com sucesso.</p>
             )}
-            {returnChoice !== 'houve_avanco' && (
+            {analysisReturnChoice !== 'houve_avanco' && (
               <p className="mt-3 text-[12px] text-muted leading-[1.5]">
                 Recomenda-se continuidade do acompanhamento pedagógico com intencionalidade e registro sistemático.
               </p>

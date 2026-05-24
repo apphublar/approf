@@ -130,6 +130,7 @@ export interface Student {
   id: string
   childCode: string
   name: string
+  enrolledAt?: string
   age: number
   ageMonths?: number
   birthDate?: string

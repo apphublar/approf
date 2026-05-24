@@ -108,7 +108,7 @@ async function loadStudentsWithPhotoPositionFallback(ownerId: string) {
 
   const query = supabase
     .from('students')
-    .select('id, class_id, full_name, birth_date, photo_path, photo_position, notes_private, support_tags')
+    .select('id, class_id, full_name, birth_date, photo_path, photo_position, notes_private, support_tags, created_at')
     .eq('owner_id', ownerId)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
@@ -117,7 +117,7 @@ async function loadStudentsWithPhotoPositionFallback(ownerId: string) {
 
   return supabase
     .from('students')
-    .select('id, class_id, full_name, birth_date, photo_path, notes_private, support_tags')
+    .select('id, class_id, full_name, birth_date, photo_path, notes_private, support_tags, created_at')
     .eq('owner_id', ownerId)
     .is('archived_at', null)
     .order('created_at', { ascending: false })

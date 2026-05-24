@@ -63,10 +63,12 @@ interface TextCompletion {
   actualCostCents: number
 }
 
-const DEFAULT_ANTHROPIC_HAIKU_MODEL = 'claude-haiku-4-5-20251001'
-const DEFAULT_ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-6'
+const DEFAULT_ANTHROPIC_HAIKU_MODEL = 'claude-3-5-haiku-20241022'
+const DEFAULT_ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-20250514'
 const DEFAULT_OPENAI_INTERVENTIONS_MODEL = 'gpt-4o-mini'
 const DEFAULT_OPENAI_HUMANIZE_MODEL = 'gpt-5'
+const ANTHROPIC_HAIKU_FALLBACK_MODELS = ['claude-3-5-haiku-20241022', 'claude-3-haiku-20240307']
+const ANTHROPIC_SONNET_FALLBACK_MODELS = ['claude-sonnet-4-20250514', 'claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-20241022']
 
 interface DocumentPipelineConfig {
   stages: 1 | 2 | 3
@@ -339,7 +341,7 @@ async function generateInterventionWithOpenAi(
     },
   ]
 
-  const cleanText = cleanupGeneratedText(openAi.text)
+  const cleanText = openAi.text.trim()
   const reportId = await persistGeneratedReport(input, cleanText)
   await persistUsage(
     reportId,
@@ -773,57 +775,79 @@ async function requestClaudeText(system: string, user: string, options: RequestC
     throw new PublicAiGenerationError('Servico de IA indisponivel no momento. Tente novamente em instantes.')
   }
 
-  const model = options.model
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
+  for (const model of resolveClaudeModelAttempts(options.model)) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: options.maxTokens ?? 1800,
+        temperature: options.temperature ?? 0.4,
+        system,
+        messages: [{ role: 'user', content: user }],
+      }),
+    })
+
+    const payload = (await response.json().catch(() => null)) as {
+      content?: Array<{ type?: string; text?: string }>
+      usage?: { input_tokens?: number; output_tokens?: number }
+      error?: { message?: string; type?: string }
+    } | null
+
+    if (!response.ok) {
+      console.error('[ai-generation] Claude HTTP', response.status, payload?.error?.message)
+      if (isClaudeModelUnavailable(response.status, payload?.error?.message, payload?.error?.type)) {
+        continue
+      }
+      throw new PublicAiGenerationError('Não foi possivel gerar o texto agora. Tente novamente em instantes.')
+    }
+
+    const text = payload?.content
+      ?.filter((item) => item?.type === 'text' && typeof item?.text === 'string')
+      .map((item) => item.text ?? '')
+      .join('\n')
+      .trim()
+
+    if (!text) {
+      throw new PublicAiGenerationError('A IA não retornou conteudo suficiente. Ajuste o contexto e tente novamente.')
+    }
+
+    const inputTokens = payload?.usage?.input_tokens ?? 0
+    const outputTokens = payload?.usage?.output_tokens ?? 0
+    const estimatedCostCents = estimateClaudeCostCents(model, inputTokens, outputTokens)
+
+    return {
+      text,
+      provider: 'anthropic',
       model,
-      max_tokens: options.maxTokens ?? 1800,
-      temperature: options.temperature ?? 0.4,
-      system,
-      messages: [{ role: 'user', content: user }],
-    }),
-  })
-
-  const payload = (await response.json().catch(() => null)) as {
-    content?: Array<{ type?: string; text?: string }>
-    usage?: { input_tokens?: number; output_tokens?: number }
-    error?: { message?: string }
-  } | null
-
-  if (!response.ok) {
-    console.error('[ai-generation] Claude HTTP', response.status, payload?.error?.message)
-    throw new PublicAiGenerationError('Não foi possivel gerar o texto agora. Tente novamente em instantes.')
+      inputTokens,
+      outputTokens,
+      estimatedCostCents,
+      actualCostCents: estimatedCostCents,
+    } satisfies TextCompletion
   }
 
-  const text = payload?.content
-    ?.filter((item) => item?.type === 'text' && typeof item?.text === 'string')
-    .map((item) => item.text ?? '')
-    .join('\n')
-    .trim()
+  throw new PublicAiGenerationError('Não foi possivel gerar o texto agora. Tente novamente em instantes.')
+}
 
-  if (!text) {
-    throw new PublicAiGenerationError('A IA não retornou conteudo suficiente. Ajuste o contexto e tente novamente.')
+function resolveClaudeModelAttempts(requestedModel: string) {
+  const candidates = [requestedModel]
+  const normalized = requestedModel.toLowerCase()
+  if (normalized.includes('haiku')) {
+    candidates.push(...ANTHROPIC_HAIKU_FALLBACK_MODELS)
+  } else if (normalized.includes('sonnet') || normalized.includes('claude')) {
+    candidates.push(...ANTHROPIC_SONNET_FALLBACK_MODELS)
   }
+  return Array.from(new Set(candidates.filter(Boolean)))
+}
 
-  const inputTokens = payload?.usage?.input_tokens ?? 0
-  const outputTokens = payload?.usage?.output_tokens ?? 0
-  const estimatedCostCents = estimateClaudeCostCents(model, inputTokens, outputTokens)
-
-  return {
-    text,
-    provider: 'anthropic',
-    model,
-    inputTokens,
-    outputTokens,
-    estimatedCostCents,
-    actualCostCents: estimatedCostCents,
-  } satisfies TextCompletion
+function isClaudeModelUnavailable(status: number, message?: string, type?: string) {
+  const normalized = `${message ?? ''} ${type ?? ''}`.toLowerCase()
+  return status === 400 && /model|not_found|not found|invalid|does not exist|not supported/.test(normalized)
 }
 
 function sanitizeInternalLogError(error: unknown) {
@@ -891,9 +915,11 @@ async function requestOpenAiInterventionText(options: RequestOpenAiInterventionO
   const outputTokens = payload?.usage?.completion_tokens ?? 0
   return {
     text,
+    provider: 'openai',
     model: payload?.model ?? options.model,
     inputTokens,
     outputTokens,
+    estimatedCostCents: estimateOpenAiInterventionCostCents(inputTokens, outputTokens),
     actualCostCents: estimateOpenAiInterventionCostCents(inputTokens, outputTokens),
   }
 }
