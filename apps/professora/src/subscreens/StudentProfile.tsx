@@ -56,11 +56,11 @@ export default function StudentProfileSubscreen() {
   }))
   const timeline: TimelineEvent[] = student.timeline && student.timeline.length > 0 ? student.timeline : timelineFromAnnotations
   const totalNotes = studentAnns.length
-  const totalMilestones = timeline.filter(
+  const timelineMilestones = (student.timeline ?? []).filter(
     (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
-  ).length
-  const extraTimelineRecords = timeline.filter((event) => event.type !== 'marco').length
-  const totalRecords = totalNotes + totalMilestones + generatedCount + extraTimelineRecords
+  )
+  const totalMilestones = timelineMilestones.length
+  const totalRecords = totalNotes + totalMilestones + generatedCount
   const absenceRecords = attendanceRecords
     .filter((record) => record.classId === cls.id && !record.presentStudentIds.includes(student.id))
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -68,7 +68,6 @@ export default function StudentProfileSubscreen() {
   const totalAbsences = absenceRecords.length
   const totalPresences = Math.max(0, totalAttendanceCalls - totalAbsences)
   const attendanceRate = totalAttendanceCalls > 0 ? Math.round((totalPresences / totalAttendanceCalls) * 100) : 0
-  const lastAbsences = absenceRecords.slice(0, 3)
   const visibleAnnotations = showAllAnnotations
     ? studentAnns
     : studentAnns.slice(0, ANNOTATION_PREVIEW_COUNT)
@@ -179,20 +178,9 @@ export default function StudentProfileSubscreen() {
           <div className="h-2 rounded-full bg-cream overflow-hidden mt-3">
             <div className="h-full rounded-full bg-gm transition-all" style={{ width: `${attendanceRate}%` }} />
           </div>
-          {lastAbsences.length > 0 ? (
-            <div className="mt-3 rounded-app-sm bg-cream border border-border p-3">
-              <p className="text-[11px] font-bold text-ink mb-2">Últimas faltas</p>
-              <div className="flex flex-wrap gap-2">
-                {lastAbsences.map((absence) => (
-                  <span key={absence.id} className="text-[11px] text-muted bg-white border border-border rounded-full px-2 py-1">
-                    {formatAttendanceDate(absence.date)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="text-[12px] text-muted mt-3">Sem faltas registradas até o momento.</p>
-          )}
+          <p className="text-[12px] text-muted mt-3">
+            {totalAttendanceCalls > 0 ? 'A frequência é atualizada conforme as chamadas realizadas.' : 'Ainda não há chamadas registradas para esta turma.'}
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-[10px] mb-5">
@@ -375,11 +363,6 @@ function formatStudentAge(years?: number, months?: number) {
   const safeMonths = typeof months === 'number' ? months : 0
   if (safeMonths > 0) return `${safeYears} anos e ${safeMonths} meses`
   return `${safeYears} anos`
-}
-
-function formatAttendanceDate(value: string) {
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year}`
 }
 
 function normalizeText(value: string) {

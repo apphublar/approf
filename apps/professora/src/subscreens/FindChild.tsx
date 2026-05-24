@@ -1,7 +1,8 @@
-﻿import { useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, Search, ShieldCheck } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import type { ChildSearchPreview } from '@/types'
+import { listReports } from '@/services/reports'
 
 const EXTERNAL_PREVIEWS: ChildSearchPreview[] = [
   {
@@ -24,6 +25,37 @@ export default function FindChildSubscreen() {
   const [name, setName] = useState('')
   const [birthDate, setBirthDate] = useState('')
   const [requestedId, setRequestedId] = useState<string | null>(null)
+  const [generatedByStudentId, setGeneratedByStudentId] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    const allClassIds = classes.map((item) => item.id).filter(Boolean)
+    if (!allClassIds.length) {
+      setGeneratedByStudentId({})
+      return
+    }
+
+    let active = true
+    Promise.all(
+      allClassIds.map((classId) => listReports({ classId, compact: true, limit: 300 })),
+    )
+      .then((results) => {
+        if (!active) return
+        const counter: Record<string, number> = {}
+        results.flat().forEach((report) => {
+          if (!report.student_id || report.status === 'failed') return
+          counter[report.student_id] = (counter[report.student_id] ?? 0) + 1
+        })
+        setGeneratedByStudentId(counter)
+      })
+      .catch(() => {
+        if (!active) return
+        setGeneratedByStudentId({})
+      })
+
+    return () => {
+      active = false
+    }
+  }, [classes])
 
   const localPreviews: ChildSearchPreview[] = useMemo(
     () =>
@@ -36,11 +68,14 @@ export default function FindChildSubscreen() {
           school: cls.school,
           previousClass: cls.name,
           lastTeacher: 'Prof. Ana Lima',
-          recordsCount: student.annotationCount,
+          recordsCount:
+            student.annotationCount +
+            (student.timeline ?? []).filter((event) => event.type === 'marco').length +
+            (generatedByStudentId[student.id] ?? 0),
           timelineSummary: (student.timeline ?? []).slice(0, 3).map((event) => event.title),
         })),
       ),
-    [classes],
+    [classes, generatedByStudentId],
   )
 
   const results = [...localPreviews, ...EXTERNAL_PREVIEWS].filter((child) => {
@@ -121,7 +156,7 @@ export default function FindChildSubscreen() {
                 </div>
                 <span className="text-[10px] font-bold text-gm bg-gbg rounded-full px-2 py-1 h-fit">{child.childCode}</span>
               </div>
-              <p className="text-[12px] text-soft mt-3">{child.school} - {child.recordsCount} registros pedagogicos</p>
+              <p className="text-[12px] text-soft mt-3">{child.school} - {child.recordsCount} registros pedagógicos</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 {child.timelineSummary.map((item) => (
                   <span key={item} className="text-[10px] text-muted bg-cream rounded-full px-2 py-1 border border-border">{item}</span>

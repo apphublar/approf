@@ -4,6 +4,7 @@ import { BarChart3, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardChe
 import { useNavStore, useAppStore } from '@/store'
 import { saveSupabaseAttendanceRecord } from '@/services/supabase/attendance'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
+import { listReports } from '@/services/reports'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import type { AttendanceRecord, Student } from '@/types'
 type ClassTool = 'students' | 'attendance' | 'calendar' | 'report'
@@ -12,7 +13,7 @@ const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
 export default function ClassStudentsSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes, activeClassId, setActiveStudent, attendanceRecords, saveAttendanceRecord, upsertAttendanceRecord } = useAppStore()
+  const { classes, activeClassId, setActiveStudent, attendanceRecords, saveAttendanceRecord, upsertAttendanceRecord, annotations } = useAppStore()
   const [query, setQuery] = useState('')
   const [activeTool, setActiveTool] = useState<ClassTool>('students')
   const [attendanceDate, setAttendanceDate] = useState(getTodayKey())
@@ -22,6 +23,7 @@ export default function ClassStudentsSubscreen() {
   const [savedMessage, setSavedMessage] = useState('')
   const [savingAttendance, setSavingAttendance] = useState(false)
   const [attendanceError, setAttendanceError] = useState('')
+  const [generatedByStudentId, setGeneratedByStudentId] = useState<Record<string, number>>({})
 
   const cls = classes.find((c) => c.id === activeClassId) ?? classes[0]
   const classAttendanceRecords = useMemo(
@@ -37,6 +39,33 @@ export default function ClassStudentsSubscreen() {
   useEffect(() => {
     setPresentStudentIds(currentAttendanceRecord?.presentStudentIds ?? [])
   }, [currentAttendanceRecord])
+
+  useEffect(() => {
+    if (!cls?.id) {
+      setGeneratedByStudentId({})
+      return
+    }
+
+    let active = true
+    listReports({ classId: cls.id, limit: 300, compact: true })
+      .then((reports) => {
+        if (!active) return
+        const counter: Record<string, number> = {}
+        reports.forEach((report) => {
+          if (!report.student_id || report.status === 'failed') return
+          counter[report.student_id] = (counter[report.student_id] ?? 0) + 1
+        })
+        setGeneratedByStudentId(counter)
+      })
+      .catch(() => {
+        if (!active) return
+        setGeneratedByStudentId({})
+      })
+
+    return () => {
+      active = false
+    }
+  }, [cls?.id])
 
   if (!cls) return null
 
@@ -175,8 +204,10 @@ export default function ClassStudentsSubscreen() {
                   student={student}
                   rightSlot={
                     <div className="text-right flex-shrink-0">
-                      <span className="text-[11px] font-semibold text-gm">{student.annotationCount}</span>
-                      <span className="text-[10px] text-muted block">anotações</span>
+                      <span className="text-[11px] font-semibold text-gm">
+                        {countStudentRecords(student, annotations, generatedByStudentId[student.id] ?? 0)}
+                      </span>
+                      <span className="text-[10px] text-muted block">registros</span>
                     </div>
                   }
                   onClick={() => openStudent(student.id)}
@@ -549,5 +580,29 @@ function formatMonthTitle(date: Date) {
 
 function formatDateTitle(dateKey: string) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(parseDateKey(dateKey))
+}
+
+function countStudentRecords(student: Student, annotations: ReturnType<typeof useAppStore.getState>['annotations'], generatedCount: number) {
+  const normalizedStudentName = normalizeText(student.name)
+  const notesCount = annotations.filter((annotation) => {
+    const hasStudentIdMatch = annotation.studentId === student.id
+    if (hasStudentIdMatch) return true
+    if (normalizeText(annotation.studentName ?? '') === normalizedStudentName) return true
+    return false
+  }).length
+
+  const milestonesCount = (student.timeline ?? []).filter(
+    (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
+  ).length
+
+  return notesCount + milestonesCount + generatedCount
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }
 

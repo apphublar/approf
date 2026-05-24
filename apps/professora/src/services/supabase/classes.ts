@@ -82,12 +82,20 @@ export async function loadTeacherWorkspace() {
     students: studentsByClassId.get(item.id) ?? [],
   }))
   const annotations = await loadSupabaseAnnotations(user.id, classes)
+  const noteCountByStudentId = buildNoteCountByStudentId(classes, annotations)
+  const classesWithCounts = classes.map((classData) => ({
+    ...classData,
+    students: classData.students.map((student) => ({
+      ...student,
+      annotationCount: noteCountByStudentId.get(student.id) ?? 0,
+    })),
+  }))
 
   return {
     userId: user.id,
     userName: toTitleCaseName(profile.full_name),
     schoolName: schoolsResult.data?.[0]?.name ?? 'Escola nao informada',
-    classes,
+    classes: classesWithCounts,
     annotations,
     attendanceRecords,
     onboardingCompleted: Number(profile.estimated_student_count ?? 0) > 0 || classes.length > 0,
@@ -203,4 +211,40 @@ async function ensureSchool(name: string, ownerId: string) {
 function isMissingPhotoPositionError(error: unknown) {
   if (!error || typeof error !== 'object') return false
   return JSON.stringify(error).toLowerCase().includes('photo_position')
+}
+
+function buildNoteCountByStudentId(classes: ClassData[], annotations: Array<{ studentId?: string | null; studentName?: string | null }>) {
+  const nameByStudentId = new Map<string, string>()
+  classes.forEach((classData) => {
+    classData.students.forEach((student) => {
+      nameByStudentId.set(student.id, normalizeText(student.name))
+    })
+  })
+
+  const countByStudentId = new Map<string, number>()
+  annotations.forEach((annotation) => {
+    if (annotation.studentId && nameByStudentId.has(annotation.studentId)) {
+      countByStudentId.set(annotation.studentId, (countByStudentId.get(annotation.studentId) ?? 0) + 1)
+      return
+    }
+
+    const normalizedAnnotationName = normalizeText(annotation.studentName ?? '')
+    if (!normalizedAnnotationName) return
+    for (const [studentId, normalizedStudentName] of nameByStudentId.entries()) {
+      if (normalizedStudentName === normalizedAnnotationName) {
+        countByStudentId.set(studentId, (countByStudentId.get(studentId) ?? 0) + 1)
+        break
+      }
+    }
+  })
+
+  return countByStudentId
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }

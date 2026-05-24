@@ -228,6 +228,18 @@ export async function cancelTeacherSubscription() {
 }
 
 export async function uploadTeacherVerificationDocuments(files: File[]) {
+  try {
+    const response = await callAccountApiForm<{ documents: VerificationDocument[] }>('/api/account/verification/upload', files)
+    const docs = Array.isArray(response.documents) ? response.documents : []
+    if (!docs.length) throw new Error('Nenhum documento foi processado para verificação.')
+    return docs
+  } catch (apiError) {
+    // Fallback local em caso de falha do endpoint (ambiente antigo sem rota nova).
+    return uploadTeacherVerificationDocumentsDirect(files, apiError)
+  }
+}
+
+async function uploadTeacherVerificationDocumentsDirect(files: File[], originalError?: unknown) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase nao configurado.')
 
@@ -247,7 +259,10 @@ export async function uploadTeacherVerificationDocuments(files: File[]) {
       upsert: false,
       contentType: file.type || 'application/octet-stream',
     })
-    if (error) throw toError(error, 'Nao foi possivel enviar o documento de verificacao.')
+    if (error) {
+      const cause = originalError instanceof Error ? ` (${originalError.message})` : ''
+      throw toError(error, `Nao foi possivel enviar o documento de verificacao.${cause}`)
+    }
 
     uploaded.push({
       path,
@@ -317,6 +332,42 @@ async function callAccountApi<T = Record<string, unknown>>(path: string, init: R
     const message = payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
       ? payload.error
       : 'Falha ao processar solicitação da conta.'
+    throw new Error(message)
+  }
+
+  return (payload ?? {}) as T
+}
+
+async function callAccountApiForm<T = Record<string, unknown>>(path: string, files: File[]): Promise<T> {
+  const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
+  if (!apiBaseUrl) {
+    throw new Error('Backend administrativo nao configurado. Informe VITE_APPROF_ADMIN_API_URL.')
+  }
+
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase nao configurado.')
+
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+  const token = data.session?.access_token
+  if (!token) throw new Error('Sessao expirada. Entre novamente.')
+
+  const formData = new FormData()
+  files.slice(0, 10).forEach((file) => formData.append('files', file))
+
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  })
+
+  const payload = await response.json().catch(() => null) as { error?: string } | T | null
+  if (!response.ok) {
+    const message = payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
+      ? payload.error
+      : 'Falha ao processar upload de documentos.'
     throw new Error(message)
   }
 

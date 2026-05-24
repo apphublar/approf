@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, Camera, ChevronLeft, Eye, EyeOff, LogOut, ShieldAlert, ShieldCheck, Wallet } from 'lucide-react'
+import { BadgeCheck, ChevronLeft, Eye, EyeOff, ImagePlus, LogOut, ShieldAlert, ShieldCheck, Wallet } from 'lucide-react'
 import { useNavStore } from '@/store'
 import {
   cancelTeacherSubscription,
@@ -13,6 +13,7 @@ import {
   uploadTeacherVerificationDocuments,
   type TeacherAccountSnapshot,
 } from '@/services/supabase/account'
+import { getAdjustedPhotoStyle, parsePhotoAdjustment, serializePhotoAdjustment } from '@/utils/photo'
 
 export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
@@ -33,6 +34,11 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
+  const [avatarPositionX, setAvatarPositionX] = useState(() => getStoredAvatarAdjustment().x)
+  const [avatarPositionY, setAvatarPositionY] = useState(() => getStoredAvatarAdjustment().y)
+  const [avatarZoom, setAvatarZoom] = useState(() => getStoredAvatarAdjustment().zoom)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -79,6 +85,12 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     }
   }, [initialSnapshot])
 
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl)
+    }
+  }, [avatarPreviewUrl])
+
   const blocked = useMemo(() => isTeacherAccessBlocked(snapshot?.subscription?.status ?? null), [snapshot])
   const isProfileVerified = useMemo(
     () => (snapshot?.verifications ?? []).some((item) => item.status === 'approved'),
@@ -88,6 +100,8 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     () => (snapshot?.verifications ?? []).some((item) => item.status === 'pending'),
     [snapshot],
   )
+  const canUploadAvatar = Boolean(avatarFile)
+  const displayedAvatar = avatarPreviewUrl ?? avatarUrl
 
   async function saveProfile() {
     if (!snapshot) return
@@ -146,16 +160,39 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     }
   }
 
-  async function handleAvatarUpload(file?: File | null) {
+  function queueAvatar(file?: File | null) {
     if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Selecione uma imagem válida para foto de perfil.')
+      return
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError('A imagem deve ter no máximo 8 MB.')
+      return
+    }
+    if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl)
+    setAvatarFile(file)
+    setAvatarPreviewUrl(URL.createObjectURL(file))
+    setError('')
+    setMessage('')
+  }
+
+  async function saveAvatar() {
+    if (!avatarFile) return
     setSaving(true)
     setError('')
     try {
-      const uploadedUrl = await uploadTeacherAvatar(file)
+      const adjustment = { x: avatarPositionX, y: avatarPositionY, zoom: avatarZoom }
+      const adjustedFile = await buildAdjustedAvatarFile(avatarFile, adjustment)
+      const uploadedUrl = await uploadTeacherAvatar(adjustedFile)
       await updateTeacherProfile({ avatarUrl: uploadedUrl })
+      setAvatarFile(null)
+      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl)
+      setAvatarPreviewUrl(null)
       setAvatarUrl(uploadedUrl)
+      saveAvatarAdjustment(adjustment)
       await refreshAccount()
-      setMessage('Foto de perfil atualizada.')
+      setMessage('Foto de perfil atualizada com sucesso.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível atualizar sua foto.')
     } finally {
@@ -165,13 +202,30 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
 
   function queueVerificationFiles(files: FileList | null) {
     if (!files?.length) return
-    setPendingFiles((current) => [...current, ...Array.from(files)].slice(-10))
+    const allowedExtensions = ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'txt']
+    const sanitized = Array.from(files).filter((file) => {
+      const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+      const validExtension = allowedExtensions.includes(extension)
+      const validSize = file.size <= 15 * 1024 * 1024
+      return validExtension && validSize
+    })
+
+    if (!sanitized.length) {
+      setError('Use arquivos PDF, imagem, DOC/DOCX ou TXT de até 15 MB.')
+      return
+    }
+    setPendingFiles((current) => [...current, ...sanitized].slice(-10))
+    setError('')
   }
 
   async function submitVerification() {
     if (!snapshot) return
     if (!pendingFiles.length) {
       setError('Anexe ao menos um documento para enviar a verificação.')
+      return
+    }
+    if (snapshot.schools.length === 0) {
+      setError('Cadastre ao menos uma escola antes de solicitar a verificação do perfil.')
       return
     }
 
@@ -223,22 +277,21 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Perfil da professora</p>
               <div className="flex items-center gap-3">
-                <label className="w-12 h-12 rounded-full bg-gbg border border-gp flex items-center justify-center text-gd font-bold overflow-hidden cursor-pointer">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Foto da professora" className="w-full h-full object-cover" />
+                <div className="w-14 h-14 rounded-full bg-gbg border border-gp flex items-center justify-center text-gd font-bold overflow-hidden">
+                  {displayedAvatar ? (
+                    <img
+                      src={displayedAvatar}
+                      alt="Foto da professora"
+                      className="w-full h-full object-cover"
+                      style={getAdjustedPhotoStyle(serializePhotoAdjustment({ x: avatarPositionX, y: avatarPositionY, zoom: avatarZoom }))}
+                    />
                   ) : (
                     initialsFromName(snapshot.fullName)
                   )}
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                    onChange={(event) => void handleAvatarUpload(event.target.files?.[0])}
-                  />
-                </label>
+                </div>
                 <div className="flex-1">
                   <p className="text-[14px] font-bold text-ink">{snapshot.fullName}</p>
-                  <p className="text-[11px] text-muted">Professora florescente</p>
+                  <p className="text-[11px] text-muted">Perfil profissional</p>
                   <div className="mt-1 inline-flex items-center gap-1.5">
                     {isProfileVerified ? (
                       <>
@@ -258,8 +311,36 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                     )}
                   </div>
                 </div>
-                <Camera size={15} className="text-muted" />
+                <ImagePlus size={16} className="text-muted" />
               </div>
+              {displayedAvatar && (
+                <div className="mt-4 space-y-3">
+                  <PhotoPositionSlider label="Zoom" min={100} max={240} value={avatarZoom} onChange={setAvatarZoom} />
+                  <PhotoPositionSlider label="Mover para os lados" value={avatarPositionX} onChange={setAvatarPositionX} />
+                  <PhotoPositionSlider label="Mover para cima/baixo" value={avatarPositionY} onChange={setAvatarPositionY} />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <label className="inline-flex items-center justify-center py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer">
+                  Escolher foto
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={(event) => queueAvatar(event.target.files?.[0])}
+                  />
+                </label>
+                <button
+                  onClick={saveAvatar}
+                  disabled={!canUploadAvatar || saving}
+                  className="py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50"
+                >
+                  {saving && canUploadAvatar ? 'Salvando...' : 'Salvar foto'}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted mt-3">
+                Escolha a imagem, ajuste o enquadramento e salve a foto final do perfil.
+              </p>
             </div>
 
             {blocked && (
@@ -322,6 +403,13 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                   {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
+              <button onClick={savePassword} disabled={saving} className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50">
+                {saving ? 'Salvando...' : 'Atualizar senha'}
+              </button>
+            </div>
+
+            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Acesso do aplicativo</p>
               <label className="flex items-center justify-between mt-1 text-[12px] text-muted">
                 <span>Desbloqueio biométrico</span>
                 <input
@@ -336,9 +424,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                   }}
                 />
               </label>
-              <button onClick={savePassword} disabled={saving} className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50">
-                {saving ? 'Salvando...' : 'Atualizar senha'}
-              </button>
+              <p className="text-[11px] text-muted mt-2">
+                Esta opção controla o acesso rápido ao app e funciona separadamente da troca de senha.
+              </p>
             </div>
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
@@ -347,7 +435,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Assinatura</p>
               </div>
               <p className="text-[13px] font-bold text-ink">Status: {formatSubscriptionStatus(snapshot.subscription?.status)}</p>
-              <p className="text-[12px] text-muted mt-1">Plano: {snapshot.subscription?.plan ?? 'Não identificado'}</p>
+              <p className="text-[12px] text-muted mt-1">Plano: {formatSubscriptionPlan(snapshot.subscription?.plan, snapshot.subscription?.status)}</p>
               <p className="text-[12px] text-muted mt-1">Provedor: {formatProvider(snapshot.subscription?.provider)}</p>
               <p className="text-[12px] text-muted mt-1">Próximo vencimento: {formatDate(snapshot.subscription?.currentPeriodEnd)}</p>
               <button onClick={requestCancellation} disabled={saving || blocked} className="w-full mt-3 py-2 rounded-app-sm border border-[#C1440E] text-[#C1440E] text-[12px] font-bold disabled:opacity-50">
@@ -371,14 +459,28 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               />
               <label className="w-full mt-3 inline-flex justify-center py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer">
                 Anexar documentos
-                <input type="file" className="hidden" multiple accept=".pdf,.png,.jpg,.jpeg" onChange={(event) => queueVerificationFiles(event.target.files)} />
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
+                  onChange={(event) => queueVerificationFiles(event.target.files)}
+                />
               </label>
               {pendingFiles.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {pendingFiles.map((file, index) => (
-                    <p key={`${file.name}-${index}`} className="text-[11px] text-muted">
-                      {file.name} ({Math.max(1, Math.round(file.size / 1024))} KB)
-                    </p>
+                    <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-muted">
+                        {file.name} ({Math.max(1, Math.round(file.size / 1024))} KB)
+                      </p>
+                      <button
+                        onClick={() => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        className="text-[11px] text-[#C1440E] font-bold"
+                      >
+                        remover
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -471,8 +573,94 @@ function formatProvider(provider?: string) {
   return provider
 }
 
+function formatSubscriptionPlan(plan?: string | null, status?: string | null) {
+  if (status === 'trial') return 'Plano teste'
+  if (!plan) return 'Não identificado'
+  const normalized = plan.trim().toLowerCase()
+  if (['monthly', 'mensal', 'month', 'mês'].includes(normalized)) return 'Mensal'
+  if (['annual', 'anual', 'yearly', 'ano'].includes(normalized)) return 'Anual'
+  if (['trial', 'teste'].includes(normalized)) return 'Plano teste'
+  return plan
+}
+
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return 'PR'
   return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('')
+}
+
+function getStoredAvatarAdjustment() {
+  if (typeof window === 'undefined') return parsePhotoAdjustment(null)
+  return parsePhotoAdjustment(window.localStorage.getItem('approf:teacher-avatar-adjustment'))
+}
+
+function saveAvatarAdjustment(adjustment: { x: number; y: number; zoom: number }) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem('approf:teacher-avatar-adjustment', serializePhotoAdjustment(adjustment))
+}
+
+async function buildAdjustedAvatarFile(file: File, adjustment: { x: number; y: number; zoom: number }) {
+  const imageUrl = URL.createObjectURL(file)
+  try {
+    const image = await loadImage(imageUrl)
+    const size = 640
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Não foi possível preparar a imagem.')
+
+    const scale = adjustment.zoom / 100
+    const drawWidth = image.width * scale
+    const drawHeight = image.height * scale
+    const offsetX = size / 2 - (adjustment.x / 100) * drawWidth
+    const offsetY = size / 2 - (adjustment.y / 100) * drawHeight
+    context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight)
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+    if (!blob) throw new Error('Não foi possível finalizar a foto.')
+    return new File([blob], `avatar-${Date.now()}.jpg`, { type: 'image/jpeg' })
+  } finally {
+    URL.revokeObjectURL(imageUrl)
+  }
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('Não foi possível carregar a imagem selecionada.'))
+    image.src = src
+  })
+}
+
+function PhotoPositionSlider({
+  label,
+  min = 0,
+  max = 100,
+  value,
+  onChange,
+}: {
+  label: string
+  min?: number
+  max?: number
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <label className="block">
+      <span className="flex justify-between text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">
+        <span>{label}</span>
+        <span>{value}%</span>
+      </span>
+      <input
+        className="w-full accent-gm"
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  )
 }
