@@ -151,10 +151,8 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   }
 
   function onNativeDocumentChange(event: ChangeEvent<HTMLInputElement>) {
-    event.preventDefault()
-    event.stopPropagation()
-    const selectedFile = event.currentTarget.files?.[0] ?? null
-    event.currentTarget.value = ''
+    const input = event.currentTarget
+    const selectedFile = input.files?.[0] ?? null
     clearUploadDebugSteps(DEBUG_KEY)
     setDebugSteps([])
     upsertDebugStep({
@@ -164,6 +162,9 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
       detail: selectedFile ? 'Evento change disparou.' : 'Evento change disparou sem arquivo.',
     })
     handleFileSelect(selectedFile)
+    window.setTimeout(() => {
+      input.value = ''
+    }, 0)
   }
 
   async function openSystemDocumentPicker() {
@@ -275,7 +276,6 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
                 })
               }}
               onChange={(event) => void onNativeDocumentChange(event)}
-              onInput={(event) => void onNativeDocumentChange(event as unknown as ChangeEvent<HTMLInputElement>)}
               className="block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-gd file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-white"
             />
           </div>

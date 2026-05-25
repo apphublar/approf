@@ -200,10 +200,8 @@ export default function MaterialsScreen() {
   }
 
   function onNativeMaterialChange(event: ChangeEvent<HTMLInputElement>) {
-    event.preventDefault()
-    event.stopPropagation()
-    const selectedFile = event.currentTarget.files?.[0] ?? null
-    event.currentTarget.value = ''
+    const input = event.currentTarget
+    const selectedFile = input.files?.[0] ?? null
     setShowDebug(true)
     setUploadDebugStep({
       id: 'native-input',
@@ -212,6 +210,9 @@ export default function MaterialsScreen() {
       detail: selectedFile ? 'Evento change disparou.' : 'Evento change disparou sem arquivo.',
     })
     if (selectedFile) pickFile(selectedFile)
+    window.setTimeout(() => {
+      input.value = ''
+    }, 0)
   }
 
   async function openSystemMaterialPicker() {
@@ -477,7 +478,6 @@ export default function MaterialsScreen() {
                     })
                   }}
                   onChange={onNativeMaterialChange}
-                  onInput={(event) => onNativeMaterialChange(event as unknown as ChangeEvent<HTMLInputElement>)}
                   className="block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-gd file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-white"
                 />
               </div>
