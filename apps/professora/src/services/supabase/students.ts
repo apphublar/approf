@@ -103,6 +103,27 @@ export async function createSupabaseStudent(input: StudentInput) {
   return mapSupabaseStudent(savedStudent)
 }
 
+export async function archiveSupabaseStudent(studentId: string, justification?: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não está configurado.')
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError) throw userError
+  const ownerId = userData.user?.id
+  if (!ownerId) throw new Error('Sessão não encontrada.')
+
+  const { error } = await supabase
+    .from('students')
+    .update({
+      archived_at: new Date().toISOString(),
+      ...(justification?.trim() ? { notes_private: justification.trim() } : {}),
+    })
+    .eq('id', studentId)
+    .eq('owner_id', ownerId)
+
+  if (error) throw toError(error, 'Não foi possível remover a criança.')
+}
+
 export async function updateSupabaseStudent(studentId: string, input: StudentInput) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')

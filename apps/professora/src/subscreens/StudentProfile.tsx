@@ -51,10 +51,7 @@ export default function StudentProfileSubscreen() {
 
   const timeline: TimelineEvent[] = student.timeline ?? []
   const totalNotes = studentAnns.length
-  const timelineMilestones = (student.timeline ?? []).filter(
-    (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
-  )
-  const totalMilestones = timelineMilestones.length
+  const totalMilestones = timeline.length
   const totalRecords = totalNotes + totalMilestones + generatedCount
   const attendanceSummary = getStudentAttendanceSummary(
     student,

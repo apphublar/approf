@@ -114,6 +114,7 @@ interface AppStore {
   addClass: (classData: ClassData) => void
   updateClass: (classId: string, updates: Partial<Omit<ClassData, 'id' | 'students'>>) => void
   addStudent: (classId: string, student: ClassData['students'][number]) => void
+  removeStudent: (classId: string, studentId: string) => void
   updateStudent: (classId: string, studentId: string, updates: Partial<ClassData['students'][number]>) => void
   addTimelineEvent: (classId: string, studentId: string, event: TimelineEvent) => void
   removeTimelineEvent: (classId: string, studentId: string, eventId: string) => void
@@ -261,6 +262,14 @@ export const useAppStore = create<AppStore>()(
           classes: state.classes.map((classData) =>
             classData.id === classId
               ? { ...classData, students: [student, ...classData.students] }
+              : classData,
+          ),
+        })),
+      removeStudent: (classId, studentId) =>
+        set((state) => ({
+          classes: state.classes.map((classData) =>
+            classData.id === classId
+              ? { ...classData, students: classData.students.filter((s) => s.id !== studentId) }
               : classData,
           ),
         })),

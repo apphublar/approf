@@ -1,8 +1,8 @@
 ﻿import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ImagePlus } from 'lucide-react'
+import { ChevronLeft, ImagePlus, Trash2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
-import { updateSupabaseStudent } from '@/services/supabase/students'
+import { archiveSupabaseStudent, updateSupabaseStudent } from '@/services/supabase/students'
 import { birthDateInputToIso, formatBirthDateInput, isoToBirthDateInput } from '@/utils/date'
 import { getAdjustedPhotoStyle, parsePhotoAdjustment, serializePhotoAdjustment } from '@/utils/photo'
 
@@ -26,8 +26,8 @@ function calculateAgeParts(birthDate: string) {
 }
 
 export default function EditStudentSubscreen() {
-  const { closeSubscreen } = useNavStore()
-  const { classes, activeClassId, activeStudentId, updateStudent } = useAppStore()
+  const { closeSubscreen, closeAllSubscreens } = useNavStore()
+  const { classes, activeClassId, activeStudentId, updateStudent, removeStudent } = useAppStore()
   const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
   const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
 
@@ -42,6 +42,9 @@ export default function EditStudentSubscreen() {
   const [photoZoom, setPhotoZoom] = useState(() => parsePhotoAdjustment(student?.photoPosition).zoom)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [showDelete, setShowDelete] = useState(false)
+  const [justification, setJustification] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -65,6 +68,21 @@ export default function EditStudentSubscreen() {
     setPhotoFile(file)
     setPhotoName(file.name)
     setPhotoPreviewUrl(URL.createObjectURL(file))
+  }
+
+  async function deleteStudent() {
+    if (justification.trim().length < 5) return
+    setDeleting(true)
+    try {
+      if (isSupabaseAuthEnabled()) {
+        await archiveSupabaseStudent(student.id, justification.trim())
+      }
+      removeStudent(cls.id, student.id)
+      closeAllSubscreens()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível remover a criança.')
+      setDeleting(false)
+    }
   }
 
   async function saveStudent() {
@@ -187,6 +205,49 @@ export default function EditStudentSubscreen() {
           onChange={(event) => setGeneralNotes(event.target.value)}
         />
         {error && <p className="text-[12px] text-[#C1440E] mt-3 leading-[1.5]">{error}</p>}
+
+        <div className="mt-6 pt-5 border-t border-border">
+          {!showDelete ? (
+            <button
+              type="button"
+              onClick={() => setShowDelete(true)}
+              className="flex items-center gap-2 text-[13px] font-bold text-[#C1440E]"
+            >
+              <Trash2 size={15} />
+              Remover criança da turma
+            </button>
+          ) : (
+            <div className="bg-[#FFF5F5] rounded-app-sm border border-[#F5C6C6] p-4">
+              <p className="text-[13px] font-bold text-[#C1440E] mb-1">Remover criança da turma</p>
+              <p className="text-[11px] text-muted leading-[1.5] mb-3">
+                O cadastro será arquivado e não aparecerá mais na turma. Informe o motivo.
+              </p>
+              <textarea
+                className="w-full min-h-[80px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none leading-[1.5]"
+                placeholder="Ex: criança saiu da escola em março de 2025."
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+              />
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowDelete(false); setJustification('') }}
+                  className="flex-1 py-[11px] rounded-app-sm border border-border text-[13px] font-bold text-muted bg-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteStudent}
+                  disabled={justification.trim().length < 5 || deleting}
+                  className="flex-1 py-[11px] rounded-app-sm bg-[#C1440E] text-white text-[13px] font-bold disabled:opacity-40"
+                >
+                  {deleting ? 'Removendo...' : 'Confirmar remoção'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="p-[18px] bg-white border-t border-border flex-shrink-0 shadow-card" style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom, 0px))' }}>
