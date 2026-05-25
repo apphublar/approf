@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
+import { MATERIAL_BUCKET } from './material-upload'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     const supabase = createSupabaseServiceClient()
     const { data, error } = await supabase
       .from('materials')
-      .select('id, title, description, file_path, file_name, file_type, file_size_bytes, status, detected_category, content_preview, published_at, submitted_by, created_at')
+      .select('id, title, description, type, age_range, pedagogical_objective, file_path, file_name, file_type, file_size_bytes, mime_type, status, ai_analysis_status, detected_category, content_preview, published_at, submitted_by, author_id, author_name, author_avatar, created_at')
       .or(`status.eq.published,submitted_by.eq.${ownerId}`)
       .order('created_at', { ascending: false })
       .limit(80)
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
       const filePath = typeof item.file_path === 'string' ? item.file_path : ''
       let downloadUrl: string | null = null
       if (filePath) {
-        const signed = await supabase.storage.from('material-files').createSignedUrl(filePath, 60 * 10)
+        const signed = await supabase.storage.from(MATERIAL_BUCKET).createSignedUrl(filePath, 60 * 10)
         downloadUrl = signed.data?.signedUrl ?? null
       }
       const { file_path: _filePath, submitted_by: _submittedBy, created_at: _createdAt, ...safeItem } = item

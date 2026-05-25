@@ -8,7 +8,7 @@ export const MATERIALS_CORS_HEADERS = {
 
 export const MAX_MATERIAL_SIZE_MB = 10
 export const MAX_MATERIAL_SIZE_BYTES = MAX_MATERIAL_SIZE_MB * 1024 * 1024
-export const MATERIAL_BUCKET = 'material-files'
+export const MATERIAL_BUCKET = 'material-apoio'
 
 const MATERIAL_REVIEW_SCHEMA = {
   type: 'object',
@@ -61,60 +61,111 @@ export async function finalizeMaterialUpload(input: {
   tempPath: string
 }) {
   const supabase = createSupabaseServiceClient()
-  const extractedText = extractReadableText(input.file, input.bytes)
-  const review = await analyzeMaterialWithOpenAi({
-    title: input.title,
-    description: input.description,
-    file: input.file,
-    bytes: input.bytes,
-    extractedText,
+  console.info('[materials/upload] registering material', {
+    ownerId: input.ownerId,
+    fileName: input.file.name,
+    mimeType: input.file.type,
+    fileSize: input.file.size,
+    tempPath: input.tempPath,
   })
-  const status = resolveMaterialStatus(review)
-  const extension = safeExtension(input.file.name)
-  const publicPath = status === 'published'
-    ? `${input.ownerId}/published/${crypto.randomUUID()}.${extension}`
-    : input.tempPath
-
-  if (status === 'published') {
-    const { error: publishUploadError } = await supabase.storage.from(MATERIAL_BUCKET).upload(publicPath, input.bytes, {
-      contentType: input.file.type || 'application/octet-stream',
-      upsert: false,
-    })
-    if (publishUploadError) throw toError(publishUploadError, 'Nao foi possivel publicar o arquivo aprovado.')
-    await supabase.storage.from(MATERIAL_BUCKET).remove([input.tempPath])
-  }
-
-  const { data, error } = await supabase
+  const profile = await getAuthorProfile(input.ownerId)
+  const initial = await supabase
     .from('materials')
     .insert({
       title: input.title,
       description: input.description,
-      file_path: publicPath,
+      type: input.file.type.startsWith('image/') ? 'image' : 'document',
+      age_range: null,
+      pedagogical_objective: input.description,
+      file_path: input.tempPath,
+      file_url: null,
       file_name: input.file.name,
-      file_type: input.file.type || extension,
+      file_type: input.file.type || safeExtension(input.file.name),
+      mime_type: input.file.type || inferMimeType(input.file.name),
       file_size_bytes: input.file.size,
-      status,
-      published_at: status === 'published' ? new Date().toISOString() : null,
+      file_size: input.file.size,
+      status: 'em_analise',
+      ai_analysis_status: 'pending',
+      published_at: null,
       created_by: input.ownerId,
       submitted_by: input.ownerId,
-      ai_review: review,
-      ai_confidence: review.confianca,
-      detected_category: review.categoria_detectada,
-      content_preview: extractedText.slice(0, 2000),
-      reviewed_at: new Date().toISOString(),
+      author_id: input.ownerId,
+      author_name: profile.name,
+      author_avatar: profile.avatar,
+      ai_review: {},
+      content_preview: '',
     })
     .select('id')
     .single()
-  if (error) throw toError(error, 'Nao foi possivel registrar o material analisado.')
+  if (initial.error) throw toError(initial.error, 'Nao foi possivel registrar o material enviado.')
+  const materialId = initial.data?.id ?? null
 
-  return {
-    payload: {
-      materialId: data?.id ?? null,
-      status,
-      review,
-      extractedTextPreview: extractedText.slice(0, 1200),
-    },
-    remainingTempPath: status === 'published' ? null : input.tempPath,
+  const extractedText = extractReadableText(input.file, input.bytes)
+  try {
+    const review = await analyzeMaterialWithOpenAi({
+      title: input.title,
+      description: input.description,
+      file: input.file,
+      bytes: input.bytes,
+      extractedText,
+    })
+    const status = resolveMaterialStatus(review)
+    const aiAnalysisStatus = status === 'published' ? 'approved' : status === 'blocked' ? 'blocked' : 'review_required'
+    const signed = await supabase.storage.from(MATERIAL_BUCKET).createSignedUrl(input.tempPath, 60 * 60)
+    const update = await supabase
+      .from('materials')
+      .update({
+        status,
+        ai_analysis_status: aiAnalysisStatus,
+        ai_review: review,
+        ai_confidence: review.confianca,
+        detected_category: review.categoria_detectada,
+        content_preview: extractedText.slice(0, 2000),
+        file_url: signed.data?.signedUrl ?? null,
+        published_at: status === 'published' ? new Date().toISOString() : null,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', materialId)
+      .select('id')
+      .single()
+    if (update.error) throw toError(update.error, 'Nao foi possivel atualizar o material analisado.')
+    console.info('[materials/upload] material analyzed', { materialId, status, aiAnalysisStatus })
+
+    return {
+      payload: {
+        materialId,
+        status,
+        review,
+        extractedTextPreview: extractedText.slice(0, 1200),
+      },
+      remainingTempPath: null,
+    }
+  } catch (error) {
+    console.error('[materials/upload] ai analysis failed', error)
+    const fallbackReview = sanitizeReview({
+      aprovado: false,
+      confianca: 0,
+      categoria_detectada: 'Em analise',
+      motivo: 'Material enviado com sucesso. A analise de IA ficara pendente para revisao.',
+    })
+    await supabase
+      .from('materials')
+      .update({
+        status: 'em_analise',
+        ai_analysis_status: 'failed',
+        ai_review: fallbackReview,
+        content_preview: extractedText.slice(0, 2000),
+      })
+      .eq('id', materialId)
+    return {
+      payload: {
+        materialId,
+        status: 'em_analise' as const,
+        review: fallbackReview,
+        extractedTextPreview: extractedText.slice(0, 1200),
+      },
+      remainingTempPath: null,
+    }
   }
 }
 
@@ -286,9 +337,10 @@ export function validateMaterialFile(file: MaterialFileInfo) {
 }
 
 function isAllowedMaterialFile(file: MaterialFileInfo) {
-  if (file.type.startsWith('image/')) return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
   const lowerName = file.name.toLowerCase()
-  return ['.pdf', '.docx', '.xlsx', '.pptx', '.txt', '.csv'].some((extension) => lowerName.endsWith(extension))
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return true
+  if (['.jpg', '.jpeg', '.png', '.webp'].some((extension) => lowerName.endsWith(extension))) return true
+  return ['.pdf', '.docx', '.xlsx', '.pptx'].some((extension) => lowerName.endsWith(extension))
 }
 
 function isDocumentForOpenAiFileInput(fileName: string, mimeType: string) {
@@ -315,6 +367,32 @@ export function inferMimeType(fileName: string) {
 
 export function safeExtension(fileName: string) {
   return fileName.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'
+}
+
+export function safeFileName(fileName: string) {
+  const normalized = fileName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  const parts = normalized.split('.')
+  const extension = safeExtension(fileName)
+  const base = (parts.length > 1 ? parts.slice(0, -1).join('.') : normalized)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'arquivo'
+  return `${base}.${extension}`
+}
+
+async function getAuthorProfile(ownerId: string) {
+  const { data } = await createSupabaseServiceClient()
+    .from('profiles')
+    .select('full_name, avatar_url')
+    .eq('id', ownerId)
+    .maybeSingle()
+  return {
+    name: typeof data?.full_name === 'string' ? data.full_name : 'Professora',
+    avatar: typeof data?.avatar_url === 'string' ? data.avatar_url : null,
+  }
 }
 
 export function toError(error: unknown, fallback: string) {

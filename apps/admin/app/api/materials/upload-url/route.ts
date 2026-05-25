@@ -3,7 +3,7 @@ import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from
 import {
   MATERIAL_BUCKET,
   MATERIALS_CORS_HEADERS,
-  safeExtension,
+  safeFileName,
   validateMaterialFile,
 } from '../material-upload'
 
@@ -26,7 +26,8 @@ export async function POST(request: Request) {
     const validationError = validateMaterialFile({ name: fileName, type: fileType, size: fileSize })
     if (validationError) return jsonError(validationError, 400)
 
-    const filePath = `${ownerId}/tmp/${crypto.randomUUID()}.${safeExtension(fileName)}`
+    const filePath = `${ownerId}/${Date.now()}-${safeFileName(fileName)}`
+    console.info('[materials/upload-url] signed upload requested', { ownerId, fileName, fileType, fileSize, filePath })
     const { data, error } = await createSupabaseServiceClient()
       .storage
       .from(MATERIAL_BUCKET)

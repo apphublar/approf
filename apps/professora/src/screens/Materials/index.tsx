@@ -15,8 +15,6 @@ const ACCEPTED_MATERIALS = [
   '.docx',
   '.xlsx',
   '.pptx',
-  '.txt',
-  '.csv',
   'image/jpeg',
   'image/png',
   'image/webp',
@@ -30,6 +28,7 @@ export default function MaterialsScreen() {
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [uploadStep, setUploadStep] = useState<'idle' | 'uploading' | 'analyzing'>('idle')
   const [loadingMaterials, setLoadingMaterials] = useState(false)
   const [message, setMessage] = useState('')
   const [analysis, setAnalysis] = useState<MaterialAnalysisResult | null>(null)
@@ -85,9 +84,13 @@ export default function MaterialsScreen() {
     if (!file || !canSubmit) return
 
     setSubmitting(true)
+    setUploadStep('uploading')
     setMessage('')
     setAnalysis(null)
     try {
+      window.setTimeout(() => {
+        setUploadStep((current) => current === 'uploading' ? 'analyzing' : current)
+      }, 800)
       const result = await analyzeAndUploadMaterial({
         title: title.trim(),
         description: description.trim(),
@@ -103,6 +106,7 @@ export default function MaterialsScreen() {
       setMessage(error instanceof Error ? error.message : 'Não foi possível enviar o material.')
     } finally {
       setSubmitting(false)
+      setUploadStep('idle')
     }
   }
 
@@ -141,7 +145,7 @@ export default function MaterialsScreen() {
             <UploadCloud size={28} className="text-gm" />
             <span className="mt-2 text-[13px] font-bold text-gd">Adicionar documento ou imagem</span>
             <span className="mt-1 text-[11px] leading-[1.5] text-muted">
-              PDF, DOCX, XLSX, PPTX, TXT, CSV, JPG, PNG ou WEBP até {MAX_MATERIAL_SIZE_MB} MB
+              PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MATERIAL_SIZE_MB} MB
             </span>
             <input
               type="file"
@@ -199,7 +203,7 @@ export default function MaterialsScreen() {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-app bg-gd py-4 text-[15px] font-bold text-white disabled:opacity-50"
           >
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
-            {submitting ? 'Analisando com IA...' : 'Analisar e enviar'}
+            {submitting ? (uploadStep === 'uploading' ? 'Enviando arquivo...' : 'Analisando com IA...') : 'Adicionar material'}
           </button>
         </div>
 
@@ -266,7 +270,7 @@ function MaterialCard({ material }: { material: SupportMaterial }) {
         </div>
       </div>
 
-      {kind === 'image' && material.downloadUrl && material.status === 'published' && (
+      {kind === 'image' && material.downloadUrl && (
         <img src={material.downloadUrl} alt="" className="mt-3 max-h-56 w-full rounded-app-sm border border-border bg-white object-contain" />
       )}
 
@@ -276,7 +280,7 @@ function MaterialCard({ material }: { material: SupportMaterial }) {
         </p>
       )}
 
-      {material.downloadUrl && material.status === 'published' && (
+      {material.downloadUrl && (
         <a
           href={material.downloadUrl}
           target="_blank"
@@ -313,11 +317,10 @@ function getMaterialKindFromType(fileType?: string | null, fileName?: string | n
 }
 
 function isAllowedMaterialFile(file: File) {
-  if (file.type.startsWith('image/')) {
-    return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
-  }
   const name = file.name.toLowerCase()
-  return ['.pdf', '.docx', '.xlsx', '.pptx', '.txt', '.csv'].some((extension) => name.endsWith(extension))
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return true
+  if (['.jpg', '.jpeg', '.png', '.webp'].some((extension) => name.endsWith(extension))) return true
+  return ['.pdf', '.docx', '.xlsx', '.pptx'].some((extension) => name.endsWith(extension))
 }
 
 function formatFileSize(size: number) {

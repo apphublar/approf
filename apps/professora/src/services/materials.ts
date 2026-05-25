@@ -1,6 +1,6 @@
 import { getSupabaseClient } from './supabase/client'
 
-export type MaterialUploadStatus = 'published' | 'review_required' | 'blocked'
+export type MaterialUploadStatus = 'published' | 'review_required' | 'blocked' | 'em_analise'
 
 export interface MaterialAiReview {
   aprovado: boolean
@@ -27,7 +27,12 @@ export interface SupportMaterial {
   file_name: string | null
   file_type: string | null
   file_size_bytes?: number | null
+  mime_type?: string | null
+  type?: string | null
+  age_range?: string | null
+  pedagogical_objective?: string | null
   status?: MaterialUploadStatus
+  ai_analysis_status?: string | null
   detected_category: string | null
   content_preview: string | null
   published_at: string | null
@@ -46,32 +51,23 @@ export interface GeneratedMaterialPublishResult extends GeneratedMaterialPreview
   status: MaterialUploadStatus
 }
 
+const MAX_MATERIAL_SIZE_BYTES = 10 * 1024 * 1024
+const ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.pptx']
+const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
 export async function analyzeAndUploadMaterial(input: {
   title: string
   description: string
   file: File
 }): Promise<MaterialAnalysisResult> {
-  const upload = await callMaterialsApi<{ bucket: string; path: string; token: string }>('/api/materials/upload-url', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fileName: input.file.name,
-      fileType: input.file.type,
-      fileSize: input.file.size,
-    }),
-  })
-
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+  const userId = data.session?.user.id
+  if (!userId) throw new Error('Você precisa estar logada para enviar materiais.')
 
-  const { error: uploadError } = await supabase
-    .storage
-    .from(upload.bucket)
-    .uploadToSignedUrl(upload.path, upload.token, input.file, {
-      contentType: input.file.type || 'application/octet-stream',
-      upsert: true,
-    })
-  if (uploadError) throw uploadError
+  const uploaded = await uploadMaterialFile(input.file, userId)
 
   const payload = await callMaterialsApi<Partial<MaterialAnalysisResult>>('/api/materials/analyze-stored', {
     method: 'POST',
@@ -79,10 +75,10 @@ export async function analyzeAndUploadMaterial(input: {
     body: JSON.stringify({
       title: input.title,
       description: input.description,
-      fileName: input.file.name,
-      fileType: input.file.type,
-      fileSize: input.file.size,
-      filePath: upload.path,
+      fileName: uploaded.file_name,
+      fileType: uploaded.mime_type,
+      fileSize: uploaded.file_size,
+      filePath: uploaded.file_path,
     }),
   })
 
@@ -95,6 +91,52 @@ export async function analyzeAndUploadMaterial(input: {
     status: payload.status,
     review: payload.review,
     extractedTextPreview: payload.extractedTextPreview,
+  }
+}
+
+export async function uploadMaterialFile(file: File, userId: string): Promise<{
+  file_path: string
+  signed_url: string | null
+  file_name: string
+  mime_type: string
+  file_size: number
+}> {
+  validateMaterialFile(file)
+  console.info('[materials] selected file', {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    userId,
+  })
+  const upload = await callMaterialsApi<{ bucket: string; path: string; token: string }>('/api/materials/upload-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+    }),
+  })
+
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
+
+  const { error: uploadError } = await supabase
+    .storage
+    .from(upload.bucket)
+    .uploadToSignedUrl(upload.path, upload.token, file, {
+      contentType: file.type || 'application/octet-stream',
+      upsert: true,
+    })
+  console.info('[materials] storage upload response', { path: upload.path, error: uploadError })
+  if (uploadError) throw new Error('Não foi possível enviar o arquivo. Verifique o tamanho e tente novamente.')
+
+  return {
+    file_path: upload.path,
+    signed_url: null,
+    file_name: file.name,
+    mime_type: file.type || 'application/octet-stream',
+    file_size: file.size,
   }
 }
 
@@ -127,6 +169,19 @@ export async function publishGeneratedMaterialShare(input: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'publish', ...input }),
   })
+}
+
+function validateMaterialFile(file: File) {
+  const lowerName = file.name.toLowerCase()
+  const allowed = ALLOWED_IMAGE_MIME_TYPES.includes(file.type)
+    || ['.jpg', '.jpeg', '.png', '.webp'].some((extension) => lowerName.endsWith(extension))
+    || ALLOWED_DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
+  if (!allowed) {
+    throw new Error('Arquivo não permitido. Envie apenas PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
+  }
+  if (file.size > MAX_MATERIAL_SIZE_BYTES) {
+    throw new Error('Não foi possível enviar o arquivo. Verifique o tamanho e tente novamente.')
+  }
 }
 
 async function callMaterialsApi<T>(path: string, init: RequestInit): Promise<T> {

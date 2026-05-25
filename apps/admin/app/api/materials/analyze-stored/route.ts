@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     if (!title) return jsonError('Informe o tema ou nome do arquivo.', 400)
     if (!description) return jsonError('Informe a descricao do material.', 400)
     if (!fileName || !filePath || !Number.isFinite(fileSize)) return jsonError('Arquivo invalido para analise.', 400)
-    if (!filePath.startsWith(`${ownerId}/tmp/`)) return jsonError('Arquivo temporario invalido.', 400)
+    if (!filePath.startsWith(`${ownerId}/`)) return jsonError('Arquivo temporario invalido.', 400)
 
     const materialFile = {
       name: fileName,
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     const supabase = createSupabaseServiceClient()
     const { data, error } = await supabase.storage.from(MATERIAL_BUCKET).download(filePath)
     if (error || !data) throw toError(error, 'Nao foi possivel ler o arquivo enviado.')
+    console.info('[materials/analyze-stored] file downloaded', { ownerId, fileName, fileType, fileSize, filePath })
 
     const bytes = Buffer.from(await data.arrayBuffer())
     const result = await finalizeMaterialUpload({
