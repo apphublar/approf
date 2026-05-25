@@ -37,6 +37,8 @@ export interface SupportMaterial {
   content_preview: string | null
   published_at: string | null
   downloadUrl?: string | null
+  author_id?: string | null
+  author_name?: string | null
 }
 
 export interface GeneratedMaterialPreview {
@@ -232,10 +234,12 @@ export async function uploadMaterialFile(
   console.info('[materials] uploading to storage via signed URL', { bucket, path })
 
   // Step B: upload to storage
+  // iOS Safari can fail when passing a File object directly — convert to ArrayBuffer first
+  const fileBuffer = await file.arrayBuffer()
   const { error: uploadError } = await supabase
     .storage
     .from(bucket)
-    .uploadToSignedUrl(path, signedToken, file, {
+    .uploadToSignedUrl(path, signedToken, fileBuffer, {
       contentType: file.type || 'application/octet-stream',
     })
 

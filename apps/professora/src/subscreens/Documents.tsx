@@ -73,21 +73,20 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
           </div>
 
           <input
+            id="doc-file-input"
             ref={fileInputRef}
             type="file"
             accept={ACCEPTED_TYPES}
             className="hidden"
             onChange={(event) => void handleFileSelect(event.target.files)}
           />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 mb-4 disabled:opacity-50"
+          <label
+            htmlFor="doc-file-input"
+            className={`w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 mb-4 ${uploading ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
           >
             <Paperclip size={15} />
             {uploading ? 'Anexando...' : 'Anexar documento'}
-          </button>
+          </label>
 
           {uploadError && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError}</p>

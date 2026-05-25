@@ -4,7 +4,7 @@ import { useAppStore, useNavStore } from '@/store'
 import type { CommunityPost } from '@/types'
 
 const CATEGORY_LABEL: Record<CommunityPost['category'], string> = {
-  duvida: 'Duvida',
+  duvida: 'Dúvida',
   ideia: 'Ideia',
   material: 'Material',
   relato: 'Relato',
@@ -48,7 +48,7 @@ export default function CommunitySubscreen() {
             <div className="w-20 h-20 rounded-[24px] flex items-center justify-center text-gm mb-5" style={{ background: '#D8F3DC' }}>
               <Users size={40} />
             </div>
-            <h2 className="font-serif text-[22px] text-gd mb-2">Comunidade em liberacao gradual</h2>
+            <h2 className="font-serif text-[22px] text-gd mb-2">Comunidade em liberação gradual</h2>
             <p className="text-[13px] text-muted leading-[1.7] max-w-[300px]">
               O Super Admin pode liberar para todas as professoras ou apenas para contas selecionadas.
             </p>
@@ -59,7 +59,7 @@ export default function CommunitySubscreen() {
               <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Nova postagem</p>
               <textarea
                 className="w-full min-h-[82px] rounded-app-sm border border-border px-3 py-2 text-[13px] outline-none resize-none"
-                placeholder="Compartilhe uma duvida, relato ou ideia com outras professoras."
+                placeholder="Compartilhe uma dúvida, relato ou ideia com outras professoras."
                 value={text}
                 onChange={(event) => setText(event.target.value)}
               />
@@ -69,7 +69,7 @@ export default function CommunitySubscreen() {
                   value={category}
                   onChange={(event) => setCategory(event.target.value as CommunityPost['category'])}
                 >
-                  <option value="duvida">Duvida</option>
+                  <option value="duvida">Dúvida</option>
                   <option value="ideia">Ideia</option>
                   <option value="material">Material</option>
                   <option value="relato">Relato</option>
