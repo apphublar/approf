@@ -222,7 +222,9 @@ export interface TeacherPersonalDocument {
   name: string
   mimeType: string
   size: number
-  dataUrl: string
+  dataUrl?: string
+  url?: string | null
+  filePath?: string | null
   uploadedAt: string
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   CheckCircle2,
   ExternalLink,
@@ -59,6 +59,7 @@ export default function MaterialsScreen() {
   const [debugSteps, setDebugSteps] = useState<UploadDebugStep[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [adminUrl, setAdminUrl] = useState<string | null>(null)
+  const materialFileInputRef = useRef<HTMLInputElement | null>(null)
 
   const canSubmit = Boolean(title.trim() && desc.trim() && file && !submitting)
 
@@ -313,15 +314,24 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              <label className="flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center">
+              <div
+                className="flex min-h-[120px] flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center"
+                role="group"
+              >
                 <UploadCloud size={26} className="text-gm" />
-                <span className="mt-2 text-[13px] font-bold text-gd">
+                <button
+                  type="button"
+                  onClick={() => materialFileInputRef.current?.click()}
+                  disabled={submitting}
+                  className="mt-2 text-[13px] font-bold text-gd disabled:opacity-50"
+                >
                   {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
-                </span>
+                </button>
                 <span className="mt-1 text-[11px] leading-[1.5] text-muted">
                   PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
                 </span>
                 <input
+                  ref={materialFileInputRef}
                   type="file"
                   className="hidden"
                   accept={ACCEPTED_MATERIALS}
@@ -330,7 +340,7 @@ export default function MaterialsScreen() {
                     e.currentTarget.value = ''
                   }}
                 />
-              </label>
+              </div>
 
               {file && (
                 <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">

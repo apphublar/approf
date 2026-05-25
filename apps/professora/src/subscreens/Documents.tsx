@@ -1,52 +1,95 @@
-import { useMemo, useRef, useState } from 'react'
-import { ChevronLeft, FileText, Paperclip, Search, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, FileText, Loader2, Paperclip, Search, Trash2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
+import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument } from '@/services/personal-documents'
 import type { TeacherPersonalDocument } from '@/types'
 
-const MAX_FILE_BYTES = 4 * 1024 * 1024
-const ACCEPTED_TYPES = 'image/*,.pdf,.doc,.docx,.txt,.odt,.rtf'
+const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.txt,.odt,.rtf'
 
 export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
-  const { personalDocuments, addPersonalDocument, removePersonalDocument } = useAppStore()
+  const { personalDocuments, removePersonalDocument } = useAppStore()
+  const [documents, setDocuments] = useState<TeacherPersonalDocument[]>([])
   const [query, setQuery] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [uploadError, setUploadError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    void refreshDocuments()
+  }, [])
+
+  useEffect(() => {
+    if (loading || personalDocuments.length === 0) return
+    void migrateLocalDocuments()
+  }, [loading, personalDocuments])
+
   const visibleDocuments = useMemo(() => {
     const normalizedQuery = normalizeText(query)
-    if (!normalizedQuery) return personalDocuments
-    return personalDocuments.filter((doc) => normalizeText(doc.name).includes(normalizedQuery))
-  }, [personalDocuments, query])
+    if (!normalizedQuery) return documents
+    return documents.filter((doc) => normalizeText(doc.name).includes(normalizedQuery))
+  }, [documents, query])
+
+  async function refreshDocuments() {
+    setLoading(true)
+    setLoadError('')
+    try {
+      setDocuments(await listPersonalDocuments())
+    } catch (error) {
+      setDocuments([])
+      setLoadError(error instanceof Error ? error.message : 'Nao foi possivel carregar seus documentos.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function migrateLocalDocuments() {
+    const localOnlyDocuments = personalDocuments.filter((doc) => doc.dataUrl && !doc.filePath && !doc.url)
+    if (localOnlyDocuments.length === 0) return
+
+    for (const localDoc of localOnlyDocuments) {
+      try {
+        const file = dataUrlToFile(localDoc.dataUrl!, localDoc.name, localDoc.mimeType)
+        const uploaded = await uploadPersonalDocument(file)
+        setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
+        removePersonalDocument(localDoc.id)
+      } catch (error) {
+        console.warn('[personal-documents] local migration failed', {
+          id: localDoc.id,
+          name: localDoc.name,
+          error: error instanceof Error ? error.message : error,
+        })
+      }
+    }
+  }
 
   async function handleFileSelect(files: FileList | null) {
-    const file = files?.[0]
-    if (!file) return
+    const selectedFile = files?.[0]
+    if (!selectedFile) return
 
     setUploadError('')
-    if (file.size > MAX_FILE_BYTES) {
-      setUploadError('Arquivo muito grande. Use arquivos de até 4 MB.')
-      return
-    }
-
     setUploading(true)
     try {
-      const dataUrl = await readFileAsDataUrl(file)
-      const doc: TeacherPersonalDocument = {
-        id: `pdoc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        size: file.size,
-        dataUrl,
-        uploadedAt: new Date().toISOString(),
-      }
-      addPersonalDocument(doc)
-    } catch {
-      setUploadError('Não foi possível anexar o arquivo. Tente novamente.')
+      const uploaded = await uploadPersonalDocument(selectedFile)
+      setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Nao foi possivel anexar o arquivo. Tente novamente.')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleRemove(id: string) {
+    if (!window.confirm('Excluir este documento permanentemente?')) return
+    setUploadError('')
+    try {
+      await deletePersonalDocument(id)
+      setDocuments((current) => current.filter((doc) => doc.id !== id))
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Nao foi possivel remover o documento.')
     }
   }
 
@@ -64,11 +107,11 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
           <div className="bg-gbg border border-gp rounded-app p-4 mb-4">
             <p className="text-[13px] font-bold text-gd mb-2">Seus arquivos pessoais</p>
             <p className="text-[12px] text-muted leading-[1.6]">
-              Guarde aqui certificados de cursos, diplomas, histórico escolar, comprovantes e outros documentos da sua
-              trajetória profissional. Eles ficam salvos neste aparelho, com acesso restrito a você.
+              Guarde aqui certificados de cursos, diplomas, historico escolar, comprovantes e outros documentos da sua
+              trajetoria profissional. Eles ficam salvos com seguranca na sua conta e aparecem em todos os seus aparelhos.
             </p>
             <p className="text-[11px] text-muted mt-2 leading-[1.5]">
-              Formatos: imagens, PDF e documentos de texto. Tamanho máximo por arquivo: 4 MB.
+              Formatos: JPG, PNG, WEBP, PDF, DOC, DOCX, TXT, ODT e RTF. Tamanho maximo por arquivo: 15 MB.
             </p>
           </div>
 
@@ -80,16 +123,18 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             className="hidden"
             onChange={(event) => void handleFileSelect(event.target.files)}
           />
-          <label
-            htmlFor="doc-file-input"
-            className={`w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 mb-4 ${uploading ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 mb-4 disabled:opacity-50"
           >
-            <Paperclip size={15} />
+            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
             {uploading ? 'Anexando...' : 'Anexar documento'}
-          </label>
+          </button>
 
-          {uploadError && (
-            <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError}</p>
+          {(uploadError || loadError) && (
+            <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>
           )}
 
           <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
@@ -104,7 +149,12 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </div>
           </div>
 
-          {visibleDocuments.length === 0 ? (
+          {loading ? (
+            <div className="bg-white rounded-app p-5 border border-border shadow-card text-center">
+              <Loader2 size={24} className="text-gm mx-auto mb-2 animate-spin" />
+              <p className="text-[13px] font-bold text-ink">Carregando documentos...</p>
+            </div>
+          ) : visibleDocuments.length === 0 ? (
             <div className="bg-white rounded-app p-5 border border-border shadow-card text-center">
               <FileText size={24} className="text-gm mx-auto mb-2" />
               <p className="text-[13px] font-bold text-ink">Nenhum documento anexado</p>
@@ -115,11 +165,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
           ) : (
             <div className="flex flex-col gap-[9px] pb-8">
               {visibleDocuments.map((doc) => (
-                <PersonalDocumentRow
-                  key={doc.id}
-                  doc={doc}
-                  onRemove={() => removePersonalDocument(doc.id)}
-                />
+                <PersonalDocumentRow key={doc.id} doc={doc} onRemove={() => void handleRemove(doc.id)} />
               ))}
             </div>
           )}
@@ -136,6 +182,7 @@ function PersonalDocumentRow({
   doc: TeacherPersonalDocument
   onRemove: () => void
 }) {
+  const fileUrl = doc.url ?? doc.dataUrl ?? ''
   return (
     <div className="bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[13px]">
       <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center bg-gbg text-gm flex-shrink-0">
@@ -144,15 +191,19 @@ function PersonalDocumentRow({
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-bold text-ink truncate">{doc.name}</p>
         <p className="text-[11px] text-muted">
-          {formatFileSize(doc.size)} · {formatDate(doc.uploadedAt)}
+          {formatFileSize(doc.size)} - {formatDate(doc.uploadedAt)}
         </p>
-        <a
-          href={doc.dataUrl}
-          download={doc.name}
-          className="text-[11px] font-bold text-gm mt-1 inline-block"
-        >
-          Abrir ou baixar
-        </a>
+        {fileUrl && (
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            download={doc.dataUrl ? doc.name : undefined}
+            className="text-[11px] font-bold text-gm mt-1 inline-block"
+          >
+            Abrir ou baixar
+          </a>
+        )}
       </div>
       <button
         type="button"
@@ -164,18 +215,6 @@ function PersonalDocumentRow({
       </button>
     </div>
   )
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') resolve(reader.result)
-      else reject(new Error('invalid'))
-    }
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
 }
 
 function formatFileSize(bytes: number) {
@@ -190,6 +229,18 @@ function formatDate(iso: string) {
     month: '2-digit',
     year: 'numeric',
   })
+}
+
+function dataUrlToFile(dataUrl: string, fileName: string, mimeType: string) {
+  const [header, base64] = dataUrl.split(',')
+  if (!base64) throw new Error('Arquivo local invalido.')
+  const detectedMime = /data:(.*?);base64/.exec(header)?.[1] || mimeType || 'application/octet-stream'
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return new File([bytes], fileName, { type: detectedMime })
 }
 
 function normalizeText(value: string) {
