@@ -18,16 +18,8 @@ import {
   type MaterialAnalysisResult,
   type MaterialUploadStatus,
   type SupportMaterial,
-  type UploadDebugStep,
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
-import { UploadDebugPanel } from '@/components/UploadDebugPanel'
-import {
-  clearUploadDebugSteps,
-  loadUploadDebugSteps,
-  saveUploadDebugSteps,
-  upsertUploadDebugStep,
-} from '@/services/upload-debug-store'
 
 type TabId = 'all' | 'mine' | 'blocked'
 type SortBy = 'newest' | 'oldest' | 'name'
@@ -37,7 +29,6 @@ type MaterialKind = 'document' | 'image'
 const ACCEPTED_MATERIALS = ['.pdf', '.docx', '.xlsx', '.pptx', '.jpg', '.jpeg', '.png', '.webp', 'image/jpeg', 'image/png', 'image/webp'].join(',')
 const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
-const DEBUG_KEY = 'material-apoio'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -63,10 +54,8 @@ export default function MaterialsScreen() {
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'analyzing'>('idle')
   const [uploadMsg, setUploadMsg] = useState('')
   const [analysis, setAnalysis] = useState<MaterialAnalysisResult | null>(null)
-  const [debugSteps, setDebugSteps] = useState<UploadDebugStep[]>(() => loadUploadDebugSteps(DEBUG_KEY))
-  const [showDebug, setShowDebug] = useState(false)
-  const [adminUrl, setAdminUrl] = useState<string | null>(null)
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
+  const [mobileUploadBlocked] = useState(() => isMobileUploadContext())
 
   const canSubmit = Boolean(title.trim() && desc.trim() && file && !submitting)
 
@@ -103,27 +92,6 @@ export default function MaterialsScreen() {
   }, [])
 
   useEffect(() => {
-    const persistReload = (event: PageTransitionEvent | BeforeUnloadEvent) => {
-      const detail = event.type === 'pagehide'
-        ? `pagehide disparado. persisted: ${(event as PageTransitionEvent).persisted ? 'sim' : 'nao'}`
-        : 'beforeunload disparado.'
-      const next = upsertUploadDebugStep(loadUploadDebugSteps(DEBUG_KEY), {
-        id: `reload-${Date.now()}`,
-        label: 'Pagina recarregou ou saiu',
-        status: 'error',
-        detail,
-      })
-      saveUploadDebugSteps(DEBUG_KEY, next)
-    }
-    window.addEventListener('pagehide', persistReload)
-    window.addEventListener('beforeunload', persistReload)
-    return () => {
-      window.removeEventListener('pagehide', persistReload)
-      window.removeEventListener('beforeunload', persistReload)
-    }
-  }, [])
-
-  useEffect(() => {
     if (!file || getKindFromFile(file) !== 'image') {
       setFilePreviewUrl(null)
       return
@@ -134,7 +102,6 @@ export default function MaterialsScreen() {
   }, [file])
 
   async function init() {
-    setAdminUrl(import.meta.env.VITE_APPROF_ADMIN_API_URL ?? '(não configurado)')
     const supabase = getSupabaseClient()
     if (supabase) {
       const { data } = await supabase.auth.getSession()
@@ -160,9 +127,6 @@ export default function MaterialsScreen() {
     setFile(null)
     setUploadMsg('')
     setAnalysis(null)
-    clearUploadDebugSteps(DEBUG_KEY)
-    setDebugSteps([])
-    setShowDebug(true)
     setShowUpload(true)
   }
 
@@ -179,78 +143,15 @@ export default function MaterialsScreen() {
     }
     setFile(f ?? null)
     setUploadMsg('')
-    if (f) {
-      setUploadDebugStep({
-        id: 'file-selected',
-        label: 'Arquivo selecionado',
-        status: 'ok',
-        detail: formatFileDebug(f),
-      })
-    } else {
-      setDebugSteps([])
-    }
-  }
-
-  function setUploadDebugStep(step: UploadDebugStep) {
-    setDebugSteps((current) => {
-      const next = upsertUploadDebugStep(current, step)
-      saveUploadDebugSteps(DEBUG_KEY, next)
-      return next
-    })
   }
 
   function onNativeMaterialChange(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget
     const selectedFile = input.files?.[0] ?? null
-    setShowDebug(true)
-    setUploadDebugStep({
-      id: 'native-input',
-      label: 'Input nativo do celular',
-      status: selectedFile ? 'ok' : 'error',
-      detail: selectedFile ? 'Evento change disparou.' : 'Evento change disparou sem arquivo.',
-    })
     if (selectedFile) pickFile(selectedFile)
     window.setTimeout(() => {
       input.value = ''
     }, 0)
-  }
-
-  async function openSystemMaterialPicker() {
-    setShowDebug(true)
-    setUploadDebugStep({
-      id: 'system-picker-open',
-      label: 'Abrindo seletor alternativo',
-      status: 'running',
-      detail: 'Tentando showOpenFilePicker sem filtro accept.',
-    })
-    const picker = getSystemFilePicker()
-    if (!picker) {
-      setUploadDebugStep({
-        id: 'system-picker-open',
-        label: 'Abrindo seletor alternativo',
-        status: 'error',
-        detail: 'showOpenFilePicker nao esta disponivel neste navegador/PWA.',
-      })
-      return
-    }
-    try {
-      const handles = await picker({ multiple: false })
-      const selectedFile = handles[0] ? await handles[0].getFile() : null
-      setUploadDebugStep({
-        id: 'system-picker-open',
-        label: 'Abrindo seletor alternativo',
-        status: selectedFile ? 'ok' : 'error',
-        detail: selectedFile ? 'Arquivo retornou pelo seletor alternativo.' : 'Nenhum arquivo retornou pelo seletor alternativo.',
-      })
-      if (selectedFile) pickFile(selectedFile)
-    } catch (error) {
-      setUploadDebugStep({
-        id: 'system-picker-open',
-        label: 'Abrindo seletor alternativo',
-        status: 'error',
-        detail: error instanceof Error ? error.message : String(error),
-      })
-    }
   }
 
   async function submitMaterial() {
@@ -259,22 +160,12 @@ export default function MaterialsScreen() {
     setUploadPhase('uploading')
     setUploadMsg('')
     setAnalysis(null)
-    setUploadDebugStep({
-      id: 'manual-upload',
-      label: 'Inicio do upload',
-      status: 'running',
-      detail: 'Botao Enviar material pressionado.',
-    })
     try {
       window.setTimeout(() => setUploadPhase((p) => (p === 'uploading' ? 'analyzing' : p)), 800)
       const result = await analyzeAndUploadMaterial({
         title: title.trim(),
         description: desc.trim(),
         file,
-        onDebugStep: (steps) => {
-          setDebugSteps(steps)
-          saveUploadDebugSteps(DEBUG_KEY, steps)
-        },
       })
       setAnalysis(result)
       setUploadMsg(getStatusMessage(result.status))
@@ -284,7 +175,6 @@ export default function MaterialsScreen() {
       await refresh()
     } catch (e) {
       setUploadMsg(e instanceof Error ? e.message : 'Não foi possível enviar o material.')
-      setShowDebug(true)
     } finally {
       setSubmitting(false)
       setUploadPhase('idle')
@@ -389,11 +279,6 @@ export default function MaterialsScreen() {
 
       {/* ── Grid ── */}
       <div className="flex-1 min-h-0 overflow-y-auto px-[14px] pb-28 pt-1 overscroll-contain">
-        {!showUpload && debugSteps.length > 0 && (
-          <div className="mb-3">
-            <UploadDebugPanel title="Ultimo debug de upload" steps={debugSteps} />
-          </div>
-        )}
         {filtered.length === 0 ? (
           <EmptyState tab={tab} hasSearch={Boolean(query.trim())} onAdd={openUpload} />
         ) : (
@@ -447,40 +332,30 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${submitting ? 'opacity-50' : ''}`}>
-                <UploadCloud size={26} className="mx-auto text-gm" />
-                <p className="mt-2 text-[13px] font-bold text-gd">
-                  {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
-                </p>
-                <p className="mb-3 mt-1 text-[11px] leading-[1.5] text-muted">
-                  PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP ate {MAX_MB} MB
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void openSystemMaterialPicker()}
-                  disabled={submitting}
-                  className="mb-3 flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
-                >
-                  <UploadCloud size={14} />
-                  Escolher pelo seletor alternativo
-                </button>
-                <input
-                  type="file"
-                  disabled={submitting}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setShowDebug(true)
-                    setUploadDebugStep({
-                      id: 'native-input-open',
-                      label: 'Abrindo seletor nativo',
-                      status: 'running',
-                      detail: ACCEPTED_MATERIALS,
-                    })
-                  }}
-                  onChange={onNativeMaterialChange}
-                  className="block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-gd file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-white"
-                />
-              </div>
+              {mobileUploadBlocked ? (
+                <UploadDesktopOnlyNotice />
+              ) : (
+                <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${submitting ? 'opacity-50' : ''}`}>
+                  <UploadCloud size={26} className="mx-auto text-gm" />
+                  <p className="mt-2 text-[13px] font-bold text-gd">
+                    {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
+                  </p>
+                  <p className="mb-3 mt-1 text-[11px] leading-[1.5] text-muted">
+                    PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP ate {MAX_MB} MB
+                  </p>
+                  <label className="flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white">
+                    <UploadCloud size={15} />
+                    Escolher arquivo
+                    <input
+                      type="file"
+                      accept={ACCEPTED_MATERIALS}
+                      disabled={submitting}
+                      onChange={onNativeMaterialChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
               {file && (
                 <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
                   <MaterialIcon kind={getKindFromFile(file)} />
@@ -544,12 +419,6 @@ export default function MaterialsScreen() {
                   : 'Enviar material'}
               </button>
 
-              {showDebug && (
-                <UploadDebugPanel
-                  title={`Debug temporario de upload - Admin: ${adminUrl ?? '...'}`}
-                  steps={debugSteps}
-                />
-              )}
             </div>
           </div>
         </div>
@@ -848,14 +717,6 @@ function formatFileSize(size: number) {
   return `${Math.max(1, Math.round(size / 1024))} KB`
 }
 
-function formatFileDebug(file: File) {
-  return [
-    `Nome do arquivo: ${file.name}`,
-    `Tamanho: ${formatFileSize(file.size)}`,
-    `MIME Type: ${file.type || '(vazio)'}`,
-  ].join('\n')
-}
-
 function formatStatus(status: MaterialUploadStatus) {
   if (status === 'published') return 'Aprovado'
   if (status === 'blocked') return 'Bloqueado'
@@ -885,10 +746,22 @@ function normalizeText(value: string) {
     .trim()
 }
 
-type SystemFileHandle = { getFile: () => Promise<File> }
-type SystemFilePicker = (options?: { multiple?: boolean }) => Promise<SystemFileHandle[]>
+function UploadDesktopOnlyNotice() {
+  return (
+    <div className="rounded-app-sm border border-gp bg-gbg px-4 py-4">
+      <p className="text-[13px] font-bold text-gd">Envio disponível pelo computador</p>
+      <p className="mt-1 text-[12px] leading-[1.55] text-muted">
+        Para garantir a segurança, a validação correta dos arquivos e evitar falhas no PWA mobile, o envio de materiais deve ser feito pelo computador por enquanto. Pelo celular, você pode consultar e visualizar os materiais normalmente.
+      </p>
+    </div>
+  )
+}
 
-function getSystemFilePicker(): SystemFilePicker | null {
-  const candidate = (window as unknown as { showOpenFilePicker?: SystemFilePicker }).showOpenFilePicker
-  return typeof candidate === 'function' ? candidate.bind(window) : null
+function isMobileUploadContext() {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false
+  const ua = navigator.userAgent.toLowerCase()
+  const mobileUa = /android|iphone|ipad|ipod|mobile/.test(ua)
+  const standalone = window.matchMedia('(display-mode: standalone)').matches
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true
+  return mobileUa || standalone
 }

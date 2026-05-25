@@ -2,18 +2,9 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { ChevronLeft, FileText, Loader2, Paperclip, Search, Trash2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument } from '@/services/personal-documents'
-import { UploadDebugPanel } from '@/components/UploadDebugPanel'
 import type { TeacherPersonalDocument } from '@/types'
-import type { VisualUploadDebugStep } from '@/services/uploads'
-import {
-  clearUploadDebugSteps,
-  loadUploadDebugSteps,
-  saveUploadDebugSteps,
-  upsertUploadDebugStep,
-} from '@/services/upload-debug-store'
 
 const ACCEPTED_TYPES = '.pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp,application/pdf'
-const DEBUG_KEY = 'meus-documentos'
 
 export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
@@ -22,34 +13,13 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState('')
   const [uploadError, setUploadError] = useState('')
-  const [debugSteps, setDebugSteps] = useState<VisualUploadDebugStep[]>(() => loadUploadDebugSteps(DEBUG_KEY))
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [mobileUploadBlocked] = useState(() => isMobileUploadContext())
 
   useEffect(() => {
     void refreshDocuments()
-  }, [])
-
-  useEffect(() => {
-    const persistReload = (event: PageTransitionEvent | BeforeUnloadEvent) => {
-      const detail = event.type === 'pagehide'
-        ? `pagehide disparado. persisted: ${(event as PageTransitionEvent).persisted ? 'sim' : 'nao'}`
-        : 'beforeunload disparado.'
-      const next = upsertUploadDebugStep(loadUploadDebugSteps(DEBUG_KEY), {
-        id: `reload-${Date.now()}`,
-        label: 'Pagina recarregou ou saiu',
-        status: 'error',
-        detail,
-      })
-      saveUploadDebugSteps(DEBUG_KEY, next)
-    }
-    window.addEventListener('pagehide', persistReload)
-    window.addEventListener('beforeunload', persistReload)
-    return () => {
-      window.removeEventListener('pagehide', persistReload)
-      window.removeEventListener('beforeunload', persistReload)
-    }
   }, [])
 
   useEffect(() => {
@@ -98,52 +68,22 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
 
   function handleFileSelect(file: File | null) {
     if (!file) {
-      upsertDebugStep({
-        id: 'file-selected',
-        label: 'Arquivo selecionado',
-        status: 'error',
-        detail: 'Nenhum arquivo retornou do seletor.',
-      })
       return
     }
 
     setUploadError('')
     setSelectedFile(file)
-    upsertDebugStep({
-      id: 'file-selected',
-      label: 'Arquivo selecionado',
-      status: 'ok',
-      detail: formatFileDebug(file),
-    })
   }
 
   async function uploadSelectedDocument() {
     if (!selectedFile || uploading) return
     setUploadError('')
     setUploading(true)
-    upsertDebugStep({
-      id: 'manual-upload',
-      label: 'Inicio do upload',
-      status: 'running',
-      detail: 'Botao Adicionar arquivo pressionado.',
-    })
     try {
-      const uploaded = await uploadPersonalDocument(selectedFile, upsertDebugStep)
+      const uploaded = await uploadPersonalDocument(selectedFile)
       setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
       setSelectedFile(null)
-      upsertDebugStep({
-        id: 'done',
-        label: 'Arquivo enviado com sucesso',
-        status: 'ok',
-        detail: `documento: ${uploaded.id}`,
-      })
     } catch (error) {
-      upsertDebugStep({
-        id: 'error',
-        label: 'Erro completo caso exista',
-        status: 'error',
-        detail: error instanceof Error ? error.stack || error.message : String(error),
-      })
       setUploadError(error instanceof Error ? error.message : 'Nao foi possivel anexar o arquivo. Tente novamente.')
     } finally {
       setUploading(false)
@@ -153,65 +93,10 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   function onNativeDocumentChange(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget
     const selectedFile = input.files?.[0] ?? null
-    clearUploadDebugSteps(DEBUG_KEY)
-    setDebugSteps([])
-    upsertDebugStep({
-      id: 'native-input',
-      label: 'Input nativo do celular',
-      status: selectedFile ? 'ok' : 'error',
-      detail: selectedFile ? 'Evento change disparou.' : 'Evento change disparou sem arquivo.',
-    })
     handleFileSelect(selectedFile)
     window.setTimeout(() => {
       input.value = ''
     }, 0)
-  }
-
-  async function openSystemDocumentPicker() {
-    clearUploadDebugSteps(DEBUG_KEY)
-    setDebugSteps([])
-    upsertDebugStep({
-      id: 'system-picker-open',
-      label: 'Abrindo seletor alternativo',
-      status: 'running',
-      detail: 'Tentando showOpenFilePicker sem filtro accept.',
-    })
-    const picker = getSystemFilePicker()
-    if (!picker) {
-      upsertDebugStep({
-        id: 'system-picker-open',
-        label: 'Abrindo seletor alternativo',
-        status: 'error',
-        detail: 'showOpenFilePicker nao esta disponivel neste navegador/PWA.',
-      })
-      return
-    }
-    try {
-      const handles = await picker({ multiple: false })
-      const file = handles[0] ? await handles[0].getFile() : null
-      upsertDebugStep({
-        id: 'system-picker-open',
-        label: 'Abrindo seletor alternativo',
-        status: file ? 'ok' : 'error',
-        detail: file ? 'Arquivo retornou pelo seletor alternativo.' : 'Nenhum arquivo retornou pelo seletor alternativo.',
-      })
-      handleFileSelect(file)
-    } catch (error) {
-      upsertDebugStep({
-        id: 'system-picker-open',
-        label: 'Abrindo seletor alternativo',
-        status: 'error',
-        detail: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-
-  function upsertDebugStep(step: VisualUploadDebugStep) {
-    setDebugSteps((current) => {
-      const next = upsertUploadDebugStep(current, step)
-      saveUploadDebugSteps(DEBUG_KEY, next)
-      return next
-    })
   }
 
   async function handleRemove(id: string) {
@@ -247,38 +132,23 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </p>
           </div>
 
-          <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white p-3">
-            <div className="mb-2 flex items-center justify-center gap-2 text-[13px] font-bold text-gm">
-              {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-              {uploading ? 'Anexando...' : 'Escolher documento'}
+          {mobileUploadBlocked ? (
+            <UploadDesktopOnlyNotice />
+          ) : (
+            <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white p-3">
+              <label className="flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white">
+                {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
+                {uploading ? 'Anexando...' : 'Escolher arquivo'}
+                <input
+                  type="file"
+                  accept={ACCEPTED_TYPES}
+                  disabled={uploading}
+                  onChange={(event) => void onNativeDocumentChange(event)}
+                  className="hidden"
+                />
+              </label>
             </div>
-            <button
-              type="button"
-              onClick={() => void openSystemDocumentPicker()}
-              disabled={uploading}
-              className="mb-3 flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
-            >
-              <Paperclip size={14} />
-              Escolher pelo seletor alternativo
-            </button>
-            <input
-              type="file"
-              disabled={uploading}
-              onClick={(event) => {
-                event.stopPropagation()
-                clearUploadDebugSteps(DEBUG_KEY)
-                setDebugSteps([])
-                upsertDebugStep({
-                  id: 'native-input-open',
-                  label: 'Abrindo seletor nativo',
-                  status: 'running',
-                  detail: ACCEPTED_TYPES,
-                })
-              }}
-              onChange={(event) => void onNativeDocumentChange(event)}
-              className="block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-gd file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-white"
-            />
-          </div>
+          )}
 
           {(uploadError || loadError) && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>
@@ -304,10 +174,6 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
               </button>
             </div>
           )}
-
-          <div className="mb-4">
-            <UploadDebugPanel steps={debugSteps} />
-          </div>
 
           <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
             <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
@@ -403,14 +269,6 @@ function formatDate(iso: string) {
   })
 }
 
-function formatFileDebug(file: File) {
-  return [
-    `Nome do arquivo: ${file.name}`,
-    `Tamanho: ${formatFileSize(file.size)}`,
-    `MIME Type: ${file.type || '(vazio)'}`,
-  ].join('\n')
-}
-
 function dataUrlToFile(dataUrl: string, fileName: string, mimeType: string) {
   const [header, base64] = dataUrl.split(',')
   if (!base64) throw new Error('Arquivo local invalido.')
@@ -431,10 +289,22 @@ function normalizeText(value: string) {
     .trim()
 }
 
-type SystemFileHandle = { getFile: () => Promise<File> }
-type SystemFilePicker = (options?: { multiple?: boolean }) => Promise<SystemFileHandle[]>
+function UploadDesktopOnlyNotice() {
+  return (
+    <div className="mb-4 rounded-app-sm border border-gp bg-gbg px-4 py-4">
+      <p className="text-[13px] font-bold text-gd">Envio disponível pelo computador</p>
+      <p className="mt-1 text-[12px] leading-[1.55] text-muted">
+        Para garantir a segurança, a validação correta dos arquivos e evitar falhas no PWA mobile, o envio de documentos deve ser feito pelo computador por enquanto. Você pode visualizar seus arquivos normalmente pelo celular.
+      </p>
+    </div>
+  )
+}
 
-function getSystemFilePicker(): SystemFilePicker | null {
-  const candidate = (window as unknown as { showOpenFilePicker?: SystemFilePicker }).showOpenFilePicker
-  return typeof candidate === 'function' ? candidate.bind(window) : null
+function isMobileUploadContext() {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false
+  const ua = navigator.userAgent.toLowerCase()
+  const mobileUa = /android|iphone|ipad|ipod|mobile/.test(ua)
+  const standalone = window.matchMedia('(display-mode: standalone)').matches
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true
+  return mobileUa || standalone
 }
