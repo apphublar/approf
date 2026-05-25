@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, FileText, ImageIcon, Loader2, RefreshCw, UploadCloud } from 'lucide-react'
+import { CheckCircle2, ExternalLink, FileText, ImageIcon, Loader2, RefreshCw, UploadCloud, XCircle } from 'lucide-react'
 import {
   analyzeAndUploadMaterial,
   listSupportMaterials,
   type MaterialAnalysisResult,
   type MaterialUploadStatus,
   type SupportMaterial,
+  type UploadDebugStep,
 } from '@/services/materials'
+import { getSupabaseClient } from '@/services/supabase/client'
 
 type MaterialKind = 'document' | 'image'
 
@@ -33,12 +35,17 @@ export default function MaterialsScreen() {
   const [message, setMessage] = useState('')
   const [analysis, setAnalysis] = useState<MaterialAnalysisResult | null>(null)
   const [materials, setMaterials] = useState<SupportMaterial[]>([])
+  const [debugSteps, setDebugSteps] = useState<UploadDebugStep[]>([])
+  const [showDebug, setShowDebug] = useState(false)
+  const [debugUserId, setDebugUserId] = useState<string | null>(null)
+  const [debugAdminUrl, setDebugAdminUrl] = useState<string | null>(null)
 
   const materialKind = useMemo(() => file ? getMaterialKind(file) : null, [file])
   const canSubmit = Boolean(title.trim() && description.trim() && file && !submitting)
 
   useEffect(() => {
     void refreshMaterials()
+    void loadDebugInfo()
   }, [])
 
   useEffect(() => {
@@ -50,6 +57,20 @@ export default function MaterialsScreen() {
     setPreviewUrl(nextUrl)
     return () => URL.revokeObjectURL(nextUrl)
   }, [file])
+
+  async function loadDebugInfo() {
+    try {
+      const adminUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL ?? '(não configurado)'
+      setDebugAdminUrl(adminUrl)
+      const supabase = getSupabaseClient()
+      if (supabase) {
+        const { data } = await supabase.auth.getSession()
+        setDebugUserId(data.session?.user.id ?? '(sem sessão)')
+      }
+    } catch {
+      // non-fatal
+    }
+  }
 
   async function refreshMaterials() {
     setLoadingMaterials(true)
@@ -78,6 +99,7 @@ export default function MaterialsScreen() {
     setFile(nextFile ?? null)
     setAnalysis(null)
     setMessage('')
+    setDebugSteps([])
   }
 
   async function submitMaterial() {
@@ -87,6 +109,7 @@ export default function MaterialsScreen() {
     setUploadStep('uploading')
     setMessage('')
     setAnalysis(null)
+    setDebugSteps([])
     try {
       window.setTimeout(() => {
         setUploadStep((current) => current === 'uploading' ? 'analyzing' : current)
@@ -95,6 +118,7 @@ export default function MaterialsScreen() {
         title: title.trim(),
         description: description.trim(),
         file,
+        onDebugStep: setDebugSteps,
       })
       setAnalysis(result)
       setMessage(getStatusMessage(result.status))
@@ -104,6 +128,7 @@ export default function MaterialsScreen() {
       await refreshMaterials()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível enviar o material.')
+      setShowDebug(true)
     } finally {
       setSubmitting(false)
       setUploadStep('idle')
@@ -164,7 +189,7 @@ export default function MaterialsScreen() {
                 <MaterialIcon kind={materialKind ?? 'document'} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-bold text-ink">{file.name}</p>
-                  <p className="text-[11px] text-muted">{formatFileSize(file.size)}</p>
+                  <p className="text-[11px] text-muted">{formatFileSize(file.size)} • {file.type || 'tipo desconhecido'}</p>
                 </div>
                 <button type="button" onClick={() => selectFile(null)} className="text-[11px] font-bold text-[#C1440E]">
                   remover
@@ -207,6 +232,57 @@ export default function MaterialsScreen() {
           </button>
         </div>
 
+        {/* DEBUG PANEL */}
+        <div className="mt-4 rounded-app border border-amber-200 bg-amber-50 p-4">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between text-left"
+            onClick={() => setShowDebug((v) => !v)}
+          >
+            <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Diagnóstico de upload (debug)</span>
+            <span className="text-[10px] text-amber-600">{showDebug ? 'ocultar' : 'mostrar'}</span>
+          </button>
+
+          {showDebug && (
+            <div className="mt-3 space-y-2">
+              <DebugRow label="Admin API URL" value={debugAdminUrl ?? '(carregando...)'} />
+              <DebugRow label="Usuário ID" value={debugUserId ?? '(carregando...)'} />
+              {file && (
+                <>
+                  <DebugRow label="Arquivo" value={file.name} />
+                  <DebugRow label="MIME type" value={file.type || '(vazio — pode causar problemas)'}  warn={!file.type} />
+                  <DebugRow label="Tamanho" value={formatFileSize(file.size)} />
+                </>
+              )}
+
+              {debugSteps.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Etapas do upload</p>
+                  {debugSteps.map((step) => (
+                    <div key={step.id} className="flex items-start gap-2">
+                      {step.status === 'ok' && <CheckCircle2 size={13} className="mt-[2px] shrink-0 text-green-600" />}
+                      {step.status === 'error' && <XCircle size={13} className="mt-[2px] shrink-0 text-red-600" />}
+                      {step.status === 'running' && <Loader2 size={13} className="mt-[2px] shrink-0 animate-spin text-amber-600" />}
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-ink">{step.label}</p>
+                        {step.detail && (
+                          <p className={`mt-0.5 break-all text-[10px] leading-[1.4] ${step.status === 'error' ? 'text-red-700' : 'text-muted'}`}>
+                            {step.detail}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="mt-2 text-[10px] text-amber-700">
+                Verifique também o console do navegador (F12 → Console) e os logs do servidor (Vercel / terminal) para mensagens com prefixo [materials/...].
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="mt-4 rounded-app border border-border bg-white p-4 shadow-card">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -234,6 +310,15 @@ export default function MaterialsScreen() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function DebugRow({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] font-bold text-amber-700">{label}</span>
+      <span className={`break-all text-[11px] ${warn ? 'text-red-700 font-bold' : 'text-ink'}`}>{value}</span>
     </div>
   )
 }
@@ -331,12 +416,14 @@ function formatFileSize(size: number) {
 function formatStatus(status: MaterialUploadStatus) {
   if (status === 'published') return 'Aprovado'
   if (status === 'blocked') return 'Bloqueado'
+  if (status === 'em_analise') return 'Em análise'
   return 'Revisão necessária'
 }
 
 function getStatusMessage(status: MaterialUploadStatus) {
   if (status === 'published') return 'Material aprovado e publicado com segurança.'
   if (status === 'blocked') return 'Material bloqueado pela análise de segurança e não publicado.'
+  if (status === 'em_analise') return 'Material salvo. A análise de IA ficará pendente para revisão.'
   return 'Material enviado para revisão antes de ficar disponível.'
 }
 

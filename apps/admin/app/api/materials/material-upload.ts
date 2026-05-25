@@ -61,46 +61,71 @@ export async function finalizeMaterialUpload(input: {
   tempPath: string
 }) {
   const supabase = createSupabaseServiceClient()
-  console.info('[materials/upload] registering material', {
+
+  console.info('[materials/upload] step 1 — fetching author profile', { ownerId: input.ownerId })
+  const profile = await getAuthorProfile(input.ownerId)
+  console.info('[materials/upload] step 1 — profile fetched', { name: profile.name, hasAvatar: Boolean(profile.avatar) })
+
+  const insertPayload = {
+    title: input.title,
+    description: input.description,
+    // 0020 columns
+    type: input.file.type.startsWith('image/') ? 'image' : 'document',
+    age_range: null as null,
+    pedagogical_objective: input.description,
+    file_url: null as null,
+    file_size: input.file.size,
+    mime_type: input.file.type || inferMimeType(input.file.name),
+    author_id: input.ownerId,
+    author_name: profile.name,
+    author_avatar: profile.avatar,
+    ai_analysis_status: 'pending',
+    // 0019 columns
+    ai_review: {} as Record<string, unknown>,
+    content_preview: '',
+    submitted_by: input.ownerId,
+    // 0001 columns
+    file_path: input.tempPath,
+    file_name: input.file.name,
+    file_type: input.file.type || safeExtension(input.file.name),
+    file_size_bytes: input.file.size,
+    status: 'em_analise',
+    published_at: null as null,
+    created_by: input.ownerId,
+  }
+
+  console.info('[materials/upload] step 2 — inserting material record', {
     ownerId: input.ownerId,
     fileName: input.file.name,
     mimeType: input.file.type,
     fileSize: input.file.size,
     tempPath: input.tempPath,
+    status: insertPayload.status,
   })
-  const profile = await getAuthorProfile(input.ownerId)
+
   const initial = await supabase
     .from('materials')
-    .insert({
-      title: input.title,
-      description: input.description,
-      type: input.file.type.startsWith('image/') ? 'image' : 'document',
-      age_range: null,
-      pedagogical_objective: input.description,
-      file_path: input.tempPath,
-      file_url: null,
-      file_name: input.file.name,
-      file_type: input.file.type || safeExtension(input.file.name),
-      mime_type: input.file.type || inferMimeType(input.file.name),
-      file_size_bytes: input.file.size,
-      file_size: input.file.size,
-      status: 'em_analise',
-      ai_analysis_status: 'pending',
-      published_at: null,
-      created_by: input.ownerId,
-      submitted_by: input.ownerId,
-      author_id: input.ownerId,
-      author_name: profile.name,
-      author_avatar: profile.avatar,
-      ai_review: {},
-      content_preview: '',
-    })
+    .insert(insertPayload)
     .select('id')
     .single()
-  if (initial.error) throw toError(initial.error, 'Nao foi possivel registrar o material enviado.')
+
+  if (initial.error) {
+    const err = initial.error as { message?: string; code?: string; details?: string; hint?: string }
+    console.error('[materials/upload] step 2 FAILED — DB insert error', {
+      code: err.code,
+      message: err.message,
+      details: err.details,
+      hint: err.hint,
+    })
+    throw toError(initial.error, 'Nao foi possivel registrar o material enviado.')
+  }
+
   const materialId = initial.data?.id ?? null
+  console.info('[materials/upload] step 2 — material record created', { materialId })
 
   const extractedText = extractReadableText(input.file, input.bytes)
+  console.info('[materials/upload] step 3 — starting AI analysis', { materialId, extractedTextLength: extractedText.length })
+
   try {
     const review = await analyzeMaterialWithOpenAi({
       title: input.title,
@@ -111,7 +136,13 @@ export async function finalizeMaterialUpload(input: {
     })
     const status = resolveMaterialStatus(review)
     const aiAnalysisStatus = status === 'published' ? 'approved' : status === 'blocked' ? 'blocked' : 'review_required'
+    console.info('[materials/upload] step 3 — AI analysis complete', { materialId, status, aiAnalysisStatus, confianca: review.confianca })
+
     const signed = await supabase.storage.from(MATERIAL_BUCKET).createSignedUrl(input.tempPath, 60 * 60)
+    if (signed.error) {
+      console.warn('[materials/upload] step 3 — signed URL generation failed (non-fatal)', signed.error.message)
+    }
+
     const update = await supabase
       .from('materials')
       .update({
@@ -128,8 +159,19 @@ export async function finalizeMaterialUpload(input: {
       .eq('id', materialId)
       .select('id')
       .single()
-    if (update.error) throw toError(update.error, 'Nao foi possivel atualizar o material analisado.')
-    console.info('[materials/upload] material analyzed', { materialId, status, aiAnalysisStatus })
+
+    if (update.error) {
+      const err = update.error as { message?: string; code?: string; details?: string; hint?: string }
+      console.error('[materials/upload] step 3 FAILED — DB update error', {
+        code: err.code,
+        message: err.message,
+        details: err.details,
+        hint: err.hint,
+      })
+      throw toError(update.error, 'Nao foi possivel atualizar o material analisado.')
+    }
+
+    console.info('[materials/upload] step 3 — material updated successfully', { materialId, status })
 
     return {
       payload: {
@@ -141,7 +183,9 @@ export async function finalizeMaterialUpload(input: {
       remainingTempPath: null,
     }
   } catch (error) {
-    console.error('[materials/upload] ai analysis failed', error)
+    console.error('[materials/upload] step 3 — AI analysis or update failed (using fallback)', {
+      error: error instanceof Error ? error.message : String(error),
+    })
     const fallbackReview = sanitizeReview({
       aprovado: false,
       confianca: 0,
@@ -157,6 +201,7 @@ export async function finalizeMaterialUpload(input: {
         content_preview: extractedText.slice(0, 2000),
       })
       .eq('id', materialId)
+
     return {
       payload: {
         materialId,
@@ -214,7 +259,7 @@ async function analyzeMaterialWithOpenAi(input: {
     error?: { message?: string }
   } | null
   if (!response.ok) {
-    console.error('[materials/analyze-upload] OpenAI HTTP', response.status, payload?.error?.message)
+    console.error('[materials/upload] OpenAI Chat Completions error', response.status, payload?.error?.message)
     throw new Error('Nao foi possivel concluir a analise de IA do material.')
   }
   const raw = payload?.choices?.[0]?.message?.content
@@ -257,7 +302,7 @@ async function tryAnalyzeWithResponsesApi(input: {
     error?: { message?: string }
   } | null
   if (!response.ok) {
-    console.warn('[materials/analyze-upload] Responses API fallback', response.status, payload?.error?.message)
+    console.warn('[materials/upload] Responses API fallback to Chat Completions', response.status, payload?.error?.message)
     return null
   }
   const raw = payload?.output_text
@@ -296,10 +341,10 @@ function extractReadableText(file: MaterialFileInfo, bytes: Buffer) {
   const mime = file.type.toLowerCase()
   const name = file.name.toLowerCase()
   if (mime.startsWith('text/') || name.endsWith('.txt') || name.endsWith('.csv')) {
-    return bytes.toString('utf8').replace(/\u0000/g, ' ').trim()
+    return bytes.toString('utf8').replace(/ /g, ' ').trim()
   }
   if (mime.includes('json') || name.endsWith('.json')) {
-    return bytes.toString('utf8').replace(/\u0000/g, ' ').trim()
+    return bytes.toString('utf8').replace(/ /g, ' ').trim()
   }
   return ''
 }
@@ -372,7 +417,7 @@ export function safeExtension(fileName: string) {
 export function safeFileName(fileName: string) {
   const normalized = fileName
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
   const parts = normalized.split('.')
   const extension = safeExtension(fileName)
@@ -384,11 +429,14 @@ export function safeFileName(fileName: string) {
 }
 
 async function getAuthorProfile(ownerId: string) {
-  const { data } = await createSupabaseServiceClient()
+  const { data, error } = await createSupabaseServiceClient()
     .from('profiles')
     .select('full_name, avatar_url')
     .eq('id', ownerId)
     .maybeSingle()
+  if (error) {
+    console.warn('[materials/upload] profile fetch failed (non-fatal)', { ownerId, error: error.message })
+  }
   return {
     name: typeof data?.full_name === 'string' ? data.full_name : 'Professora',
     avatar: typeof data?.avatar_url === 'string' ? data.avatar_url : null,
