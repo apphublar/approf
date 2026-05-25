@@ -4,7 +4,7 @@ import { uploadFileToBackend } from './uploads'
 
 const MAX_PERSONAL_DOCUMENT_SIZE_BYTES = 15 * 1024 * 1024
 const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.odt', '.rtf', '.txt']
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.docx', '.xlsx', '.pptx']
 
 export async function listPersonalDocuments(): Promise<TeacherPersonalDocument[]> {
   const payload = await callPersonalDocumentsApi<{ documents?: TeacherPersonalDocument[] }>('/api/personal-documents', {
@@ -45,7 +45,7 @@ function validatePersonalDocumentFile(file: File) {
   const allowed = ALLOWED_IMAGE_MIME_TYPES.includes(mimeType)
     || mimeType === 'application/pdf'
     || ALLOWED_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
-  if (!allowed) throw new Error('Arquivo nao permitido. Envie imagens, PDF ou documentos de texto.')
+  if (!allowed) throw new Error('Arquivo nao permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
   if (file.size > MAX_PERSONAL_DOCUMENT_SIZE_BYTES) throw new Error('Arquivo muito grande. Use arquivos de ate 15 MB.')
 }
 

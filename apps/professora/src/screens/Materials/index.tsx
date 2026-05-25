@@ -30,7 +30,7 @@ type SortBy = 'newest' | 'oldest' | 'name'
 type KindFilter = 'all' | 'documents' | 'images'
 type MaterialKind = 'document' | 'image'
 
-const ACCEPTED_MATERIALS = ['.pdf', '.docx', '.xlsx', '.pptx', 'image/jpeg', 'image/png', 'image/webp'].join(',')
+const ACCEPTED_MATERIALS = ['.pdf', '.docx', '.xlsx', '.pptx', '.jpg', '.jpeg', '.png', '.webp', 'image/jpeg', 'image/png', 'image/webp'].join(',')
 const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
 
@@ -148,7 +148,7 @@ export default function MaterialsScreen() {
     if (submitting) return
     try {
       const selectedFile = await pickFileFromDevice({ accept: ACCEPTED_MATERIALS, debugKey: 'material-apoio' })
-      pickFile(selectedFile)
+      if (selectedFile) pickFile(selectedFile)
     } catch (error) {
       setUploadMsg(error instanceof Error ? error.message : 'Nao foi possivel abrir o seletor de arquivos.')
       setShowDebug(true)

@@ -5,7 +5,7 @@ import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument }
 import { pickFileFromDevice } from '@/services/file-picker'
 import type { TeacherPersonalDocument } from '@/types'
 
-const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.txt,.odt,.rtf'
+const ACCEPTED_TYPES = '.pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp,application/pdf'
 
 export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
@@ -120,7 +120,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
               trajetoria profissional. Eles ficam salvos com seguranca na sua conta e aparecem em todos os seus aparelhos.
             </p>
             <p className="text-[11px] text-muted mt-2 leading-[1.5]">
-              Formatos: JPG, PNG, WEBP, PDF, DOC, DOCX, TXT, ODT e RTF. Tamanho maximo por arquivo: 15 MB.
+              Formatos: JPG, PNG, WEBP, PDF, DOCX, XLSX e PPTX. Tamanho maximo por arquivo: 15 MB.
             </p>
           </div>
 
