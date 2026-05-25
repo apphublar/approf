@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { CreditCard, Unlock } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
@@ -66,82 +66,81 @@ export default async function SubscriptionsPage() {
         }
       />
 
-      <section className="content-grid">
-        <article className="panel panel-wide">
-          <div className="table">
-            <div className="table-row table-head subscriptions-admin-grid">
-              <span>Professora</span>
-              <span>Status atual</span>
-              <span>Editar plano</span>
-            </div>
-            {teachers.map((teacher) => {
-              const subscription = teacher.subscriptions?.[0]
-              return (
-                <div className="table-row subscriptions-admin-grid" key={teacher.id}>
-                  <span>
-                    <strong>{teacher.full_name || 'Professora'}</strong>
-                    <small>{teacher.email}</small>
-                  </span>
-                  <span>
-                    <StatusBadge status={subscription?.status ?? 'blocked'} />
-                    <small>{formatPlan(subscription?.plan)}</small>
-                    <small>{subscription?.current_period_end ? `Validade: ${formatDate(subscription.current_period_end)}` : 'Sem validade definida'}</small>
-                    {subscription?.external_reference && (
-                      <a className="verification-doc-link" href={subscription.external_reference} target="_blank" rel="noreferrer">
-                        Abrir link de pagamento
-                      </a>
-                    )}
-                  </span>
-                  <span className="edit-plan-cell">
-                    <form action={liberarAcessoGratuito} className="release-free-form">
-                      <input type="hidden" name="teacherId" value={teacher.id} />
-                      <button className="quiet-button secondary-action" type="submit">
-                        <Unlock size={14} />
-                        Liberar acesso gratuito
-                      </button>
-                    </form>
-                    <div className="cell-divider" />
-                    <form action={updateTeacherSubscription} className="inline-form">
-                      <input type="hidden" name="teacherId" value={teacher.id} />
+      <article className="panel">
+        <div className="table">
+          <div className="table-row table-head subs-grid">
+            <span>Professora</span>
+            <span>Status atual</span>
+            <span>Editar plano</span>
+          </div>
+          {teachers.map((teacher) => {
+            const subscription = teacher.subscriptions?.[0]
+            return (
+              <div className="table-row subs-grid" key={teacher.id}>
+                <div>
+                  <strong>{teacher.full_name || 'Professora'}</strong>
+                  <small>{teacher.email}</small>
+                </div>
+
+                <div>
+                  <StatusBadge status={subscription?.status ?? 'blocked'} />
+                  <small>{formatPlan(subscription?.plan)}</small>
+                  <small>
+                    {subscription?.current_period_end
+                      ? `Validade: ${formatDate(subscription.current_period_end)}`
+                      : 'Sem validade definida'}
+                  </small>
+                  {subscription?.external_reference && (
+                    <a className="verification-doc-link" href={subscription.external_reference} target="_blank" rel="noreferrer">
+                      Abrir link de pagamento
+                    </a>
+                  )}
+                </div>
+
+                <div className="subs-edit-col">
+                  <form action={liberarAcessoGratuito}>
+                    <input type="hidden" name="teacherId" value={teacher.id} />
+                    <button className="quiet-button secondary-action subs-free-btn" type="submit">
+                      <Unlock size={14} />
+                      Liberar acesso gratuito
+                    </button>
+                  </form>
+
+                  <div className="subs-divider" />
+
+                  <form action={updateTeacherSubscription} className="subs-edit-form">
+                    <input type="hidden" name="teacherId" value={teacher.id} />
+                    <div className="subs-row-2">
                       <select name="status" defaultValue={subscription?.status ?? 'blocked'}>
-                        {statusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
+                        {statusOptions.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
                       <select name="plan" defaultValue={subscription?.plan ?? 'verification_required'}>
-                        {planOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
+                        {planOptions.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
-                      <input name="paymentLink" defaultValue={subscription?.external_reference ?? ''} placeholder="https://link-de-pagamento..." />
+                    </div>
+                    <input
+                      name="paymentLink"
+                      defaultValue={subscription?.external_reference ?? ''}
+                      placeholder="https://link-de-pagamento..."
+                    />
+                    <div className="subs-row-2">
                       <input name="currentPeriodEnd" type="date" defaultValue={toDateInput(subscription?.current_period_end)} />
-                      <textarea name="notes" defaultValue={subscription?.notes ?? ''} placeholder="Observações internas" />
-                      <button className="quiet-button" type="submit">
-                        Salvar plano
-                      </button>
-                    </form>
-                  </span>
+                      <textarea name="notes" defaultValue={subscription?.notes ?? ''} placeholder="Observações internas" rows={2} />
+                    </div>
+                    <button className="quiet-button subs-save-btn" type="submit">
+                      Salvar plano
+                    </button>
+                  </form>
                 </div>
-              )
-            })}
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Fluxo de acesso</p>
-              <h2>Como liberar</h2>
-            </div>
-          </div>
-          <ol className="number-list">
-            <li><strong>Gratuito:</strong> clique "Liberar acesso gratuito" — sem plano nem pagamento.</li>
-            <li><strong>Pago:</strong> escolha Mensal ou Anual, cole o link de pagamento e salve.</li>
-            <li>Use status <strong>Ativa</strong> após confirmação do pagamento.</li>
-            <li><strong>Bloqueada</strong> impede acesso no app da professora.</li>
-          </ol>
-        </article>
-      </section>
+              </div>
+            )
+          })}
+        </div>
+      </article>
     </>
   )
 }
@@ -154,17 +153,20 @@ async function liberarAcessoGratuito(formData: FormData) {
   const supabase = createSupabaseServiceClient()
   const { error } = await supabase
     .from('subscriptions')
-    .upsert({
-      user_id: teacherId,
-      status: 'active',
-      plan: 'free',
-      provider: 'manual',
-      external_reference: null,
-      trial_expires_at: null,
-      current_period_end: null,
-      notes: 'Acesso gratuito liberado pelo admin.',
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
+    .upsert(
+      {
+        user_id: teacherId,
+        status: 'active',
+        plan: 'free',
+        provider: 'manual',
+        external_reference: null,
+        trial_expires_at: null,
+        current_period_end: null,
+        notes: 'Acesso gratuito liberado pelo admin.',
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' },
+    )
   if (error) throw new Error(error.message)
 
   await supabase.from('admin_action_logs').insert({
@@ -174,8 +176,8 @@ async function liberarAcessoGratuito(formData: FormData) {
     target_id: null,
     metadata: { teacherId, status: 'active', plan: 'free' },
   })
-  revalidatePath('/assinaturas')
-  revalidatePath('/professoras')
+
+  redirect('/assinaturas')
 }
 
 async function updateTeacherSubscription(formData: FormData) {
@@ -187,23 +189,32 @@ async function updateTeacherSubscription(formData: FormData) {
   const currentPeriodEnd = String(formData.get('currentPeriodEnd') ?? '').trim()
   const notes = String(formData.get('notes') ?? '').trim()
 
-  if (!teacherId || !statusOptions.some((option) => option.value === status)) return
-  if (!planOptions.some((option) => option.value === plan)) return
+  if (!teacherId || !statusOptions.some((o) => o.value === status)) return
+  if (!planOptions.some((o) => o.value === plan)) return
 
   const supabase = createSupabaseServiceClient()
   const { error } = await supabase
     .from('subscriptions')
-    .upsert({
-      user_id: teacherId,
-      status,
-      plan,
-      provider: 'manual',
-      external_reference: plan === 'free' ? null : (paymentLink || null),
-      trial_expires_at: plan === 'trial_15_days' && currentPeriodEnd ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString() : null,
-      current_period_end: plan !== 'free' && currentPeriodEnd ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString() : null,
-      notes: notes || null,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
+    .upsert(
+      {
+        user_id: teacherId,
+        status,
+        plan,
+        provider: 'manual',
+        external_reference: plan === 'free' ? null : paymentLink || null,
+        trial_expires_at:
+          plan === 'trial_15_days' && currentPeriodEnd
+            ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString()
+            : null,
+        current_period_end:
+          plan !== 'free' && currentPeriodEnd
+            ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString()
+            : null,
+        notes: notes || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' },
+    )
   if (error) throw new Error(error.message)
 
   await supabase.from('admin_action_logs').insert({
@@ -213,13 +224,13 @@ async function updateTeacherSubscription(formData: FormData) {
     target_id: null,
     metadata: { teacherId, status, plan, paymentLink: paymentLink || null, currentPeriodEnd: currentPeriodEnd || null },
   })
-  revalidatePath('/assinaturas')
-  revalidatePath('/professoras')
+
+  redirect('/assinaturas')
 }
 
 function formatPlan(plan?: string | null) {
   if (!plan) return 'Sem plano'
-  return planOptions.find((option) => option.value === plan)?.label ?? plan
+  return planOptions.find((o) => o.value === plan)?.label ?? plan
 }
 
 function formatDate(value: string) {

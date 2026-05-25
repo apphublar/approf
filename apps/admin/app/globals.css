@@ -325,8 +325,9 @@ a {
   grid-template-columns: 1.1fr 0.7fr 0.8fr 0.7fr 0.8fr;
 }
 
-.subscriptions-admin-grid {
-  grid-template-columns: 1fr 0.65fr 1.35fr;
+.subs-grid {
+  grid-template-columns: 1.3fr 0.9fr 2fr;
+  align-items: start;
 }
 
 .materials-grid {
@@ -616,19 +617,37 @@ a {
   grid-column: 1 / -1;
 }
 
-.edit-plan-cell {
+.subs-edit-col {
   display: grid;
   gap: 0;
+  padding: 4px 0;
 }
 
-.release-free-form {
-  padding-bottom: 12px;
+.subs-free-btn {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 14px;
 }
 
-.cell-divider {
+.subs-divider {
   border: none;
   border-top: 1px solid var(--line);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.subs-edit-form {
+  display: grid;
+  gap: 8px;
+}
+
+.subs-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.subs-save-btn {
+  justify-self: start;
 }
 
 .inline-form {
@@ -638,7 +657,10 @@ a {
 
 .inline-form select,
 .inline-form input,
-.inline-form textarea {
+.inline-form textarea,
+.subs-edit-form select,
+.subs-edit-form input,
+.subs-edit-form textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -648,7 +670,8 @@ a {
   font: inherit;
 }
 
-.inline-form textarea {
+.inline-form textarea,
+.subs-edit-form textarea {
   min-height: 64px;
   resize: vertical;
 }
@@ -853,14 +876,18 @@ a {
   .table-row,
   .teachers-grid,
   .teachers-page-grid,
-    .subscriptions-grid,
-    .subscriptions-admin-grid,
-    .materials-grid,
-    .admin-materials-grid,
-    .reports-grid,
+  .subscriptions-grid,
+  .subs-grid,
+  .materials-grid,
+  .admin-materials-grid,
+  .reports-grid,
   .ai-grid,
   .audit-grid,
   .notifications-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .subs-row-2 {
     grid-template-columns: 1fr;
   }
 
