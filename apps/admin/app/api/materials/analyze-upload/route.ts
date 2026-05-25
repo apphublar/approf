@@ -6,7 +6,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
-const MAX_MATERIAL_SIZE_MB = 4
+const MAX_MATERIAL_SIZE_MB = 10
 const MAX_MATERIAL_SIZE_BYTES = MAX_MATERIAL_SIZE_MB * 1024 * 1024
 
 const MATERIAL_REVIEW_SCHEMA = {

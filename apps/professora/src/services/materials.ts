@@ -26,9 +26,12 @@ export interface SupportMaterial {
   description: string | null
   file_name: string | null
   file_type: string | null
+  file_size_bytes?: number | null
+  status?: MaterialUploadStatus
   detected_category: string | null
   content_preview: string | null
   published_at: string | null
+  downloadUrl?: string | null
 }
 
 export interface GeneratedMaterialPreview {

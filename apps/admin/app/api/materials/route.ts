@@ -13,17 +13,29 @@ export function OPTIONS() {
 
 export async function GET(request: Request) {
   try {
-    await getAuthenticatedUserId(request.headers.get('authorization'))
+    const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const supabase = createSupabaseServiceClient()
     const { data, error } = await supabase
       .from('materials')
-      .select('id, title, description, file_name, file_type, detected_category, content_preview, published_at')
-      .eq('status', 'published')
-      .order('published_at', { ascending: false, nullsFirst: false })
+      .select('id, title, description, file_path, file_name, file_type, file_size_bytes, status, detected_category, content_preview, published_at, submitted_by, created_at')
+      .or(`status.eq.published,submitted_by.eq.${ownerId}`)
+      .order('created_at', { ascending: false })
       .limit(80)
 
     if (error) throw toError(error, 'Nao foi possivel listar os materiais de apoio.')
-    return NextResponse.json({ materials: data ?? [] }, { status: 200, headers: CORS_HEADERS })
+
+    const materials = await Promise.all((data ?? []).map(async (item) => {
+      const filePath = typeof item.file_path === 'string' ? item.file_path : ''
+      let downloadUrl: string | null = null
+      if (filePath) {
+        const signed = await supabase.storage.from('material-files').createSignedUrl(filePath, 60 * 10)
+        downloadUrl = signed.data?.signedUrl ?? null
+      }
+      const { file_path: _filePath, submitted_by: _submittedBy, created_at: _createdAt, ...safeItem } = item
+      return { ...safeItem, downloadUrl }
+    }))
+
+    return NextResponse.json({ materials }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
       return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })

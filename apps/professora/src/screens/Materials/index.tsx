@@ -1,6 +1,12 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
-import { FileText, ImageIcon, Loader2, UploadCloud } from 'lucide-react'
-import { analyzeAndUploadMaterial, type MaterialAnalysisResult } from '@/services/materials'
+import { useEffect, useMemo, useState } from 'react'
+import { ExternalLink, FileText, ImageIcon, Loader2, RefreshCw, UploadCloud } from 'lucide-react'
+import {
+  analyzeAndUploadMaterial,
+  listSupportMaterials,
+  type MaterialAnalysisResult,
+  type MaterialUploadStatus,
+  type SupportMaterial,
+} from '@/services/materials'
 
 type MaterialKind = 'document' | 'image'
 
@@ -15,7 +21,7 @@ const ACCEPTED_MATERIALS = [
   'image/png',
   'image/webp',
 ].join(',')
-const MAX_MATERIAL_SIZE_MB = 4
+const MAX_MATERIAL_SIZE_MB = 10
 const MAX_MATERIAL_SIZE_BYTES = MAX_MATERIAL_SIZE_MB * 1024 * 1024
 
 export default function MaterialsScreen() {
@@ -24,11 +30,17 @@ export default function MaterialsScreen() {
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [loadingMaterials, setLoadingMaterials] = useState(false)
   const [message, setMessage] = useState('')
   const [analysis, setAnalysis] = useState<MaterialAnalysisResult | null>(null)
+  const [materials, setMaterials] = useState<SupportMaterial[]>([])
 
   const materialKind = useMemo(() => file ? getMaterialKind(file) : null, [file])
   const canSubmit = Boolean(title.trim() && description.trim() && file && !submitting)
+
+  useEffect(() => {
+    void refreshMaterials()
+  }, [])
 
   useEffect(() => {
     if (!file) {
@@ -40,6 +52,17 @@ export default function MaterialsScreen() {
     return () => URL.revokeObjectURL(nextUrl)
   }, [file])
 
+  async function refreshMaterials() {
+    setLoadingMaterials(true)
+    try {
+      setMaterials(await listSupportMaterials())
+    } catch {
+      setMaterials([])
+    } finally {
+      setLoadingMaterials(false)
+    }
+  }
+
   function selectFile(nextFile?: File | null) {
     if (nextFile && !isAllowedMaterialFile(nextFile)) {
       setFile(null)
@@ -50,7 +73,7 @@ export default function MaterialsScreen() {
     if (nextFile && nextFile.size > MAX_MATERIAL_SIZE_BYTES) {
       setFile(null)
       setAnalysis(null)
-      setMessage(`O arquivo precisa ter ate ${MAX_MATERIAL_SIZE_MB} MB.`)
+      setMessage(`O arquivo precisa ter até ${MAX_MATERIAL_SIZE_MB} MB.`)
       return
     }
     setFile(nextFile ?? null)
@@ -58,8 +81,7 @@ export default function MaterialsScreen() {
     setMessage('')
   }
 
-  async function submitMaterial(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault()
+  async function submitMaterial() {
     if (!file || !canSubmit) return
 
     setSubmitting(true)
@@ -73,11 +95,10 @@ export default function MaterialsScreen() {
       })
       setAnalysis(result)
       setMessage(getStatusMessage(result.status))
-      if (result.status === 'published') {
-        setTitle('')
-        setDescription('')
-        setFile(null)
-      }
+      setTitle('')
+      setDescription('')
+      setFile(null)
+      await refreshMaterials()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível enviar o material.')
     } finally {
@@ -89,11 +110,11 @@ export default function MaterialsScreen() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="bg-white px-[18px] pt-12 pb-[14px] border-b border-border flex-shrink-0">
         <span className="font-serif text-[22px] text-gd">Material de Apoio</span>
-        <p className="text-xs text-muted mt-1">Envie recursos para análise antes de publicar na comunidade</p>
+        <p className="text-xs text-muted mt-1">Envie documentos e imagens para análise antes de publicar</p>
       </div>
 
       <div className="scroll-area px-[18px] pb-8">
-        <form onSubmit={(event) => void submitMaterial(event)} className="bg-white rounded-app p-4 border border-border shadow-card mt-[14px]">
+        <div className="bg-white rounded-app p-4 border border-border shadow-card mt-[14px]">
           <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Novo material</p>
 
           <label className="block mb-3">
@@ -102,7 +123,7 @@ export default function MaterialsScreen() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               className="w-full rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none focus:border-gp"
-              placeholder="Ex: Sequencia didatica sobre cores e formas"
+              placeholder="Ex: Sequência didática sobre cores e formas"
             />
           </label>
 
@@ -118,15 +139,18 @@ export default function MaterialsScreen() {
 
           <label className="flex min-h-[136px] cursor-pointer flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center">
             <UploadCloud size={28} className="text-gm" />
-              <span className="mt-2 text-[13px] font-bold text-gd">Adicionar documento ou imagem</span>
-              <span className="mt-1 text-[11px] leading-[1.5] text-muted">
-              PDF, DOCX, XLSX, PPTX, TXT, CSV, JPG, PNG ou WEBP
+            <span className="mt-2 text-[13px] font-bold text-gd">Adicionar documento ou imagem</span>
+            <span className="mt-1 text-[11px] leading-[1.5] text-muted">
+              PDF, DOCX, XLSX, PPTX, TXT, CSV, JPG, PNG ou WEBP até {MAX_MATERIAL_SIZE_MB} MB
             </span>
             <input
               type="file"
               className="hidden"
               accept={ACCEPTED_MATERIALS}
-              onChange={(event) => selectFile(event.target.files?.[0])}
+              onChange={(event) => {
+                selectFile(event.target.files?.[0])
+                event.currentTarget.value = ''
+              }}
             />
           </label>
 
@@ -169,20 +193,41 @@ export default function MaterialsScreen() {
           )}
 
           <button
-            type="submit"
+            type="button"
+            onClick={() => void submitMaterial()}
             disabled={!canSubmit}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-app bg-gd py-4 text-[15px] font-bold text-white disabled:opacity-50"
           >
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
             {submitting ? 'Analisando com IA...' : 'Analisar e enviar'}
           </button>
-        </form>
+        </div>
 
         <div className="mt-4 rounded-app border border-border bg-white p-4 shadow-card">
-          <p className="text-[13px] font-bold text-ink">Publicação protegida</p>
-          <p className="mt-1 text-[12px] leading-[1.6] text-muted">
-            Materiais aprovados ficam disponíveis. Materiais bloqueados não são publicados. Quando a confiança da IA é baixa, o arquivo fica em revisão.
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-bold text-ink">Materiais enviados</p>
+              <p className="mt-1 text-[11px] text-muted">Aprovados aparecem para a comunidade. Pendentes e bloqueados ficam visíveis para acompanhamento.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshMaterials()}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-border bg-white text-muted"
+              aria-label="Atualizar materiais"
+            >
+              {loadingMaterials ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={15} />}
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-3">
+            {materials.length ? materials.map((material) => (
+              <MaterialCard key={material.id} material={material} />
+            )) : (
+              <p className="rounded-app-sm border border-border bg-cream px-3 py-3 text-[12px] text-muted">
+                Nenhum material enviado ainda.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -201,6 +246,51 @@ function MaterialPreview({ file, previewUrl, kind }: { file: File; previewUrl: s
   )
 }
 
+function MaterialCard({ material }: { material: SupportMaterial }) {
+  const kind = getMaterialKindFromType(material.file_type, material.file_name)
+  return (
+    <div className="rounded-app-sm border border-border bg-cream p-3">
+      <div className="flex items-start gap-3">
+        <MaterialIcon kind={kind} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[13px] font-bold text-ink">{material.title}</p>
+            <span className={`rounded-full px-2 py-1 text-[9px] font-bold ${getStatusClass(material.status ?? 'published')}`}>
+              {formatStatus(material.status ?? 'published')}
+            </span>
+          </div>
+          {material.description && <p className="mt-1 text-[11px] leading-[1.45] text-muted">{material.description}</p>}
+          <p className="mt-2 text-[10px] text-muted">
+            {material.file_name ?? 'Material gerado'}{material.file_size_bytes ? ` • ${formatFileSize(material.file_size_bytes)}` : ''}
+          </p>
+        </div>
+      </div>
+
+      {kind === 'image' && material.downloadUrl && material.status === 'published' && (
+        <img src={material.downloadUrl} alt="" className="mt-3 max-h-56 w-full rounded-app-sm border border-border bg-white object-contain" />
+      )}
+
+      {material.content_preview && (
+        <p className="mt-3 rounded-app-sm border border-border bg-white px-3 py-2 text-[11px] leading-[1.5] text-muted">
+          {material.content_preview.slice(0, 260)}
+        </p>
+      )}
+
+      {material.downloadUrl && material.status === 'published' && (
+        <a
+          href={material.downloadUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-app-sm border border-gp bg-gbg py-2 text-[12px] font-bold text-gd"
+        >
+          <ExternalLink size={14} />
+          Visualizar arquivo
+        </a>
+      )}
+    </div>
+  )
+}
+
 function MaterialIcon({ kind }: { kind: MaterialKind }) {
   const Icon = kind === 'image' ? ImageIcon : FileText
   return (
@@ -212,6 +302,13 @@ function MaterialIcon({ kind }: { kind: MaterialKind }) {
 
 function getMaterialKind(file: File): MaterialKind {
   if (file.type.startsWith('image/')) return 'image'
+  return 'document'
+}
+
+function getMaterialKindFromType(fileType?: string | null, fileName?: string | null): MaterialKind {
+  if (fileType?.startsWith('image/')) return 'image'
+  const name = fileName?.toLowerCase() ?? ''
+  if (['.jpg', '.jpeg', '.png', '.webp'].some((extension) => name.endsWith(extension))) return 'image'
   return 'document'
 }
 
@@ -228,19 +325,19 @@ function formatFileSize(size: number) {
   return `${Math.max(1, Math.round(size / 1024))} KB`
 }
 
-function formatStatus(status: MaterialAnalysisResult['status']) {
+function formatStatus(status: MaterialUploadStatus) {
   if (status === 'published') return 'Aprovado'
   if (status === 'blocked') return 'Bloqueado'
   return 'Revisão necessária'
 }
 
-function getStatusMessage(status: MaterialAnalysisResult['status']) {
+function getStatusMessage(status: MaterialUploadStatus) {
   if (status === 'published') return 'Material aprovado e publicado com segurança.'
   if (status === 'blocked') return 'Material bloqueado pela análise de segurança e não publicado.'
   return 'Material enviado para revisão antes de ficar disponível.'
 }
 
-function getStatusClass(status: MaterialAnalysisResult['status']) {
+function getStatusClass(status: MaterialUploadStatus) {
   if (status === 'published') return 'bg-gbg text-gd border border-gp'
   if (status === 'blocked') return 'bg-red-50 text-red-700 border border-red-200'
   return 'bg-[#FFF3CD] text-[#856404] border border-[#EAD58A]'
