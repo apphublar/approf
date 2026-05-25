@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './supabase/client'
+import { uploadFileToBackend } from './uploads'
 
 export type MaterialUploadStatus = 'published' | 'review_required' | 'blocked' | 'em_analise'
 
@@ -90,55 +91,25 @@ export async function analyzeAndUploadMaterial(input: {
     throw error
   }
   const userId = data.session?.user.id
-  const token = data.session?.access_token
-  if (!userId || !token) {
+  if (!userId || !data.session?.access_token) {
     setStep('auth', 'Verificando autenticacao', 'error', 'Sessao nao encontrada')
     throw new Error('Voce precisa estar logada para enviar materiais.')
   }
   setStep('auth', 'Verificando autenticacao', 'ok', `userId: ${userId}; token: sim`)
   console.info('[materials/mobile-diagnostics]', getMobileUploadDiagnostics(input.file, userId, true))
 
-  setStep('storage', 'Enviando arquivo', 'running')
-  let uploaded: Awaited<ReturnType<typeof uploadMaterialFile>>
+  setStep('upload', 'Enviando arquivo', 'running')
   try {
-    uploaded = await uploadMaterialFile(input.file, userId, (detail) => {
-      setStep('storage', 'Enviando arquivo', 'running', detail)
-    })
-    setStep('storage', 'Enviando arquivo', 'ok', `path: ${uploaded.file_path}`)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro desconhecido no upload assinado'
-    setStep('storage', 'Enviando arquivo', 'error', message)
-    return uploadMaterialDirectWithSteps(input, token, setStep, message)
-  }
-
-  setStep('analyze', 'Upload realizado, analisando material', 'running')
-  try {
-    const response = await fetch(`${getAdminApiUrl()}/api/materials/analyze-stored`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    const payload = await uploadFileToBackend<Partial<MaterialAnalysisResult> & { error?: string }>({
+      module: 'material_apoio',
+      file: input.file,
+      metadata: {
         title: input.title,
         description: input.description,
-        fileName: uploaded.file_name,
-        fileType: uploaded.mime_type,
-        fileSize: uploaded.file_size,
-        filePath: uploaded.file_path,
-      }),
+      },
     })
-    const rawBody = await response.text().catch((readError) => `__READ_ERROR__:${String(readError)}`)
-    const payload = parseJsonBody(rawBody) as (Partial<MaterialAnalysisResult> & { error?: string }) | null
-    console.info('[materials] analyze-stored response', { status: response.status, ok: response.ok, raw: rawBody, payload })
-
-    if (!response.ok) {
-      const message = payload?.error || `HTTP ${response.status}`
-      setStep('analyze', 'Upload realizado, analisando material', 'error', message)
-      return uploadMaterialDirectWithSteps(input, token, setStep, message)
-    }
     if (!payload?.status || !payload.review) throw new Error('Resposta invalida da analise do material.')
-    setStep('analyze', 'Material enviado e aguardando analise', 'ok', `status: ${payload.status}`)
+    setStep('upload', 'Arquivo enviado e aguardando analise', 'ok', `status: ${payload.status}`)
     return {
       materialId: payload.materialId,
       status: payload.status,
@@ -146,9 +117,9 @@ export async function analyzeAndUploadMaterial(input: {
       extractedTextPreview: payload.extractedTextPreview,
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro na analise'
-    setStep('analyze', 'Upload realizado, analisando material', 'error', message)
-    return uploadMaterialDirectWithSteps(input, token, setStep, message)
+    const message = error instanceof Error ? error.message : 'Nao foi possivel enviar o arquivo. Tente novamente.'
+    setStep('upload', 'Enviando arquivo', 'error', message)
+    throw error
   }
 }
 
@@ -264,60 +235,6 @@ export async function publishGeneratedMaterialShare(input: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'publish', ...input }),
   })
-}
-
-async function uploadMaterialDirectWithSteps(
-  input: { title: string; description: string; file: File },
-  token: string,
-  setStep: (id: string, label: string, status: UploadDebugStep['status'], detail?: string) => void,
-  reason: string,
-) {
-  setStep('fallback', 'Tentando upload pelo servidor', 'running', reason)
-  const result = await uploadMaterialDirect(input.title, input.description, input.file, token, (detail) => {
-    setStep('fallback', 'Tentando upload pelo servidor', 'running', detail)
-  })
-  setStep('fallback', 'Tentando upload pelo servidor', 'ok', `status: ${result.status}`)
-  return result
-}
-
-async function uploadMaterialDirect(
-  title: string,
-  description: string,
-  file: File,
-  token: string,
-  onProgress?: (detail: string) => void,
-): Promise<MaterialAnalysisResult> {
-  const endpoint = `${getAdminApiUrl()}/api/materials/upload-direct`
-  const formData = new FormData()
-  formData.append('title', title)
-  formData.append('description', description)
-  formData.append('file', file, file.name)
-
-  onProgress?.(`chamando ${endpoint}`)
-  console.info('[materials] calling upload-direct fallback', {
-    endpoint,
-    diagnostics: getMobileUploadDiagnostics(file, undefined, true),
-  })
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  })
-  const rawBody = await response.text().catch((error) => `__READ_ERROR__:${String(error)}`)
-  const payload = parseJsonBody(rawBody) as (Partial<MaterialAnalysisResult> & { error?: string }) | null
-  console.info('[materials] upload-direct response', { status: response.status, ok: response.ok, raw: rawBody, payload })
-
-  if (!response.ok) {
-    throw new Error(payload?.error || 'Nao foi possivel enviar. Tente novamente usando Wi-Fi ou escolha um arquivo menor.')
-  }
-  if (!payload?.status || !payload.review) throw new Error('Resposta invalida do upload alternativo.')
-  return {
-    materialId: payload.materialId,
-    status: payload.status,
-    review: payload.review,
-    extractedTextPreview: payload.extractedTextPreview,
-  }
 }
 
 function validateMaterialFile(file: File) {

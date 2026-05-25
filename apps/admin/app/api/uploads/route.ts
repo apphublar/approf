@@ -1,0 +1,196 @@
+import { NextResponse } from 'next/server'
+import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
+import {
+  finalizeMaterialUpload,
+  inferMimeType,
+  MATERIAL_BUCKET,
+  MATERIALS_CORS_HEADERS,
+  safeFileName,
+  toError,
+  validateMaterialFile,
+} from '../materials/material-upload'
+import {
+  buildPersonalDocumentPath,
+  createSignedDownloadUrl,
+  PERSONAL_DOCUMENT_BUCKET,
+  validatePersonalDocument,
+} from '../personal-documents/helpers'
+
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+type UploadModule = 'material_apoio' | 'meus_documentos'
+
+const UPLOAD_CORS_HEADERS = {
+  ...MATERIALS_CORS_HEADERS,
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: UPLOAD_CORS_HEADERS })
+}
+
+export async function POST(request: Request) {
+  const startedAt = Date.now()
+  try {
+    const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
+    const formData = await request.formData()
+    const module = String(formData.get('module') ?? '').trim() as UploadModule
+    const metadata = parseMetadata(formData.get('metadata'))
+    const file = formData.get('file')
+
+    if (!(file instanceof File)) return jsonError('Arquivo nao recebido pelo servidor.', 400)
+    if (module !== 'material_apoio' && module !== 'meus_documentos') return jsonError('Modulo de upload invalido.', 400)
+
+    const fileName = file.name || 'arquivo'
+    const mimeType = file.type || inferUploadMimeType(fileName)
+    const extension = getExtension(fileName)
+    const fileSize = file.size
+    const bucket = module === 'material_apoio' ? MATERIAL_BUCKET : PERSONAL_DOCUMENT_BUCKET
+    const filePath = module === 'material_apoio'
+      ? `${ownerId}/${Date.now()}-${safeFileName(fileName)}`
+      : buildPersonalDocumentPath(ownerId, fileName)
+
+    console.info('[uploads] request received', {
+      origin: request.headers.get('origin'),
+      userAgent: request.headers.get('user-agent'),
+      ownerId,
+      module,
+      fileName,
+      fileSize,
+      mimeType,
+      extension,
+      bucket,
+      filePath,
+      metadata,
+    })
+
+    const validationError = module === 'material_apoio'
+      ? validateMaterialFile({ name: fileName, type: mimeType, size: fileSize })
+      : validatePersonalDocument({ fileName, fileType: mimeType, fileSize })
+    if (validationError) return jsonError(validationError, 400)
+
+    const bytes = Buffer.from(await file.arrayBuffer())
+    const supabase = createSupabaseServiceClient()
+    const upload = await supabase.storage.from(bucket).upload(filePath, bytes, {
+      contentType: mimeType,
+      upsert: false,
+    })
+
+    console.info('[uploads] storage upload result', {
+      module,
+      bucket,
+      filePath,
+      error: upload.error ? serializeError(upload.error) : null,
+      durationMs: Date.now() - startedAt,
+    })
+
+    if (upload.error) throw toError(upload.error, 'Nao foi possivel salvar o arquivo no storage.')
+
+    if (module === 'material_apoio') {
+      const title = typeof metadata.title === 'string' ? metadata.title.trim() : ''
+      const description = typeof metadata.description === 'string' ? metadata.description.trim() : ''
+      if (!title) return jsonError('Informe o tema ou nome do arquivo.', 400)
+      if (!description) return jsonError('Informe a descricao do material.', 400)
+
+      const result = await finalizeMaterialUpload({
+        ownerId,
+        title,
+        description,
+        file: {
+          name: fileName,
+          type: mimeType,
+          size: bytes.byteLength || fileSize,
+        },
+        bytes,
+        tempPath: filePath,
+      })
+
+      console.info('[uploads] material record result', {
+        materialId: result.payload.materialId,
+        status: result.payload.status,
+        durationMs: Date.now() - startedAt,
+      })
+
+      return NextResponse.json({
+        module,
+        uploadedVia: 'global-backend',
+        filePath,
+        ...result.payload,
+      }, { status: 200, headers: UPLOAD_CORS_HEADERS })
+    }
+
+    const insert = await supabase
+      .from('teacher_personal_documents')
+      .insert({
+        owner_id: ownerId,
+        title: fileName,
+        file_path: filePath,
+        file_name: fileName,
+        file_size: bytes.byteLength || fileSize,
+        mime_type: mimeType,
+      })
+      .select('id, title, file_path, file_name, file_size, mime_type, created_at')
+      .single()
+
+    console.info('[uploads] personal document insert result', {
+      error: insert.error ? serializeError(insert.error) : null,
+      id: insert.data?.id,
+      durationMs: Date.now() - startedAt,
+    })
+
+    if (insert.error) throw toError(insert.error, 'Nao foi possivel salvar o registro do documento.')
+
+    return NextResponse.json({
+      module,
+      uploadedVia: 'global-backend',
+      document: {
+        id: insert.data.id,
+        name: insert.data.file_name,
+        title: insert.data.title,
+        filePath: insert.data.file_path,
+        mimeType: insert.data.mime_type,
+        size: insert.data.file_size,
+        uploadedAt: insert.data.created_at,
+        url: await createSignedDownloadUrl(insert.data.file_path),
+      },
+    }, { status: 200, headers: UPLOAD_CORS_HEADERS })
+  } catch (error) {
+    if (error instanceof AiAuthError) return jsonError('Sua sessao expirou. Faca login novamente.', error.status)
+    console.error('[uploads] unhandled error', serializeError(error))
+    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel enviar o arquivo. Tente novamente.', 500)
+  }
+}
+
+function parseMetadata(value: FormDataEntryValue | null) {
+  if (typeof value !== 'string' || !value.trim()) return {} as Record<string, unknown>
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function inferUploadMimeType(fileName: string) {
+  const lowerName = fileName.toLowerCase()
+  if (lowerName.endsWith('.doc')) return 'application/msword'
+  if (lowerName.endsWith('.odt')) return 'application/vnd.oasis.opendocument.text'
+  if (lowerName.endsWith('.rtf')) return 'application/rtf'
+  if (lowerName.endsWith('.txt')) return 'text/plain'
+  return inferMimeType(fileName)
+}
+
+function getExtension(fileName: string) {
+  return fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() ?? '' : ''
+}
+
+function serializeError(error: unknown) {
+  if (error instanceof Error) return { name: error.name, message: error.message, stack: error.stack }
+  if (error && typeof error === 'object') return error
+  return { message: String(error) }
+}
+
+function jsonError(error: string, status: number) {
+  return NextResponse.json({ error }, { status, headers: UPLOAD_CORS_HEADERS })
+}
