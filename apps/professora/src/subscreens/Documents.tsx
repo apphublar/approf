@@ -32,6 +32,27 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   }, [])
 
   useEffect(() => {
+    const persistReload = (event: PageTransitionEvent | BeforeUnloadEvent) => {
+      const detail = event.type === 'pagehide'
+        ? `pagehide disparado. persisted: ${(event as PageTransitionEvent).persisted ? 'sim' : 'nao'}`
+        : 'beforeunload disparado.'
+      const next = upsertUploadDebugStep(loadUploadDebugSteps(DEBUG_KEY), {
+        id: `reload-${Date.now()}`,
+        label: 'Pagina recarregou ou saiu',
+        status: 'error',
+        detail,
+      })
+      saveUploadDebugSteps(DEBUG_KEY, next)
+    }
+    window.addEventListener('pagehide', persistReload)
+    window.addEventListener('beforeunload', persistReload)
+    return () => {
+      window.removeEventListener('pagehide', persistReload)
+      window.removeEventListener('beforeunload', persistReload)
+    }
+  }, [])
+
+  useEffect(() => {
     if (loading || personalDocuments.length === 0) return
     void migrateLocalDocuments()
   }, [loading, personalDocuments])
@@ -186,11 +207,11 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </p>
           </div>
 
-          <label
-            className={`relative mb-4 flex w-full items-center justify-center gap-2 rounded-app-sm border-[1.5px] border-gp bg-white px-3 py-[13px] text-[13px] font-bold text-gm ${
-              uploading ? 'opacity-50' : ''
-            }`}
-          >
+          <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white p-3">
+            <div className="mb-2 flex items-center justify-center gap-2 text-[13px] font-bold text-gm">
+              {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
+              {uploading ? 'Anexando...' : 'Escolher documento'}
+            </div>
             <input
               type="file"
               accept={ACCEPTED_TYPES}
@@ -207,11 +228,10 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
                 })
               }}
               onChange={(event) => void onNativeDocumentChange(event)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              onInput={(event) => void onNativeDocumentChange(event as unknown as ChangeEvent<HTMLInputElement>)}
+              className="block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-gd file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-white"
             />
-            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-            {uploading ? 'Anexando...' : 'Anexar documento'}
-          </label>
+          </div>
 
           {(uploadError || loadError) && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>

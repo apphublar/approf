@@ -103,6 +103,27 @@ export default function MaterialsScreen() {
   }, [])
 
   useEffect(() => {
+    const persistReload = (event: PageTransitionEvent | BeforeUnloadEvent) => {
+      const detail = event.type === 'pagehide'
+        ? `pagehide disparado. persisted: ${(event as PageTransitionEvent).persisted ? 'sim' : 'nao'}`
+        : 'beforeunload disparado.'
+      const next = upsertUploadDebugStep(loadUploadDebugSteps(DEBUG_KEY), {
+        id: `reload-${Date.now()}`,
+        label: 'Pagina recarregou ou saiu',
+        status: 'error',
+        detail,
+      })
+      saveUploadDebugSteps(DEBUG_KEY, next)
+    }
+    window.addEventListener('pagehide', persistReload)
+    window.addEventListener('beforeunload', persistReload)
+    return () => {
+      window.removeEventListener('pagehide', persistReload)
+      window.removeEventListener('beforeunload', persistReload)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!file || getKindFromFile(file) !== 'image') {
       setFilePreviewUrl(null)
       return
@@ -373,25 +394,28 @@ export default function MaterialsScreen() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none focus:border-gp"
-                  placeholder="Ex: Sequência didática sobre cores e formas"
+                  placeholder="Ex: Sequencia didatica sobre cores e formas"
                 />
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-muted mb-1">Descrição</span>
+                <span className="block text-[11px] font-bold text-muted mb-1">Descricao</span>
                 <textarea
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   className="w-full min-h-[96px] resize-none rounded-app-sm border border-border px-3 py-3 text-[13px] leading-[1.5] outline-none focus:border-gp"
-                  placeholder="Descreva como esse material ajuda na prática pedagógica."
+                  placeholder="Descreva como esse material ajuda na pratica pedagogica."
                 />
               </label>
 
-              <label
-                className={`relative flex min-h-[120px] w-full flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${
-                  submitting ? 'opacity-50' : ''
-                }`}
-              >
+              <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${submitting ? 'opacity-50' : ''}`}>
+                <UploadCloud size={26} className="mx-auto text-gm" />
+                <p className="mt-2 text-[13px] font-bold text-gd">
+                  {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
+                </p>
+                <p className="mb-3 mt-1 text-[11px] leading-[1.5] text-muted">
+                  PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP ate {MAX_MB} MB
+                </p>
                 <input
                   type="file"
                   accept={ACCEPTED_MATERIALS}
@@ -407,17 +431,10 @@ export default function MaterialsScreen() {
                     })
                   }}
                   onChange={onNativeMaterialChange}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  onInput={(event) => onNativeMaterialChange(event as unknown as ChangeEvent<HTMLInputElement>)}
+                  className="block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-gd file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-white"
                 />
-                <UploadCloud size={26} className="text-gm" />
-                <span className="mt-2 text-[13px] font-bold text-gd">
-                  {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
-                </span>
-                <span className="mt-1 text-[11px] leading-[1.5] text-muted">
-                  PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
-                </span>
-              </label>
-
+              </div>
               {file && (
                 <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
                   <MaterialIcon kind={getKindFromFile(file)} />
