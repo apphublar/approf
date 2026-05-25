@@ -165,7 +165,7 @@ async function requestOpenAiChat(messages: ChatMessage[]) {
       model,
       temperature: 0.5,
       messages: [
-        { role: 'system', content: 'Você e um assistente útil, claro e cordial. Responda em português brasileiro.' },
+        { role: 'system', content: 'Você é um assistente útil, claro e cordial para professoras de educação infantil. Responda em português brasileiro. Escreva sempre em texto corrido e limpo, sem formatação Markdown: sem asteriscos, sem hashtags, sem traços de lista, sem backticks, sem negrito nem itálico.' },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
     }),
@@ -180,12 +180,12 @@ async function requestOpenAiChat(messages: ChatMessage[]) {
     throw new Error(payload?.error?.message || 'Não foi possível responder com GPT agora.')
   }
 
-  const text = payload?.choices?.[0]?.message?.content?.trim()
-  if (!text) throw new Error('O GPT não retornou resposta suficiente.')
+  const raw = payload?.choices?.[0]?.message?.content?.trim()
+  if (!raw) throw new Error('O GPT não retornou resposta suficiente.')
   const inputTokens = payload?.usage?.prompt_tokens ?? 0
   const outputTokens = payload?.usage?.completion_tokens ?? 0
   return {
-    text,
+    text: stripMarkdown(raw),
     model,
     inputTokens,
     outputTokens,
@@ -208,7 +208,7 @@ async function requestAnthropicChat(messages: ChatMessage[]) {
       model,
       max_tokens: 900,
       temperature: 0.5,
-      system: 'Você e um assistente útil, claro e cordial. Responda em português brasileiro.',
+      system: 'Você é um assistente útil, claro e cordial para professoras de educação infantil. Responda em português brasileiro. Escreva sempre em texto corrido e limpo, sem formatação Markdown: sem asteriscos, sem hashtags, sem traços de lista, sem backticks, sem negrito nem itálico.',
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     }),
   })
@@ -222,21 +222,40 @@ async function requestAnthropicChat(messages: ChatMessage[]) {
     throw new Error(payload?.error?.message || 'Não foi possível responder com Claude agora.')
   }
 
-  const text = payload?.content
+  const raw = payload?.content
     ?.filter((item) => item.type === 'text' && typeof item.text === 'string')
     .map((item) => item.text ?? '')
     .join('\n')
     .trim()
-  if (!text) throw new Error('O Claude não retornou resposta suficiente.')
+  if (!raw) throw new Error('O Claude não retornou resposta suficiente.')
   const inputTokens = payload?.usage?.input_tokens ?? 0
   const outputTokens = payload?.usage?.output_tokens ?? 0
   return {
-    text,
+    text: stripMarkdown(raw),
     model,
     inputTokens,
     outputTokens,
     actualCostCents: estimateAnthropicCostCents(model, inputTokens, outputTokens),
   }
+}
+
+function stripMarkdown(value: string) {
+  return value
+    .replace(/\r\n/g, '\n')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/`{3}[\s\S]*?`{3}/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    .replace(/^-{3,}$/gm, '')
+    .replace(/^={3,}$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function resolveOpenAiChatModel() {

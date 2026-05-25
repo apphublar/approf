@@ -693,11 +693,18 @@ function normalize(value: string) {
 function cleanupGeneratedText(value: string) {
   return value
     .replace(/\r\n/g, '\n')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/__(.*?)__/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')              // ## Títulos
+    .replace(/\*\*(.*?)\*\*/g, '$1')          // **negrito**
+    .replace(/__(.*?)__/g, '$1')              // __negrito__
+    .replace(/\*(.*?)\*/g, '$1')              // *itálico*
+    .replace(/_(.*?)_/g, '$1')               // _itálico_
+    .replace(/`{3}[\s\S]*?`{3}/g, '')        // ```bloco de código```
+    .replace(/`([^`]+)`/g, '$1')             // `código inline`
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [link](url)
+    .replace(/^[-*+]\s+/gm, '')              // - listas com traço/asterisco
+    .replace(/^\d+\.\s+/gm, '')              // 1. listas numeradas
+    .replace(/^-{3,}$/gm, '')                // --- separadores
+    .replace(/^={3,}$/gm, '')                // === separadores
     .replace(/[{}[\]]/g, '')
     .replace(/"{2,}/g, '"')
     .replace(/\n{3,}/g, '\n\n')
