@@ -1,6 +1,13 @@
 import { CheckCircle2, LockKeyhole } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
-import { privacyTasks } from '../lib/mock-admin-data'
+
+const privacyTasks = [
+  'Validar consentimento antes de anexar fotos de crianças.',
+  'Manter buckets de fotos e PDFs sempre privados.',
+  'Auditar liberações manuais de acesso no painel interno.',
+  'Revisar uso anormal de IA antes de aumentar limites.',
+  'Não enviar dados completos de crianças por Telegram ou email.',
+]
 
 export default function PrivacyPage() {
   return (
@@ -16,7 +23,7 @@ export default function PrivacyPage() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">Checklist</p>
-              <h2>Antes de usuárias reais</h2>
+              <h2>Regras operacionais</h2>
             </div>
             <LockKeyhole size={20} />
           </div>
@@ -34,16 +41,16 @@ export default function PrivacyPage() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">Storage</p>
-              <h2>Arquivos privados</h2>
+              <h2>Buckets privados</h2>
             </div>
           </div>
           <div className="stack-list">
             <div className="stack-item">
-              <strong>child-photos</strong>
+              <strong>profile-verification</strong>
               <span className="badge badge-private">privado</span>
             </div>
             <div className="stack-item">
-              <strong>report-exports</strong>
+              <strong>material-apoio</strong>
               <span className="badge badge-private">privado</span>
             </div>
             <div className="stack-item">

@@ -1,13 +1,5 @@
-﻿import { MoveRight, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { MoveRight, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
-import { StatusBadge } from '../components/StatusBadge'
-import { ContinuityRequestsPanel } from './ContinuityRequestsPanel'
-import {
-  childLinkRequests,
-  childTransfers,
-  continuityAudit,
-  continuityMetrics,
-} from '../lib/mock-admin-data'
 
 export default function ContinuityPage() {
   return (
@@ -24,19 +16,18 @@ export default function ContinuityPage() {
         }
       />
 
-      <section className="metrics-grid">
-        {continuityMetrics.map((metric) => (
-          <article className="metric-card" key={metric.label}>
-            <ShieldAlert size={20} />
-            <p>{metric.label}</p>
-            <strong>{metric.value}</strong>
-            <span>{metric.detail}</span>
-          </article>
-        ))}
-      </section>
-
       <section className="content-grid">
-        <ContinuityRequestsPanel requests={childLinkRequests} />
+        <article className="panel panel-wide">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Solicitações</p>
+              <h2>Vínculo de criança existente</h2>
+            </div>
+          </div>
+          <p className="text-muted-panel">
+            Nenhuma solicitação pendente. As professoras ainda não iniciaram pedidos de vínculo pelo app — os casos aparecerão aqui quando essa funcionalidade estiver ativa na plataforma.
+          </p>
+        </article>
 
         <article className="panel privacy-panel">
           <div className="panel-header">
@@ -46,7 +37,6 @@ export default function ContinuityPage() {
             </div>
             <ShieldCheck size={22} />
           </div>
-
           <ul className="privacy-list">
             <li><ShieldCheck size={16} /> Prévia sem fotos, anexos, relatórios completos ou observações sensíveis.</li>
             <li><ShieldCheck size={16} /> Acesso completo apenas após vínculo aprovado.</li>
@@ -67,55 +57,10 @@ export default function ContinuityPage() {
             Aceite ou aprovação
           </span>
         </div>
-
-        <div className="table">
-          <div className="table-row table-head continuity-grid">
-            <span>Criança</span>
-            <span>Origem</span>
-            <span>Destino</span>
-            <span>Status</span>
-            <span>Motivo</span>
-            <span>Data</span>
-          </div>
-          {childTransfers.map((transfer) => (
-            <div className="table-row continuity-grid" key={`${transfer.child}-${transfer.date}`}>
-              <strong>{transfer.child}<small>{transfer.childCode}</small></strong>
-              <span>{transfer.fromTeacher}<small>{transfer.fromCode}</small></span>
-              <span>{transfer.toTeacher}<small>{transfer.toCode}</small></span>
-              <StatusBadge status={transfer.status} />
-              <span>{transfer.reason}</span>
-              <span>{transfer.date}</span>
-            </div>
-          ))}
-        </div>
-      </article>
-
-      <article className="panel spaced-panel">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Auditoria</p>
-            <h2>Eventos recentes</h2>
-          </div>
-        </div>
-
-        <div className="table">
-          <div className="table-row table-head audit-grid">
-            <span>Ator</span>
-            <span>Ação</span>
-            <span>Alvo</span>
-            <span>Data</span>
-          </div>
-          {continuityAudit.map((item) => (
-            <div className="table-row audit-grid" key={`${item.actor}-${item.date}`}>
-              <strong>{item.actor}</strong>
-              <span>{item.action}</span>
-              <span>{item.target}</span>
-              <span>{item.date}</span>
-            </div>
-          ))}
-        </div>
+        <p className="text-muted-panel">
+          Nenhuma transferência registrada. As transferências entre professoras ou turmas aparecerão aqui quando solicitadas pelo app.
+        </p>
       </article>
     </>
   )
 }
-
