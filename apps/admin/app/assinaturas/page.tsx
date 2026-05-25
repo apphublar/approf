@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation'
 import { CreditCard, Unlock } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
+import { liberarAcessoGratuito, updateTeacherSubscription } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -145,88 +145,6 @@ export default async function SubscriptionsPage() {
   )
 }
 
-async function liberarAcessoGratuito(formData: FormData) {
-  'use server'
-  const teacherId = String(formData.get('teacherId') ?? '').trim()
-  if (!teacherId) return
-
-  const supabase = createSupabaseServiceClient()
-  const { error } = await supabase
-    .from('subscriptions')
-    .upsert(
-      {
-        user_id: teacherId,
-        status: 'active',
-        plan: 'free',
-        provider: 'manual',
-        external_reference: null,
-        trial_expires_at: null,
-        current_period_end: null,
-        notes: 'Acesso gratuito liberado pelo admin.',
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' },
-    )
-  if (error) throw new Error(error.message)
-
-  await supabase.from('admin_action_logs').insert({
-    actor_id: null,
-    action: 'teacher_access_granted_free',
-    target_table: 'subscriptions',
-    target_id: null,
-    metadata: { teacherId, status: 'active', plan: 'free' },
-  })
-
-  redirect('/assinaturas')
-}
-
-async function updateTeacherSubscription(formData: FormData) {
-  'use server'
-  const teacherId = String(formData.get('teacherId') ?? '').trim()
-  const status = String(formData.get('status') ?? '').trim() as SubscriptionStatus
-  const plan = String(formData.get('plan') ?? '').trim()
-  const paymentLink = String(formData.get('paymentLink') ?? '').trim()
-  const currentPeriodEnd = String(formData.get('currentPeriodEnd') ?? '').trim()
-  const notes = String(formData.get('notes') ?? '').trim()
-
-  if (!teacherId || !statusOptions.some((o) => o.value === status)) return
-  if (!planOptions.some((o) => o.value === plan)) return
-
-  const supabase = createSupabaseServiceClient()
-  const { error } = await supabase
-    .from('subscriptions')
-    .upsert(
-      {
-        user_id: teacherId,
-        status,
-        plan,
-        provider: 'manual',
-        external_reference: plan === 'free' ? null : paymentLink || null,
-        trial_expires_at:
-          plan === 'trial_15_days' && currentPeriodEnd
-            ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString()
-            : null,
-        current_period_end:
-          plan !== 'free' && currentPeriodEnd
-            ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString()
-            : null,
-        notes: notes || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' },
-    )
-  if (error) throw new Error(error.message)
-
-  await supabase.from('admin_action_logs').insert({
-    actor_id: null,
-    action: 'teacher_subscription_updated',
-    target_table: 'subscriptions',
-    target_id: null,
-    metadata: { teacherId, status, plan, paymentLink: paymentLink || null, currentPeriodEnd: currentPeriodEnd || null },
-  })
-
-  redirect('/assinaturas')
-}
 
 function formatPlan(plan?: string | null) {
   if (!plan) return 'Sem plano'
