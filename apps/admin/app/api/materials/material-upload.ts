@@ -2,7 +2,7 @@ import { createSupabaseServiceClient } from '@/app/lib/supabase-server'
 
 export const MATERIALS_CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
 

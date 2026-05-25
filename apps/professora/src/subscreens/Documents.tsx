@@ -115,23 +115,21 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </p>
           </div>
 
-          <input
-            id="doc-file-input"
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED_TYPES}
-            className="hidden"
-            onChange={(event) => void handleFileSelect(event.target.files)}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 mb-4 disabled:opacity-50"
+          <label
+            className={`relative w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 mb-4 overflow-hidden ${uploading ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
           >
+            <input
+              id="doc-file-input"
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_TYPES}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              disabled={uploading}
+              onChange={(event) => void handleFileSelect(event.target.files)}
+            />
             {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
             {uploading ? 'Anexando...' : 'Anexar documento'}
-          </button>
+          </label>
 
           {(uploadError || loadError) && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>

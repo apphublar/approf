@@ -24,8 +24,9 @@ import {
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
 
-type TabId = 'all' | 'mine' | 'pending' | 'blocked'
+type TabId = 'all' | 'mine' | 'blocked'
 type SortBy = 'newest' | 'oldest' | 'name'
+type KindFilter = 'all' | 'documents' | 'images'
 type MaterialKind = 'document' | 'image'
 
 const ACCEPTED_MATERIALS = ['.pdf', '.docx', '.xlsx', '.pptx', 'image/jpeg', 'image/png', 'image/webp'].join(',')
@@ -35,7 +36,6 @@ const MAX_BYTES = MAX_MB * 1024 * 1024
 const TABS: { id: TabId; label: string }[] = [
   { id: 'all', label: 'Todos' },
   { id: 'mine', label: 'Meus enviados' },
-  { id: 'pending', label: 'Em análise' },
   { id: 'blocked', label: 'Bloqueados' },
 ]
 
@@ -46,6 +46,7 @@ export default function MaterialsScreen() {
   const [tab, setTab] = useState<TabId>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortBy>('newest')
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [showUpload, setShowUpload] = useState(false)
   const [preview, setPreview] = useState<SupportMaterial | null>(null)
 
@@ -65,9 +66,11 @@ export default function MaterialsScreen() {
 
   const filtered = useMemo(() => {
     let list = [...materials]
-    if (tab === 'mine') list = list.filter((m) => m.author_id === userId)
-    else if (tab === 'pending') list = list.filter((m) => m.status === 'em_analise' || m.status === 'review_required')
-    else if (tab === 'blocked') list = list.filter((m) => m.status === 'blocked')
+    if (tab === 'all') list = list.filter((m) => m.status === 'published')
+    else if (tab === 'mine') list = list.filter((m) => m.author_id === userId)
+    else if (tab === 'blocked') list = list.filter((m) => m.status === 'blocked' && m.author_id === userId)
+    if (kindFilter === 'documents') list = list.filter((m) => getKindFromMaterial(m) === 'document')
+    else if (kindFilter === 'images') list = list.filter((m) => getKindFromMaterial(m) === 'image')
     if (query.trim()) {
       const q = normalizeText(query)
       list = list.filter(
@@ -78,14 +81,13 @@ export default function MaterialsScreen() {
     else if (sort === 'oldest') list.sort((a, b) => (a.published_at ?? '').localeCompare(b.published_at ?? ''))
     else list.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
     return list
-  }, [materials, tab, query, sort, userId])
+  }, [materials, tab, query, sort, kindFilter, userId])
 
   const counts = useMemo(
     () => ({
-      all: materials.length,
+      all: materials.filter((m) => m.status === 'published').length,
       mine: materials.filter((m) => m.author_id === userId).length,
-      pending: materials.filter((m) => m.status === 'em_analise' || m.status === 'review_required').length,
-      blocked: materials.filter((m) => m.status === 'blocked').length,
+      blocked: materials.filter((m) => m.status === 'blocked' && m.author_id === userId).length,
     }),
     [materials, userId],
   )
@@ -256,11 +258,20 @@ export default function MaterialsScreen() {
             <option value="oldest">Mais antigos</option>
             <option value="name">A–Z</option>
           </select>
+          <select
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value as KindFilter)}
+            className="text-[11px] border border-border rounded-app-sm px-2 py-1 bg-white text-muted outline-none"
+          >
+            <option value="all">Arquivos</option>
+            <option value="documents">Documentos</option>
+            <option value="images">Imagens</option>
+          </select>
         </div>
       </div>
 
       {/* ── Grid ── */}
-      <div className="flex-1 overflow-y-auto px-[14px] pb-8 pt-1">
+      <div className="flex-1 min-h-0 overflow-y-auto px-[14px] pb-28 pt-1 overscroll-contain">
         {filtered.length === 0 ? (
           <EmptyState tab={tab} hasSearch={Boolean(query.trim())} onAdd={openUpload} />
         ) : (
@@ -314,33 +325,28 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              <div
-                className="flex min-h-[120px] flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center"
-                role="group"
+              <label
+                className={`relative flex min-h-[120px] flex-col items-center justify-center overflow-hidden rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${submitting ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
               >
                 <UploadCloud size={26} className="text-gm" />
-                <button
-                  type="button"
-                  onClick={() => materialFileInputRef.current?.click()}
-                  disabled={submitting}
-                  className="mt-2 text-[13px] font-bold text-gd disabled:opacity-50"
-                >
+                <span className="mt-2 text-[13px] font-bold text-gd">
                   {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
-                </button>
+                </span>
                 <span className="mt-1 text-[11px] leading-[1.5] text-muted">
                   PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
                 </span>
                 <input
                   ref={materialFileInputRef}
                   type="file"
-                  className="hidden"
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   accept={ACCEPTED_MATERIALS}
+                  disabled={submitting}
                   onChange={(e) => {
                     pickFile(e.target.files?.[0])
                     e.currentTarget.value = ''
                   }}
                 />
-              </div>
+              </label>
 
               {file && (
                 <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
@@ -553,8 +559,8 @@ function MaterialCard({
     setDeleting(true)
     try {
       await onDelete()
-    } catch {
-      // parent refresh will update state
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Nao foi possivel excluir este material.')
     } finally {
       setDeleting(false)
     }
@@ -642,7 +648,6 @@ function EmptyState({
   const messages: Record<TabId, { title: string; subtitle: string; showAdd: boolean }> = {
     all: { title: 'Nenhum material ainda', subtitle: 'Adicione seu primeiro material de apoio!', showAdd: true },
     mine: { title: 'Você não enviou materiais', subtitle: 'Toque em "Adicionar" para enviar seu primeiro material.', showAdd: true },
-    pending: { title: 'Nenhum material em análise', subtitle: 'Materiais enviados para revisão aparecem aqui.', showAdd: false },
     blocked: { title: 'Nenhum material bloqueado', subtitle: 'Ótimo! Nenhum material foi bloqueado pela análise.', showAdd: false },
   }
 
@@ -704,6 +709,8 @@ function DeleteButton({ onDelete }: { onDelete: () => Promise<void> }) {
     setDeleting(true)
     try {
       await onDelete()
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Nao foi possivel excluir este material.')
     } finally {
       setDeleting(false)
     }

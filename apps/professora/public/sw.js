@@ -1,4 +1,4 @@
-const SW_VERSION = 'approf-pwa-v2'
+const SW_VERSION = 'approf-pwa-v3'
 const SHELL_CACHE = `${SW_VERSION}:shell`
 const STATIC_CACHE = `${SW_VERSION}:static`
 const THUMB_CACHE = `${SW_VERSION}:thumb`

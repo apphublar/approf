@@ -32,6 +32,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ documents }, { status: 200, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
+    if (isMissingPersonalDocumentsTable(error)) {
+      return jsonError('Banco de dados ainda nao atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
+    }
     return jsonError(error instanceof Error ? error.message : 'Não foi possível listar seus documentos.', 500)
   }
 }
@@ -79,6 +82,9 @@ export async function POST(request: Request) {
     }, { status: 200, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
+    if (isMissingPersonalDocumentsTable(error)) {
+      return jsonError('Banco de dados ainda nao atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
+    }
     return jsonError(error instanceof Error ? error.message : 'Não foi possível salvar seu documento.', 500)
   }
 }
@@ -95,4 +101,9 @@ function toError(error: unknown, fallback: string) {
     if (message) return new Error(message)
   }
   return new Error(fallback)
+}
+
+function isMissingPersonalDocumentsTable(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('teacher_personal_documents') && message.includes('schema cache')
 }
