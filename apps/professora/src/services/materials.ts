@@ -126,7 +126,6 @@ export async function uploadMaterialFile(file: File, userId: string): Promise<{
     .from(upload.bucket)
     .uploadToSignedUrl(upload.path, upload.token, file, {
       contentType: file.type || 'application/octet-stream',
-      upsert: true,
     })
   console.info('[materials] storage upload response', { path: upload.path, error: uploadError })
   if (uploadError) throw new Error('Não foi possível enviar o arquivo. Verifique o tamanho e tente novamente.')
