@@ -116,6 +116,7 @@ interface AppStore {
   addStudent: (classId: string, student: ClassData['students'][number]) => void
   updateStudent: (classId: string, studentId: string, updates: Partial<ClassData['students'][number]>) => void
   addTimelineEvent: (classId: string, studentId: string, event: TimelineEvent) => void
+  removeTimelineEvent: (classId: string, studentId: string, eventId: string) => void
   setActiveClass: (id: string) => void
   setActiveStudent: (id: string) => void
 }
@@ -288,6 +289,21 @@ export const useAppStore = create<AppStore>()(
                           ...student,
                           timeline: [event, ...(student.timeline ?? [])],
                         }
+                      : student,
+                  ),
+                }
+              : classData,
+          ),
+        })),
+      removeTimelineEvent: (classId, studentId, eventId) =>
+        set((state) => ({
+          classes: state.classes.map((classData) =>
+            classData.id === classId
+              ? {
+                  ...classData,
+                  students: classData.students.map((student) =>
+                    student.id === studentId
+                      ? { ...student, timeline: (student.timeline ?? []).filter((e) => e.id !== eventId) }
                       : student,
                   ),
                 }

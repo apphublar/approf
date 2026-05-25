@@ -63,6 +63,24 @@ export async function createSupabaseTimelineEvent(input: TimelineEventInput) {
   return mapTimelineEvent(savedEvent)
 }
 
+export async function deleteSupabaseTimelineEvent(eventId: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não está configurado.')
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError) throw userError
+  const ownerId = userData.user?.id
+  if (!ownerId) throw new Error('Sessão não encontrada.')
+
+  const { error } = await supabase
+    .from('student_timeline_events')
+    .delete()
+    .eq('id', eventId)
+    .eq('owner_id', ownerId)
+
+  if (error) throw toError(error, 'Não foi possível excluir o marco.')
+}
+
 export async function loadSupabaseTimelineEvents(ownerId: string) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')

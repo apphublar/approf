@@ -1,9 +1,10 @@
 ﻿import { useEffect, useState } from 'react'
-import { ChevronLeft, ExternalLink, FileText, MoveRight, Pencil, Plus, Sparkles } from 'lucide-react'
+import { ChevronLeft, ExternalLink, FileText, MoveRight, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import type { TimelineEvent, TimelineEventType } from '@/types'
 import { getAppDataMode } from '@/services/app-data'
 import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
+import { deleteSupabaseTimelineEvent } from '@/services/supabase/timeline'
 import { listReports } from '@/services/reports'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
@@ -24,7 +25,7 @@ const ANNOTATION_PREVIEW_COUNT = 3
 
 export default function StudentProfileSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { classes, activeStudentId, activeClassId, annotations, attendanceRecords, removeAnnotation } = useAppStore()
+  const { classes, activeStudentId, activeClassId, annotations, attendanceRecords, removeAnnotation, removeTimelineEvent } = useAppStore()
   const [showAllAnnotations, setShowAllAnnotations] = useState(false)
   const [generatedCount, setGeneratedCount] = useState(0)
 
@@ -92,6 +93,21 @@ export default function StudentProfileSubscreen() {
       active = false
     }
   }, [student.id])
+
+  async function handleDeleteTimelineEvent(eventId: string) {
+    const confirmed = window.confirm('Deseja excluir este marco? Esta ação não pode ser desfeita.')
+    if (!confirmed) return
+
+    try {
+      if (getAppDataMode() === 'supabase') {
+        await deleteSupabaseTimelineEvent(eventId)
+      }
+      removeTimelineEvent(cls.id, student.id, eventId)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível excluir o marco.'
+      window.alert(message)
+    }
+  }
 
   async function handleDeleteAnnotation(annotationId: string) {
     const confirmed = window.confirm('Deseja excluir esta anotação? Esta ação não pode ser desfeita.')
@@ -348,7 +364,16 @@ export default function StudentProfileSubscreen() {
                   {event.attachmentName && !event.attachmentUrl && (
                     <p className="text-[10px] text-muted mt-2">Anexo privado: {event.attachmentName}</p>
                   )}
-                  <p className="text-[10px] text-muted mt-2">{event.date}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-[10px] text-muted">{event.date}</p>
+                    <button
+                      onClick={() => handleDeleteTimelineEvent(event.id)}
+                      className="text-muted hover:text-red-500 transition-colors"
+                      aria-label="Excluir marco"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               </article>
             )
