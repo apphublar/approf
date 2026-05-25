@@ -325,9 +325,7 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              <label
-                className={`relative flex min-h-[120px] flex-col items-center justify-center overflow-hidden rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${submitting ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
-              >
+              <div className="flex min-h-[120px] flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center">
                 <UploadCloud size={26} className="text-gm" />
                 <span className="mt-2 text-[13px] font-bold text-gd">
                   {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
@@ -338,15 +336,18 @@ export default function MaterialsScreen() {
                 <input
                   ref={materialFileInputRef}
                   type="file"
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  className="mt-3 block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-white file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-gd"
                   accept={ACCEPTED_MATERIALS}
                   disabled={submitting}
                   onChange={(e) => {
-                    pickFile(e.target.files?.[0])
+                    e.preventDefault()
+                    e.stopPropagation()
+                    pickFile(e.currentTarget.files?.[0])
                     e.currentTarget.value = ''
                   }}
+                  onClick={(e) => e.stopPropagation()}
                 />
-              </label>
+              </div>
 
               {file && (
                 <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
