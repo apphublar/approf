@@ -62,7 +62,7 @@ export interface UploadDebugStep {
 
 const MAX_MATERIAL_SIZE_BYTES = 10 * 1024 * 1024
 const ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.pptx']
-const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 export async function analyzeAndUploadMaterial(input: {
   title: string
@@ -72,9 +72,8 @@ export async function analyzeAndUploadMaterial(input: {
 }): Promise<MaterialAnalysisResult> {
   const steps: UploadDebugStep[] = []
   const emit = input.onDebugStep
-
-  function setStep(id: string, label: string, status: UploadDebugStep['status'], detail?: string) {
-    const existing = steps.findIndex((s) => s.id === id)
+  const setStep = (id: string, label: string, status: UploadDebugStep['status'], detail?: string) => {
+    const existing = steps.findIndex((step) => step.id === id)
     const step: UploadDebugStep = { id, label, status, detail }
     if (existing >= 0) steps[existing] = step
     else steps.push(step)
@@ -84,46 +83,37 @@ export async function analyzeAndUploadMaterial(input: {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
 
-  // Step: auth
-  setStep('auth', 'Verificando autenticação', 'running')
+  setStep('auth', 'Verificando autenticacao', 'running')
   const { data, error } = await supabase.auth.getSession()
   if (error) {
-    setStep('auth', 'Verificando autenticação', 'error', error.message)
+    setStep('auth', 'Verificando autenticacao', 'error', error.message)
     throw error
   }
   const userId = data.session?.user.id
-  if (!userId) {
-    setStep('auth', 'Verificando autenticação', 'error', 'Sessão não encontrada')
-    throw new Error('Você precisa estar logada para enviar materiais.')
+  const token = data.session?.access_token
+  if (!userId || !token) {
+    setStep('auth', 'Verificando autenticacao', 'error', 'Sessao nao encontrada')
+    throw new Error('Voce precisa estar logada para enviar materiais.')
   }
-  setStep('auth', 'Verificando autenticação', 'ok', `userId: ${userId}`)
+  setStep('auth', 'Verificando autenticacao', 'ok', `userId: ${userId}; token: sim`)
+  console.info('[materials/mobile-diagnostics]', getMobileUploadDiagnostics(input.file, userId, true))
 
-  // Step: upload to storage
-  setStep('storage', 'Enviando arquivo para storage', 'running')
+  setStep('storage', 'Enviando arquivo', 'running')
   let uploaded: Awaited<ReturnType<typeof uploadMaterialFile>>
   try {
     uploaded = await uploadMaterialFile(input.file, userId, (detail) => {
-      setStep('storage', 'Enviando arquivo para storage', 'running', detail)
+      setStep('storage', 'Enviando arquivo', 'running', detail)
     })
-    setStep('storage', 'Enviando arquivo para storage', 'ok', `path: ${uploaded.file_path}`)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erro desconhecido no upload'
-    setStep('storage', 'Enviando arquivo para storage', 'error', msg)
-    throw err
+    setStep('storage', 'Enviando arquivo', 'ok', `path: ${uploaded.file_path}`)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro desconhecido no upload assinado'
+    setStep('storage', 'Enviando arquivo', 'error', message)
+    return uploadMaterialDirectWithSteps(input, token, setStep, message)
   }
 
-  // Step: analyze
-  setStep('analyze', 'Registrando e analisando com IA', 'running')
-  let payload: Partial<MaterialAnalysisResult>
+  setStep('analyze', 'Upload realizado, analisando material', 'running')
   try {
-    const apiBaseUrl = getAdminApiUrl()
-    const token = data.session?.access_token
-    if (!token) throw new Error('Token de sessao nao encontrado.')
-
-    const analyzeUrl = `${apiBaseUrl}/api/materials/analyze-stored`
-    console.info('[materials] calling analyze-stored', { analyzeUrl, filePath: uploaded.file_path })
-
-    const response = await fetch(analyzeUrl, {
+    const response = await fetch(`${getAdminApiUrl()}/api/materials/analyze-stored`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -138,38 +128,27 @@ export async function analyzeAndUploadMaterial(input: {
         filePath: uploaded.file_path,
       }),
     })
-
-    const responseBody = await response.json().catch(() => null) as ({ error?: string } & Record<string, unknown>) | null
-    console.info('[materials] analyze-stored response', { status: response.status, body: responseBody })
+    const rawBody = await response.text().catch((readError) => `__READ_ERROR__:${String(readError)}`)
+    const payload = parseJsonBody(rawBody) as (Partial<MaterialAnalysisResult> & { error?: string }) | null
+    console.info('[materials] analyze-stored response', { status: response.status, ok: response.ok, raw: rawBody, payload })
 
     if (!response.ok) {
-      const msg = responseBody?.error || `HTTP ${response.status}`
-      setStep('analyze', 'Registrando e analisando com IA', 'error', msg)
-      throw new Error(msg)
+      const message = payload?.error || `HTTP ${response.status}`
+      setStep('analyze', 'Upload realizado, analisando material', 'error', message)
+      return uploadMaterialDirectWithSteps(input, token, setStep, message)
     }
-    if (!responseBody || typeof responseBody !== 'object') {
-      setStep('analyze', 'Registrando e analisando com IA', 'error', 'Resposta invalida do servidor')
-      throw new Error('Resposta invalida ao acessar materiais.')
+    if (!payload?.status || !payload.review) throw new Error('Resposta invalida da analise do material.')
+    setStep('analyze', 'Material enviado e aguardando analise', 'ok', `status: ${payload.status}`)
+    return {
+      materialId: payload.materialId,
+      status: payload.status,
+      review: payload.review,
+      extractedTextPreview: payload.extractedTextPreview,
     }
-    payload = responseBody as Partial<MaterialAnalysisResult>
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erro na analise'
-    setStep('analyze', 'Registrando e analisando com IA', 'error', msg)
-    throw err
-  }
-
-  if (!payload.status || !payload.review) {
-    setStep('analyze', 'Registrando e analisando com IA', 'error', 'Resposta invalida da analise')
-    throw new Error('Resposta invalida da analise do material.')
-  }
-
-  setStep('analyze', 'Registrando e analisando com IA', 'ok', `status: ${payload.status}`)
-
-  return {
-    materialId: payload.materialId,
-    status: payload.status,
-    review: payload.review,
-    extractedTextPreview: payload.extractedTextPreview,
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro na analise'
+    setStep('analyze', 'Upload realizado, analisando material', 'error', message)
+    return uploadMaterialDirectWithSteps(input, token, setStep, message)
   }
 }
 
@@ -186,7 +165,6 @@ export async function uploadMaterialFile(
 }> {
   validateMaterialFile(file)
 
-  const apiBaseUrl = getAdminApiUrl()
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
 
@@ -194,15 +172,11 @@ export async function uploadMaterialFile(
   const token = sessionData.session?.access_token
   if (!token) throw new Error('Sessao expirada. Entre novamente.')
 
-  // Step A: get signed URL
-  const uploadUrlEndpoint = `${apiBaseUrl}/api/materials/upload-url`
+  const uploadUrlEndpoint = `${getAdminApiUrl()}/api/materials/upload-url`
   onProgress?.(`chamando ${uploadUrlEndpoint}`)
   console.info('[materials] calling upload-url', {
     uploadUrlEndpoint,
-    fileName: file.name,
-    fileType: file.type,
-    fileSize: file.size,
-    userId,
+    diagnostics: getMobileUploadDiagnostics(file, userId, true),
   })
 
   const uploadUrlResponse = await fetch(uploadUrlEndpoint, {
@@ -213,9 +187,14 @@ export async function uploadMaterialFile(
     },
     body: JSON.stringify({ fileName: file.name, fileType: file.type, fileSize: file.size }),
   })
-
-  const uploadUrlBody = await uploadUrlResponse.json().catch(() => null) as ({ error?: string; bucket?: string; path?: string; token?: string }) | null
-  console.info('[materials] upload-url response', { status: uploadUrlResponse.status, body: uploadUrlBody })
+  const rawUploadUrlBody = await uploadUrlResponse.text().catch((error) => `__READ_ERROR__:${String(error)}`)
+  const uploadUrlBody = parseJsonBody(rawUploadUrlBody) as ({ error?: string; bucket?: string; path?: string; token?: string }) | null
+  console.info('[materials] upload-url response', {
+    status: uploadUrlResponse.status,
+    ok: uploadUrlResponse.ok,
+    raw: rawUploadUrlBody,
+    body: uploadUrlBody,
+  })
 
   if (!uploadUrlResponse.ok) {
     throw new Error(uploadUrlBody?.error || `Falha ao obter URL de upload (HTTP ${uploadUrlResponse.status})`)
@@ -224,23 +203,15 @@ export async function uploadMaterialFile(
   const bucket = uploadUrlBody?.bucket
   const path = uploadUrlBody?.path
   const signedToken = uploadUrlBody?.token
-
-  if (!bucket || !path || !signedToken) {
-    console.error('[materials] upload-url returned incomplete data', uploadUrlBody)
-    throw new Error('Resposta incompleta da rota de upload.')
-  }
+  if (!bucket || !path || !signedToken) throw new Error('Resposta incompleta da rota de upload.')
 
   onProgress?.(`enviando para storage: ${bucket}/${path}`)
-  console.info('[materials] uploading to storage via signed URL', { bucket, path })
-
-  // Step B: upload to storage
-  // iOS Safari can fail when passing a File object directly — convert to ArrayBuffer first
   const fileBuffer = await file.arrayBuffer()
   const { error: uploadError } = await supabase
     .storage
     .from(bucket)
     .uploadToSignedUrl(path, signedToken, fileBuffer, {
-      contentType: file.type || 'application/octet-stream',
+      contentType: file.type || inferMimeType(file.name),
     })
 
   console.info('[materials] storage uploadToSignedUrl result', {
@@ -248,17 +219,14 @@ export async function uploadMaterialFile(
     path,
     uploadError: uploadError ? { message: uploadError.message, status: (uploadError as { status?: number }).status } : null,
   })
-
-  if (uploadError) {
-    throw new Error(`Falha no upload ao storage: ${uploadError.message}`)
-  }
+  if (uploadError) throw new Error(`Falha no upload ao storage: ${uploadError.message}`)
 
   onProgress?.('upload concluido')
   return {
     file_path: path,
     signed_url: null,
     file_name: file.name,
-    mime_type: file.type || 'application/octet-stream',
+    mime_type: file.type || inferMimeType(file.name),
     file_size: file.size,
   }
 }
@@ -298,16 +266,72 @@ export async function publishGeneratedMaterialShare(input: {
   })
 }
 
+async function uploadMaterialDirectWithSteps(
+  input: { title: string; description: string; file: File },
+  token: string,
+  setStep: (id: string, label: string, status: UploadDebugStep['status'], detail?: string) => void,
+  reason: string,
+) {
+  setStep('fallback', 'Tentando upload pelo servidor', 'running', reason)
+  const result = await uploadMaterialDirect(input.title, input.description, input.file, token, (detail) => {
+    setStep('fallback', 'Tentando upload pelo servidor', 'running', detail)
+  })
+  setStep('fallback', 'Tentando upload pelo servidor', 'ok', `status: ${result.status}`)
+  return result
+}
+
+async function uploadMaterialDirect(
+  title: string,
+  description: string,
+  file: File,
+  token: string,
+  onProgress?: (detail: string) => void,
+): Promise<MaterialAnalysisResult> {
+  const endpoint = `${getAdminApiUrl()}/api/materials/upload-direct`
+  const formData = new FormData()
+  formData.append('title', title)
+  formData.append('description', description)
+  formData.append('file', file, file.name)
+
+  onProgress?.(`chamando ${endpoint}`)
+  console.info('[materials] calling upload-direct fallback', {
+    endpoint,
+    diagnostics: getMobileUploadDiagnostics(file, undefined, true),
+  })
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  })
+  const rawBody = await response.text().catch((error) => `__READ_ERROR__:${String(error)}`)
+  const payload = parseJsonBody(rawBody) as (Partial<MaterialAnalysisResult> & { error?: string }) | null
+  console.info('[materials] upload-direct response', { status: response.status, ok: response.ok, raw: rawBody, payload })
+
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Nao foi possivel enviar. Tente novamente usando Wi-Fi ou escolha um arquivo menor.')
+  }
+  if (!payload?.status || !payload.review) throw new Error('Resposta invalida do upload alternativo.')
+  return {
+    materialId: payload.materialId,
+    status: payload.status,
+    review: payload.review,
+    extractedTextPreview: payload.extractedTextPreview,
+  }
+}
+
 function validateMaterialFile(file: File) {
   const lowerName = file.name.toLowerCase()
-  const allowed = ALLOWED_IMAGE_MIME_TYPES.includes(file.type)
+  const mimeType = file.type.toLowerCase()
+  const allowed = ALLOWED_IMAGE_MIME_TYPES.includes(mimeType)
+    || mimeType === 'application/pdf'
     || ['.jpg', '.jpeg', '.png', '.webp'].some((extension) => lowerName.endsWith(extension))
     || ALLOWED_DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
   if (!allowed) {
-    throw new Error('Arquivo não permitido. Envie apenas PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
+    throw new Error('Arquivo nao permitido. Envie apenas PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
   }
   if (file.size > MAX_MATERIAL_SIZE_BYTES) {
-    throw new Error('Não foi possível enviar o arquivo. Verifique o tamanho e tente novamente.')
+    throw new Error('Nao foi possivel enviar o arquivo. Verifique o tamanho e tente novamente.')
   }
 }
 
@@ -318,7 +342,6 @@ function getAdminApiUrl() {
 }
 
 async function callMaterialsApi<T>(path: string, init: RequestInit): Promise<T> {
-  const apiBaseUrl = getAdminApiUrl()
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
 
@@ -327,9 +350,8 @@ async function callMaterialsApi<T>(path: string, init: RequestInit): Promise<T> 
   const token = data.session?.access_token
   if (!token) throw new Error('Sessao expirada. Entre novamente.')
 
-  const fullUrl = `${apiBaseUrl}${path}`
+  const fullUrl = `${getAdminApiUrl()}${path}`
   console.info('[materials] API call', { method: init.method, url: fullUrl })
-
   const response = await fetch(fullUrl, {
     ...init,
     headers: {
@@ -337,15 +359,50 @@ async function callMaterialsApi<T>(path: string, init: RequestInit): Promise<T> 
       ...(init.headers ?? {}),
     },
   })
+  const rawBody = await response.text().catch((readError) => `__READ_ERROR__:${String(readError)}`)
+  const payload = parseJsonBody(rawBody) as ({ error?: string } & Record<string, unknown>) | null
+  console.info('[materials] API response', { url: fullUrl, status: response.status, ok: response.ok, raw: rawBody, payload })
 
-  const payload = await response.json().catch(() => null) as ({ error?: string } & Record<string, unknown>) | null
-  console.info('[materials] API response', { url: fullUrl, status: response.status, payload })
-
-  if (!response.ok) {
-    throw new Error(payload?.error || 'Nao foi possivel acessar os materiais agora.')
-  }
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Resposta invalida ao acessar materiais.')
-  }
+  if (!response.ok) throw new Error(payload?.error || 'Nao foi possivel acessar os materiais agora.')
+  if (!payload || typeof payload !== 'object') throw new Error('Resposta invalida ao acessar materiais.')
   return payload as T
+}
+
+function inferMimeType(fileName: string) {
+  const lowerName = fileName.toLowerCase()
+  if (lowerName.endsWith('.pdf')) return 'application/pdf'
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg'
+  if (lowerName.endsWith('.png')) return 'image/png'
+  if (lowerName.endsWith('.webp')) return 'image/webp'
+  if (lowerName.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  if (lowerName.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  if (lowerName.endsWith('.pptx')) return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  return 'application/octet-stream'
+}
+
+function parseJsonBody(raw: string) {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function getMobileUploadDiagnostics(file: File, userId?: string, hasToken?: boolean) {
+  const nav = typeof navigator !== 'undefined' ? navigator : null
+  const win = typeof window !== 'undefined' ? window : null
+  const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : ''
+  return {
+    userAgent: nav?.userAgent ?? 'unknown',
+    platform: nav?.platform ?? 'unknown',
+    origin: win?.location?.origin ?? 'unknown',
+    href: win?.location?.href ?? 'unknown',
+    standalone: win?.matchMedia?.('(display-mode: standalone)').matches ?? false,
+    userId: userId ?? null,
+    hasToken: Boolean(hasToken),
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type || '(empty)',
+    extension,
+  }
 }

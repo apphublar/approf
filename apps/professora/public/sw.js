@@ -1,4 +1,4 @@
-const SW_VERSION = 'approf-pwa-v3'
+const SW_VERSION = 'approf-pwa-v4'
 const SHELL_CACHE = `${SW_VERSION}:shell`
 const STATIC_CACHE = `${SW_VERSION}:static`
 const THUMB_CACHE = `${SW_VERSION}:thumb`
@@ -31,10 +31,16 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
   const isSameOrigin = url.origin === self.location.origin
+  const isApi = isSameOrigin && url.pathname.startsWith('/api/')
+  const isSupabaseStorage = url.hostname.endsWith('.supabase.co') && url.pathname.includes('/storage/v1/object')
   const isReportApi = isSameOrigin && url.pathname.startsWith('/api/reports')
   const isImage = request.destination === 'image'
   const isStaticAsset = isSameOrigin && ['script', 'style', 'font'].includes(request.destination)
   const isThumbnail = isImage && /\b(thumbnail|thumb|small)\b/i.test(url.pathname + url.search)
+
+  if (isApi || isSupabaseStorage) {
+    return
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith(networkFirstNavigate(request))

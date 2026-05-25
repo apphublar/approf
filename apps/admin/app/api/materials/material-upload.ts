@@ -4,6 +4,7 @@ export const MATERIALS_CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Max-Age': '86400',
 }
 
 export const MAX_MATERIAL_SIZE_MB = 10
@@ -383,7 +384,8 @@ export function validateMaterialFile(file: MaterialFileInfo) {
 
 function isAllowedMaterialFile(file: MaterialFileInfo) {
   const lowerName = file.name.toLowerCase()
-  if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return true
+  const mimeType = file.type.toLowerCase()
+  if (['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'].includes(mimeType)) return true
   if (['.jpg', '.jpeg', '.png', '.webp'].some((extension) => lowerName.endsWith(extension))) return true
   return ['.pdf', '.docx', '.xlsx', '.pptx'].some((extension) => lowerName.endsWith(extension))
 }

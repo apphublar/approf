@@ -5,15 +5,18 @@ export const PERSONAL_DOCUMENT_CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Max-Age': '86400',
 }
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
 const ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.doc', '.docx', '.odt', '.rtf', '.txt']
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 export function validatePersonalDocument(input: { fileName: string; fileType: string; fileSize: number }) {
   const lowerName = input.fileName.toLowerCase()
-  const allowed = ALLOWED_IMAGE_TYPES.includes(input.fileType)
+  const mimeType = input.fileType.toLowerCase()
+  const allowed = ALLOWED_IMAGE_TYPES.includes(mimeType)
+    || mimeType === 'application/pdf'
     || ['.jpg', '.jpeg', '.png', '.webp'].some((extension) => lowerName.endsWith(extension))
     || ALLOWED_DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
   if (!allowed) return 'Arquivo não permitido. Use imagens, PDF ou documentos de texto.'
