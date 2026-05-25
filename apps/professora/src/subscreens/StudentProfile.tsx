@@ -49,18 +49,7 @@ export default function StudentProfileSubscreen() {
       annotation.studentName === `${student?.name.split(' ')[0]} ${student?.name.split(' ')[1]?.[0]}.`,
   )
 
-  const timelineFromAnnotations: TimelineEvent[] = studentAnns.map((annotation) => ({
-    id: annotation.id,
-    type: 'evolucao' as const,
-    title: annotation.label,
-    text: annotation.text,
-    date: annotation.date,
-    tags: annotation.tags,
-    attachmentName: annotation.attachmentName,
-    attachmentUrl: null,
-    attachmentKind: annotation.attachmentName ? 'file' : undefined,
-  }))
-  const timeline: TimelineEvent[] = student.timeline && student.timeline.length > 0 ? student.timeline : timelineFromAnnotations
+  const timeline: TimelineEvent[] = student.timeline ?? []
   const totalNotes = studentAnns.length
   const timelineMilestones = (student.timeline ?? []).filter(
     (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
@@ -320,6 +309,11 @@ export default function StudentProfileSubscreen() {
             Marco
           </button>
         </div>
+        {timeline.length === 0 && (
+          <p className="text-[12px] text-muted leading-[1.6] mb-8">
+            Nenhum marco registrado ainda. Use o botão Marco para adicionar o primeiro registro.
+          </p>
+        )}
         <div className="relative pl-7 pb-8">
           <div className="absolute left-[10px] top-0 bottom-0 w-[2px] bg-gp" />
           {timeline.map((event) => {
@@ -364,14 +358,15 @@ export default function StudentProfileSubscreen() {
                   {event.attachmentName && !event.attachmentUrl && (
                     <p className="text-[10px] text-muted mt-2">Anexo privado: {event.attachmentName}</p>
                   )}
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-[10px] text-muted">{event.date}</p>
+                  <p className="text-[10px] text-muted mt-2">{event.date}</p>
+                  <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
                     <button
+                      type="button"
                       onClick={() => handleDeleteTimelineEvent(event.id)}
-                      className="text-muted hover:text-red-500 transition-colors"
-                      aria-label="Excluir marco"
+                      className="flex items-center gap-1.5 text-[12px] font-bold text-[#C1440E] ml-auto"
                     >
                       <Trash2 size={13} />
+                      Excluir
                     </button>
                   </div>
                 </div>
