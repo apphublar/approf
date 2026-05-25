@@ -7,6 +7,13 @@ export function StatusBadge({ status }: { status: string }) {
     blocked: 'Bloqueado',
     review_required: 'Revisao necessaria',
     em_analise: 'Em analise',
+    active: 'Ativa',
+    trial: 'Teste',
+    overdue: 'Em atraso',
+    canceled: 'Cancelada',
+    pending: 'Em analise',
+    approved: 'Aprovado',
+    rejected: 'Rejeitado',
   }
   return <span className={`badge badge-${normalized}`}>{labels[status] ?? status}</span>
 }

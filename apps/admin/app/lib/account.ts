@@ -226,6 +226,14 @@ export async function updateTeacherVerificationStatus(input: {
   reviewNotes?: string
 }) {
   const supabase = createSupabaseServiceClient()
+  const { data: current, error: currentError } = await supabase
+    .from('teacher_profile_verifications')
+    .select('id, owner_id')
+    .eq('id', input.verificationId)
+    .maybeSingle()
+  if (currentError) throw currentError
+  if (!current) throw new Error('Solicitacao de verificacao nao encontrada.')
+
   const patch = {
     status: input.status,
     notes: input.reviewNotes?.trim() || null,
@@ -236,6 +244,45 @@ export async function updateTeacherVerificationStatus(input: {
     .update(patch)
     .eq('id', input.verificationId)
   if (error) throw error
+
+  const subscriptionPatch = input.status === 'approved'
+    ? {
+        status: 'trial' as const,
+        plan: 'trial_15_days',
+        provider: 'manual' as const,
+        trial_expires_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        current_period_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        notes: appendAdminNote(input.reviewNotes, 'Cadastro aprovado pelo admin.'),
+      }
+    : {
+        status: 'blocked' as const,
+        plan: 'verification_required',
+        provider: 'manual' as const,
+        trial_expires_at: null,
+        current_period_end: null,
+        notes: appendAdminNote(input.reviewNotes, input.status === 'rejected' ? 'Cadastro rejeitado pelo admin.' : 'Cadastro mantido em analise.'),
+      }
+
+  const { error: subscriptionError } = await supabase
+    .from('subscriptions')
+    .upsert({
+      user_id: current.owner_id,
+      ...subscriptionPatch,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+  if (subscriptionError) throw subscriptionError
+
+  await supabase.from('admin_action_logs').insert({
+    actor_id: null,
+    action: 'teacher_verification_updated',
+    target_table: 'teacher_profile_verifications',
+    target_id: input.verificationId,
+    metadata: { ownerId: current.owner_id, status: input.status, notes: input.reviewNotes ?? null },
+  })
+}
+
+function appendAdminNote(notes: string | undefined, action: string) {
+  return [`[${new Date().toISOString()}] ${action}`, notes?.trim()].filter(Boolean).join(' ')
 }
 
 function normalizeDocument(value: unknown) {

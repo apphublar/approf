@@ -1,6 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import type { ReactNode } from 'react'
-import { Eye, FileText, Flag, ShieldCheck } from 'lucide-react'
+import { ExternalLink, Eye, FileText, Flag, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
@@ -17,6 +17,7 @@ type MaterialRecord = {
   age_range: string | null
   pedagogical_objective: string | null
   file_name: string | null
+  file_path: string | null
   file_type: string | null
   file_size_bytes: number | null
   status: MaterialStatus
@@ -34,6 +35,7 @@ type MaterialRecord = {
   auto_hidden_at: string | null
   published_at: string | null
   created_at: string
+  openUrl?: string | null
 }
 
 type ReportRecord = {
@@ -60,7 +62,7 @@ export default async function MaterialsPage() {
   const [{ data: materialsData, error }, { data: categoriesData }, { data: reportsData }] = await Promise.all([
     supabase
       .from('materials')
-      .select('id, title, description, type, age_range, pedagogical_objective, file_name, file_type, file_size_bytes, status, ai_analysis_status, ai_review, detected_category, content_preview, author_name, author_avatar, downloads_count, views_count, ratings_count, average_rating, reports_count, auto_hidden_at, published_at, created_at')
+      .select('id, title, description, type, age_range, pedagogical_objective, file_name, file_path, file_type, file_size_bytes, status, ai_analysis_status, ai_review, detected_category, content_preview, author_name, author_avatar, downloads_count, views_count, ratings_count, average_rating, reports_count, auto_hidden_at, published_at, created_at')
       .order('created_at', { ascending: false })
       .limit(100),
     supabase
@@ -79,7 +81,18 @@ export default async function MaterialsPage() {
     throw new Error(error.message)
   }
 
-  const materials = (materialsData ?? []) as MaterialRecord[]
+  const rawMaterials = (materialsData ?? []) as MaterialRecord[]
+  const materials = await Promise.all(rawMaterials.map(async (material) => {
+    if (!material.file_path) return { ...material, openUrl: null }
+    const signed = await supabase.storage
+      .from('material-apoio')
+      .createSignedUrl(material.file_path, 60 * 30, { download: material.file_name || material.title })
+    if (signed.data?.signedUrl) return { ...material, openUrl: signed.data.signedUrl }
+    const legacySigned = await supabase.storage
+      .from('material-files')
+      .createSignedUrl(material.file_path, 60 * 30, { download: material.file_name || material.title })
+    return { ...material, openUrl: legacySigned.data?.signedUrl ?? null }
+  }))
   const reports = (reportsData ?? []) as ReportRecord[]
   const metrics = {
     published: materials.filter((item) => item.status === 'published').length,
@@ -156,13 +169,27 @@ export default async function MaterialsPage() {
                 </span>
                 <form action={updateMaterialStatus} className="inline-form">
                   <input type="hidden" name="materialId" value={material.id} />
+                  <input name="title" defaultValue={material.title} placeholder="Titulo" />
+                  <textarea name="description" defaultValue={material.description ?? ''} placeholder="Descricao" />
+                  <input name="ageRange" defaultValue={material.age_range ?? ''} placeholder="Faixa etaria" />
+                  <input name="pedagogicalObjective" defaultValue={material.pedagogical_objective ?? ''} placeholder="Objetivo pedagogico" />
+                  <textarea name="contentPreview" defaultValue={material.content_preview ?? ''} placeholder="Texto/preview editavel" />
                   <select name="status" defaultValue={material.status}>
                     {statusOptions.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
                   <textarea name="notes" placeholder="Nota de moderacao opcional" />
-                  <button className="quiet-button" type="submit">Salvar</button>
+                  <div className="action-row">
+                    {material.openUrl && (
+                      <a className="quiet-button secondary-action" href={material.openUrl} target="_blank" rel="noreferrer">
+                        <ExternalLink size={14} />
+                        Abrir arquivo
+                      </a>
+                    )}
+                    <button className="quiet-button" name="quickStatus" value="published" type="submit">Aprovar</button>
+                    <button className="quiet-button secondary-action" type="submit">Salvar</button>
+                  </div>
                 </form>
               </div>
             ))}
@@ -258,13 +285,24 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
 async function updateMaterialStatus(formData: FormData) {
   'use server'
   const materialId = String(formData.get('materialId') ?? '').trim()
-  const status = String(formData.get('status') ?? '').trim() as MaterialStatus
+  const quickStatus = String(formData.get('quickStatus') ?? '').trim()
+  const status = (quickStatus || String(formData.get('status') ?? '').trim()) as MaterialStatus
+  const title = String(formData.get('title') ?? '').trim()
+  const description = String(formData.get('description') ?? '').trim()
+  const ageRange = String(formData.get('ageRange') ?? '').trim()
+  const pedagogicalObjective = String(formData.get('pedagogicalObjective') ?? '').trim()
+  const contentPreview = String(formData.get('contentPreview') ?? '').trim()
   const notes = String(formData.get('notes') ?? '').trim()
   if (!materialId || !statusOptions.some((option) => option.value === status)) return
 
   const supabase = createSupabaseServiceClient()
   const payload: Record<string, unknown> = {
     status,
+    ...(title ? { title } : {}),
+    description: description || null,
+    age_range: ageRange || null,
+    pedagogical_objective: pedagogicalObjective || null,
+    content_preview: contentPreview || null,
     ai_analysis_status: status === 'published' ? 'approved_by_admin' : status,
     reviewed_at: new Date().toISOString(),
   }
