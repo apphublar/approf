@@ -29,6 +29,7 @@ import {
   type SupportMaterial,
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
+import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 
 type TabId = 'all' | 'mine' | 'favorites' | 'blocked'
 type SortBy = 'newest' | 'downloads' | 'rating' | 'oldest' | 'name'
@@ -39,7 +40,7 @@ type MaterialKind = 'document' | 'image'
 const ACCEPTED_MATERIALS = ['.pdf', '.docx', '.xlsx', '.pptx', '.jpg', '.jpeg', '.png', '.webp', 'image/jpeg', 'image/png', 'image/webp'].join(',')
 const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
-const AGE_RANGES = ['0 a 1 ano', '1 a 2 anos', '2 a 3 anos', '3 a 4 anos', '4 a 5 anos', 'Multietaria']
+const DEFAULT_AGE_RANGE = '0 a 5 anos'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -64,7 +65,7 @@ export default function MaterialsScreen() {
 
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
-  const [ageRange, setAgeRange] = useState('')
+  const [ageRange, setAgeRange] = useState(DEFAULT_AGE_RANGE)
   const [pedagogicalObjective, setPedagogicalObjective] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -114,6 +115,15 @@ export default function MaterialsScreen() {
     return Array.from(values).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   }, [materials])
 
+  const ageOptions = useMemo(() => {
+    const values = new Set<string>()
+    for (const material of materials) {
+      const value = (material.age_range ?? '').trim()
+      if (value) values.add(value)
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }))
+  }, [materials])
+
   const counts = useMemo(
     () => ({
       all: materials.filter((m) => m.status === 'published').length,
@@ -161,7 +171,7 @@ export default function MaterialsScreen() {
   function openUpload() {
     setTitle('')
     setDesc('')
-    setAgeRange('')
+    setAgeRange(DEFAULT_AGE_RANGE)
     setPedagogicalObjective('')
     setFile(null)
     setUploadMsg('')
@@ -212,7 +222,7 @@ export default function MaterialsScreen() {
       setUploadMsg(getStatusMessage(result.status))
       setTitle('')
       setDesc('')
-      setAgeRange('')
+      setAgeRange(DEFAULT_AGE_RANGE)
       setPedagogicalObjective('')
       setFile(null)
       await refresh()
@@ -375,7 +385,7 @@ export default function MaterialsScreen() {
             className="text-[11px] border border-border rounded-app-sm px-2 py-1 bg-white text-muted outline-none"
           >
             <option value="all">Faixa etaria</option>
-            {AGE_RANGES.map((range) => (
+            {ageOptions.map((range) => (
               <option key={range} value={range}>{range}</option>
             ))}
           </select>
@@ -465,16 +475,7 @@ export default function MaterialsScreen() {
 
               <label className="block">
                 <span className="block text-[11px] font-bold text-muted mb-1">Faixa etária</span>
-                <select
-                  value={ageRange}
-                  onChange={(e) => setAgeRange(e.target.value)}
-                  className="w-full rounded-app-sm border border-border bg-white px-3 py-3 text-[13px] outline-none focus:border-gp"
-                >
-                  <option value="">Não informar</option>
-                  {AGE_RANGES.map((range) => (
-                    <option key={range} value={range}>{range}</option>
-                  ))}
-                </select>
+                <AgeRangeSelector value={ageRange} onChange={setAgeRange} />
               </label>
 
               <label className="block">
