@@ -5,6 +5,7 @@ import {
   Flag,
   Heart,
   ImageIcon,
+  Download,
   Loader2,
   Plus,
   RefreshCw,
@@ -379,7 +380,7 @@ export default function MaterialsScreen() {
 
           <div
             className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-[18px] pb-8"
-            style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+            style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(9rem + env(safe-area-inset-bottom, 0px))' }}
           >
             <div className="py-4 flex flex-col gap-4">
               <label className="block">
@@ -513,7 +514,7 @@ export default function MaterialsScreen() {
 
           <div
             className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-[18px] pb-8"
-            style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+            style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(9rem + env(safe-area-inset-bottom, 0px))' }}
           >
             <div className="py-4 flex flex-col gap-4">
               {getKindFromMaterial(preview) === 'image' && preview.downloadUrl && (
@@ -577,16 +578,27 @@ export default function MaterialsScreen() {
 
               <div className="flex gap-2">
                 {preview.downloadUrl && (
-                  <a
-                    href={preview.downloadUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => void handleDownload(preview)}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-app-sm border border-gp bg-gbg py-3 text-[13px] font-bold text-gd"
-                  >
-                    <ExternalLink size={15} />
-                    Visualizar arquivo
-                  </a>
+                  <>
+                    <a
+                      href={preview.downloadUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => void handleDownload(preview)}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-app-sm border border-gp bg-gbg py-3 text-[13px] font-bold text-gd"
+                    >
+                      <ExternalLink size={15} />
+                      Visualizar
+                    </a>
+                    <a
+                      href={preview.downloadUrl}
+                      download={preview.file_name ?? preview.title}
+                      onClick={() => void handleDownload(preview)}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-app-sm bg-gd py-3 text-[13px] font-bold text-white"
+                    >
+                      <Download size={15} />
+                      Baixar
+                    </a>
+                  </>
                 )}
                 {(preview.status === 'blocked' || preview.status === 'em_analise') &&
                   preview.author_id === userId && (
