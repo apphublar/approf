@@ -51,14 +51,39 @@ export async function analyzeAndUploadMaterial(input: {
   description: string
   file: File
 }): Promise<MaterialAnalysisResult> {
-  const form = new FormData()
-  form.append('title', input.title)
-  form.append('description', input.description)
-  form.append('file', input.file, input.file.name)
-
-  const payload = await callMaterialsApi<Partial<MaterialAnalysisResult>>('/api/materials/analyze-upload', {
+  const upload = await callMaterialsApi<{ bucket: string; path: string; token: string }>('/api/materials/upload-url', {
     method: 'POST',
-    body: form,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fileName: input.file.name,
+      fileType: input.file.type,
+      fileSize: input.file.size,
+    }),
+  })
+
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
+
+  const { error: uploadError } = await supabase
+    .storage
+    .from(upload.bucket)
+    .uploadToSignedUrl(upload.path, upload.token, input.file, {
+      contentType: input.file.type || 'application/octet-stream',
+      upsert: true,
+    })
+  if (uploadError) throw uploadError
+
+  const payload = await callMaterialsApi<Partial<MaterialAnalysisResult>>('/api/materials/analyze-stored', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: input.title,
+      description: input.description,
+      fileName: input.file.name,
+      fileType: input.file.type,
+      fileSize: input.file.size,
+      filePath: upload.path,
+    }),
   })
 
   if (!payload.status || !payload.review) {
