@@ -6,10 +6,11 @@ export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: MATERIALS_CORS_HEADERS })
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
-    const materialId = params.id?.trim()
+    const { id } = await params
+    const materialId = id?.trim()
 
     if (!materialId) return jsonError('ID do material nao informado.', 400)
 
