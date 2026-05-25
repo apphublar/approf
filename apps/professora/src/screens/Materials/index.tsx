@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ExternalLink, FileText, ImageIcon, Loader2, RefreshCw, UploadCloud, XCircle } from 'lucide-react'
+import { CheckCircle2, ExternalLink, FileText, ImageIcon, Loader2, RefreshCw, Trash2, UploadCloud, XCircle } from 'lucide-react'
 import {
   analyzeAndUploadMaterial,
+  deleteMaterial,
   listSupportMaterials,
   type MaterialAnalysisResult,
   type MaterialUploadStatus,
@@ -301,7 +302,14 @@ export default function MaterialsScreen() {
 
           <div className="mt-3 flex flex-col gap-3">
             {materials.length ? materials.map((material) => (
-              <MaterialCard key={material.id} material={material} />
+              <MaterialCard
+                key={material.id}
+                material={material}
+                onDelete={async () => {
+                  await deleteMaterial(material.id)
+                  await refreshMaterials()
+                }}
+              />
             )) : (
               <p className="rounded-app-sm border border-border bg-cream px-3 py-3 text-[12px] text-muted">
                 Nenhum material enviado ainda.
@@ -335,21 +343,36 @@ function MaterialPreview({ file, previewUrl, kind }: { file: File; previewUrl: s
   )
 }
 
-function MaterialCard({ material }: { material: SupportMaterial }) {
+function MaterialCard({ material, onDelete }: { material: SupportMaterial; onDelete: () => Promise<void> }) {
+  const [deleting, setDeleting] = useState(false)
   const kind = getMaterialKindFromType(material.file_type, material.file_name)
+  const isDeletable = material.status === 'blocked' || material.status === 'em_analise'
+
+  async function handleDelete() {
+    if (!window.confirm('Excluir este material? O arquivo será removido permanentemente.')) return
+    setDeleting(true)
+    try {
+      await onDelete()
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="rounded-app-sm border border-border bg-cream p-3">
       <div className="flex items-start gap-3">
         <MaterialIcon kind={kind} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-[13px] font-bold text-ink">{material.title}</p>
-            <span className={`rounded-full px-2 py-1 text-[9px] font-bold ${getStatusClass(material.status ?? 'published')}`}>
+            <p className="break-words text-[13px] font-bold text-ink leading-[1.35]">{material.title}</p>
+            <span className={`ml-1 shrink-0 rounded-full px-2 py-1 text-[9px] font-bold ${getStatusClass(material.status ?? 'published')}`}>
               {formatStatus(material.status ?? 'published')}
             </span>
           </div>
-          {material.description && <p className="mt-1 text-[11px] leading-[1.45] text-muted">{material.description}</p>}
-          <p className="mt-2 text-[10px] text-muted">
+          {material.description && (
+            <p className="mt-1 break-words text-[11px] leading-[1.45] text-muted">{material.description}</p>
+          )}
+          <p className="mt-2 break-all text-[10px] text-muted">
             {material.file_name ?? 'Material gerado'}{material.file_size_bytes ? ` • ${formatFileSize(material.file_size_bytes)}` : ''}
           </p>
         </div>
@@ -365,17 +388,30 @@ function MaterialCard({ material }: { material: SupportMaterial }) {
         </p>
       )}
 
-      {material.downloadUrl && (
-        <a
-          href={material.downloadUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-app-sm border border-gp bg-gbg py-2 text-[12px] font-bold text-gd"
-        >
-          <ExternalLink size={14} />
-          Visualizar arquivo
-        </a>
-      )}
+      <div className="mt-3 flex gap-2">
+        {material.downloadUrl && (
+          <a
+            href={material.downloadUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex flex-1 items-center justify-center gap-2 rounded-app-sm border border-gp bg-gbg py-2 text-[12px] font-bold text-gd"
+          >
+            <ExternalLink size={14} />
+            Visualizar arquivo
+          </a>
+        )}
+        {isDeletable && (
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            disabled={deleting}
+            className="flex items-center justify-center gap-1.5 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-bold text-red-700 disabled:opacity-50"
+          >
+            {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+            Excluir
+          </button>
+        )}
+      </div>
     </div>
   )
 }

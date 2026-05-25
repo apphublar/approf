@@ -264,6 +264,10 @@ export async function listSupportMaterials(): Promise<SupportMaterial[]> {
   return Array.isArray(payload.materials) ? payload.materials : []
 }
 
+export async function deleteMaterial(id: string): Promise<void> {
+  await callMaterialsApi<{ ok: boolean }>(`/api/materials/${id}`, { method: 'DELETE' })
+}
+
 export async function previewGeneratedMaterialShare(input: {
   reportId: string
   title?: string
