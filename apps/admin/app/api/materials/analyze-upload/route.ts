@@ -6,6 +6,8 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
+const MAX_MATERIAL_SIZE_MB = 4
+const MAX_MATERIAL_SIZE_BYTES = MAX_MATERIAL_SIZE_MB * 1024 * 1024
 
 const MATERIAL_REVIEW_SCHEMA = {
   type: 'object',
@@ -72,8 +74,8 @@ export async function POST(request: Request) {
         { status: 400, headers: CORS_HEADERS },
       )
     }
-    if (file.size > 25 * 1024 * 1024) {
-      return NextResponse.json({ error: 'O arquivo deve ter no máximo 25 MB.' }, { status: 400, headers: CORS_HEADERS })
+    if (file.size > MAX_MATERIAL_SIZE_BYTES) {
+      return NextResponse.json({ error: `O arquivo deve ter no maximo ${MAX_MATERIAL_SIZE_MB} MB.` }, { status: 400, headers: CORS_HEADERS })
     }
 
     const supabase = createSupabaseServiceClient()
@@ -319,7 +321,7 @@ function buildMaterialReviewPrompt(title: string, description: string, file: Fil
     `Tamanho: ${file.size} bytes`,
     '',
     'Conteúdo extraído do arquivo:',
-    extractedText || '[Conteúdo textual não extraído automaticamente. Se houver imagem anexada, faça OCR visual. Para áudio/vídeo, avalie metadados e seja conservador na confiança.]',
+    extractedText || '[Conteudo textual nao extraido automaticamente. Se houver imagem anexada, faca OCR visual. Audio e video nao sao formatos permitidos.]',
     '',
     'Critérios obrigatórios:',
     '- relação com educação infantil;',

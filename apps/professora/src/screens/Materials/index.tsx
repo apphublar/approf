@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { FileText, ImageIcon, Loader2, UploadCloud } from 'lucide-react'
 import { analyzeAndUploadMaterial, type MaterialAnalysisResult } from '@/services/materials'
 
@@ -15,6 +15,8 @@ const ACCEPTED_MATERIALS = [
   'image/png',
   'image/webp',
 ].join(',')
+const MAX_MATERIAL_SIZE_MB = 4
+const MAX_MATERIAL_SIZE_BYTES = MAX_MATERIAL_SIZE_MB * 1024 * 1024
 
 export default function MaterialsScreen() {
   const [title, setTitle] = useState('')
@@ -45,12 +47,19 @@ export default function MaterialsScreen() {
       setMessage('Apenas documentos e imagens são permitidos em materiais de apoio.')
       return
     }
+    if (nextFile && nextFile.size > MAX_MATERIAL_SIZE_BYTES) {
+      setFile(null)
+      setAnalysis(null)
+      setMessage(`O arquivo precisa ter ate ${MAX_MATERIAL_SIZE_MB} MB.`)
+      return
+    }
     setFile(nextFile ?? null)
     setAnalysis(null)
     setMessage('')
   }
 
-  async function submitMaterial() {
+  async function submitMaterial(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
     if (!file || !canSubmit) return
 
     setSubmitting(true)
@@ -84,7 +93,7 @@ export default function MaterialsScreen() {
       </div>
 
       <div className="scroll-area px-[18px] pb-8">
-        <div className="bg-white rounded-app p-4 border border-border shadow-card mt-[14px]">
+        <form onSubmit={(event) => void submitMaterial(event)} className="bg-white rounded-app p-4 border border-border shadow-card mt-[14px]">
           <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Novo material</p>
 
           <label className="block mb-3">
@@ -93,7 +102,7 @@ export default function MaterialsScreen() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               className="w-full rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none focus:border-gp"
-              placeholder="Ex: Música para roda de acolhimento"
+              placeholder="Ex: Sequencia didatica sobre cores e formas"
             />
           </label>
 
@@ -129,7 +138,7 @@ export default function MaterialsScreen() {
                   <p className="truncate text-[13px] font-bold text-ink">{file.name}</p>
                   <p className="text-[11px] text-muted">{formatFileSize(file.size)}</p>
                 </div>
-                <button onClick={() => selectFile(null)} className="text-[11px] font-bold text-[#C1440E]">
+                <button type="button" onClick={() => selectFile(null)} className="text-[11px] font-bold text-[#C1440E]">
                   remover
                 </button>
               </div>
@@ -160,14 +169,14 @@ export default function MaterialsScreen() {
           )}
 
           <button
-            onClick={() => void submitMaterial()}
+            type="submit"
             disabled={!canSubmit}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-app bg-gd py-4 text-[15px] font-bold text-white disabled:opacity-50"
           >
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
             {submitting ? 'Analisando com IA...' : 'Analisar e enviar'}
           </button>
-        </div>
+        </form>
 
         <div className="mt-4 rounded-app border border-border bg-white p-4 shadow-card">
           <p className="text-[13px] font-bold text-ink">Publicação protegida</p>
