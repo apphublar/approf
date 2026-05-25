@@ -100,14 +100,14 @@ export async function POST(request: Request) {
 
     if (error instanceof AiAuthError) {
       return NextResponse.json(
-        { error: 'Sessao expirada. Entre novamente para continuar.' },
+        { error: 'Sessão expirada. Entre novamente para continuar.' },
         { status: error.status, headers: CORS_HEADERS },
       )
     }
 
     console.error('[ai/chat] erro interno', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Nao foi possivel responder no chat agora.' },
+      { error: error instanceof Error ? error.message : 'Não foi possível responder no chat agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }
@@ -153,7 +153,7 @@ function buildPricingEstimate(provider: ChatProvider, messages: ChatMessage[]) {
 
 async function requestOpenAiChat(messages: ChatMessage[]) {
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('Servico GPT indisponivel no momento.')
+  if (!apiKey) throw new Error('Serviço GPT indisponível no momento.')
   const model = resolveOpenAiChatModel()
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -165,7 +165,7 @@ async function requestOpenAiChat(messages: ChatMessage[]) {
       model,
       temperature: 0.5,
       messages: [
-        { role: 'system', content: 'Voce e um assistente util, claro e cordial. Responda em portugues brasileiro.' },
+        { role: 'system', content: 'Você e um assistente útil, claro e cordial. Responda em português brasileiro.' },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
     }),
@@ -177,11 +177,11 @@ async function requestOpenAiChat(messages: ChatMessage[]) {
   } | null
 
   if (!response.ok) {
-    throw new Error(payload?.error?.message || 'Nao foi possivel responder com GPT agora.')
+    throw new Error(payload?.error?.message || 'Não foi possível responder com GPT agora.')
   }
 
   const text = payload?.choices?.[0]?.message?.content?.trim()
-  if (!text) throw new Error('O GPT nao retornou resposta suficiente.')
+  if (!text) throw new Error('O GPT não retornou resposta suficiente.')
   const inputTokens = payload?.usage?.prompt_tokens ?? 0
   const outputTokens = payload?.usage?.completion_tokens ?? 0
   return {
@@ -195,7 +195,7 @@ async function requestOpenAiChat(messages: ChatMessage[]) {
 
 async function requestAnthropicChat(messages: ChatMessage[]) {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('Servico Claude indisponivel no momento.')
+  if (!apiKey) throw new Error('Serviço Claude indisponível no momento.')
   const model = resolveAnthropicChatModel()
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -208,7 +208,7 @@ async function requestAnthropicChat(messages: ChatMessage[]) {
       model,
       max_tokens: 900,
       temperature: 0.5,
-      system: 'Voce e um assistente util, claro e cordial. Responda em portugues brasileiro.',
+      system: 'Você e um assistente útil, claro e cordial. Responda em português brasileiro.',
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     }),
   })
@@ -219,7 +219,7 @@ async function requestAnthropicChat(messages: ChatMessage[]) {
   } | null
 
   if (!response.ok) {
-    throw new Error(payload?.error?.message || 'Nao foi possivel responder com Claude agora.')
+    throw new Error(payload?.error?.message || 'Não foi possível responder com Claude agora.')
   }
 
   const text = payload?.content
@@ -227,7 +227,7 @@ async function requestAnthropicChat(messages: ChatMessage[]) {
     .map((item) => item.text ?? '')
     .join('\n')
     .trim()
-  if (!text) throw new Error('O Claude nao retornou resposta suficiente.')
+  if (!text) throw new Error('O Claude não retornou resposta suficiente.')
   const inputTokens = payload?.usage?.input_tokens ?? 0
   const outputTokens = payload?.usage?.output_tokens ?? 0
   return {

@@ -383,7 +383,7 @@ export default function HomeScreen() {
                         modelId: 'observacao',
                         classId: item.classId,
                         studentId: item.studentId,
-                        text: `Observacao de acompanhamento para ${item.studentName} (${item.className}): `,
+                        text: `Observação de acompanhamento para ${item.studentName} (${item.className}): `,
                       },
                     })}
                     className="w-full rounded-app-sm border border-border bg-cream px-3 py-3 text-left active:scale-[.98] transition-transform"

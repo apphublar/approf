@@ -2,17 +2,17 @@
 
 ## Objetivo
 
-O Telegram sera usado como canal auxiliar, nao como fonte principal de dados sensiveis.
+O Telegram sera usado como canal auxiliar, nao como fonte principal de dados sensíveis.
 
 Usos previstos:
 
-- Avisar que um relatorio ficou pronto.
+- Avisar que um relatório ficou pronto.
 - Lembrar trial vencendo.
 - Alertar sobre pagamento/manual pendente.
 - Enviar lembretes leves de rotina.
 - Enviar alertas internos para o Super Admin.
 
-## Ja previsto no schema
+## Já previsto no schema
 
 - `telegram_accounts`
 - `notification_events`
@@ -29,8 +29,8 @@ Usos previstos:
 3. Criar webhook server-side.
 4. Vincular `telegram_chat_id` ao usuario autenticado.
 5. Criar opt-out.
-6. Garantir que mensagens nao exponham dados completos de criancas.
+6. Garantir que mensagens nao exponham dados completos de crianças.
 
-## Regra de seguranca
+## Regra de segurança
 
-Enviar apenas notificacoes resumidas. Para ver dados sensiveis, a professora deve abrir o app autenticado.
+Enviar apenas notificacoes resumidas. Para ver dados sensíveis, a professora deve abrir o app autenticado.

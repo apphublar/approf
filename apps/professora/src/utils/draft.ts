@@ -12,7 +12,7 @@ export function saveDraft<T>(key: string, value: T) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value))
   } catch {
-    // Ignore storage quota or private mode errors.
+    // Ignore storage quota or privaté mode errors.
   }
 }
 

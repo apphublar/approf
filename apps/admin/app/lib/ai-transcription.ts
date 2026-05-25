@@ -25,12 +25,12 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<Tran
   }
 
   if (input.audio.size > MAX_AUDIO_BYTES) {
-    throw new PublicAiGenerationError('O audio ficou muito grande. Grave novamente com ate 30 segundos.')
+    throw new PublicAiGenerationError('O audio ficou muito grande. Grave novamente com até 30 segundos.')
   }
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new PublicAiGenerationError('Servico de transcricao indisponivel no momento. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Servico de transcricao indisponível no momento. Tente novamente em instantes.')
   }
 
   const model = process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || DEFAULT_TRANSCRIPTION_MODEL
@@ -89,11 +89,11 @@ function hasSupportedAudioExtension(name: string) {
 }
 
 function getAudioFilename(mimeType: string) {
-  if (mimeType.includes('mp4')) return 'anotacao.mp4'
-  if (mimeType.includes('mpeg')) return 'anotacao.mp3'
-  if (mimeType.includes('wav')) return 'anotacao.wav'
-  if (mimeType.includes('ogg')) return 'anotacao.ogg'
-  return 'anotacao.webm'
+  if (mimeType.includes('mp4')) return 'anotação.mp4'
+  if (mimeType.includes('mpeg')) return 'anotação.mp3'
+  if (mimeType.includes('wav')) return 'anotação.wav'
+  if (mimeType.includes('ogg')) return 'anotação.ogg'
+  return 'anotação.webm'
 }
 
 function getPublicOpenAiErrorMessage(status: number, message?: string) {
@@ -102,7 +102,7 @@ function getPublicOpenAiErrorMessage(status: number, message?: string) {
     return 'A chave da OpenAI no servidor nao autorizou a transcricao. Verifique a OPENAI_API_KEY na Vercel.'
   }
   if (status === 404 || normalized.includes('model')) {
-    return 'O modelo de transcricao configurado nao esta disponivel nesta conta da OpenAI. Verifique OPENAI_TRANSCRIPTION_MODEL.'
+    return 'O modelo de transcricao configurado não está disponível nesta conta da OpenAI. Verifique OPENAI_TRANSCRIPTION_MODEL.'
   }
   if (normalized.includes('format') || normalized.includes('file') || normalized.includes('audio')) {
     return 'A OpenAI nao aceitou o formato do audio. Grave novamente e tente transcrever outra vez.'
@@ -110,7 +110,7 @@ function getPublicOpenAiErrorMessage(status: number, message?: string) {
   if (status === 429) {
     return 'A OpenAI recusou a transcricao por limite de uso. Tente novamente em instantes.'
   }
-  return 'Nao foi possivel transcrever o audio agora. Tente novamente em instantes.'
+  return 'Não foi possível transcrever o áudio agora. Tente novamente em instantes.'
 }
 
 export function estimateTranscriptionCostCents(durationSeconds: number) {

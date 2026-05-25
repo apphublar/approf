@@ -26,7 +26,7 @@ interface GeneratePedagogicalTextInput {
 /** Metadados de uma etapa do pipeline (persistidos em ai_generation_logs.result_summary). */
 export interface PipelineStageMetadata {
   stage: 1 | 2 | 3
-  etapa: 'rascunho_pedagogico' | 'revisao_bncc_seguranca' | 'humanizacao_final'
+  etapa: 'rascunho_pedagogico' | 'revisão_bncc_segurança' | 'humanizacao_final'
   provider: string
   model: string
   promptVersion: string
@@ -240,7 +240,7 @@ export async function generatePedagogicalText(
 
     const pipelineStages: PipelineStageMetadata[] = [
       toStageMeta(input.promptVersion, 1, 'rascunho_pedagogico', s1),
-      toStageMeta(input.promptVersion, 2, 'revisao_bncc_seguranca', s2),
+      toStageMeta(input.promptVersion, 2, 'revisão_bncc_segurança', s2),
       toStageMeta(input.promptVersion, 3, 'humanizacao_final', s3),
     ]
 
@@ -402,7 +402,7 @@ async function ensureRequiredStructure(input: {
       ...validation.missing.map((item) => `- ${item}`),
       '',
       'INSTRUCAO:',
-      'Reorganize o texto e garanta que todas as secoes exigidas aparecam com titulos claros.',
+      'Reorganize o texto e garanta que todas as secoes exigidas aparecam com títulos claros.',
     ].join('\n'),
     {
       model: input.model,
@@ -462,12 +462,12 @@ function buildStructureRepairSystemPrompt(generationType: AiGenerationType) {
   if (generationType === 'specialist_referral' || generationType === 'specialist_report') {
     return [
       'Você revisa encaminhamentos para especialistas.',
-      'Use apenas fatos observáveis, estratégias já aplicadas e solicitação final, sem diagnóstico.',
+      'Use apenas fatos observáveis, estrategias já aplicadas e solicitação final, sem diagnóstico.',
       'Retorne APENAS o documento final.',
     ].join('\n')
   }
 
-  if (generationType === 'weekly_planning' || generationType === 'daily_lesson_plan' || generationType === 'planning' || generationType === 'pedagogical_project') {
+  if (generationType === 'weekly_planning' || generationType === 'daily_lesson_plan' || generationType === 'planning' || generationType === 'pedagógical_project') {
     return [
       'Você revisa planejamentos pedagógicos práticos para Educação Infantil.',
       'Organize o texto com títulos claros para cada seção obrigatória, sem texto acadêmico longo.',
@@ -543,22 +543,22 @@ async function ensureDocumentQuality(input: {
 function validateRequiredStructure(generationType: AiGenerationType, reportKind: string | undefined, text: string) {
   if (generationType === 'weekly_planning' || generationType === 'daily_lesson_plan' || generationType === 'planning') {
     const missing = [
-      !hasAnyHeading(text, ['tema', 'titulo']) && 'Tema/Titulo',
+      !hasAnyHeading(text, ['tema', 'título']) && 'Tema/Título',
       !hasAnyHeading(text, ['objetivo']) && 'Objetivo',
       !hasAnyHeading(text, ['atividade', 'desenvolvimento', 'passo a passo']) && 'Atividade/Desenvolvimento',
       !hasAnyHeading(text, ['materiais']) && 'Materiais necessarios',
       !hasAnyHeading(text, ['duracao', 'tempo estimado']) && 'Duracao/Tempo estimado',
-      !hasAnyHeading(text, ['observacoes', 'avaliação']) && 'Observacoes/Avaliação',
+      !hasAnyHeading(text, ['observações', 'avaliação']) && 'Observações/Avaliação',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
   }
 
-  if (generationType === 'pedagogical_project') {
+  if (generationType === 'pedagógical_project') {
     const missing = [
       !hasAnyHeading(text, ['justificativa']) && 'Justificativa',
       !hasAnyHeading(text, ['objetivo']) && 'Objetivos',
       !hasAnyHeading(text, ['etapas', 'desenvolvimento']) && 'Etapas/Desenvolvimento',
-      !hasAnyHeading(text, ['avaliacao', 'acompanhamento']) && 'Avaliação/Acompanhamento',
+      !hasAnyHeading(text, ['avaliação', 'acompanhamento']) && 'Avaliação/Acompanhamento',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
   }
@@ -567,9 +567,9 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
     const missing = [
       !hasAnyHeading(text, ['abertura']) && 'Abertura',
       !hasAnyHeading(text, ['pauta']) && 'Pauta',
-      !hasAnyHeading(text, ['informacoes gerais', 'informações gerais', 'turma']) && 'Informações gerais da turma',
+      !hasAnyHeading(text, ['informações gerais', 'informações gerais', 'turma']) && 'Informações gerais da turma',
       !hasAnyHeading(text, ['combinados']) && 'Combinados',
-      !hasAnyHeading(text, ['anotacoes', 'anotações']) && 'Espaço para anotações',
+      !hasAnyHeading(text, ['anotações', 'anotações']) && 'Espaço para anotações',
       !hasAnyHeading(text, ['encerramento']) && 'Encerramento',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
@@ -578,9 +578,9 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
   if (generationType === 'specialist_referral' || generationType === 'specialist_report') {
     const missing = [
       !hasAnyHeading(text, ['motivo', 'encaminhamento']) && 'Motivo do encaminhamento',
-      !hasAnyHeading(text, ['observacoes', 'comportamentos']) && 'Observações/Comportamentos observáveis',
-      !hasAnyHeading(text, ['estrategias', 'apoio']) && 'Estratégias já aplicadas',
-      !hasAnyHeading(text, ['encaminhamentos finais', 'solicitacao']) && 'Encaminhamento final',
+      !hasAnyHeading(text, ['observações', 'comportamentos']) && 'Observações/Comportamentos observáveis',
+      !hasAnyHeading(text, ['estrategias', 'apoio']) && 'Estrategias já aplicadas',
+      !hasAnyHeading(text, ['encaminhamentos finais', 'solicitação']) && 'Encaminhamento final',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
   }
@@ -592,11 +592,11 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
   if (isDevelopmentLike) {
     const missing = [
       !hasAnyHeading(text, ['informações basicas', 'identificacao']) && 'Informações basicas',
-      !hasAnyHeading(text, ['descricao geral', 'adaptacao']) && 'Descricao geral e adaptacao',
+      !hasAnyHeading(text, ['descrição geral', 'adaptacao']) && 'Descrição geral e adaptacao',
       !hasAnyHeading(text, ['campos de experiencia']) && 'Desenvolvimento nos campos de experiencia',
       !hasAnyHeading(text, ['conquistas']) && 'Conquistas',
-      !hasAnyHeading(text, ['pontos de atencao', 'apoio', 'acompanhamento']) && 'Pontos de atencao',
-      !hasAnyHeading(text, ['observacoes finais', 'observacoes']) && 'Observacoes finais',
+      !hasAnyHeading(text, ['pontos de atenção', 'apoio', 'acompanhamento']) && 'Pontos de atenção',
+      !hasAnyHeading(text, ['observações finais', 'observações']) && 'Observações finais',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
   }
@@ -610,7 +610,7 @@ function validateDocumentQuality(generationType: AiGenerationType, text: string)
   const words = text.trim().split(/\s+/).filter(Boolean).length
 
   const forbidden = [
-    'diagnostico',
+    'diagnóstico',
     'transtorno',
     'deficit',
     'laudo',
@@ -638,7 +638,7 @@ function validateDocumentQuality(generationType: AiGenerationType, text: string)
   }
 
   if ((generationType === 'specialist_referral' || generationType === 'specialist_report') && words > 650) {
-    issues.push('Reduzir o encaminhamento para especialista, mantendo apenas fatos observáveis, estratégias e solicitação.')
+    issues.push('Reduzir o encaminhamento para especialista, mantendo apenas fatos observáveis, estrategias e solicitação.')
   }
 
   if (generationType === 'daily_lesson_plan' && words > 700) {
@@ -653,7 +653,7 @@ function validateDocumentQuality(generationType: AiGenerationType, text: string)
     issues.push('Reduzir o relatório de desenvolvimento para tamanho médio, preservando avanços e pontos de continuidade.')
   }
 
-  if (generationType === 'pedagogical_project' && words > 1100) {
+  if (generationType === 'pedagógical_project' && words > 1100) {
     issues.push('Reduzir o projeto pedagógico para estrutura objetiva, sem texto acadêmico extenso.')
   }
 
@@ -772,7 +772,7 @@ interface RequestOpenAiHumanizationOptions {
 async function requestClaudeText(system: string, user: string, options: RequestClaudeOptions) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    throw new PublicAiGenerationError('Servico de IA indisponivel no momento. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Serviço de IA indisponível no momento. Tente novamente em instantes.')
   }
 
   for (const model of resolveClaudeModelAttempts(options.model)) {
@@ -813,7 +813,7 @@ async function requestClaudeText(system: string, user: string, options: RequestC
       .trim()
 
     if (!text) {
-      throw new PublicAiGenerationError('A IA não retornou conteudo suficiente. Ajuste o contexto e tente novamente.')
+      throw new PublicAiGenerationError('A IA não retornou conteúdo suficiente. Ajuste o contexto e tente novamente.')
     }
 
     const inputTokens = payload?.usage?.input_tokens ?? 0
@@ -865,7 +865,7 @@ function sanitizeInternalLogError(error: unknown) {
 async function requestOpenAiInterventionText(options: RequestOpenAiInterventionOptions) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new PublicAiGenerationError('Servico de IA indisponivel no momento. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Serviço de IA indisponível no momento. Tente novamente em instantes.')
   }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -908,7 +908,7 @@ async function requestOpenAiInterventionText(options: RequestOpenAiInterventionO
 
   const text = payload?.choices?.[0]?.message?.content?.trim()
   if (!text) {
-    throw new PublicAiGenerationError('A IA não retornou conteudo suficiente para intervenções.')
+    throw new PublicAiGenerationError('A IA não retornou conteúdo suficiente para intervenções.')
   }
 
   const inputTokens = payload?.usage?.prompt_tokens ?? 0
@@ -927,7 +927,7 @@ async function requestOpenAiInterventionText(options: RequestOpenAiInterventionO
 async function requestOpenAiHumanizationText(options: RequestOpenAiHumanizationOptions) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new PublicAiGenerationError('Servico de IA indisponivel no momento. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Serviço de IA indisponível no momento. Tente novamente em instantes.')
   }
 
   const requestPayload: {
@@ -971,7 +971,7 @@ async function requestOpenAiHumanizationText(options: RequestOpenAiHumanizationO
 
   const text = payload?.choices?.[0]?.message?.content?.trim()
   if (!text) {
-    throw new PublicAiGenerationError('A IA não retornou conteudo suficiente para humanização final.')
+    throw new PublicAiGenerationError('A IA não retornou conteúdo suficiente para humanização final.')
   }
 
   const inputTokens = payload?.usage?.prompt_tokens ?? 0
@@ -994,13 +994,13 @@ function buildFinalHumanizationPrompt(input: BuildPromptInput, reviewedText: str
   return {
     system: [
       'Você é uma professora experiente da educação infantil revisando um documento pedagógico já estruturado.',
-      'Sua função NÃO é reescrever completamente o texto.',
+      'Sua função NÁO é reescrever completamente o texto.',
       'Sua função é humanizar, simplificar, melhorar fluidez, deixar mais natural, acolhedor e objetivo.',
       'Preserve acontecimentos reais, nomes importantes e observações da professora.',
       'Reduza tom acadêmico, formalidade excessiva, frases robóticas e floreios desnecessários.',
       'Não invente informações, não remova fatos relevantes e não adicione BNCC sem necessidade.',
       'Mantenha a estrutura geral e os títulos do documento sempre que possível.',
-      'Se o texto já estiver enxuto, mantenha tamanho parecido ou levemente menor.',
+      'Se o texto já estiver enxuto, mantenhá tamanho parecido ou levemente menor.',
       'Entregue APENAS o texto final humanizado, sem comentários meta.',
     ].join('\n'),
     user: [
@@ -1050,7 +1050,7 @@ function buildPromptInputFromSummary(
     duration: asString(summary.duration),
     justification: asString(summary.justification),
     methodology: asString(summary.methodology),
-    assessment: asStringArray(summary.assessment) ?? asStringArray(summary.avaliacaoRegistro),
+    assessment: asStringArray(summary.assessment) ?? asStringArray(summary.avaliaçãoRegistro),
     finalConsiderations: asString(summary.finalConsiderations),
     selectedMilestones: asObjectArray(summary.selectedMilestones) as BuildPromptInput['selectedMilestones'],
     includeDayAnnotations: asBoolean(summary.includeDayAnnotations),
@@ -1088,20 +1088,20 @@ function resolveLegacyGenerationType(
   if (generationType === 'classroom_journal') return 'class_diary'
   if (generationType === 'planning_daily') return 'daily_lesson_plan'
   if (generationType === 'planning_weekly') return 'weekly_planning'
-  if (generationType === 'planning_project') return 'pedagogical_project'
+  if (generationType === 'planning_project') return 'pedagógical_project'
   if (generationType === 'planning_meeting') return 'parents_meeting_record'
   if (generationType === 'parents_meeting') return 'parents_meeting_record'
 
   if (generationType === 'planning') {
     if (normalizedDocKind.includes('plano de aula')) return 'daily_lesson_plan'
-    if (normalizedDocKind.includes('projeto pedagogico')) return 'pedagogical_project'
+    if (normalizedDocKind.includes('projeto pedagogico')) return 'pedagógical_project'
     return 'weekly_planning'
   }
 
   if (generationType === 'specialist_report') return 'specialist_referral'
   if (generationType === 'general_report') {
     if (normalizedReportKind.includes('diario de bordo')) return 'class_diary'
-    if (normalizedReportKind.includes('reuniao de pais')) return 'parents_meeting_record'
+    if (normalizedReportKind.includes('reunião de pais')) return 'parents_meeting_record'
     if (normalizedReportKind.includes('especialista') || normalizedReportKind.includes('encaminhamento')) return 'specialist_referral'
   }
 

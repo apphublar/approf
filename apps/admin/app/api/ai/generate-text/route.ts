@@ -27,7 +27,7 @@ const TEXT_GENERATION_TYPES = new Set<AiGenerationType>([
   'planning_daily',
   'daily_lesson_plan',
   'planning_project',
-  'pedagogical_project',
+  'pedagógical_project',
   'planning_meeting',
   'specialist_referral',
   'parents_meeting',
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         allowed: true,
-        message: reservation.message || 'Geracao concluida com sucesso.',
+        message: reservation.message || 'Geração concluida com sucesso.',
         chargeSource: reservation.chargeSource,
         wallet: reservation.wallet,
         entitlement: reservation.entitlement,
@@ -206,7 +206,7 @@ export async function POST(request: Request) {
         })
         await refundAiUsageReservation({
           logId,
-          reason: error instanceof Error ? error.message : 'Falha na geracao textual.',
+          reason: error instanceof Error ? error.message : 'Falha na geração textual.',
           reservedCostCentsOverride: reservedEstimatedCostCents,
         })
       } catch (refundError) {
@@ -220,7 +220,7 @@ export async function POST(request: Request) {
 
     if (error instanceof AiAuthError) {
       return NextResponse.json(
-        { error: 'Sessao expirada. Entre novamente para continuar.' },
+        { error: 'Sessão expirada. Entre novamente para continuar.' },
         { status: error.status, headers: CORS_HEADERS },
       )
     }
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
 
     const message = error instanceof Error && error.message.trim()
       ? error.message.trim()
-      : 'Nao foi possivel concluir a geracao agora. Tente novamente em instantes.'
+      : 'Não foi possível concluir a geração agora. Tente novamente em instantes.'
 
     return NextResponse.json(
       { error: message },
@@ -267,7 +267,7 @@ function parseGenerationType(value: unknown): AiGenerationType {
   if (typeof value === 'string' && TEXT_GENERATION_TYPES.has(value as AiGenerationType)) {
     return value as AiGenerationType
   }
-  throw new Error('Tipo de geracao textual invalido.')
+  throw new Error('Tipo de geração textual inválido.')
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {

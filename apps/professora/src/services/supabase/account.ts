@@ -106,7 +106,7 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
     verifications: TeacherVerificationRequest[]
   }>('/api/account', { method: 'GET' })
 
-  if (!response.profile?.id) throw new Error('Sessao nao encontrada.')
+  if (!response.profile?.id) throw new Error('Sessão não encontrada.')
   const snapshot: TeacherAccountSnapshot = {
     userId: response.profile.id,
     fullName: response.profile.full_name ?? 'Professora',
@@ -173,7 +173,7 @@ export async function updateTeacherPassword(input: {
   email: string
 }) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado.')
+  if (!supabase) throw new Error('Supabase não configurado.')
 
   if (!input.currentPassword.trim()) throw new Error('Informe a senha atual.')
   if (input.newPassword.trim().length < 8) {
@@ -187,7 +187,7 @@ export async function updateTeacherPassword(input: {
     email: input.email,
     password: input.currentPassword,
   })
-  if (signInError) throw new Error('Senha atual incorreta.')
+  if (signInError) throw new Error('Senhá atual incorreta.')
 
   const { error } = await supabase.auth.updateUser({ password: input.newPassword })
   if (error) throw error
@@ -195,12 +195,12 @@ export async function updateTeacherPassword(input: {
 
 export async function uploadTeacherAvatar(file: File) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado.')
+  if (!supabase) throw new Error('Supabase não configurado.')
 
   const { data: authData, error: authError } = await supabase.auth.getUser()
   if (authError) throw authError
   const userId = authData.user?.id
-  if (!userId) throw new Error('Sessao nao encontrada.')
+  if (!userId) throw new Error('Sessão não encontrada.')
 
   const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const path = `${userId}/avatar-${Date.now()}.${extension}`
@@ -209,7 +209,7 @@ export async function uploadTeacherAvatar(file: File) {
     upsert: true,
     contentType: file.type || 'image/jpeg',
   })
-  if (error) throw toError(error, 'Nao foi possivel enviar o avatar.')
+  if (error) throw toError(error, 'Não foi possível enviar o avatar.')
 
   const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path)
   return publicData.publicUrl
@@ -241,12 +241,12 @@ export async function uploadTeacherVerificationDocuments(files: File[]) {
 
 async function uploadTeacherVerificationDocumentsDirect(files: File[], originalError?: unknown) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado.')
+  if (!supabase) throw new Error('Supabase não configurado.')
 
   const { data: authData, error: authError } = await supabase.auth.getUser()
   if (authError) throw authError
   const userId = authData.user?.id
-  if (!userId) throw new Error('Sessao nao encontrada.')
+  if (!userId) throw new Error('Sessão não encontrada.')
 
   const uploaded: VerificationDocument[] = []
   for (const file of files) {
@@ -261,7 +261,7 @@ async function uploadTeacherVerificationDocumentsDirect(files: File[], originalE
     })
     if (error) {
       const cause = originalError instanceof Error ? ` (${originalError.message})` : ''
-      throw toError(error, `Nao foi possivel enviar o documento de verificacao.${cause}`)
+      throw toError(error, `Não foi possível enviar o documento de verificação.${cause}`)
     }
 
     uploaded.push({
@@ -308,16 +308,16 @@ export function onSubscriptionStateChange(listener: () => void) {
 async function callAccountApi<T = Record<string, unknown>>(path: string, init: RequestInit): Promise<T> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend administrativo nao configurado. Informe VITE_APPROF_ADMIN_API_URL.')
+    throw new Error('Backend administrativo não configurado. Informe VITE_APPROF_ADMIN_API_URL.')
   }
 
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado.')
+  if (!supabase) throw new Error('Supabase não configurado.')
 
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
   const token = data.session?.access_token
-  if (!token) throw new Error('Sessao expirada. Entre novamente.')
+  if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
@@ -341,16 +341,16 @@ async function callAccountApi<T = Record<string, unknown>>(path: string, init: R
 async function callAccountApiForm<T = Record<string, unknown>>(path: string, files: File[]): Promise<T> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend administrativo nao configurado. Informe VITE_APPROF_ADMIN_API_URL.')
+    throw new Error('Backend administrativo não configurado. Informe VITE_APPROF_ADMIN_API_URL.')
   }
 
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado.')
+  if (!supabase) throw new Error('Supabase não configurado.')
 
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
   const token = data.session?.access_token
-  if (!token) throw new Error('Sessao expirada. Entre novamente.')
+  if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
   const formData = new FormData()
   files.slice(0, 10).forEach((file) => formData.append('files', file))

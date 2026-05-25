@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
     const action = typeof body.action === 'string' ? body.action : ''
 
-    if (!materialId) return jsonError('ID do material nao informado.', 400)
+    if (!materialId) return jsonError('ID do material não informado.', 400)
 
     const supabase = createSupabaseServiceClient()
     const { data: material, error: materialError } = await supabase
@@ -24,12 +24,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .maybeSingle()
 
     if (materialError) throw new Error(materialError.message)
-    if (!material) return jsonError('Material nao encontrado.', 404)
+    if (!material) return jsonError('Material não encontrado.', 404)
 
     const canInteract = material.status === 'published'
       || material.submitted_by === ownerId
       || material.author_id === ownerId
-    if (!canInteract) return jsonError('Material indisponivel.', 403)
+    if (!canInteract) return jsonError('Material indisponível.', 403)
 
     if (action === 'view') {
       await incrementMaterialCounter(supabase, materialId, 'views_count')
@@ -65,7 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (action === 'rate') {
       const rating = Number(body.rating)
       const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 800) : ''
-      if (!Number.isInteger(rating) || rating < 1 || rating > 5) return jsonError('Informe uma avaliacao de 1 a 5 estrelas.', 400)
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) return jsonError('Informe uma avaliação de 1 a 5 estrelas.', 400)
       const { error } = await supabase
         .from('material_ratings')
         .upsert(
@@ -94,11 +94,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ ok: true, reportsCount }, { status: 200, headers: MATERIALS_CORS_HEADERS })
     }
 
-    return jsonError('Acao invalida.', 400)
+    return jsonError('Ação inválida.', 400)
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessao expirada. Entre novamente.', error.status)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', error.status)
     console.error('[materials/action] unhandled error', error instanceof Error ? error.message : error)
-    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel atualizar o material.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível atualizar o material.', 500)
   }
 }
 
@@ -108,7 +108,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const { id } = await params
     const materialId = id?.trim()
 
-    if (!materialId) return jsonError('ID do material nao informado.', 400)
+    if (!materialId) return jsonError('ID do material não informado.', 400)
 
     console.info('[materials/delete] request received', { ownerId, materialId })
 
@@ -125,7 +125,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       console.error('[materials/delete] fetch error', fetchError.message)
       throw new Error(fetchError.message)
     }
-    if (!material) return jsonError('Material nao encontrado.', 404)
+    if (!material) return jsonError('Material não encontrado.', 404)
 
     const isOwner = material.submitted_by === ownerId || material.author_id === ownerId
     if (!isOwner) {
@@ -160,9 +160,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     console.info('[materials/delete] material deleted successfully', { materialId })
     return NextResponse.json({ ok: true }, { status: 200, headers: MATERIALS_CORS_HEADERS })
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessao expirada. Entre novamente.', error.status)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', error.status)
     console.error('[materials/delete] unhandled error', error instanceof Error ? error.message : error)
-    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel excluir o material.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível excluir o material.', 500)
   }
 }
 

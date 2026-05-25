@@ -329,6 +329,14 @@ a {
   grid-template-columns: 1.5fr 1fr 0.5fr 0.7fr 0.6fr 0.7fr;
 }
 
+.admin-materials-grid {
+  grid-template-columns: minmax(260px, 1.7fr) minmax(150px, 0.75fr) minmax(140px, 0.7fr) minmax(150px, 0.7fr) minmax(190px, 0.8fr);
+}
+
+.reports-grid {
+  grid-template-columns: minmax(220px, 1fr) minmax(140px, 0.6fr) minmax(220px, 1fr) minmax(190px, 0.8fr);
+}
+
 .ai-grid {
   grid-template-columns: 1.3fr 0.7fr 0.7fr 0.7fr 0.7fr;
 }
@@ -404,6 +412,7 @@ a {
 }
 
 .badge-archived,
+.badge-blocked,
 .badge-canceled,
 .badge-failed {
   background: #ecefec;
@@ -423,6 +432,12 @@ a {
 .badge-rejected {
   background: var(--red-100);
   color: var(--red-700);
+}
+
+.badge-review-required,
+.badge-em-analise {
+  background: var(--amber-100);
+  color: var(--amber-700);
 }
 
 .privacy-panel svg {
@@ -594,6 +609,27 @@ a {
 
 .form-grid label:last-child {
   grid-column: 1 / -1;
+}
+
+.inline-form {
+  display: grid;
+  gap: 8px;
+}
+
+.inline-form select,
+.inline-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.inline-form textarea {
+  min-height: 64px;
+  resize: vertical;
 }
 
 .number-list {
@@ -797,7 +833,9 @@ a {
   .teachers-grid,
   .teachers-page-grid,
   .subscriptions-grid,
-  .materials-grid,
+    .materials-grid,
+    .admin-materials-grid,
+    .reports-grid,
   .ai-grid,
   .audit-grid,
   .notifications-grid {

@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       userAgent: request.headers.get('user-agent'),
     })
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
-    setDebug('auth', 'Usuario autenticado no backend', 'ok', { ownerId })
+    setDebug('auth', 'Usuária autenticada no backend', 'ok', { ownerId })
     const formData = await request.formData()
     const module = String(formData.get('module') ?? '').trim() as UploadModule
     const metadata = parseMetadata(formData.get('metadata'))
@@ -54,11 +54,11 @@ export async function POST(request: Request) {
 
     if (!(file instanceof File)) {
       setDebug('file', 'Arquivo recebido no backend', 'error', 'FormData nao contem File')
-      return jsonError('Arquivo nao recebido pelo servidor.', 400, debug)
+      return jsonError('Arquivo não recebido pelo servidor.', 400, debug)
     }
     if (module !== 'material_apoio' && module !== 'meus_documentos') {
       setDebug('module', 'Modulo de upload', 'error', { module })
-      return jsonError('Modulo de upload invalido.', 400, debug)
+      return jsonError('Modulo de upload inválido.', 400, debug)
     }
 
     const fileName = file.name || 'arquivo'
@@ -120,20 +120,22 @@ export async function POST(request: Request) {
 
     if (upload.error) {
       setDebug('storage', 'Resposta do Storage', 'error', serializeError(upload.error))
-      throw toError(upload.error, 'Nao foi possivel salvar o arquivo no storage.')
+      throw toError(upload.error, 'Não foi possível salvar o arquivo no storage.')
     }
     setDebug('storage', 'Resposta do Storage', 'ok', { path: upload.data?.path ?? filePath })
 
     if (module === 'material_apoio') {
       const title = typeof metadata.title === 'string' ? metadata.title.trim() : ''
       const description = typeof metadata.description === 'string' ? metadata.description.trim() : ''
+      const ageRange = typeof metadata.ageRange === 'string' ? metadata.ageRange.trim() : ''
+      const pedagogicalObjective = typeof metadata.pedagogicalObjective === 'string' ? metadata.pedagogicalObjective.trim() : ''
       if (!title) {
-        setDebug('metadata', 'Dados do material', 'error', 'Titulo ausente')
+        setDebug('metadata', 'Dados do material', 'error', 'Título ausente')
         return jsonError('Informe o tema ou nome do arquivo.', 400, debug)
       }
       if (!description) {
-        setDebug('metadata', 'Dados do material', 'error', 'Descricao ausente')
-        return jsonError('Informe a descricao do material.', 400, debug)
+        setDebug('metadata', 'Dados do material', 'error', 'Descrição ausente')
+        return jsonError('Informe a descrição do material.', 400, debug)
       }
       setDebug('metadata', 'Dados do material', 'ok', { title, descriptionLength: description.length })
 
@@ -142,6 +144,8 @@ export async function POST(request: Request) {
         ownerId,
         title,
         description,
+        ageRange,
+        pedagogicalObjective,
         file: {
           name: fileName,
           type: mimeType,
@@ -192,7 +196,7 @@ export async function POST(request: Request) {
 
     if (insert.error) {
       setDebug('database', 'Resposta do banco', 'error', serializeError(insert.error))
-      throw toError(insert.error, 'Nao foi possivel salvar o registro do documento.')
+      throw toError(insert.error, 'Não foi possível salvar o registro do documento.')
     }
     setDebug('database', 'Resposta do banco', 'ok', { id: insert.data.id, filePath: insert.data.file_path })
 
@@ -213,12 +217,12 @@ export async function POST(request: Request) {
     }, { status: 200, headers: UPLOAD_CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      setDebug('auth', 'Usuario autenticado no backend', 'error', serializeError(error))
-      return jsonError('Sua sessao expirou. Faca login novamente.', error.status, debug)
+      setDebug('auth', 'Usuária autenticada no backend', 'error', serializeError(error))
+      return jsonError('Sua sessão expirou. Faça login novamente.', error.status, debug)
     }
     setDebug('error', 'Erro completo', 'error', serializeError(error))
     console.error('[uploads] unhandled error', serializeError(error))
-    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel enviar o arquivo. Tente novamente.', 500, debug)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Tente novamente.', 500, debug)
   }
 }
 

@@ -236,7 +236,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
       if (navigator.share) {
         await navigator.share({
           title,
-          text: 'Veja este documento gerado pelo Approf.',
+          text: 'Vejá este documento gerado pelo Approf.',
           url: shareUrl,
         })
         return
@@ -252,7 +252,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
 
   async function prepareMaterialShare() {
     if (!document) return
-    const confirmed = window.confirm('Para proteger a privacidade das criancas, este material sera anonimizado automaticamente antes de ser compartilhado com a comunidade.')
+    const confirmed = window.confirm('Para proteger a privacidade das crianças, este material sera anonimizado automaticamente antes de ser compartilhado com a comunidade.')
     if (!confirmed) return
     setSharingAsMaterial(true)
     setError('')
@@ -269,9 +269,9 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
           : 'Documento pedagogico anonimizado para servir como referencia de exemplo.',
       })
       setMaterialPreview(preview)
-      setMessage('Versao anonimizada pronta para sua revisao.')
+      setMessage('Versao anonimizada pronta para sua revisão.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel preparar o material de apoio.')
+      setError(err instanceof Error ? err.message : 'Não foi possível preparar o material de apoio.')
     } finally {
       setSharingAsMaterial(false)
     }
@@ -293,9 +293,9 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
       setMaterialPreview(null)
       setMessage(result.status === 'published'
         ? 'Material de apoio publicado com a versao anonimizada.'
-        : 'Material enviado para revisao antes da publicacao.')
+        : 'Material enviado para revisão antes da publicação.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel publicar o material de apoio.')
+      setError(err instanceof Error ? err.message : 'Não foi possível publicar o material de apoio.')
     } finally {
       setSharingAsMaterial(false)
     }
@@ -597,7 +597,7 @@ function formatReportType(type: string) {
     case 'class_diary': return 'Diário de bordo'
     case 'weekly_planning': return 'Planejamento semanal'
     case 'daily_lesson_plan': return 'Plano de aula diário'
-    case 'pedagogical_project': return 'Projeto pedagógico específico'
+    case 'pedagógical_project': return 'Projeto pedagógico específico'
     case 'planning': return 'Planejamento'
     case 'portfolio_text': return 'Portfólio pedagógico'
     case 'portfolio_image': return 'Portfólio pedagógico'

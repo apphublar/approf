@@ -19,7 +19,7 @@ const FIXED_DATES = [
   ['04-21', 'Tiradentes', 'holiday'],
   ['04-22', 'Dia da Terra', 'pedagogical'],
   ['05-01', 'Dia do Trabalho', 'holiday'],
-  ['05-18', 'Dia Nacional de Combate ao Abuso e Exploração Sexual de Crianças e Adolescentes', 'pedagogical'],
+  ['05-18', 'Dia Nacional de Combate ao Abuso e à Exploração Sexual de Crianças e Adolescentes', 'pedagogical'],
   ['05-22', 'Dia do Abraço', 'pedagogical'],
   ['06-05', 'Dia Mundial do Meio Ambiente', 'pedagogical'],
   ['06-24', 'São João', 'pedagogical'],

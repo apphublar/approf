@@ -113,7 +113,7 @@ export default function CalendarSubscreen() {
           <div className="grid grid-cols-7 gap-1">
             {dayCells.map((cell) => {
               const userCount = calendarEvents.filter((event) => event.date === cell.iso).length
-              const pedagogicalCount = pedagogicalDates.filter((event) => event.date === cell.iso).length
+              const pedagógicalCount = pedagogicalDates.filter((event) => event.date === cell.iso).length
               const selected = selectedDate === cell.iso
               return (
                 <button
@@ -123,13 +123,13 @@ export default function CalendarSubscreen() {
                   style={{
                     background: selected ? '#1B4332' : cell.inMonth ? '#fff' : '#F7F4EE',
                     color: selected ? '#fff' : cell.inMonth ? '#1A1A1A' : '#B6B1A8',
-                    border: userCount || pedagogicalCount ? '1px solid #C2E8A0' : '1px solid transparent',
+                    border: userCount || pedagógicalCount ? '1px solid #C2E8A0' : '1px solid transparent',
                   }}
                 >
                   {cell.day}
-                  {(userCount > 0 || pedagogicalCount > 0) && (
+                  {(userCount > 0 || pedagógicalCount > 0) && (
                     <span className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-[2px]">
-                      {pedagogicalCount > 0 && <span className="w-1 h-1 rounded-full bg-gl" />}
+                      {pedagógicalCount > 0 && <span className="w-1 h-1 rounded-full bg-gl" />}
                       {userCount > 0 && <span className="w-1 h-1 rounded-full bg-[#C1440E]" />}
                     </span>
                   )}

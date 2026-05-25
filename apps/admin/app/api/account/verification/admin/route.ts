@@ -18,7 +18,7 @@ export async function GET() {
   } catch (error) {
     console.error('[account/verification/admin/list] erro interno', error)
     return NextResponse.json(
-      { error: 'Nao foi possivel carregar solicitacoes de verificacao.' },
+      { error: 'Não foi possível carregar solicitações de verificação.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }
@@ -45,7 +45,7 @@ export async function PATCH(request: Request) {
   } catch (error) {
     console.error('[account/verification/admin/update] erro interno', error)
     return NextResponse.json(
-      { error: 'Nao foi possivel atualizar a solicitacao agora.' },
+      { error: 'Não foi possível atualizar a solicitação agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }

@@ -13,7 +13,7 @@ export async function DELETE(
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { id } = await params
-    if (!id) return jsonError('Documento invalido.', 400)
+    if (!id) return jsonError('Documento inválido.', 400)
 
     const supabase = createSupabaseServiceClient()
     const { data: document, error: loadError } = await supabase
@@ -23,7 +23,7 @@ export async function DELETE(
       .eq('owner_id', ownerId)
       .single()
 
-    if (loadError || !document) return jsonError('Documento nao encontrado.', 404)
+    if (loadError || !document) return jsonError('Documento não encontrado.', 404)
 
     const { error: storageError } = await supabase.storage
       .from(PERSONAL_DOCUMENT_BUCKET)
@@ -35,15 +35,15 @@ export async function DELETE(
       .delete()
       .eq('id', id)
       .eq('owner_id', ownerId)
-    if (deleteError) throw toError(deleteError, 'Nao foi possivel excluir o documento.')
+    if (deleteError) throw toError(deleteError, 'Não foi possível excluir o documento.')
 
     return NextResponse.json({ ok: true }, { status: 200, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessao expirada. Entre novamente.', 401)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
     if (isMissingPersonalDocumentsTable(error)) {
-      return jsonError('Banco de dados ainda nao atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
+      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
     }
-    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel excluir o documento.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível excluir o documento.', 500)
   }
 }
 

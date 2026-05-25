@@ -16,12 +16,12 @@ export interface ClassInput {
 
 export async function loadTeacherWorkspace() {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const user = userData.user
-  if (!user) throw new Error('Sessao nao encontrada.')
+  if (!user) throw new Error('Sessão não encontrada.')
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -77,7 +77,7 @@ export async function loadTeacherWorkspace() {
     name: item.name,
     shift: item.shift ?? 'Manha',
     school: item.school_id ? schoolById.get(item.school_id) ?? 'Escola nao informada' : 'Escola nao informada',
-    ageGroup: item.age_group ?? 'Educacao infantil',
+    ageGroup: item.age_group ?? 'Educação infantil',
     iconBg: '#D8F3DC',
     students: studentsByClassId.get(item.id) ?? [],
   }))
@@ -104,7 +104,7 @@ export async function loadTeacherWorkspace() {
 
 async function loadStudentsWithPhotoPositionFallback(ownerId: string) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const query = supabase
     .from('students')
@@ -125,12 +125,12 @@ async function loadStudentsWithPhotoPositionFallback(ownerId: string) {
 
 export async function createSupabaseClass(input: ClassInput) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const schoolId = await ensureSchool(input.school, ownerId)
   const { data, error } = await supabase
@@ -161,12 +161,12 @@ export async function createSupabaseClass(input: ClassInput) {
 
 export async function updateSupabaseClass(classId: string, input: ClassInput) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const schoolId = await ensureSchool(input.school, ownerId)
   const { error } = await supabase
@@ -185,7 +185,7 @@ export async function updateSupabaseClass(classId: string, input: ClassInput) {
 
 async function ensureSchool(name: string, ownerId: string) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const normalizedName = name.trim()
   const { data: existing, error: selectError } = await supabase

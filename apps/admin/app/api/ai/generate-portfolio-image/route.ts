@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       try {
         await refundAiUsageReservation({
           logId,
-          reason: error instanceof Error ? error.message : 'Falha na geracao de imagem.',
+          reason: error instanceof Error ? error.message : 'Falha na geração de imagem.',
           reservedCostCentsOverride: reservedEstimatedCostCents,
         })
       } catch (refundError) {
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
 
     if (error instanceof AiAuthError) {
       return NextResponse.json(
-        { error: 'Sessao expirada. Entre novamente para continuar.' },
+        { error: 'Sessão expirada. Entre novamente para continuar.' },
         { status: error.status, headers: CORS_HEADERS },
       )
     }
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
     console.error('[ai/generate-portfolio-image] erro interno', error)
 
     return NextResponse.json(
-      { error: 'Nao foi possivel concluir a imagem agora. Tente novamente em instantes.' },
+      { error: 'Não foi possível concluir a imagem agora. Tente novamente em instantes.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }

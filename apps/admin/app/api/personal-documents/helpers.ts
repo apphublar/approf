@@ -19,7 +19,7 @@ export function validatePersonalDocument(input: { fileName: string; fileType: st
     || mimeType === 'application/pdf'
     || ['.jpg', '.jpeg', '.png', '.webp'].some((extension) => lowerName.endsWith(extension))
     || ALLOWED_DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
-  if (!allowed) return 'Arquivo nao permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.'
+  if (!allowed) return 'Arquivo não permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.'
   if (input.fileSize > MAX_FILE_SIZE_BYTES) return 'Arquivo muito grande. Use arquivos de até 15 MB.'
   return ''
 }

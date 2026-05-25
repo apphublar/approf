@@ -142,7 +142,7 @@ export const useAppStore = create<AppStore>()(
           id: 'cp-1',
           authorName: 'Marina Costa',
           authorRole: 'Professora Jardim I',
-          text: 'Como voces registram adaptacoes para alunos com muita dificuldade nas transicoes?',
+          text: 'Como voces registram adaptações para alunos com muita dificuldade nas transicoes?',
           category: 'duvida' as const,
           likes: 18,
           comments: 7,

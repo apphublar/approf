@@ -23,8 +23,8 @@ const SHARE_SCHEMA = {
         confianca: { type: 'number', minimum: 0, maximum: 1 },
         categoria_detectada: { type: 'string' },
         possui_dados_pessoais: { type: 'boolean' },
-        possui_conteudo_inadequado: { type: 'boolean' },
-        possui_imagem_sensivel: { type: 'boolean' },
+        possui_conteúdo_inadequado: { type: 'boolean' },
+        possui_imagem_sensível: { type: 'boolean' },
         possui_direito_autoral_suspeito: { type: 'boolean' },
         motivo: { type: 'string' },
       },
@@ -33,8 +33,8 @@ const SHARE_SCHEMA = {
         'confianca',
         'categoria_detectada',
         'possui_dados_pessoais',
-        'possui_conteudo_inadequado',
-        'possui_imagem_sensivel',
+        'possui_conteúdo_inadequado',
+        'possui_imagem_sensível',
         'possui_direito_autoral_suspeito',
         'motivo',
       ],
@@ -51,8 +51,8 @@ const REVIEW_SCHEMA = {
     confianca: { type: 'number', minimum: 0, maximum: 1 },
     categoria_detectada: { type: 'string' },
     possui_dados_pessoais: { type: 'boolean' },
-    possui_conteudo_inadequado: { type: 'boolean' },
-    possui_imagem_sensivel: { type: 'boolean' },
+    possui_conteúdo_inadequado: { type: 'boolean' },
+    possui_imagem_sensível: { type: 'boolean' },
     possui_direito_autoral_suspeito: { type: 'boolean' },
     motivo: { type: 'string' },
   },
@@ -61,8 +61,8 @@ const REVIEW_SCHEMA = {
     'confianca',
     'categoria_detectada',
     'possui_dados_pessoais',
-    'possui_conteudo_inadequado',
-    'possui_imagem_sensivel',
+    'possui_conteúdo_inadequado',
+    'possui_imagem_sensível',
     'possui_direito_autoral_suspeito',
     'motivo',
   ],
@@ -73,8 +73,8 @@ type MaterialReview = {
   confianca: number
   categoria_detectada: string
   possui_dados_pessoais: boolean
-  possui_conteudo_inadequado: boolean
-  possui_imagem_sensivel: boolean
+  possui_conteúdo_inadequado: boolean
+  possui_imagem_sensível: boolean
   possui_direito_autoral_suspeito: boolean
   motivo: string
 }
@@ -98,15 +98,15 @@ export async function POST(request: Request) {
     const reportId = typeof body.reportId === 'string' ? body.reportId : ''
 
     if (!['preview', 'publish'].includes(action)) {
-      return NextResponse.json({ error: 'Acao invalida.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Ação inválida.' }, { status: 400, headers: CORS_HEADERS })
     }
     if (!reportId) {
-      return NextResponse.json({ error: 'Documento invalido.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Documento inválido.' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const report = await getOwnerReportById(ownerId, reportId)
     if (!report) {
-      return NextResponse.json({ error: 'Documento nao encontrado.' }, { status: 404, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: CORS_HEADERS })
     }
 
     if (action === 'publish') {
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       const status = resolveMaterialStatus(finalReview)
       if (status !== 'published') {
         return NextResponse.json(
-          { error: 'A versao anonimizada ainda precisa ser revisada antes da publicacao.' },
+          { error: 'A versao anonimizada ainda precisa ser revisada antes da publicação.' },
           { status: 400, headers: CORS_HEADERS },
         )
       }
@@ -140,11 +140,11 @@ export async function POST(request: Request) {
     return NextResponse.json(preview, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
     console.error('[materials/share-generated] erro interno', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Nao foi possivel preparar o material agora.' },
+      { error: error instanceof Error ? error.message : 'Não foi possível preparar o material agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }
@@ -152,7 +152,7 @@ export async function POST(request: Request) {
 
 async function reviewShareableText(preview: SharePreview) {
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('Servico de IA indisponivel no momento.')
+  if (!apiKey) throw new Error('Serviço de IA indisponível no momento.')
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -170,10 +170,10 @@ async function reviewShareableText(preview: SharePreview) {
               type: 'input_text',
               text: [
                 'Valide a versao final antes de publicar como material de apoio.',
-                'Ela deve estar anonimizada e nao pode conter nomes reais de criancas, escola, responsaveis, endereco, telefone, email, documentos, imagem sensivel, propaganda ou conteudo inadequado. Direito autoral suspeito deve ser sinalizado apenas como informacao complementar.',
+                'Ela deve estar anonimizada e não pode conter nomes reais de crianças, escola, responsaveis, endereço, telefone, email, documentos, imagem sensível, propaganda ou conteúdo inadequado. Direito autoral suspeito deve ser sinalizado apenas como informacao complementar.',
                 '',
-                `Titulo: ${preview.title}`,
-                `Descricao: ${preview.description}`,
+                `Título: ${preview.title}`,
+                `Descrição: ${preview.description}`,
                 '',
                 preview.shareableBody,
               ].join('\n'),
@@ -200,12 +200,12 @@ async function reviewShareableText(preview: SharePreview) {
 
   if (!response.ok) {
     console.error('[materials/share-generated/final-review] OpenAI HTTP', response.status, payload?.error?.message)
-    throw new Error('Nao foi possivel validar a versao final do material.')
+    throw new Error('Não foi possível válidar a versao final do material.')
   }
 
   const raw = payload?.output_text
     ?? payload?.output?.flatMap((item) => item.content ?? []).find((item) => typeof item.text === 'string')?.text
-  if (!raw) throw new Error('A IA nao retornou a validacao final do material.')
+  if (!raw) throw new Error('A IA não retornou a válidacao final do material.')
   return sanitizeReview(JSON.parse(raw) as Partial<MaterialReview>)
 }
 
@@ -215,7 +215,7 @@ async function createShareablePreview(input: {
   preferredDescription: string
 }): Promise<SharePreview> {
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('Servico de IA indisponivel no momento.')
+  if (!apiKey) throw new Error('Serviço de IA indisponível no momento.')
 
   const artifacts = isRecord(input.report.ai_artifacts) ? input.report.ai_artifacts : null
   const imageDataUrl = typeof artifacts?.imageDataUrl === 'string' ? artifacts.imageDataUrl : ''
@@ -260,12 +260,12 @@ async function createShareablePreview(input: {
 
   if (!response.ok) {
     console.error('[materials/share-generated] OpenAI HTTP', response.status, payload?.error?.message)
-    throw new Error('Nao foi possivel anonimizar o material com IA.')
+    throw new Error('Não foi possível anonimizar o material com IA.')
   }
 
   const raw = payload?.output_text
     ?? payload?.output?.flatMap((item) => item.content ?? []).find((item) => typeof item.text === 'string')?.text
-  if (!raw) throw new Error('A IA nao retornou uma versao compartilhavel valida.')
+  if (!raw) throw new Error('A IA não retornou uma versao compartilhavel válida.')
   return sanitizeSharePreview(JSON.parse(raw) as Partial<SharePreview>)
 }
 
@@ -281,22 +281,22 @@ function buildSharePrompt(input: {
     'O arquivo original nunca deve ser publicado.',
     '',
     `Tipo gerado: ${input.reportType}`,
-    `Titulo sugerido pela professora: ${input.preferredTitle || '[nao informado]'}`,
-    `Descricao sugerida pela professora: ${input.preferredDescription || '[nao informada]'}`,
+    `Título sugerido pela professora: ${input.preferredTitle || '[não informado]'}`,
+    `Descrição sugerida pela professora: ${input.preferredDescription || '[nao informada]'}`,
     '',
     input.isImage
-      ? 'A professora gerou uma imagem. Analise a imagem anexada e crie uma referencia textual de exemplo. Nao reutilize a imagem original, nao descreva rostos identificaveis, uniformes, escola ou criancas reais.'
-      : 'A professora gerou um documento. Reescreva o conteudo como exemplo pedagogico anonimo.',
+      ? 'A professora gerou uma imagem. Analise a imagem anexada e crie uma referencia textual de exemplo. Nao reutilize a imagem original, nao descreva rostos identificáveis, uniformes, escola ou crianças reais.'
+      : 'A professora gerou um documento. Reescreva o conteúdo como exemplo pedagogico anonimo.',
     '',
     'Regras obrigatorias:',
-    '- Remova nomes reais de criancas, responsaveis, professoras quando forem dados de caso real, escola, endereco, telefone, email, documentos e qualquer identificador.',
-    '- Troque nomes de criancas por nomes ficticios curtos e mantenha coerencia.',
-    '- Se houver imagem de crianca ou dado visual identificavel, nao publique a imagem; substitua por uma referencia textual de exemplo.',
+    '- Remova nomes reais de crianças, responsaveis, professoras quando forem dados de caso real, escola, endereço, telefone, email, documentos e qualquer identificador.',
+    '- Troque nomes de crianças por nomes ficticios curtos e mantenhá coerencia.',
+    '- Se houver imagem de criança ou dado visual identificavel, nao publique a imagem; substitua por uma referencia textual de exemplo.',
     '- Inclua no texto a ideia de "referencia de exemplo" ou "exemplo ficticio anonimizado".',
-    '- Mantenha utilidade pedagogica para educacao infantil.',
-    '- Depois de anonimizar, revise se ainda existe dado pessoal ou conteudo sensivel.',
+    '- Mantenha utilidade pedagógica para educação infantil.',
+    '- Depois de anonimizar, revise se ainda existe dado pessoal ou conteúdo sensível.',
     '',
-    'Conteudo do documento gerado:',
+    'Conteúdo do documento gerado:',
     input.body || '[sem texto; use a imagem anexada como base apenas para criar referencia anonima]',
   ].join('\n')
 }
@@ -308,11 +308,18 @@ async function publishShareableMaterial(input: {
   preview: SharePreview
 }) {
   const supabase = createSupabaseServiceClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, avatar_url')
+    .eq('id', input.ownerId)
+    .maybeSingle()
   const { data, error } = await supabase
     .from('materials')
     .insert({
       title: input.preview.title,
       description: input.preview.description,
+      type: 'document',
+      pedagogical_objective: input.preview.description,
       file_path: null,
       file_name: null,
       file_type: 'text/shareable-generated',
@@ -321,6 +328,10 @@ async function publishShareableMaterial(input: {
       published_at: new Date().toISOString(),
       created_by: input.ownerId,
       submitted_by: input.ownerId,
+      author_id: input.ownerId,
+      author_name: typeof profile?.full_name === 'string' ? profile.full_name : 'Professora',
+      author_avatar: typeof profile?.avatar_url === 'string' ? profile.avatar_url : null,
+      ai_analysis_status: 'approved',
       ai_review: {
         ...input.preview.review,
         source_report_id: input.reportId,
@@ -334,7 +345,7 @@ async function publishShareableMaterial(input: {
     .select('id')
     .single()
 
-  if (error) throw toError(error, 'Nao foi possivel publicar o material anonimizado.')
+  if (error) throw toError(error, 'Não foi possível publicar o material anonimizado.')
   return data?.id ?? null
 }
 
@@ -361,7 +372,7 @@ function sanitizeSharePreview(value: {
     : 'Referencia de exemplo gerada a partir de material pedagogico anonimizado.'
   const shareableBody = typeof value.shareableBody === 'string' ? value.shareableBody.trim() : ''
   if (shareableBody.length < 80) {
-    throw new Error('A versao anonimizada precisa ter mais conteudo antes da publicacao.')
+    throw new Error('A versao anonimizada precisa ter mais conteúdo antes da publicação.')
   }
   return {
     title: title.slice(0, 160),
@@ -374,12 +385,12 @@ function sanitizeSharePreview(value: {
 function resolveMaterialStatus(review: MaterialReview): 'published' | 'review_required' | 'blocked' {
   const minimumConfidence = Number(process.env.MATERIAL_AI_CONFIDENCE_THRESHOLD ?? 0.6)
   if (
-    review.possui_conteudo_inadequado ||
+    review.possui_conteúdo_inadequado ||
     review.aprovado === false
   ) {
     return 'blocked'
   }
-  if (review.possui_imagem_sensivel || review.possui_dados_pessoais) {
+  if (review.possui_imagem_sensível || review.possui_dados_pessoais) {
     return 'review_required'
   }
   if (review.confianca < minimumConfidence) {
@@ -394,8 +405,8 @@ function sanitizeReview(value: Partial<MaterialReview>): MaterialReview {
     confianca: clampConfidence(value.confianca),
     categoria_detectada: typeof value.categoria_detectada === 'string' ? value.categoria_detectada : 'Exemplo pedagogico',
     possui_dados_pessoais: Boolean(value.possui_dados_pessoais),
-    possui_conteudo_inadequado: Boolean(value.possui_conteudo_inadequado),
-    possui_imagem_sensivel: Boolean(value.possui_imagem_sensivel),
+    possui_conteúdo_inadequado: Boolean(value.possui_conteúdo_inadequado),
+    possui_imagem_sensível: Boolean(value.possui_imagem_sensível),
     possui_direito_autoral_suspeito: Boolean(value.possui_direito_autoral_suspeito),
     motivo: typeof value.motivo === 'string' ? value.motivo : '',
   }

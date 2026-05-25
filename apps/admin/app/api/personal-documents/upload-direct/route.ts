@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const formData = await request.formData()
     const file = formData.get('file')
-    if (!(file instanceof File)) return jsonError('Arquivo nao recebido pelo servidor.', 400)
+    if (!(file instanceof File)) return jsonError('Arquivo não recebido pelo servidor.', 400)
 
     const fileName = file.name || 'arquivo'
     const mimeType = file.type || inferPersonalMimeType(fileName)
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         contentType: mimeType,
         upsert: false,
       })
-    if (uploadError) throw toError(uploadError, 'Nao foi possivel salvar o arquivo no storage.')
+    if (uploadError) throw toError(uploadError, 'Não foi possível salvar o arquivo no storage.')
 
     const { data, error } = await supabase
       .from('teacher_personal_documents')
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       .select('id, title, file_path, file_name, file_size, mime_type, created_at')
       .single()
 
-    if (error) throw toError(error, 'Nao foi possivel salvar o registro do documento.')
+    if (error) throw toError(error, 'Não foi possível salvar o registro do documento.')
 
     return NextResponse.json({
       document: {
@@ -74,9 +74,9 @@ export async function POST(request: Request) {
       uploadedVia: 'backend-direct',
     }, { status: 200, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessao expirada. Entre novamente.', 401)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
     console.error('[personal-documents/upload-direct] unhandled error', error instanceof Error ? error.message : error)
-    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel enviar seu documento.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível enviar seu documento.', 500)
   }
 }
 

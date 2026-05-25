@@ -37,7 +37,7 @@ export interface AnnotationUpdateInput extends AnnotationInput {
 
 export async function loadSupabaseAnnotations(ownerId: string, classes: ClassData[]) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const [annotationsResult, targetsResult] = await Promise.all([
     supabase
@@ -69,12 +69,12 @@ export async function loadSupabaseAnnotations(ownerId: string, classes: ClassDat
 
 export async function deleteSupabaseAnnotation(annotationId: string) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const { error } = await supabase
     .from('annotations')
@@ -82,17 +82,17 @@ export async function deleteSupabaseAnnotation(annotationId: string) {
     .eq('id', annotationId)
     .eq('owner_id', ownerId)
 
-  if (error) throw toError(error, 'Nao foi possivel excluir a anotacao.')
+  if (error) throw toError(error, 'Não foi possível excluir a anotação.')
 }
 
 export async function createSupabaseAnnotation(input: AnnotationInput) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const tags = [input.label, ...input.tags.filter((tag) => tag !== input.label)]
   const { data, error } = await supabase
@@ -108,15 +108,15 @@ export async function createSupabaseAnnotation(input: AnnotationInput) {
     .select('id, category, body, tags, persistence, attachment_path, occurred_at')
     .single()
 
-  if (error) throw toError(error, 'Nao foi possivel salvar a anotacao no Supabase.')
-  if (!data) throw new Error('Nao foi possivel salvar a anotacao no Supabase.')
+  if (error) throw toError(error, 'Não foi possível salvar a anotação no Supabase.')
+  if (!data) throw new Error('Não foi possível salvar a anotação no Supabase.')
 
   const targets = buildTargets(data.id, ownerId, input)
   if (targets.length > 0) {
     const { error: targetError } = await supabase.from('annotation_targets').insert(targets)
     if (targetError) {
       await supabase.from('annotations').delete().eq('id', data.id).eq('owner_id', ownerId)
-      throw toError(targetError, 'Nao foi possivel vincular a anotacao ao destino selecionado.')
+      throw toError(targetError, 'Não foi possível vincular a anotação ao destino selecionado.')
     }
   }
 
@@ -126,12 +126,12 @@ export async function createSupabaseAnnotation(input: AnnotationInput) {
 
 export async function updateSupabaseAnnotation(input: AnnotationUpdateInput) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const tags = [input.label, ...input.tags.filter((tag) => tag !== input.label)]
   const { data, error } = await supabase
@@ -148,8 +148,8 @@ export async function updateSupabaseAnnotation(input: AnnotationUpdateInput) {
     .select('id, category, body, tags, persistence, attachment_path, occurred_at')
     .single()
 
-  if (error) throw toError(error, 'Nao foi possivel atualizar a anotacao no Supabase.')
-  if (!data) throw new Error('Nao foi possivel atualizar a anotacao no Supabase.')
+  if (error) throw toError(error, 'Não foi possível atualizar a anotação no Supabase.')
+  if (!data) throw new Error('Não foi possível atualizar a anotação no Supabase.')
 
   const { error: deleteTargetError } = await supabase
     .from('annotation_targets')
@@ -157,14 +157,14 @@ export async function updateSupabaseAnnotation(input: AnnotationUpdateInput) {
     .eq('annotation_id', input.annotationId)
     .eq('owner_id', ownerId)
   if (deleteTargetError) {
-    throw toError(deleteTargetError, 'Nao foi possivel atualizar o destino da anotacao.')
+    throw toError(deleteTargetError, 'Não foi possível atualizar o destino da anotação.')
   }
 
   const targets = buildTargets(data.id, ownerId, input)
   if (targets.length > 0) {
     const { error: targetError } = await supabase.from('annotation_targets').insert(targets)
     if (targetError) {
-      throw toError(targetError, 'Nao foi possivel vincular a anotacao ao destino selecionado.')
+      throw toError(targetError, 'Não foi possível vincular a anotação ao destino selecionado.')
     }
   }
 
@@ -228,9 +228,9 @@ function mapAnnotation(
 
 function labelForCategory(category: AnnotationCategory) {
   const labels: Record<AnnotationCategory, string> = {
-    evolucao: 'Evolucao',
+    evolucao: 'Evolução',
     plano: 'Planejamento',
-    portfolio: 'Portfolio',
+    portfolio: 'Portfólio',
     projeto: 'Projeto',
     formacao: 'Formacao',
     carta: 'Comunicado',

@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
       .limit(80)
 
-    if (error) throw toError(error, 'Nao foi possivel listar os materiais de apoio.')
+    if (error) throw toError(error, 'Não foi possível listar os materiais de apoio.')
 
     const materialIds = (data ?? []).map((item) => item.id).filter(Boolean)
     const [favoritesResult, ratingsResult, allRatingsResult] = materialIds.length
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
         rating: item.rating,
         comment: item.comment.trim(),
         author_id: item.owner_id,
-        author_name: item.owner_id === ownerId ? 'Voce' : profileNameById.get(item.owner_id) ?? 'Professora',
+        author_name: item.owner_id === ownerId ? 'Você' : profileNameById.get(item.owner_id) ?? 'Professora',
         created_at: item.created_at,
       })
       ratingCommentsByMaterial.set(materialId, list)
@@ -106,11 +106,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ materials }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
     console.error('[materials/list] erro interno', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Nao foi possivel listar os materiais de apoio.' },
+      { error: error instanceof Error ? error.message : 'Não foi possível listar os materiais de apoio.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }

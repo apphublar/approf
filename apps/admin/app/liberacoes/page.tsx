@@ -15,7 +15,7 @@ export default function FeatureReleasesPage() {
         action={
           <span className="status-pill">
             <KeyRound size={16} />
-            Gate por feature
+            Gaté por feature
           </span>
         }
       />

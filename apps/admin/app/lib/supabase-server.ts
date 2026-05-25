@@ -35,7 +35,7 @@ export async function getAuthenticatedUserId(authorizationHeader: string | null)
   )
 
   const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data.user) throw new AiAuthError('Sessao invalida ou expirada.')
+  if (error || !data.user) throw new AiAuthError('Sessao inválida ou expirada.')
   return data.user.id
 }
 

@@ -190,7 +190,7 @@ function formatGenerationType(value: string) {
     class_diary: 'Diário de bordo',
     weekly_planning: 'Planejamento semanal',
     daily_lesson_plan: 'Plano de aula diário',
-    pedagogical_project: 'Projeto pedagógico específico',
+    pedagógical_project: 'Projeto pedagógico específico',
     specialist_referral: 'Encaminhamento para especialista',
     parents_meeting_record: 'Planejamento de reunião de pais',
     general_report: 'Relatório geral',

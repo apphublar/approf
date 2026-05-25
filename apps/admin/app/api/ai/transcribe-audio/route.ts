@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const form = await request.formData()
     const audio = form.get('audio')
     if (!(audio instanceof File)) {
-      return NextResponse.json({ error: 'Audio invalido.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Audio inválido.' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const durationSeconds = parseDurationSeconds(form.get('durationSeconds'))
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       try {
         await refundAiUsageReservation({
           logId,
-          reason: error instanceof Error ? error.message : 'Falha na transcricao de audio.',
+          reason: error instanceof Error ? error.message : 'Falha na transcrição de áudio.',
           reservedCostCentsOverride: reservedEstimatedCostCents,
         })
       } catch (refundError) {
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
 
     if (error instanceof AiAuthError) {
       return NextResponse.json(
-        { error: 'Sessao expirada. Entre novamente para continuar.' },
+        { error: 'Sessão expirada. Entre novamente para continuar.' },
         { status: error.status, headers: CORS_HEADERS },
       )
     }
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : ''
     if (isMissingAudioGenerationTypeError(message)) {
       return NextResponse.json(
-        { error: 'A base de dados ainda nao foi atualizada para transcricao de audio. Aplique a migration 0014 e tente novamente.' },
+        { error: 'A base de dados ainda não foi atualizada para transcrição de áudio. Aplique a migration 0014 e tente novamente.' },
         { status: 500, headers: CORS_HEADERS },
       )
     }
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
     console.error('[ai/transcribe-audio] erro interno', error)
 
     return NextResponse.json(
-      { error: 'Nao foi possivel transcrever o audio agora. Tente novamente em instantes.' },
+      { error: 'Não foi possível transcrever o áudio agora. Tente novamente em instantes.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }

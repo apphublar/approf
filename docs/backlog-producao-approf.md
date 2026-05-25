@@ -4,15 +4,15 @@ Atualizado em: 2026-05-14
 
 ## Visao do produto
 
-O Approf e um app de anotacao e organizacao da rotina da professora, com apoio de IA pedagogica para transformar registros do dia a dia em documentacao util, segura e alinhada a Educacao Infantil (0 a 5 anos), sem comparacao entre criancas.
+O Approf e um app de anotação e organizacao da rotina da professora, com apoio de IA pedagógica para transformar registros do dia a dia em documentacao util, segura e alinhada a Educação Infantil (0 a 5 anos), sem comparação entre crianças.
 
 ## Objetivo desta fase
 
 Concluir o que falta para sair de preview/mock e operar em modo real de producao, com foco em:
 
-- geracao real por IA;
+- geração real por IA;
 - persistencia no banco;
-- seguranca e auditoria;
+- segurança e auditoria;
 - operacao financeira;
 - governanca no admin.
 
@@ -20,27 +20,27 @@ Concluir o que falta para sair de preview/mock e operar em modo real de producao
 
 ### 1) IA real com persistencia no banco
 
-- Conectar geracao real com Claude para relatorios, planejamentos e textos pedagogicos.
-- Conectar geracao de imagem com ChatGPT para portfolio.
-- Criar prompts oficiais com linha pedagogica, BNCC 0 a 5 anos e inclusao de criancas atipicas.
-- Registrar versao do prompt em cada geracao.
+- Conectar geração real com Claude para relatórios, planejamentos e textos pedagogicos.
+- Conectar geração de imagem com ChatGPT para portfolio.
+- Criar prompts oficiais com linhá pedagógica, BNCC 0 a 5 anos e inclusao de crianças atipicas.
+- Registrar versao do prompt em cada geração.
 - Salvar o resultado gerado no banco (nao apenas preview/mock).
 
-### 2) Relatorios de desenvolvimento (fluxo real)
+### 2) Relatórios de desenvolvimento (fluxo real)
 
-- Salvar relatorios por crianca.
-- Permitir edicao de relatorio gerado.
-- Permitir gerar ate 2 versoes por crianca por semestre.
-- Permitir que a professora escolha a versao final e descarte a outra.
+- Salvar relatórios por criança.
+- Permitir edicao de relatório gerado.
+- Permitir gerar até 2 versoes por criança por semestre.
+- Permitir que a professora escolhá a versao final e descarte a outra.
 - Criar status: `rascunho`, `aguardando_coordenadora`, `corrigir`, `aprovado`.
 
 ### 3) Seguranca critica para producao
 
 - Revisar todas as politicas RLS.
-- Garantir que cada professora veja somente seus dados.
+- Garantir que cada professora vejá somente seus dados.
 - Garantir token seguro com expiracao para links de coordenadora.
 - Evitar exposicao de anexos privados.
-- Registrar logs de acoes sensiveis.
+- Registrar logs de acoes sensíveis.
 
 ## Prioridade alta (P1)
 
@@ -59,11 +59,11 @@ Concluir o que falta para sair de preview/mock e operar em modo real de producao
 - Criar confirmacao por codigo no e-mail da coordenadora.
 - Registrar nome, e-mail, data e acesso da coordenadora.
 - Permitir que a coordenadora aprove, edite ou solicite correcao.
-- Notificar a professora quando houver solicitacao de correcao.
+- Notificar a professora quando houver solicitação de correcao.
 
-### 6) Portfolio pedagogico
+### 6) Portfólio pedagogico
 
-- Salvar portfolios por crianca.
+- Salvar portfolios por criança.
 - Gerar texto com Claude.
 - Gerar capa/imagem com ChatGPT.
 - Permitir anexar fotos/documentos como referencia.
@@ -75,7 +75,7 @@ Concluir o que falta para sair de preview/mock e operar em modo real de producao
 - Visualizacao de assinaturas mensal e anual.
 - Consumo de IA por professora.
 - Controle de liberacoes, bloqueios e pacotes extras.
-- Auditoria de acessos e geracoes.
+- Auditoria de acessos e gerações.
 
 ### 8) Pagamentos
 
@@ -89,8 +89,8 @@ Concluir o que falta para sair de preview/mock e operar em modo real de producao
 
 ### 9) Produto e experiencia
 
-- Melhorar onboarding com quantidade de turmas e criancas.
-- Criar area "Minha conta".
+- Melhorar onboarding com quantidade de turmas e crianças.
+- Criar area "Minhá conta".
 - Criar tela de assinatura/plano.
 - Criar alertas amigaveis de limite, renovacao e pacote extra.
 - Revisar textos finais para producao.
@@ -107,8 +107,8 @@ Concluir o que falta para sair de preview/mock e operar em modo real de producao
 ## Ordem sugerida de execucao
 
 1. IA real + salvar no banco (P0.1).
-2. Relatorios reais com status e versao (P0.2).
-3. Hardening de seguranca e auditoria (P0.3).
+2. Relatórios reais com status e versao (P0.2).
+3. Hardening de segurança e auditoria (P0.3).
 4. GizTokens/custos + pagamentos (P1.4 e P1.8).
 5. Compartilhamento com coordenadora e portfolio (P1.5 e P1.6).
 6. Admin completo e melhorias finais de produto/deploy (P1.7, P2.9, P2.10).
@@ -117,8 +117,8 @@ Concluir o que falta para sair de preview/mock e operar em modo real de producao
 
 Considerar esta fase concluida quando:
 
-- pelo menos um fluxo real de geracao por IA estiver funcionando ponta a ponta;
+- pelo menos um fluxo real de geração por IA estiver funcionando ponta a ponta;
 - o resultado estiver salvo no banco com `prompt_version`, modelo, tokens e custo;
-- a professora conseguir editar e finalizar relatorio real por crianca;
-- seguranca/RLS e logs sensiveis estiverem validados;
+- a professora conseguir editar e finalizar relatório real por criança;
+- segurança/RLS e logs sensíveis estiverem válidados;
 - pagamento e controle de consumo estiverem operacionais para escalar o uso.

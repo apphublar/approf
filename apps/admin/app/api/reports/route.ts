@@ -40,12 +40,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ reports }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
 
     console.error('[reports/list] erro interno', error)
     return NextResponse.json(
-      { error: 'Nao foi possivel carregar seus documentos agora.' },
+      { error: 'Não foi possível carregar seus documentos agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     if (content.trim().length < 10) {
-      return NextResponse.json({ error: 'Conteudo do documento muito curto.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Conteúdo do documento muito curto.' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const report = await createOwnerReport({
@@ -82,12 +82,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ report }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
 
     console.error('[reports/create] erro interno', error)
     return NextResponse.json(
-      { error: 'Nao foi possivel criar o documento agora.' },
+      { error: 'Não foi possível criar o documento agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }

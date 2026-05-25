@@ -261,7 +261,7 @@ function AuthScreen({
         await signOut()
         onPasswordResetComplete?.()
         window.history.replaceState(null, '', window.location.pathname)
-        setMessage('Senha atualizada. Agora entre com sua nova senha.')
+        setMessage('Senhá atualizada. Agora entre com sua nova senha.')
         setPassword('')
         setConfirmPassword('')
         setMode('signin')
@@ -506,7 +506,7 @@ function setLocalStorageFlag(key: string, value: boolean) {
       window.localStorage.removeItem(key)
     }
   } catch {
-    // localStorage can be unavailable in private browsing.
+    // localStorage can be unavailable in privaté browsing.
   }
 }
 

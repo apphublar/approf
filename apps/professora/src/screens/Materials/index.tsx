@@ -33,11 +33,13 @@ import { getSupabaseClient } from '@/services/supabase/client'
 type TabId = 'all' | 'mine' | 'favorites' | 'blocked'
 type SortBy = 'newest' | 'downloads' | 'rating' | 'oldest' | 'name'
 type KindFilter = 'all' | 'documents' | 'images'
+type StatusFilter = 'all' | MaterialUploadStatus
 type MaterialKind = 'document' | 'image'
 
 const ACCEPTED_MATERIALS = ['.pdf', '.docx', '.xlsx', '.pptx', '.jpg', '.jpeg', '.png', '.webp', 'image/jpeg', 'image/png', 'image/webp'].join(',')
 const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
+const AGE_RANGES = ['0 a 1 ano', '1 a 2 anos', '2 a 3 anos', '3 a 4 anos', '4 a 5 anos', 'Multietaria']
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -54,11 +56,16 @@ export default function MaterialsScreen() {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortBy>('newest')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const [ageFilter, setAgeFilter] = useState('all')
+  const [objectiveFilter, setObjectiveFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [showUpload, setShowUpload] = useState(false)
   const [preview, setPreview] = useState<SupportMaterial | null>(null)
 
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
+  const [ageRange, setAgeRange] = useState('')
+  const [pedagogicalObjective, setPedagogicalObjective] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'analyzing'>('idle')
@@ -77,10 +84,17 @@ export default function MaterialsScreen() {
     else if (tab === 'blocked') list = list.filter((m) => m.status === 'blocked' && m.author_id === userId)
     if (kindFilter === 'documents') list = list.filter((m) => getKindFromMaterial(m) === 'document')
     else if (kindFilter === 'images') list = list.filter((m) => getKindFromMaterial(m) === 'image')
+    if (ageFilter !== 'all') list = list.filter((m) => (m.age_range ?? '') === ageFilter)
+    if (objectiveFilter !== 'all') list = list.filter((m) => (m.pedagogical_objective ?? m.detected_category ?? '') === objectiveFilter)
+    if (statusFilter !== 'all') list = list.filter((m) => m.status === statusFilter)
     if (query.trim()) {
       const q = normalizeText(query)
       list = list.filter(
-        (m) => normalizeText(m.title).includes(q) || normalizeText(m.description ?? '').includes(q),
+        (m) => normalizeText(m.title).includes(q)
+          || normalizeText(m.description ?? '').includes(q)
+          || normalizeText(m.age_range ?? '').includes(q)
+          || normalizeText(m.pedagogical_objective ?? '').includes(q)
+          || normalizeText(m.detected_category ?? '').includes(q),
       )
     }
     if (sort === 'newest') list.sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
@@ -89,7 +103,16 @@ export default function MaterialsScreen() {
     else if (sort === 'oldest') list.sort((a, b) => (a.published_at ?? '').localeCompare(b.published_at ?? ''))
     else list.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
     return list
-  }, [materials, tab, query, sort, kindFilter, userId])
+  }, [materials, tab, query, sort, kindFilter, ageFilter, objectiveFilter, statusFilter, userId])
+
+  const objectiveOptions = useMemo(() => {
+    const values = new Set<string>()
+    for (const material of materials) {
+      const value = (material.pedagogical_objective ?? material.detected_category ?? '').trim()
+      if (value) values.add(value)
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [materials])
 
   const counts = useMemo(
     () => ({
@@ -138,6 +161,8 @@ export default function MaterialsScreen() {
   function openUpload() {
     setTitle('')
     setDesc('')
+    setAgeRange('')
+    setPedagogicalObjective('')
     setFile(null)
     setUploadMsg('')
     setAnalysis(null)
@@ -179,12 +204,16 @@ export default function MaterialsScreen() {
       const result = await analyzeAndUploadMaterial({
         title: title.trim(),
         description: desc.trim(),
+        ageRange,
+        pedagogicalObjective: pedagogicalObjective.trim() || desc.trim(),
         file,
       })
       setAnalysis(result)
       setUploadMsg(getStatusMessage(result.status))
       setTitle('')
       setDesc('')
+      setAgeRange('')
+      setPedagogicalObjective('')
       setFile(null)
       await refresh()
     } catch (e) {
@@ -221,7 +250,7 @@ export default function MaterialsScreen() {
     } catch (error) {
       setMaterials((current) => current.map((item) => item.id === material.id ? { ...item, is_favorite: !favorite } : item))
       setPreview((current) => current?.id === material.id ? { ...current, is_favorite: !favorite } : current)
-      window.alert(error instanceof Error ? error.message : 'Nao foi possivel atualizar o favorito.')
+      window.alert(error instanceof Error ? error.message : 'Não foi possível atualizar o favorito.')
     }
   }
 
@@ -284,6 +313,9 @@ export default function MaterialsScreen() {
             </button>
           )}
         </div>
+        <div className="mt-3 rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
+          Não serão aceitos documentos ou imagens com dados pessoais, nomes de crianças, telefones, e-mails, endereços ou imagens de crianças.
+        </div>
       </div>
 
       {/* ── Tabs ── */}
@@ -308,11 +340,8 @@ export default function MaterialsScreen() {
       </div>
 
       {/* ── Sort bar ── */}
-      <div className="flex items-center justify-between px-[18px] py-2 flex-shrink-0">
-        <p className="text-[11px] text-muted">
-          {filtered.length} {filtered.length === 1 ? 'material' : 'materiais'}
-        </p>
-        <div className="flex items-center gap-2">
+      <div className="px-[18px] py-2 flex-shrink-0 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-2 min-w-max">
           <button
             type="button"
             onClick={() => void refresh()}
@@ -327,9 +356,9 @@ export default function MaterialsScreen() {
           >
             <option value="newest">Mais recentes</option>
             <option value="downloads">Mais baixados</option>
-            <option value="rating">Melhor avaliados</option>
+            <option value="rating">Melhores avaliados</option>
             <option value="oldest">Mais antigos</option>
-            <option value="name">A–Z</option>
+            <option value="name">A-Z</option>
           </select>
           <select
             value={kindFilter}
@@ -339,6 +368,37 @@ export default function MaterialsScreen() {
             <option value="all">Arquivos</option>
             <option value="documents">Documentos</option>
             <option value="images">Imagens</option>
+          </select>
+          <select
+            value={ageFilter}
+            onChange={(e) => setAgeFilter(e.target.value)}
+            className="text-[11px] border border-border rounded-app-sm px-2 py-1 bg-white text-muted outline-none"
+          >
+            <option value="all">Faixa etaria</option>
+            {AGE_RANGES.map((range) => (
+              <option key={range} value={range}>{range}</option>
+            ))}
+          </select>
+          <select
+            value={objectiveFilter}
+            onChange={(e) => setObjectiveFilter(e.target.value)}
+            className="text-[11px] border border-border rounded-app-sm px-2 py-1 bg-white text-muted outline-none"
+          >
+            <option value="all">Objetivo</option>
+            {objectiveOptions.map((objective) => (
+              <option key={objective} value={objective}>{objective}</option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="text-[11px] border border-border rounded-app-sm px-2 py-1 bg-white text-muted outline-none"
+          >
+            <option value="all">Status</option>
+            <option value="published">Aprovado</option>
+            <option value="em_analise">Em analise</option>
+            <option value="review_required">Revisao</option>
+            <option value="blocked">Bloqueado</option>
           </select>
         </div>
       </div>
@@ -375,7 +435,7 @@ export default function MaterialsScreen() {
             >
               <X size={18} />
             </button>
-            <span className="font-serif text-[18px] text-gd flex-1">Adicionar Material</span>
+            <span className="font-serif text-[18px] text-gd flex-1">Adicionar material</span>
           </div>
 
           <div
@@ -389,17 +449,41 @@ export default function MaterialsScreen() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none focus:border-gp"
-                  placeholder="Ex: Sequencia didatica sobre cores e formas"
+                  placeholder="Ex: Sequência didática sobre cores e formas"
                 />
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-muted mb-1">Descricao</span>
+                <span className="block text-[11px] font-bold text-muted mb-1">Descrição</span>
                 <textarea
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   className="w-full min-h-[96px] resize-none rounded-app-sm border border-border px-3 py-3 text-[13px] leading-[1.5] outline-none focus:border-gp"
-                  placeholder="Descreva como esse material ajuda na pratica pedagogica."
+                  placeholder="Descreva como esse material ajuda na prática pedagógica."
+                />
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-muted mb-1">Faixa etária</span>
+                <select
+                  value={ageRange}
+                  onChange={(e) => setAgeRange(e.target.value)}
+                  className="w-full rounded-app-sm border border-border bg-white px-3 py-3 text-[13px] outline-none focus:border-gp"
+                >
+                  <option value="">Não informar</option>
+                  {AGE_RANGES.map((range) => (
+                    <option key={range} value={range}>{range}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-muted mb-1">Objetivo pedagógico</span>
+                <input
+                  value={pedagogicalObjective}
+                  onChange={(e) => setPedagogicalObjective(e.target.value)}
+                  className="w-full rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none focus:border-gp"
+                  placeholder="Ex: ampliar repertório oral, coordenação motora, rotina..."
                 />
               </label>
 
@@ -412,7 +496,7 @@ export default function MaterialsScreen() {
                     {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
                   </p>
                   <p className="mb-3 mt-1 text-[11px] leading-[1.5] text-muted">
-                    PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP ate {MAX_MB} MB
+                    PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
                   </p>
                   <label className="flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white">
                     <UploadCloud size={15} />
@@ -440,10 +524,10 @@ export default function MaterialsScreen() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-bold text-ink truncate">{file.name}</p>
                     <p className="text-[11px] text-muted">{formatFileSize(file.size)}</p>
-                    <p className="text-[10px] text-muted truncate">{file.type || 'MIME vazio'}</p>
+                    <p className="text-[10px] text-muted truncate">{file.type || 'MIME não informado'}</p>
                   </div>
                   <button type="button" onClick={() => pickFile(null)} className="text-[11px] font-bold text-[#C1440E]">
-                    remover
+                    Remover
                   </button>
                 </div>
               )}
@@ -545,11 +629,13 @@ export default function MaterialsScreen() {
                 {preview.file_name && <InfoRow label="Arquivo" value={preview.file_name} />}
                 {!!preview.file_size_bytes && <InfoRow label="Tamanho" value={formatFileSize(preview.file_size_bytes)} />}
                 {preview.detected_category && <InfoRow label="Categoria" value={preview.detected_category} />}
-                {preview.author_name && <InfoRow label="Autor" value={preview.author_name} />}
-                {preview.author_id && <InfoRow label="Reputacao" value={getTeacherReputation(materials, preview.author_id)} />}
+                {preview.age_range && <InfoRow label="Faixa" value={preview.age_range} />}
+                {preview.pedagogical_objective && <InfoRow label="Objetivo" value={preview.pedagogical_objective} />}
+                {preview.author_name && <InfoRow label="Autora" value={preview.author_name} />}
+                {preview.author_id && <InfoRow label="Reputação" value={getTeacherReputation(materials, preview.author_id)} />}
                 <InfoRow label="Downloads" value={String(preview.downloads_count ?? 0)} />
-                <InfoRow label="Visualizacoes" value={String(preview.views_count ?? 0)} />
-                <InfoRow label="Avaliacoes" value={formatRatingSummary(preview)} />
+                <InfoRow label="Visualizações" value={String(preview.views_count ?? 0)} />
+                <InfoRow label="Avaliações" value={formatRatingSummary(preview)} />
                 {preview.published_at && (
                   <InfoRow
                     label="Data"
@@ -638,7 +724,7 @@ function MaterialCard({
     try {
       await onDelete()
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Nao foi possivel excluir este material.')
+      window.alert(error instanceof Error ? error.message : 'Não foi possível excluir este material.')
     } finally {
       setDeleting(false)
     }
@@ -680,6 +766,11 @@ function MaterialCard({
         <span className={`self-start rounded-full px-2 py-0.5 text-[9px] font-bold ${getStatusClass(material.status ?? 'published')}`}>
           {formatStatus(material.status ?? 'published')}
         </span>
+        {(material.age_range || material.pedagogical_objective || material.detected_category) && (
+          <p className="text-[9px] text-muted line-clamp-1">
+            {[material.age_range, material.pedagogical_objective ?? material.detected_category].filter(Boolean).join(' - ')}
+          </p>
+        )}
         <div className="flex items-center gap-2 text-[10px] text-muted">
           <span className="inline-flex items-center gap-0.5">
             <Star size={10} className="text-[#B7791F]" fill={Number(material.average_rating ?? 0) > 0 ? 'currentColor' : 'none'} />
@@ -756,7 +847,7 @@ function EmptyState({
 
   const { title, subtitle, showAdd } = messages[tab] ?? {
     title: 'Nenhum favorito ainda',
-    subtitle: 'Favorite materiais para encontrar rapidamente depois.',
+    subtitle: 'Marque materiais como favoritos para encontrar rapidamente depois.',
     showAdd: false,
   }
 
@@ -822,7 +913,7 @@ function RatingBox({
     try {
       await onRate(material, rating, comment)
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Nao foi possivel salvar a avaliacao.')
+      window.alert(error instanceof Error ? error.message : 'Não foi possível salvar a avaliação.')
     } finally {
       setSaving(false)
     }
@@ -830,10 +921,10 @@ function RatingBox({
 
   return (
     <div className="rounded-app-sm border border-border bg-white p-3">
-      <p className="text-[12px] font-bold text-ink">{hasExistingRating ? 'Sua avaliacao' : 'Avaliar material'}</p>
+      <p className="text-[12px] font-bold text-ink">{hasExistingRating ? 'Sua avaliação' : 'Avaliar material'}</p>
       {hasExistingRating && (
         <p className="mt-1 text-[11px] leading-[1.5] text-muted">
-          Voce ja avaliou este material. Ajuste as estrelas ou o comentario e salve novamente se quiser atualizar.
+          Você já avaliou este material. Ajuste as estrelas ou o comentário e salve novamente se quiser atualizar.
         </p>
       )}
       <div className="mt-2 flex items-center gap-1">
@@ -854,7 +945,7 @@ function RatingBox({
         onChange={(event) => setComment(event.target.value)}
         maxLength={800}
         className="mt-2 w-full min-h-[72px] resize-none rounded-app-sm border border-border px-3 py-2 text-[12px] leading-[1.5] outline-none focus:border-gp"
-        placeholder="Comentario opcional sobre sua avaliacao"
+        placeholder="Comentário opcional sobre sua avaliação"
       />
       <button
         type="button"
@@ -863,7 +954,7 @@ function RatingBox({
         className="mt-2 flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd py-2.5 text-[12px] font-bold text-white disabled:opacity-50"
       >
         {saving && <Loader2 size={14} className="animate-spin" />}
-        {hasExistingRating ? 'Atualizar avaliacao' : 'Salvar avaliacao'}
+        {hasExistingRating ? 'Atualizar avaliação' : 'Salvar avaliação'}
       </button>
     </div>
   )
@@ -875,13 +966,13 @@ function RatingComments({ material }: { material: SupportMaterial }) {
   return (
     <div className="rounded-app-sm border border-border bg-white p-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[12px] font-bold text-ink">Comentarios das avaliacoes</p>
+        <p className="text-[12px] font-bold text-ink">Comentários das avaliações</p>
         <span className="text-[11px] text-muted">{comments.length}</span>
       </div>
 
       {comments.length === 0 ? (
         <p className="mt-2 text-[12px] leading-[1.5] text-muted">
-          Ainda nao ha comentarios de avaliacao para este material.
+          Ainda não há comentários de avaliação para este material.
         </p>
       ) : (
         <div className="mt-3 flex flex-col gap-2">
@@ -921,9 +1012,9 @@ function ReportBox({
       await onReport(material, reason, details)
       setOpen(false)
       setDetails('')
-      window.alert('Denuncia registrada para moderacao.')
+      window.alert('Denúncia registrada para moderação.')
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Nao foi possivel registrar a denuncia.')
+      window.alert(error instanceof Error ? error.message : 'Não foi possível registrar a denúncia.')
     } finally {
       setSending(false)
     }
@@ -951,8 +1042,8 @@ function ReportBox({
         className="mt-2 w-full rounded-app-sm border border-red-100 bg-white px-3 py-2 text-[12px] outline-none"
       >
         <option value="dados_pessoais">Dados pessoais</option>
-        <option value="imagem_crianca">Imagem de crianca</option>
-        <option value="conteudo_inadequado">Conteudo inadequado</option>
+        <option value="imagem_crianca">Imagem de criança</option>
+        <option value="conteúdo_inadequado">Conteúdo inadequado</option>
         <option value="spam">Propaganda ou spam</option>
         <option value="outro">Outro motivo</option>
       </select>
@@ -993,7 +1084,7 @@ function DeleteButton({ onDelete }: { onDelete: () => Promise<void> }) {
     try {
       await onDelete()
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Nao foi possivel excluir este material.')
+      window.alert(error instanceof Error ? error.message : 'Não foi possível excluir este material.')
     } finally {
       setDeleting(false)
     }
@@ -1047,7 +1138,7 @@ function formatStatus(status: MaterialUploadStatus) {
 function formatRatingSummary(material: SupportMaterial) {
   const count = Number(material.ratings_count ?? 0)
   const average = Number(material.average_rating ?? 0)
-  if (!count) return 'Sem avaliacoes'
+  if (!count) return 'Sem avaliações'
   return `${average.toFixed(1)} estrelas (${count})`
 }
 
@@ -1055,7 +1146,7 @@ function getTeacherReputation(materials: SupportMaterial[], authorId: string) {
   const published = materials.filter((item) => item.author_id === authorId && item.status === 'published')
   const count = published.length
   const average = published.reduce((sum, item) => sum + Number(item.average_rating ?? 0), 0) / Math.max(1, count)
-  if (count >= 15 && average >= 4.6) return 'Referencia Pedagogica'
+  if (count >= 15 && average >= 4.6) return 'Referência Pedagógica'
   if (count >= 8 && average >= 4.3) return 'Colaboradora Destaque'
   if (count >= 3) return 'Colaboradora'
   return 'Colaboradora iniciante'

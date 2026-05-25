@@ -107,7 +107,7 @@ export default function AdminHome() {
           <AlertTriangle size={22} />
           <div>
             <p className="eyebrow">Aguardando Supabase</p>
-            <h2>Dados reais entram depois da validação</h2>
+            <h2>Dados reais entram depois da válidação</h2>
             <p>As telas agora definem o fluxo operacional. Depois vamos trocar mocks por consultas protegidas com RLS.</p>
           </div>
         </article>

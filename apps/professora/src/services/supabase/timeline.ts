@@ -23,12 +23,12 @@ export interface TimelineEventInput {
 
 export async function createSupabaseTimelineEvent(input: TimelineEventInput) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const { data, error } = await supabase
     .from('student_timeline_events')
@@ -43,7 +43,7 @@ export async function createSupabaseTimelineEvent(input: TimelineEventInput) {
     .select('id, student_id, event_type, title, body, tags, attachment_path, occurred_at')
     .single()
 
-  if (error) throw toError(error, 'Nao foi possivel salvar o marco no Supabase.')
+  if (error) throw toError(error, 'Não foi possível salvar o marco no Supabase.')
 
   let savedEvent = data
   if (input.attachmentFile) {
@@ -56,7 +56,7 @@ export async function createSupabaseTimelineEvent(input: TimelineEventInput) {
       .select('id, student_id, event_type, title, body, tags, attachment_path, occurred_at')
       .single()
 
-    if (updateError) throw toError(updateError, 'Marco salvo, mas nao foi possivel vincular a foto.')
+    if (updateError) throw toError(updateError, 'Marco salvo, mas não foi possível vincular a foto.')
     savedEvent = updatedEvent
   }
 
@@ -65,7 +65,7 @@ export async function createSupabaseTimelineEvent(input: TimelineEventInput) {
 
 export async function loadSupabaseTimelineEvents(ownerId: string) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data, error } = await supabase
     .from('student_timeline_events')
@@ -101,7 +101,7 @@ async function mapTimelineEvent(event: TimelineRow): Promise<TimelineEvent> {
 
 async function uploadTimelineAttachment(ownerId: string, studentId: string, eventId: string, file: File) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const safeName = sanitizeFileName(file.name, extension)
@@ -112,7 +112,7 @@ async function uploadTimelineAttachment(ownerId: string, studentId: string, even
     contentType: file.type || 'application/octet-stream',
   })
 
-  if (error) throw toError(error, 'Nao foi possivel enviar a foto privada do marco.')
+  if (error) throw toError(error, 'Não foi possível enviar a foto privada do marco.')
   return path
 }
 

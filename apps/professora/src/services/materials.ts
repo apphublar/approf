@@ -8,8 +8,8 @@ export interface MaterialAiReview {
   confianca: number
   categoria_detectada: string
   possui_dados_pessoais: boolean
-  possui_conteudo_inadequado: boolean
-  possui_imagem_sensivel: boolean
+  possui_conteúdo_inadequado: boolean
+  possui_imagem_sensível: boolean
   possui_direito_autoral_suspeito: boolean
   motivo: string
 }
@@ -90,6 +90,8 @@ const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image
 export async function analyzeAndUploadMaterial(input: {
   title: string
   description: string
+  ageRange?: string
+  pedagogicalObjective?: string
   file: File
   onDebugStep?: (steps: UploadDebugStep[]) => void
 }): Promise<MaterialAnalysisResult> {
@@ -104,20 +106,20 @@ export async function analyzeAndUploadMaterial(input: {
   }
 
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
+  if (!supabase) throw new Error('Supabase não configurado para enviar materiais.')
 
-  setStep('auth', 'Verificando autenticacao', 'running')
+  setStep('auth', 'Verificando autenticação', 'running')
   const { data, error } = await supabase.auth.getSession()
   if (error) {
-    setStep('auth', 'Verificando autenticacao', 'error', error.message)
+    setStep('auth', 'Verificando autenticação', 'error', error.message)
     throw error
   }
   const userId = data.session?.user.id
   if (!userId || !data.session?.access_token) {
-    setStep('auth', 'Verificando autenticacao', 'error', 'Sessao nao encontrada')
-    throw new Error('Voce precisa estar logada para enviar materiais.')
+    setStep('auth', 'Verificando autenticação', 'error', 'Sessão não encontrada')
+    throw new Error('Você precisa estar logada para enviar materiais.')
   }
-  setStep('auth', 'Verificando autenticacao', 'ok', `userId: ${userId}; token: sim`)
+  setStep('auth', 'Verificando autenticação', 'ok', `userId: ${userId}; token: sim`)
   console.info('[materials/mobile-diagnostics]', getMobileUploadDiagnostics(input.file, userId, true))
 
   setStep('upload', 'Enviando arquivo', 'running')
@@ -128,6 +130,8 @@ export async function analyzeAndUploadMaterial(input: {
       metadata: {
         title: input.title,
         description: input.description,
+        ageRange: input.ageRange,
+        pedagogicalObjective: input.pedagogicalObjective,
       },
       onDebugStep: (step) => {
         const normalized = toUploadDebugStep(step)
@@ -137,8 +141,8 @@ export async function analyzeAndUploadMaterial(input: {
         emit?.([...steps])
       },
     })
-    if (!payload?.status || !payload.review) throw new Error('Resposta invalida da analise do material.')
-    setStep('upload', 'Arquivo enviado e aguardando analise', 'ok', `status: ${payload.status}`)
+    if (!payload?.status || !payload.review) throw new Error('Resposta inválida da análise do material.')
+    setStep('upload', 'Arquivo enviado e aguardando análise', 'ok', `status: ${payload.status}`)
     return {
       materialId: payload.materialId,
       status: payload.status,
@@ -146,7 +150,7 @@ export async function analyzeAndUploadMaterial(input: {
       extractedTextPreview: payload.extractedTextPreview,
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Nao foi possivel enviar o arquivo. Tente novamente.'
+    const message = error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Tente novamente.'
     setStep('upload', 'Enviando arquivo', 'error', message)
     throw error
   }
@@ -166,11 +170,11 @@ export async function uploadMaterialFile(
   validateMaterialFile(file)
 
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
+  if (!supabase) throw new Error('Supabase não configurado para enviar materiais.')
 
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
-  if (!token) throw new Error('Sessao expirada. Entre novamente.')
+  if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
   const uploadUrlEndpoint = `${getAdminApiUrl()}/api/materials/upload-url`
   onProgress?.(`chamando ${uploadUrlEndpoint}`)
@@ -294,27 +298,27 @@ function validateMaterialFile(file: File) {
     || ['.jpg', '.jpeg', '.png', '.webp'].some((extension) => lowerName.endsWith(extension))
     || ALLOWED_DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
   if (!allowed) {
-    throw new Error('Arquivo nao permitido. Envie apenas PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
+    throw new Error('Arquivo não permitido. Envie apenas PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
   }
   if (file.size > MAX_MATERIAL_SIZE_BYTES) {
-    throw new Error('Nao foi possivel enviar o arquivo. Verifique o tamanho e tente novamente.')
+    throw new Error('Não foi possível enviar o arquivo. Verifique o tamanho e tente novamente.')
   }
 }
 
 function getAdminApiUrl() {
   const url = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
-  if (!url) throw new Error('Backend de materiais nao configurado. Informe VITE_APPROF_ADMIN_API_URL.')
+  if (!url) throw new Error('Backend de materiais não configurado. Informe VITE_APPROF_ADMIN_API_URL.')
   return url
 }
 
 async function callMaterialsApi<T>(path: string, init: RequestInit): Promise<T> {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado para enviar materiais.')
+  if (!supabase) throw new Error('Supabase não configurado para enviar materiais.')
 
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
   const token = data.session?.access_token
-  if (!token) throw new Error('Sessao expirada. Entre novamente.')
+  if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
   const fullUrl = `${getAdminApiUrl()}${path}`
   console.info('[materials] API call', { method: init.method, url: fullUrl })
@@ -329,8 +333,8 @@ async function callMaterialsApi<T>(path: string, init: RequestInit): Promise<T> 
   const payload = parseJsonBody(rawBody) as ({ error?: string } & Record<string, unknown>) | null
   console.info('[materials] API response', { url: fullUrl, status: response.status, ok: response.ok, raw: rawBody, payload })
 
-  if (!response.ok) throw new Error(payload?.error || 'Nao foi possivel acessar os materiais agora.')
-  if (!payload || typeof payload !== 'object') throw new Error('Resposta invalida ao acessar materiais.')
+  if (!response.ok) throw new Error(payload?.error || 'Não foi possível acessar os materiais agora.')
+  if (!payload || typeof payload !== 'object') throw new Error('Resposta inválida ao acessar materiais.')
   return payload as T
 }
 

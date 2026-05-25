@@ -129,7 +129,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      setMessage('Senha atualizada com sucesso.')
+      setMessage('Senhá atualizada com sucesso.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível atualizar a senha.')
     } finally {
@@ -201,7 +201,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             <ChevronLeft size={18} />
           </button>
         )}
-        <span className="font-serif text-[18px] text-gd flex-1">Minha conta</span>
+        <span className="font-serif text-[18px] text-gd flex-1">Minhá conta</span>
       </div>
 
       <div className="scroll-area px-[18px] py-4">
@@ -262,8 +262,8 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             </div>
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Senha e segurança</p>
-              <label className="text-[11px] text-muted">Senha atual</label>
+              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Senhá e segurança</p>
+              <label className="text-[11px] text-muted">Senhá atual</label>
               <div className="relative mt-1 mb-3">
                 <input
                   type={showCurrentPassword ? 'text' : 'password'}

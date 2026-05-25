@@ -29,7 +29,7 @@ export async function listOwnerReports(ownerId: string, filters: ReportListFilte
       ownerId,
       filters,
     )
-    if (compactResult.error) throw toError(compactResult.error, 'Nao foi possivel listar documentos.')
+    if (compactResult.error) throw toError(compactResult.error, 'Não foi possível listar documentos.')
     return (compactResult.data ?? []).map((report: Record<string, unknown>) =>
       withEmptyArtifacts({ ...report, body: null }),
     )
@@ -47,11 +47,11 @@ export async function listOwnerReports(ownerId: string, filters: ReportListFilte
       ownerId,
       filters,
     )
-    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel listar documentos.')
+    if (fallback.error) throw toError(fallback.error, 'Não foi possível listar documentos.')
     return (fallback.data ?? []).map(withEmptyArtifacts)
   }
 
-  if (error) throw toError(error, 'Nao foi possivel listar documentos.')
+  if (error) throw toError(error, 'Não foi possível listar documentos.')
   return data ?? []
 }
 
@@ -71,11 +71,11 @@ export async function getOwnerReportById(ownerId: string, reportId: string) {
       .eq('id', reportId)
       .eq('owner_id', ownerId)
       .maybeSingle()
-    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel carregar o documento.')
+    if (fallback.error) throw toError(fallback.error, 'Não foi possível carregar o documento.')
     return fallback.data ? withEmptyArtifacts(fallback.data) : null
   }
 
-  if (error) throw toError(error, 'Nao foi possivel carregar o documento.')
+  if (error) throw toError(error, 'Não foi possível carregar o documento.')
   return data
 }
 
@@ -97,11 +97,11 @@ export async function getPublicReportByShareToken(reportId: string, token: strin
       .eq('id', reportId)
       .neq('status', 'archived')
       .maybeSingle()
-    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel carregar o documento publico.')
+    if (fallback.error) throw toError(fallback.error, 'Não foi possível carregar o documento publico.')
     return fallback.data ? withEmptyArtifacts(fallback.data) : null
   }
 
-  if (error) throw toError(error, 'Nao foi possivel carregar o documento publico.')
+  if (error) throw toError(error, 'Não foi possível carregar o documento publico.')
   return data
 }
 
@@ -146,11 +146,11 @@ export async function updateOwnerReport(input: {
       .eq('id', input.reportId)
       .eq('owner_id', input.ownerId)
       .single()
-    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel salvar documento.')
+    if (fallback.error) throw toError(fallback.error, 'Não foi possível salvar documento.')
     return withEmptyArtifacts(fallback.data)
   }
 
-  if (error) throw toError(error, 'Nao foi possivel salvar documento.')
+  if (error) throw toError(error, 'Não foi possível salvar documento.')
 
   if (typeof input.isFinalVersion === 'boolean') {
     return setOwnerReportFinalVersion(input.ownerId, input.reportId, input.isFinalVersion)
@@ -197,11 +197,11 @@ export async function createOwnerReport(input: {
       })
       .select(REPORT_SELECT_BASE)
       .single()
-    if (fallback.error) throw toError(fallback.error, 'Nao foi possivel criar documento.')
+    if (fallback.error) throw toError(fallback.error, 'Não foi possível criar documento.')
     return withEmptyArtifacts(fallback.data)
   }
 
-  if (error) throw toError(error, 'Nao foi possivel criar documento.')
+  if (error) throw toError(error, 'Não foi possível criar documento.')
   return data
 }
 
@@ -251,7 +251,7 @@ export async function setOwnerReportFinalVersion(ownerId: string, reportId: stri
     p_is_final: isFinalVersion,
   })
 
-  if (error) throw toError(error, 'Nao foi possivel atualizar versao final.')
+  if (error) throw toError(error, 'Não foi possível atualizar versao final.')
 
   const result = Array.isArray(data) ? data[0] : data
   return result ?? null

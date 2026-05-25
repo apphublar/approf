@@ -19,10 +19,10 @@ export async function GET(request: Request) {
     return NextResponse.json(account, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
     console.error('[account/get] erro interno', error)
-    return NextResponse.json({ error: 'Nao foi possivel carregar sua conta agora.' }, { status: 500, headers: CORS_HEADERS })
+    return NextResponse.json({ error: 'Não foi possível carregar sua conta agora.' }, { status: 500, headers: CORS_HEADERS })
   }
 }
 
@@ -44,9 +44,9 @@ export async function PATCH(request: Request) {
     return NextResponse.json(account, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
     console.error('[account/update] erro interno', error)
-    return NextResponse.json({ error: 'Nao foi possivel atualizar seus dados agora.' }, { status: 500, headers: CORS_HEADERS })
+    return NextResponse.json({ error: 'Não foi possível atualizar seus dados agora.' }, { status: 500, headers: CORS_HEADERS })
   }
 }

@@ -14,8 +14,8 @@ import {
 export const dashboardMetrics = [
   { label: 'Professoras', value: '128', detail: '+18 nos ultimos 7 dias', icon: Users },
   { label: 'Trials ativos', value: '42', detail: '9 vencem em 48h', icon: UserRoundCheck },
-  { label: 'Assinaturas manuais', value: '73', detail: '5 precisam revisao', icon: CreditCard },
-  { label: 'Relatorios IA', value: '386', detail: 'R$ 41,80 em uso estimado', icon: Bot },
+  { label: 'Assinaturas manuais', value: '73', detail: '5 precisam revisão', icon: CreditCard },
+  { label: 'Relatórios IA', value: '386', detail: 'R$ 41,80 em uso estimado', icon: Bot },
 ]
 
 export const adminSections = [
@@ -72,18 +72,18 @@ export const subscriptions = [
 ]
 
 export const materialCategories = [
-  { name: 'Modelos de Relatorio', count: 12, published: 10 },
+  { name: 'Modelos de Relatório', count: 12, published: 10 },
   { name: 'Planos de Aula', count: 24, published: 21 },
   { name: 'Atividades Impressas', count: 18, published: 16 },
-  { name: 'Portfolio do Aluno', count: 8, published: 6 },
-  { name: 'Avaliacao e Registro', count: 15, published: 12 },
+  { name: 'Portfólio do Aluno', count: 8, published: 6 },
+  { name: 'Avaliação e Registro', count: 15, published: 12 },
   { name: 'Datas Comemorativas', count: 9, published: 9 },
 ]
 
 export const materials = [
   {
-    title: 'Relatorio semestral - Educacao Infantil',
-    category: 'Modelos de Relatorio',
+    title: 'Relatório semestral - Educação Infantil',
+    category: 'Modelos de Relatório',
     type: 'DOCX',
     status: 'published',
     downloads: 86,
@@ -98,8 +98,8 @@ export const materials = [
     updatedAt: '2026-05-05',
   },
   {
-    title: 'Ficha de observacao individual',
-    category: 'Avaliacao e Registro',
+    title: 'Fichá de observacao individual',
+    category: 'Avaliação e Registro',
     type: 'PDF',
     status: 'draft',
     downloads: 0,
@@ -122,11 +122,11 @@ export const aiUsage = [
 ]
 
 export const privacyTasks = [
-  'Validar consentimento antes de anexar fotos de criancas.',
+  'Validar consentimento antes de anexar fotos de crianças.',
   'Manter buckets de fotos e PDFs sempre privados.',
   'Auditar liberacoes manuais de acesso no painel interno.',
   'Revisar uso anormal de IA antes de aumentar limites.',
-  'Nao enviar dados completos de criancas por Telegram ou email.',
+  'Nao enviar dados completos de crianças por Telegram ou email.',
 ]
 
 export const auditLogs = [
@@ -137,7 +137,7 @@ export const auditLogs = [
 
 export const notifications = [
   { type: 'Trial expirando', channel: 'email', status: 'queued', target: 'Ana Lima' },
-  { type: 'Relatorio pronto', channel: 'telegram', status: 'sent', target: 'Marina Costa' },
+  { type: 'Relatório pronto', channel: 'telegram', status: 'sent', target: 'Marina Costa' },
   { type: 'Pagamento manual pendente', channel: 'system', status: 'queued', target: 'Beatriz Rocha' },
 ]
 
@@ -153,10 +153,10 @@ export const featureFlags = [
 ]
 
 export const continuityMetrics = [
-  { label: 'Solicitacoes pendentes', value: '7', detail: '3 sem codigo da crianca' },
+  { label: 'Solicitacoes pendentes', value: '7', detail: '3 sem codigo da criança' },
   { label: 'Transferencias abertas', value: '4', detail: '2 aguardam aceite' },
   { label: 'Vinculos aprovados', value: '38', detail: 'ultimos 30 dias' },
-  { label: 'Casos sensiveis', value: '2', detail: 'exigem revisao manual' },
+  { label: 'Casos sensíveis', value: '2', detail: 'exigem revisão manual' },
 ]
 
 export const childLinkRequests = [

@@ -10,18 +10,18 @@ export async function createManualReport(input: {
 }) {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend de documentos nao configurado. Informe VITE_APPROF_ADMIN_API_URL.')
+    throw new Error('Backend de documentos não configurado. Informe VITE_APPROF_ADMIN_API_URL.')
   }
 
   const supabase = getSupabaseClient()
   if (!supabase) {
-    throw new Error('Supabase nao configurado para salvar documentos.')
+    throw new Error('Supabase não configurado para salvar documentos.')
   }
 
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
   const token = data.session?.access_token
-  if (!token) throw new Error('Sessao expirada. Entre novamente.')
+  if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
   const response = await fetch(`${apiBaseUrl}/api/reports`, {
     method: 'POST',
@@ -34,12 +34,12 @@ export async function createManualReport(input: {
 
   const payload = await response.json().catch(() => null) as { error?: string; report?: GeneratedDocument } | null
   if (!response.ok) {
-    const message = payload?.error || 'Nao foi possivel criar o documento manual.'
+    const message = payload?.error || 'Não foi possível criar o documento manual.'
     throw new Error(message)
   }
 
   if (!payload?.report) {
-    throw new Error('Resposta invalida ao criar documento manual.')
+    throw new Error('Resposta inválida ao criar documento manual.')
   }
 
   return payload.report

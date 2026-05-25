@@ -410,7 +410,7 @@ function normalizeText(value: string) {
 }
 
 function getSectionReportTypes(sectionTitle: SectionTitle) {
-  if (sectionTitle === 'Planejamentos') return ['weekly_planning', 'daily_lesson_plan', 'pedagogical_project', 'parents_meeting_record']
+  if (sectionTitle === 'Planejamentos') return ['weekly_planning', 'daily_lesson_plan', 'pedagógical_project', 'parents_meeting_record']
   if (sectionTitle === 'Relatórios') return ['development_report', 'class_diary', 'portfolio_text', 'portfolio_image']
   return undefined
 }

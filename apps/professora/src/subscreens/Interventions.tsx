@@ -256,14 +256,14 @@ export default function InterventionsSubscreen() {
         addAnnotation({
           id: `ann-int-${Date.now()}`,
           category: 'evolucao',
-          label: 'Evolucao de intervencao',
+          label: 'Evolução de intervenção',
           badgeClass: 'badge-ev',
           studentName: selectedStudent.name,
           text: parsed.evolutionRecord || parsed.analysisText,
           date: 'Agora',
           classId: selectedStudent.classId,
           studentId: selectedStudent.id,
-          tags: ['Intervencao', 'Houve avanco'],
+          tags: ['Intervenção', 'Houve avanço'],
           persistence: ['observacao-continua', 'evolucao-positiva'],
         })
       }
@@ -355,7 +355,7 @@ export default function InterventionsSubscreen() {
 
         {step === 'suggestions' && (
           <>
-            <p className="text-[13px] text-muted mb-3">Selecione uma estratégia pedagógica para aplicar com a criança.</p>
+            <p className="text-[13px] text-muted mb-3">Selecione uma estrategia pedagógica para aplicar com a criança.</p>
             <div className="flex flex-col gap-3">
               {suggestions.map((suggestion) => (
                 <div key={suggestion.id} className="bg-white rounded-app border border-border shadow-card p-4">
@@ -458,7 +458,7 @@ export default function InterventionsSubscreen() {
 
             {followupSuggestions.length > 0 && (
               <div className="mt-4">
-                <p className="text-[12px] font-bold text-ink mb-2">Novas estratégias sugeridas</p>
+                <p className="text-[12px] font-bold text-ink mb-2">Novas estrategias sugeridas</p>
                 <div className="flex flex-col gap-2">
                   {followupSuggestions.map((suggestion) => (
                     <div key={suggestion.id} className="rounded-app-sm border border-border bg-cream p-3">

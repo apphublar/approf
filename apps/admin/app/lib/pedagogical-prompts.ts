@@ -77,17 +77,17 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
 
   const system = [
     `Você executa a ETAPA 1 (rascunho pedagógico) do pipeline textual do Approf (${pv}).`,
-    'Produza um RASCUNHO em portugues brasileiro para Educação Infantil (0 a 5 anos), alinhado a BNCC.',
+    'Produza um RASCUNHO em português brasileiro para Educação Infantil (0 a 5 anos), alinhado a BNCC.',
     'Priorize texto util para o dia a dia escolar: claro, objetivo, profissional e natural.',
     'Evite tom academico excessivo, introducoes longas, repeticoes e paragrafos extensos.',
     'Mantenha estrutura organizada com secoes curtas e foco pratico.',
-    'Organize o contexto recebido em secoes logicas com titulos claros.',
+    'Organize o contexto recebido em secoes logicas com títulos claros.',
     'Use linguagem descritiva e acolhedora; evite linguagem julgadora ou rótulos para a criança.',
     'Nunca compare crianças entre si.',
-    'Nunca realize diagnostico medico, clinico ou psicologico.',
+    'Nunca realize diagnóstico medico, clinico ou psicologico.',
     'Não invente fatos: use apenas o contexto fornecido.',
     `Evite em todos os documentos estas expressoes: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
-    'Transforme as informações da professora: preserve detalhes relevantes, organize melhor, corrija a escrita e humanize sem apagar o que foi informado.',
+    'Transforme as informações da professora: preserve detalhes relevantes, organize melhor, corrijá a escrita e humanize sem apagar o que foi informado.',
     ...documentGuidelines.system,
     'A saida desta etapa e um rascunho que sera revisado nas etapas seguintes; não precisa estar perfeita, mas deve ser completa e estruturada.',
   ].join('\n')
@@ -116,12 +116,12 @@ export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromSt
     'Você recebe um RASCUNHO da etapa anterior. Revise e reescreva o texto completo.',
     'Revise a BNCC apenas quando o tipo de documento pedir; não force códigos, teoria ou citações longas.',
     'Mantenha formato profissional, leitura leve e objetiva, sem linguagem academica exagerada.',
-    'Remova ou neutralize qualquer comparacao entre crianças, diagnostico ou conclusao clinica, e linguagem julgadora.',
-    'Mantenha apenas observacoes pedagogicas e descritivas.',
+    'Remova ou neutralize qualquer comparação entre crianças, diagnóstico ou conclusão clínica, e linguagem julgadora.',
+    'Mantenha apenas observações pedagógicas e descritivas.',
     'Preserve fatos e intencoes do rascunho; não invente novos fatos.',
     `Remova linguagem artificial ou bacharelesca, especialmente: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
     ...documentGuidelines.system,
-    'Responda APENAS com o texto final revisado (sem prefacio, sem comentarios meta, sem markdown de explicacao).',
+    'Responda APENAS com o texto final revisado (sem prefácio, sem comentários meta, sem markdown de explicação).',
   ].join('\n')
 
   const user = [
@@ -154,14 +154,14 @@ export function buildStage3FinalRefinementPrompt(input: BuildPromptInput, textFr
 
   const system = [
     `Você executa a ETAPA 3 (refinamento final e humanização) do pipeline textual do Approf (${pv}).`,
-    'Você recebe um texto já revisado pedagogicamente. Melhore fluidez, clareza e tom humano e acolhedor.',
-    'Personalize levemente quando fizer sentido (sem inventar dados) para leitura pela professora e familias.',
-    'Mantenha todas as regras: Educação Infantil 0-5 anos, BNCC, sem diagnostico clinico, sem comparacao entre crianças, sem linguagem julgadora.',
+    'Você recebe um texto já revisado pedagógicamente. Melhore fluidez, clareza e tom humano e acolhedor.',
+    'Personalize levemente quando fizer sentido (sem inventar dados) para leitura pela professora e famílias.',
+    'Mantenha todas as regras: Educação Infantil 0-5 anos, BNCC, sem diagnóstico clinico, sem comparação entre crianças, sem linguagem julgadora.',
     `Se aparecer alguma destas expressoes, substitua por linguagem natural: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
     'Entregue em formato final curto e pratico: secoes claras, paragrafos curtos e linguagem natural.',
     ...documentGuidelines.system,
     'A professora podera editar depois: o texto deve estar pronto para uso e sem tom robotizado.',
-    'Responda APENAS com o texto final (sem prefacio, sem comentarios meta).',
+    'Responda APENAS com o texto final (sem prefácio, sem comentários meta).',
   ].join('\n')
 
   const user = [
@@ -198,7 +198,7 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     `CRIANÇA: ${input.studentName ?? 'Não informado'}`,
     `TURMA: ${input.className ?? 'Não informado'}`,
     `FAIXA ETÁRIA: ${input.ageGroup ?? 'Não informado'}`,
-    `PERÍODO DE AVALIAÇÃO: ${input.evaluationPeriod ?? 'Não informado'}`,
+    `PERÍODO DE AVALIAÇÁO: ${input.evaluationPeriod ?? 'Não informado'}`,
     `MODO: ${input.mode ?? 'Não informado'}`,
     `ESCOPO DE HISTÓRICO: ${input.historyScope === 'student' ? 'desta criança' : 'deste modelo'}`,
     `CAMPOS BNCC: ${bncc}`,
@@ -209,7 +209,7 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     `DURACAO DO PROJETO: ${input.duration?.trim() || 'Não informado'}`,
     `JUSTIFICATIVA DO PROJETO: ${input.justification?.trim() || 'Não informado'}`,
     `METODOLOGIA: ${input.methodology?.trim() || 'Não informado'}`,
-    `AVALIACAO / REGISTRO: ${input.assessment?.join(', ') || 'Não informado'}`,
+    `AVALIAÇÁO / REGISTRO: ${input.assessment?.join(', ') || 'Não informado'}`,
     `CONSIDERACOES FINAIS: ${input.finalConsiderations?.trim() || 'Não informado'}`,
     `DATA DO DIÁRIO: ${input.diaryDate?.trim() || 'Não informado'}`,
     `TEMA DO DIÁRIO: ${input.diaryTheme?.trim() || 'Não informado'}`,
@@ -236,21 +236,21 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     'CONTEXTO LIVRE (QUANDO GERADO DO ZERO):',
     input.blankContext?.trim() || '- Não informado.',
     '',
-    'ANOTAÇÃO BRUTA DA PROFESSORA (quando for Diário de Bordo):',
+    'ANOTAÇÁO BRUTA DA PROFESSORA (quando for Diário de Bordo):',
     input.diaryRawText?.trim() || '- Não informado.',
     '',
-    'ORIENTAÇÃO EXTRA DA PROFESSORA:',
+    'ORIENTAÇÁO EXTRA DA PROFESSORA:',
     input.extraContext?.trim() || '- Não informado.',
     '',
-    'ANEXOS AUTORIZADOS COMO REFERÃŠNCIA (apenas nomes/metadados; não analise o conteúdo binário):',
+    'ANEXOS AUTORIZADOS COMO REFERÊNCIA (apenas nomes/metadados; não analise o conteúdo binário):',
     attachments || '- Nenhum anexo enviado.',
     '',
     'INSTRUCOES DE FORMATO DO RASCUNHO:',
     '- Entregue texto pratico e diretamente utilizavel no dia a dia escolar.',
-    '- Estruture em secoes com titulos claros.',
+    '- Estruture em secoes com títulos claros.',
     '- Use paragrafos curtos, linguagem natural e objetiva, sem excesso de teoria.',
     '- Evite repeticoes, floreios e texto longo sem necessidade.',
-    '- Inclua apenas informações pedagogicamente úteis para professora, escola e família.',
+    '- Inclua apenas informações pedagógicamente úteis para professora, escola e família.',
     ...documentGuidelines.user.map((item) => `- ${item}`),
     ...(requiredStructure.length
       ? [
@@ -296,7 +296,7 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
       'Use BNCC apenas como referência pedagógica breve, sem dominar o documento.',
     )
     user.push('Tamanho final: curto a médio, pronto para a professora aplicar no dia.')
-  } else if (type === 'pedagogical_project') {
+  } else if (type === 'pedagógical_project') {
     system.push(
       'Este documento é um projeto pedagógico específico, com estrutura própria e linguagem institucional simples.',
       'Inclua justificativa, objetivos, etapas, propostas, registros, culminância opcional e avaliação processual.',
@@ -306,7 +306,7 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
   } else if (type === 'specialist_referral' || type === 'specialist_report') {
     system.push(
       'Este documento é um encaminhamento para especialista: formal, objetivo e sem diagnóstico.',
-      'Use apenas comportamentos observáveis, frequência/contexto quando informado e estratégias já tentadas.',
+      'Use apenas comportamentos observáveis, frequência/contexto quando informado e estrategias já tentadas.',
       'Não use termos clínicos como suspeita, transtorno, laudo, déficit, TEA, TDAH ou diagnóstico.',
       'BNCC não deve aparecer como seção central; o foco é registro escolar observável.',
     )
@@ -337,7 +337,7 @@ function formatAnnotations(annotations?: Array<{ date?: string; label?: string; 
     .map((annotation) => {
       const date = annotation.date ?? 'Sem data'
       const label = annotation.label ?? 'Registro'
-      const text = annotation.text?.trim() || 'Sem conteudo'
+      const text = annotation.text?.trim() || 'Sem conteúdo'
       return `- ${date} | ${label}: ${text}`
     })
     .join('\n')
@@ -366,7 +366,7 @@ function mapGenerationType(generationType: AiGenerationType) {
       return 'Planejamento semanal'
     case 'daily_lesson_plan':
       return 'Plano de aula diário'
-    case 'pedagogical_project':
+    case 'pedagógical_project':
       return 'Projeto pedagógico específico'
     case 'specialist_referral':
       return 'Encaminhamento para especialista'
@@ -422,7 +422,7 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
     ]
   }
 
-  if (input.generationType === 'pedagogical_project') {
+  if (input.generationType === 'pedagógical_project') {
     return [
       'Justificativa',
       'Objetivos do projeto',
@@ -435,7 +435,7 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
     return [
       'Motivo do encaminhamento',
       'Comportamentos observáveis na rotina',
-      'Estratégias pedagógicas já aplicadas',
+      'Estrategias pedagógicas já aplicadas',
       'Solicitação de avaliação externa',
     ]
   }
@@ -468,9 +468,9 @@ function buildInterventionSuggestionsPrompt(
     `Você executa a etapa ${stage} do fluxo de Intervenções do Approf (${promptVersion}).`,
     'Você é um assistente pedagógico especializado em educação infantil.',
     'Suas sugestões devem estar alinhadas a BNCC para Educação Infantil e aos direitos de aprendizagem.',
-    'Você NÃƒO pode diagnosticar, citar transtornos, usar linguagem clínica ou emitir laudos.',
+    'Você NÁO pode diagnosticar, citar transtornos, usar linguagem clínica ou emitir laudos.',
     'Use linguagem acolhedora, prática, pedagógica, simples e profissional.',
-    'Nunca use termos: problema, transtorno, diagnostico, falhou, deficit.',
+    'Nunca use termos: problema, transtorno, diagnóstico, falhou, deficit.',
     'Use termos: observou-se, recomenda-se, sugere-se, houve avanço, continuidade do acompanhamento.',
     'Responda APENAS em JSON válido.',
     'Formato JSON obrigatório: {"suggestions":[{"title":"...","summary":"...","objective":"...","howToApply":"...","whatToObserve":"...","recordText":"..."}]}',
@@ -482,7 +482,7 @@ function buildInterventionSuggestionsPrompt(
     '',
     'Sua função é ajudar professoras a pensarem em intervenções pedagógicas a partir de observações feitas sobre crianças durante a rotina escolar.',
     '',
-    'Você NÃƒO pode:',
+    'Você NÁO pode:',
     '- fazer diagnósticos',
     '- citar transtornos',
     '- usar linguagem clínica',
@@ -533,8 +533,8 @@ function buildInterventionFeedbackPrompt(
   const baseSystem = [
     `Você executa a etapa ${stage} do fluxo de Análise de Retorno de Intervenções (${promptVersion}).`,
     'Você é um assistente pedagógico especializado em educação infantil.',
-    'Sua analise deve permanecer alinhada a BNCC para Educação Infantil e ao acompanhamento pedagógico continuo.',
-    'Você NÃƒO pode diagnosticar, sugerir transtornos, usar linguagem médica ou emitir parecer clínico.',
+    'Sua analise deve permanecer alinhada a BNCC para Educação Infantil e ao acompanhamento pedagógico contínuo.',
+    'Você NÁO pode diagnosticar, sugerir transtornos, usar linguagem médica ou emitir parecer clínico.',
     'Use linguagem prática, pedagógica, acolhedora, profissional e simples.',
     'Responda APENAS em JSON válido.',
     'Formato JSON obrigatório:',
@@ -548,7 +548,7 @@ function buildInterventionFeedbackPrompt(
     '',
     'Analise o retorno da professora após uma intervenção pedagógica aplicada.',
     '',
-    'Você NÃƒO pode:',
+    'Você NÁO pode:',
     '- diagnosticar',
     '- sugerir transtornos',
     '- usar linguagem médica',
@@ -577,8 +577,8 @@ function buildInterventionFeedbackPrompt(
     '- sugira adaptações',
     '',
     'Se ainda necessita acompanhamento:',
-    '- sugira novas estratégias pedagógicas',
-    '- mantenha linguagem acolhedora',
+    '- sugira novas estrategias pedagógicas',
+    '- mantenhá linguagem acolhedora',
     '- recomende continuidade do acompanhamento pedagógico',
     '',
     'A resposta deve ser:',
@@ -594,8 +594,8 @@ function buildInterventionFeedbackPrompt(
   return {
     system: baseSystem,
     user: [
-      'Refine a analise anterior preservando regras e objetividade.',
-      'Retorne apenas JSON valido no formato solicitado.',
+      'Refine a análise anterior preservando regras e objetividade.',
+      'Retorne apenas JSON válido no formato solicitado.',
       '',
       previous.trim(),
     ].join('\n'),

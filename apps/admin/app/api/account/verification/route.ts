@@ -38,10 +38,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ verification, account }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Nao foi possivel enviar a verificacao agora.' },
+      { error: error instanceof Error ? error.message : 'Não foi possível enviar a verificação agora.' },
       { status: 400, headers: CORS_HEADERS },
     )
   }

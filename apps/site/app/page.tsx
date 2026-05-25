@@ -57,7 +57,7 @@ const features = [
   {
     icon: <Users size={22} strokeWidth={1.8} />,
     title: 'Cada aluno no seu lugar',
-    desc: 'Crie suas turmas, adicione seus alunos e veja o histórico completo de cada um em um só lugar.',
+    desc: 'Crie suas turmas, adicione seus alunos e vejá o histórico completo de cada um em um só lugar.',
   },
   {
     icon: <Sparkles size={22} strokeWidth={1.8} />,

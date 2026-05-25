@@ -19,8 +19,8 @@ const MATERIAL_REVIEW_SCHEMA = {
     confianca: { type: 'number', minimum: 0, maximum: 1 },
     categoria_detectada: { type: 'string' },
     possui_dados_pessoais: { type: 'boolean' },
-    possui_conteudo_inadequado: { type: 'boolean' },
-    possui_imagem_sensivel: { type: 'boolean' },
+    possui_conteúdo_inadequado: { type: 'boolean' },
+    possui_imagem_sensível: { type: 'boolean' },
     possui_direito_autoral_suspeito: { type: 'boolean' },
     motivo: { type: 'string' },
   },
@@ -29,8 +29,8 @@ const MATERIAL_REVIEW_SCHEMA = {
     'confianca',
     'categoria_detectada',
     'possui_dados_pessoais',
-    'possui_conteudo_inadequado',
-    'possui_imagem_sensivel',
+    'possui_conteúdo_inadequado',
+    'possui_imagem_sensível',
     'possui_direito_autoral_suspeito',
     'motivo',
   ],
@@ -41,8 +41,8 @@ export type MaterialReview = {
   confianca: number
   categoria_detectada: string
   possui_dados_pessoais: boolean
-  possui_conteudo_inadequado: boolean
-  possui_imagem_sensivel: boolean
+  possui_conteúdo_inadequado: boolean
+  possui_imagem_sensível: boolean
   possui_direito_autoral_suspeito: boolean
   motivo: string
 }
@@ -57,6 +57,8 @@ export async function finalizeMaterialUpload(input: {
   ownerId: string
   title: string
   description: string
+  ageRange?: string | null
+  pedagogicalObjective?: string | null
   file: MaterialFileInfo
   bytes: Buffer
   tempPath: string
@@ -72,8 +74,8 @@ export async function finalizeMaterialUpload(input: {
     description: input.description,
     // 0020 columns
     type: input.file.type.startsWith('image/') ? 'image' : 'document',
-    age_range: null as null,
-    pedagogical_objective: input.description,
+    age_range: input.ageRange?.trim() || null,
+    pedagogical_objective: input.pedagogicalObjective?.trim() || input.description,
     file_url: null as null,
     file_size: input.file.size,
     mime_type: input.file.type || inferMimeType(input.file.name),
@@ -118,7 +120,7 @@ export async function finalizeMaterialUpload(input: {
       details: err.details,
       hint: err.hint,
     })
-    throw toError(initial.error, 'Nao foi possivel registrar o material enviado.')
+    throw toError(initial.error, 'Não foi possível registrar o material enviado.')
   }
 
   const materialId = initial.data?.id ?? null
@@ -169,7 +171,7 @@ export async function finalizeMaterialUpload(input: {
         details: err.details,
         hint: err.hint,
       })
-      throw toError(update.error, 'Nao foi possivel atualizar o material analisado.')
+      throw toError(update.error, 'Não foi possível atualizar o material analisado.')
     }
 
     console.info('[materials/upload] step 3 — material updated successfully', { materialId, status })
@@ -191,7 +193,7 @@ export async function finalizeMaterialUpload(input: {
       aprovado: false,
       confianca: 0,
       categoria_detectada: 'Em analise',
-      motivo: 'Material enviado com sucesso. A analise de IA ficara pendente para revisao.',
+      motivo: 'Material enviado com sucesso. A análise de IA ficara pendente para revisão.',
     })
     await supabase
       .from('materials')
@@ -223,7 +225,7 @@ async function analyzeMaterialWithOpenAi(input: {
   extractedText: string
 }) {
   const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('Servico de IA indisponivel no momento.')
+  if (!apiKey) throw new Error('Serviço de IA indisponível no momento.')
 
   const model = process.env.OPENAI_MATERIAL_REVIEW_MODEL?.trim() || 'gpt-4o-mini'
   const prompt = buildMaterialReviewPrompt(input.title, input.description, input.file, input.extractedText)
@@ -245,7 +247,7 @@ async function analyzeMaterialWithOpenAi(input: {
       model,
       temperature: 0,
       messages: [
-        { role: 'system', content: 'Voce analisa materiais pedagogicos para Educacao Infantil e responde apenas JSON valido no schema solicitado.' },
+        { role: 'system', content: 'Você analisa materiais pedagogicos para Educação Infantil e responde apenas JSON válido no schema solicitado.' },
         { role: 'user', content },
       ],
       response_format: {
@@ -261,10 +263,10 @@ async function analyzeMaterialWithOpenAi(input: {
   } | null
   if (!response.ok) {
     console.error('[materials/upload] OpenAI Chat Completions error', response.status, payload?.error?.message)
-    throw new Error('Nao foi possivel concluir a analise de IA do material.')
+    throw new Error('Não foi possível concluir a análise de IA do material.')
   }
   const raw = payload?.choices?.[0]?.message?.content
-  if (!raw) throw new Error('A IA nao retornou uma analise valida.')
+  if (!raw) throw new Error('A IA não retornou uma análise válida.')
   return sanitizeReview(JSON.parse(raw) as Partial<MaterialReview>)
 }
 
@@ -314,28 +316,28 @@ async function tryAnalyzeWithResponsesApi(input: {
 
 function buildMaterialReviewPrompt(title: string, description: string, file: MaterialFileInfo, extractedText: string) {
   return [
-    'Analise o material antes da publicacao na comunidade do app Approf.',
+    'Analise o material antes da publicação na comunidade do app Approf.',
     '',
-    `Titulo informado: ${title}`,
-    `Descricao informada: ${description}`,
+    `Título informado: ${title}`,
+    `Descrição informada: ${description}`,
     `Arquivo: ${file.name}`,
-    `Tipo MIME: ${file.type || 'nao informado'}`,
+    `Tipo MIME: ${file.type || 'não informado'}`,
     `Tamanho: ${file.size} bytes`,
     '',
-    'Conteudo extraido do arquivo:',
-    extractedText || '[Conteudo textual nao extraido automaticamente. Se houver imagem anexada, faca OCR visual. Audio e video nao sao formatos permitidos.]',
+    'Conteúdo extraido do arquivo:',
+    extractedText || '[Conteúdo textual nao extraido automaticamente. Se houver imagem anexada, faca OCR visual. Audio e video nao sao formatos permitidos.]',
     '',
     'Criterios obrigatorios:',
-    '- relacao com educacao infantil;',
-    '- utilidade pedagogica;',
-    '- CPF, telefone, e-mail, endereco, nomes completos de criancas e dados pessoais;',
+    '- relação com educação infantil;',
+    '- utilidade pedagógica;',
+    '- CPF, telefone, e-mail, endereço, nomes completos de crianças e dados pessoais;',
     '- linguagem inadequada, ofensiva, propaganda ou spam;',
-    '- imagem sensivel;',
+    '- imagem sensível;',
     '- suspeita de direito autoral, apenas como informacao complementar;',
-    '- correspondencia entre conteudo, titulo e descricao.',
+    '- correspondencia entre conteúdo, título e descrição.',
     '',
-    'Direito autoral suspeito nao deve impedir aprovacao automatica. O ponto critico e impedir dados pessoais e imagens sensiveis/criancas identificaveis.',
-    'Bloqueie conteudo inadequado. Use confianca baixa quando o conteudo nao puder ser inspecionado suficientemente.',
+    'Direito autoral suspeito não deve impedir aprovacao automatica. O ponto critico e impedir dados pessoais e imagens sensíveis/crianças identificáveis.',
+    'Bloqueie conteúdo inadequado. Use confianca baixa quando o conteúdo nao puder ser inspecionado suficientemente.',
   ].join('\n')
 }
 
@@ -353,8 +355,8 @@ function extractReadableText(file: MaterialFileInfo, bytes: Buffer) {
 
 function resolveMaterialStatus(review: MaterialReview): 'published' | 'review_required' | 'blocked' {
   const minimumConfidence = Number(process.env.MATERIAL_AI_CONFIDENCE_THRESHOLD ?? 0.6)
-  if (review.possui_conteudo_inadequado || review.aprovado === false) return 'blocked'
-  if (review.possui_imagem_sensivel || review.possui_dados_pessoais) return 'review_required'
+  if (review.possui_conteúdo_inadequado || review.aprovado === false) return 'blocked'
+  if (review.possui_imagem_sensível || review.possui_dados_pessoais) return 'review_required'
   if (review.confianca < minimumConfidence) return 'review_required'
   return 'published'
 }
@@ -365,8 +367,8 @@ function sanitizeReview(value: Partial<MaterialReview>): MaterialReview {
     confianca: clampConfidence(value.confianca),
     categoria_detectada: typeof value.categoria_detectada === 'string' ? value.categoria_detectada : 'Nao identificada',
     possui_dados_pessoais: Boolean(value.possui_dados_pessoais),
-    possui_conteudo_inadequado: Boolean(value.possui_conteudo_inadequado),
-    possui_imagem_sensivel: Boolean(value.possui_imagem_sensivel),
+    possui_conteúdo_inadequado: Boolean(value.possui_conteúdo_inadequado),
+    possui_imagem_sensível: Boolean(value.possui_imagem_sensível),
     possui_direito_autoral_suspeito: Boolean(value.possui_direito_autoral_suspeito),
     motivo: typeof value.motivo === 'string' ? value.motivo : '',
   }

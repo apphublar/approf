@@ -2,40 +2,40 @@
 
 ## Publico central
 
-O Approf existe para professoras da educacao infantil que acompanham criancas de 0 a 5 anos.
+O Approf existe para professoras da educação infantil que acompanham crianças de 0 a 5 anos.
 
-Todas as funcionalidades, exemplos, textos de IA, materiais de apoio e relatorios devem considerar essa faixa etaria.
+Todas as funcionalidades, exemplos, textos de IA, materiais de apoio e relatórios devem considerar essa faixa etaria.
 
 O produto deve priorizar:
 
-- rotina pedagogica da educacao infantil;
-- desenvolvimento integral da crianca pequena;
-- linguagem acolhedora para professora e familia;
-- memoria afetiva e pedagogica;
+- rotina pedagógica da educação infantil;
+- desenvolvimento integral da criança pequena;
+- linguagem acolhedora para professora e família;
+- memoria afetiva e pedagógica;
 - campos de experiencia da BNCC quando fizer sentido.
 
-Evitar exemplos, relatorios ou atividades com foco em ensino fundamental, provas, notas, ranking, desempenho escolar competitivo ou comparacao.
+Evitar exemplos, relatórios ou atividades com foco em ensino fundamental, provas, notas, ranking, desempenho escolar competitivo ou comparação.
 
-## Cada crianca e unica
+## Cada criança e unica
 
-O Approf nunca deve comparar criancas entre si.
+O Approf nunca deve comparar crianças entre si.
 
 Nao implementar:
 
-- ranking de criancas;
-- comparacao publica ou privada entre alunos;
+- ranking de crianças;
+- comparação publica ou privada entre alunos;
 - graficos do tipo "melhor/pior";
-- media da turma usada para avaliar uma crianca;
-- diagnostico comparativo.
+- media da turma usada para avaliar uma criança;
+- diagnóstico comparativo.
 
 O produto deve sempre tratar a evolucao como uma jornada individual, contextual e acolhedora.
 
 Permitido:
 
-- acompanhar a evolucao da propria crianca ao longo do tempo;
+- acompanhar a evolucao da propria criança ao longo do tempo;
 - registrar marcos individuais;
-- mostrar memoria pedagogica individual;
-- apoiar a professora com observacoes cuidadosas;
+- mostrar memoria pedagógica individual;
+- apoiar a professora com observações cuidadosas;
 - valorizar progresso sem competicao.
 
 Regra de linguagem:

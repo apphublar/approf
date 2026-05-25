@@ -28,7 +28,7 @@ O Super Admin deve conseguir:
   - ideia;
   - material;
   - relato.
-- Curtidas e comentarios mockados nesta fase.
+- Curtidas e comentários mockados nesta fase.
 - Moderacao futura pelo Super Admin.
 
 ## Banco planejado
@@ -39,7 +39,7 @@ O Super Admin deve conseguir:
 
 ## Privacidade
 
-- Nao permitir postagem com dados completos de criancas.
+- Nao permitir postagem com dados completos de crianças.
 - Criar moderacao antes de liberar para toda a base.
 - Permitir ocultar/remover post pelo Super Admin.
-- Evitar imagens de criancas na Comunidade sem consentimento explicito.
+- Evitar imagens de crianças na Comunidade sem consentimento explicito.

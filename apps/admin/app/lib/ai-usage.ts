@@ -9,7 +9,7 @@ export type AiGenerationType =
   | 'planning_daily'
   | 'daily_lesson_plan'
   | 'planning_project'
-  | 'pedagogical_project'
+  | 'pedagógical_project'
   | 'planning_meeting'
   | 'specialist_referral'
   | 'parents_meeting'
@@ -149,7 +149,7 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     outputTokens: 3000,
     imageCount: 0,
   },
-  pedagogical_project: {
+  pedagógical_project: {
     provider: 'anthropic',
     model: 'claude-text-3stage',
     giztokens: toGizTokens(190),
@@ -273,13 +273,13 @@ const GENERATION_TYPE_RPC_FALLBACK: Partial<Record<AiGenerationType, AiGeneratio
   classroom_journal: 'class_diary',
   planning_daily: 'daily_lesson_plan',
   planning_weekly: 'weekly_planning',
-  planning_project: 'pedagogical_project',
+  planning_project: 'pedagógical_project',
   planning_meeting: 'parents_meeting_record',
   parents_meeting: 'parents_meeting_record',
   class_diary: 'general_report',
   weekly_planning: 'planning',
   daily_lesson_plan: 'planning',
-  pedagogical_project: 'planning',
+  pedagógical_project: 'planning',
   specialist_referral: 'specialist_report',
   parents_meeting_record: 'general_report',
   audio_transcription: 'other',
@@ -351,7 +351,7 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
     const fallbackType = GENERATION_TYPE_RPC_FALLBACK[input.generationType]
     if (fallbackType) {
       console.warn(
-        `[ai-usage] tipo ${input.generationType} indisponivel no banco; reservando como ${fallbackType}`,
+        `[ai-usage] tipo ${input.generationType} indisponível no banco; reservando como ${fallbackType}`,
       )
       rpcGenerationType = fallbackType
       const retry = await supabase.rpc('reserve_ai_usage_atomic', {
@@ -364,12 +364,12 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
   }
 
   if (error) {
-    throw toError(error, 'Nao foi possivel reservar uso de IA.')
+    throw toError(error, 'Não foi possível reservar uso de IA.')
   }
 
   const result = Array.isArray(data) ? data[0] : data
   if (!result) {
-    throw new Error('Resposta invalida ao reservar uso de IA.')
+    throw new Error('Resposta inválida ao reservar uso de IA.')
   }
 
   const walletSummary: WalletSummary | undefined = result.wallet_id ? {
@@ -400,7 +400,7 @@ export async function reserveAiUsage(input: AiUsageRequest): Promise<ReserveAiUs
   return {
     allowed: Boolean(result.allowed),
     reason: result.reason ?? undefined,
-    message: typeof result.message === 'string' ? result.message : 'Nao foi possivel reservar uso de IA.',
+    message: typeof result.message === 'string' ? result.message : 'Não foi possível reservar uso de IA.',
     chargeSource: result.charge_source ?? undefined,
     logId: result.log_id ?? undefined,
     estimate,
@@ -422,12 +422,12 @@ export async function completeAiUsageReservation(input: {
   })
 
   if (error) {
-    throw toError(error, 'Nao foi possivel finalizar a geracao de IA.')
+    throw toError(error, 'Não foi possível finalizar a geração de IA.')
   }
 
   const result = Array.isArray(data) ? data[0] : data
   if (result?.status === 'refunded') {
-    throw new Error('A reserva desta geracao ja foi estornada.')
+    throw new Error('A reserva desta geração já foi estornada.')
   }
 }
 
@@ -450,7 +450,7 @@ export async function refundAiUsageReservation(input: {
   })
 
   if (error) {
-    throw toError(error, 'Nao foi possivel registrar estorno da geracao.')
+    throw toError(error, 'Não foi possível registrar estorno da geração.')
   }
 }
 
@@ -583,7 +583,7 @@ async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, 
     .maybeSingle()
 
   if (currentWalletError) {
-    throw toError(currentWalletError, 'Nao foi possivel ler a carteira mensal atual de IA.')
+    throw toError(currentWalletError, 'Não foi possível ler a carteira mensal atual de IA.')
   }
 
   if (currentWallet) {
@@ -609,7 +609,7 @@ async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, 
     .limit(1)
 
   if (previousWalletError) {
-    throw toError(previousWalletError, 'Nao foi possivel ler a carteira mensal anterior de IA.')
+    throw toError(previousWalletError, 'Não foi possível ler a carteira mensal anterior de IA.')
   }
 
   const previousWallet = previousWalletRows?.[0]

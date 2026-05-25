@@ -13,7 +13,7 @@ const GENERATION_TYPES = new Set<AiGenerationType>([
   'class_diary',
   'weekly_planning',
   'daily_lesson_plan',
-  'pedagogical_project',
+  'pedagógical_project',
   'specialist_referral',
   'parents_meeting_record',
   'general_report',
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Nao foi possivel reservar uso de IA.' },
+      { error: error instanceof Error ? error.message : 'Não foi possível reservar uso de IA.' },
       { status: 400, headers: CORS_HEADERS },
     )
   }
@@ -61,7 +61,7 @@ function parseGenerationType(value: unknown): AiGenerationType {
   if (typeof value === 'string' && GENERATION_TYPES.has(value as AiGenerationType)) {
     return value as AiGenerationType
   }
-  throw new Error('Tipo de geracao invalido.')
+  throw new Error('Tipo de geração inválido.')
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {

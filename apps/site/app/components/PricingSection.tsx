@@ -7,13 +7,13 @@ const WHATSAPP_URL =
   'https://wa.me/5511948268902?text=Ola%2C%20quero%20comecar%20meu%20teste%20gratis%20do%20Approf.'
 
 const allFeatures = [
-  'Anotacoes ilimitadas',
+  'Anotações ilimitadas',
   'Turmas e perfil de alunos',
   'Calendario pedagogico',
   'Comunidade de professoras',
   'Biblioteca de material de apoio',
   'Documentos pessoais seguros',
-  'Relatorios com IA incluidos',
+  'Relatórios com IA incluidos',
   'Conquistas e gamificacao',
 ]
 
@@ -88,7 +88,7 @@ export default function PricingSection() {
 
             <p className="pricing-tagline">
               {isAnnual
-                ? 'Voce paga 10 meses e usa o ano todo.'
+                ? 'Você paga 10 meses e usa o ano todo.'
                 : 'Tudo incluso. Sem planos diferentes.'}
             </p>
 
@@ -125,7 +125,7 @@ export default function PricingSection() {
         </div>
 
         <p className="pricing-security">
-          Pagamento processado com seguranca. Seus dados estao protegidos.
+          Pagamento processado com segurança. Seus dados estao protegidos.
         </p>
       </div>
     </section>

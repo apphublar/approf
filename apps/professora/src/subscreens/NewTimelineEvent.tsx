@@ -66,7 +66,7 @@ export default function NewTimelineEventSubscreen({
     if (!file) return
     setError('')
     if (file.size > MAX_ATTACHMENT_SIZE_MB * 1024 * 1024) {
-      setError(`O arquivo precisa ter ate ${MAX_ATTACHMENT_SIZE_MB} MB.`)
+      setError(`O arquivo precisa ter até ${MAX_ATTACHMENT_SIZE_MB} MB.`)
       return
     }
     if (!ACCEPTED_ATTACHMENT_TYPES.some((type) => file.type.startsWith(type) || file.type === type)) {

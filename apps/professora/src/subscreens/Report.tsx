@@ -3,7 +3,6 @@ import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
 import { listReports, updateReport } from '@/services/reports'
-import { listSupportMaterials, type SupportMaterial } from '@/services/materials'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import { loadDocumentStyleSettings } from '@/utils/document-style'
@@ -38,7 +37,7 @@ interface ReportAttachment {
 }
 
 type ReportMode = 'annotations' | 'blank'
-type PortfolioOutput = 'text' | 'image'
+type PortfólioOutput = 'text' | 'image'
 type PortfolioImageFormat = 'portrait' | 'landscape' | 'square'
 
 export default function ReportSubscreen({ data }: ReportSubscreenProps) {
@@ -73,10 +72,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [blankContext, setBlankContext] = useState('')
   const [extraContext, setExtraContext] = useState('')
   const [attachments, setAttachments] = useState<ReportAttachment[]>([])
-  const [supportMaterials, setSupportMaterials] = useState<SupportMaterial[]>([])
-  const [selectedSupportMaterialIds, setSelectedSupportMaterialIds] = useState<string[]>([])
-  const [loadingSupportMaterials, setLoadingSupportMaterials] = useState(false)
-  const [portfolioOutput, setPortfolioOutput] = useState<PortfolioOutput>('text')
+  const [portfolioOutput, setPortfólioOutput] = useState<PortfólioOutput>('text')
   const [portfolioImageFormat, setPortfolioImageFormat] = useState<PortfolioImageFormat>('portrait')
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
@@ -124,9 +120,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     return filtered.length ? filtered : studentAnnotations
   }, [studentAnnotations])
   const selectedMilestones = milestoneAnnotations.filter((annotation) => selectedMilestoneIds.includes(annotation.id))
-  const selectedSupportMaterials = supportMaterials.filter((material) => selectedSupportMaterialIds.includes(material.id))
   const firstName = selectedStudent?.name.split(' ')[0] ?? 'A criança'
-  const isPortfolio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
+  const isPortfólio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
   const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
   const isClassDiary = reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo'
   const isParentsMeeting = reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais'
@@ -140,7 +135,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const isSpecialistReferral = currentReportType === 'specialist_referral' || currentReportType === 'specialist_report'
   const hasContentBase = isClassDiary
     ? diaryRawText.trim().length >= 20
-    : isPortfolio
+    : isPortfólio
       ? selectedMilestones.length > 0 || extraContext.trim().length >= 10 || attachments.length > 0
     : isParentsMeeting
       ? meetingAgenda.trim().length >= 10
@@ -215,7 +210,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       ignoredNotes: string
       blankContext: string
       extraContext: string
-      portfolioOutput: PortfolioOutput
+      portfolioOutput: PortfólioOutput
       portfolioImageFormat: PortfolioImageFormat
       ageGroup: string
       bnccFields: string[]
@@ -245,7 +240,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       setIgnoredNotes(draft.ignoredNotes || '')
       setBlankContext(draft.blankContext || '')
       setExtraContext(draft.extraContext || '')
-      setPortfolioOutput(draft.portfolioOutput || 'text')
+      setPortfólioOutput(draft.portfolioOutput || 'text')
       setPortfolioImageFormat(draft.portfolioImageFormat || 'portrait')
       setAgeGroup(draft.ageGroup || '')
       setBnccFields(draft.bnccFields || [])
@@ -371,26 +366,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setMode('blank')
   }, [assistantMode])
 
-  useEffect(() => {
-    let active = true
-    setLoadingSupportMaterials(true)
-    listSupportMaterials()
-      .then((items) => {
-        if (!active) return
-        setSupportMaterials(items)
-      })
-      .catch(() => {
-        if (!active) return
-        setSupportMaterials([])
-      })
-      .finally(() => {
-        if (active) setLoadingSupportMaterials(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [])
-
   const mockReport = createReportPreview({
     reportKind,
     studentName: isClassDiary || isParentsMeeting ? '-' : (selectedStudent?.name ?? '-'),
@@ -462,19 +437,12 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setAttachments((current) => current.filter((item) => item.id !== id))
   }
 
-  function toggleSupportMaterial(id: string) {
-    setSelectedSupportMaterialIds((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    )
-  }
-
   function resetReportFormAfterGeneration() {
     setSelectedAnnotationIds([])
     setIgnoredNotes('')
     setBlankContext('')
     setExtraContext('')
     setAttachments([])
-    setSelectedSupportMaterialIds([])
     setDiaryTheme('')
     setDiaryRawText('')
     setAgeGroup('')
@@ -506,7 +474,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
     try {
       const styleSettings = loadDocumentStyleSettings()
-      const materialExampleContext = formatSupportMaterialExamples(selectedSupportMaterials)
       const requestSummary = {
         reportKind,
         portfolioOutput,
@@ -546,13 +513,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         })),
         ignoredNotes,
         blankContext,
-        extraContext: [extraContext.trim(), materialExampleContext].filter(Boolean).join('\n\n'),
-        materialExamples: selectedSupportMaterials.map((material) => ({
-          title: material.title,
-          description: material.description,
-          category: material.detected_category,
-          preview: material.content_preview,
-        })),
+        extraContext: extraContext.trim(),
         attachments: attachments.map((item) => ({
           name: item.name,
           type: item.type,
@@ -695,7 +656,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                       ? 'Preencha rapidamente os dados do dia da turma para gerar o diário.'
                       : isParentsMeeting
                       ? 'Selecione a turma e descreva a pauta para planejar a reunião.'
-                      : 'Escolha a criança. Orientações extras e anexos são opcionais.'}
+                      : 'Escolhá a criança. Orientações extras e anexos são opcionais.'}
                   </p>
                 </div>
               </div>
@@ -1006,7 +967,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfolio && (
+            {!isClassDiary && !isParentsMeeting && !isPortfólio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Base do documento
@@ -1061,14 +1022,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {isPortfolio && (
+            {isPortfólio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Tipo de portfólio
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => setPortfolioOutput('text')}
+                    onClick={() => setPortfólioOutput('text')}
                     className={`rounded-app-sm border px-3 py-3 text-left ${
                       portfolioOutput === 'text' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
                     }`}
@@ -1077,7 +1038,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                     <span className="block text-[11px] mt-1">Narrativa pedagógica e evidências</span>
                   </button>
                   <button
-                    onClick={() => setPortfolioOutput('image')}
+                    onClick={() => setPortfólioOutput('image')}
                     className={`rounded-app-sm border px-3 py-3 text-left ${
                       portfolioOutput === 'image' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
                     }`}
@@ -1089,7 +1050,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfolio && !isDevelopmentReport && (
+            {!isClassDiary && !isParentsMeeting && !isPortfólio && !isDevelopmentReport && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                 Histórico
@@ -1122,7 +1083,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
-            {isPortfolio && (
+            {isPortfólio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
@@ -1163,7 +1124,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfolio && (mode === 'annotations' ? (
+            {!isClassDiary && !isParentsMeeting && !isPortfólio && (mode === 'annotations' ? (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
@@ -1230,7 +1191,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 </label>
                 <textarea
                   className="w-full min-h-[86px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                  placeholder="Ex: não considerar a anotação sobre choro da primeira semana, pois ja foi superado..."
+                  placeholder="Ex: não considerar a anotação sobre choro da primeira semana, pois já foi superado..."
                   value={ignoredNotes}
                   onChange={(event) => setIgnoredNotes(event.target.value)}
                 />
@@ -1272,11 +1233,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             {!isParentsMeeting && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                {isPortfolio ? 'Campo de observação' : 'Orientação adicional'}
+                {isPortfólio ? 'Campo de observação' : 'Orientação adicional'}
               </label>
               <textarea
                 className="w-full min-h-[118px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-                placeholder={isPortfolio
+                placeholder={isPortfólio
                   ? 'Algo que você queira acrescentar sobre o desenvolvimento desta criança ou sobre as fotos anexadas.'
                   : 'Ex.: destacar a adaptação nas últimas semanas, evitar linguagem muito técnica e incluir encaminhamentos para a família...'}
                 value={extraContext}
@@ -1285,16 +1246,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
-            {!isParentsMeeting && (
-              <SupportMaterialPicker
-                materials={supportMaterials}
-                selectedIds={selectedSupportMaterialIds}
-                loading={loadingSupportMaterials}
-                onToggle={toggleSupportMaterial}
-              />
-            )}
-
-            {isPortfolio && (
+            {isPortfólio && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-[12px] bg-gbg flex items-center justify-center text-gm flex-shrink-0">
@@ -1507,12 +1459,12 @@ function matchesStudent(annotation: Annotation, studentId: string, studentName?:
   return false
 }
 
-function getReportGenerationType(reportKind: string, portfolioOutput: PortfolioOutput): AiGenerationType {
+function getReportGenerationType(reportKind: string, portfolioOutput: PortfólioOutput): AiGenerationType {
   if (reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento') return 'development_report'
   if (reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo') return 'class_diary'
   if (reportKind === 'Planejamento semanal') return 'weekly_planning'
   if (reportKind === 'Plano de aula diário') return 'daily_lesson_plan'
-  if (reportKind === 'Projeto pedagógico específico' || reportKind === 'Projeto Pedagógico') return 'pedagogical_project'
+  if (reportKind === 'Projeto pedagógico específico' || reportKind === 'Projeto Pedagógico') return 'pedagógical_project'
   if (reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais') return 'parents_meeting_record'
   if (reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio') {
     return portfolioOutput === 'image' ? 'portfolio_image' : 'portfolio_text'
@@ -1532,7 +1484,7 @@ function createReportPreview(input: {
   blankContext: string
   extraContext: string
   attachments: ReportAttachment[]
-  portfolioOutput: PortfolioOutput
+  portfolioOutput: PortfólioOutput
   portfolioImageFormat: PortfolioImageFormat
   diaryDate: string
   diaryTheme: string
@@ -1565,18 +1517,18 @@ BASE UTILIZADA
 
 ${sourceBlock}
 
-ORIENTAÇÃO ADICIONAL DA PROFESSORA
+ORIENTAÇÁO ADICIONAL DA PROFESSORA
 
 ${input.extraContext.trim() || 'Nenhuma orientação adicional foi incluída antes da geração.'}`
 
   if (input.reportKind === 'Registro de reunião de pais' || input.reportKind === 'Planejamento de Reunião dos Pais') {
-    return `PLANEJAMENTO DE REUNIÃO — ${input.className}
+    return `PLANEJAMENTO DE REUNIÁO — ${input.className}
 Data: ${input.meetingDate || '__ / __ / ____'}   Duração estimada: ${input.meetingDuration || '1h30'}
 
 ABERTURA (10 min)
 ${input.meetingOpening.trim() || 'Como receber os pais e criar ambiente acolhedor.'}
 
-PAUTA DA REUNIÃO
+PAUTA DA REUNIÁO
 ${input.meetingAgenda.trim() || '1. [item da pauta] — tempo sugerido'}
 
 INFORMAÇÕES GERAIS DA TURMA
@@ -1585,7 +1537,7 @@ ${input.meetingGeneralInfo.trim() || 'Baseado nas suas anotações: como a turma
 COMBINADOS GERAIS
 ${input.meetingAgreements.trim() || 'Sugestões de rotina e parceria com as famílias.'}
 
-ESPAÇO PARA ANOTAÇÕES DURANTE A REUNIÃO
+ESPAÇO PARA ANOTAÇÕES DURANTE A REUNIÁO
 ________________________________________
 ________________________________________
 ________________________________________
@@ -1696,13 +1648,13 @@ ${specialistSections.axes.map((axis) => `- ${axis}`).join('\n')}
 Potencialidades e respostas positivas:
 - interesses, iniciativas e momentos de participação;
 - vínculos construídos com adultos e colegas;
-- estratégias que favoreceram segurança, comunicação ou organização;
+- estrategias que favoreceram segurança, comunicação ou organização;
 - situações em que a criança demonstrou curiosidade, autonomia ou bem-estar.
 
 Pontos de apoio observados:
 - situações que exigem mediação mais próxima;
 - contextos de maior desafio na rotina;
-- recursos, adaptacoes ou antecipacoes que podem ajudar;
+- recursos, adaptações ou antecipacoes que podem ajudar;
 - parceria necessária entre escola, família e especialista.
 
 Encaminhamentos:
@@ -1749,68 +1701,6 @@ function formatAttachments(attachments: ReportAttachment[]) {
   return `\n\nANEXOS CONSIDERADOS\n\n${attachments.map((item) => `- ${item.name} (${formatFileSize(item.size)})`).join('\n')}`
 }
 
-function formatSupportMaterialExamples(materials: SupportMaterial[]) {
-  if (!materials.length) return ''
-  return [
-    'MATERIAIS DE APOIO USADOS COMO REFERENCIA',
-    '',
-    ...materials.map((material, index) => [
-      `${index + 1}. ${material.title}`,
-      material.description ? `Descricao: ${material.description}` : '',
-      material.detected_category ? `Categoria: ${material.detected_category}` : '',
-      material.content_preview ? `Trecho seguro: ${material.content_preview.slice(0, 900)}` : '',
-    ].filter(Boolean).join('\n')),
-    '',
-    'Use estes materiais apenas como referencia de estrutura, linguagem, ideias pedagogicas e exemplos. Nao copie dados pessoais e nao invente que a crianca realizou algo sem base nas informacoes do formulario.',
-  ].join('\n')
-}
-
-function SupportMaterialPicker(props: {
-  materials: SupportMaterial[]
-  selectedIds: string[]
-  loading: boolean
-  onToggle: (id: string) => void
-}) {
-  if (props.loading) {
-    return (
-      <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-        <p className="text-[13px] font-bold text-ink">Material de apoio como exemplo</p>
-        <p className="text-[12px] text-muted mt-1">Carregando materiais aprovados...</p>
-      </div>
-    )
-  }
-
-  if (!props.materials.length) return null
-
-  return (
-    <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-      <p className="text-[13px] font-bold text-ink">Material de apoio como exemplo</p>
-      <p className="text-[11px] text-muted leading-[1.5] mt-1 mb-3">
-        Selecione materiais aprovados para a IA usar como referencia na estrutura e nas ideias do documento.
-      </p>
-      <div className="flex flex-col gap-2">
-        {props.materials.slice(0, 8).map((material) => {
-          const selected = props.selectedIds.includes(material.id)
-          return (
-            <button
-              key={material.id}
-              onClick={() => props.onToggle(material.id)}
-              className={`w-full rounded-app-sm border px-3 py-3 text-left ${
-                selected ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
-              }`}
-            >
-              <span className="block text-[12px] font-bold text-ink">{selected ? '[x] ' : '[ ] '}{material.title}</span>
-              <span className="block text-[11px] mt-1 line-clamp-2">
-                {material.description || material.content_preview || 'Material aprovado para referencia.'}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function isSpecialistReport(reportKind: string) {
   return [
     'Relatório para neuropediatra',
@@ -1848,7 +1738,7 @@ function getSpecialistSections(reportKind: string) {
 
   if (reportKind === 'Relatório para terapeuta ocupacional') {
     return {
-      objective: 'Descrever aspectos sensoriais, motores e de autonomia que interferem na participacao da criança nas atividades diarias.',
+      objective: 'Descrever aspectos sensoriais, motores e de autonomia que interferem na participação da criança nas atividades diarias.',
       axes: [
         'processamento sensorial diante de ruidos, texturas, luz, cheiros e movimentos',
         'habilidades motoras finas, preensao, manipulacao e uso de materiais',
@@ -1864,7 +1754,7 @@ function getSpecialistSections(reportKind: string) {
       axes: [
         'regulacao emocional diante de alegria, tristeza, frustracao e espera',
         'interacao social com colegas e adultos',
-        'participacao em atividades coletivas, cooperacao e combinados',
+        'participação em atividades coletivas, cooperacao e combinados',
         'mudancas de humor, isolamento, medos ou preocupacoes observadas',
       ],
     }
@@ -1872,12 +1762,12 @@ function getSpecialistSections(reportKind: string) {
 
   if (reportKind === 'Relatório para psicopedagogo') {
     return {
-      objective: 'Descrever processos de aprendizagem, engajamento e estrategias que favorecem a participacao da criança.',
+      objective: 'Descrever processos de aprendizagem, engajamento e estrategias que favorecem a participação da criança.',
       axes: [
-        'formas de aprender: visual, auditiva, corporal, pratica ou por imitacao',
-        'atencao, memoria, raciocinio logico e resolucao de problemas',
-        'motivacao e engajamento nas propostas pedagogicas',
-        'estrategias pedagogicas que funcionam melhor para a criança',
+        'formas de aprender: visual, auditiva, corporal, prática ou por imitacao',
+        'atenção, memoria, raciocinio logico e resolucao de problemas',
+        'motivacao e engajamento nas propostas pedagógicas',
+        'estrategias pedagógicas que funcionam melhor para a criança',
       ],
     }
   }
@@ -1888,8 +1778,8 @@ function getSpecialistSections(reportKind: string) {
       axes: [
         'motivo do encaminhamento e situacoes observadas',
         'frequencia, contexto e impacto na rotina escolar',
-        'estrategias ja tentadas pela escola',
-        'solicitacao de avaliação e orientacoes para continuidade do acompanhamento',
+        'estrategias já tentadas pela escola',
+        'solicitação de avaliação e orientacoes para continuidade do acompanhamento',
       ],
     }
   }
@@ -1902,7 +1792,7 @@ function getSpecialistSections(reportKind: string) {
       'comportamento: rotina, frustracoes, interesses, repeticoes, passividade ou agressividade',
       'aspectos sensoriais: sons, texturas, cheiros, luz e movimentos',
       'sono, alimentacao, higiene, vestuario e outras habilidades adaptativas',
-      'aspectos psicomotores e cognitivos: coordenacao, atencao, memoria e resolucao de problemas',
+      'aspectos psicomotores e cognitivos: coordenacao, atenção, memoria e resolucao de problemas',
     ],
   }
 }

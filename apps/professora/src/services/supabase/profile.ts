@@ -5,12 +5,12 @@ export async function updateTeacherOnboardingProfile(input: {
   estimatedStudentCount?: number
 }) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const userId = userData.user?.id
-  if (!userId) throw new Error('Sessao nao encontrada.')
+  if (!userId) throw new Error('Sessão não encontrada.')
 
   const update = {
     ...(input.fullName?.trim() ? { full_name: input.fullName.trim() } : {}),
@@ -25,7 +25,7 @@ export async function updateTeacherOnboardingProfile(input: {
     .update(update)
     .eq('id', userId)
 
-  if (error) throw toError(error, 'Nao foi possivel salvar os dados iniciais.')
+  if (error) throw toError(error, 'Não foi possível salvar os dados iniciais.')
 }
 
 function toError(error: unknown, fallbackMessage: string) {

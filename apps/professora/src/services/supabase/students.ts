@@ -30,12 +30,12 @@ export interface StudentInput {
 
 export async function createSupabaseStudent(input: StudentInput) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const studentInsert = {
     owner_id: ownerId,
@@ -67,8 +67,8 @@ export async function createSupabaseStudent(input: StudentInput) {
     error = fallback.error
   }
 
-  if (error) throw toError(error, 'Nao foi possivel criar a crianca no Supabase.')
-  if (!data) throw new Error('Nao foi possivel criar a crianca no Supabase.')
+  if (error) throw toError(error, 'Não foi possível criar a criança no Supabase.')
+  if (!data) throw new Error('Não foi possível criar a criança no Supabase.')
 
   let savedStudent = data
   if (input.photoFile) {
@@ -94,8 +94,8 @@ export async function createSupabaseStudent(input: StudentInput) {
         .single()
     }
 
-    if (update.error) throw toError(update.error, 'Foto enviada, mas nao foi possivel vincular ao cadastro.')
-    if (!update.data) throw new Error('Foto enviada, mas nao foi possivel vincular ao cadastro.')
+    if (update.error) throw toError(update.error, 'Foto enviada, mas não foi possível vincular ao cadastro.')
+    if (!update.data) throw new Error('Foto enviada, mas não foi possível vincular ao cadastro.')
     savedStudent = update.data
   }
 
@@ -105,12 +105,12 @@ export async function createSupabaseStudent(input: StudentInput) {
 
 export async function updateSupabaseStudent(studentId: string, input: StudentInput) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const photoPath = input.photoFile ? await uploadChildPhoto(ownerId, studentId, input.photoFile) : undefined
   const updatePayload = {
@@ -146,8 +146,8 @@ export async function updateSupabaseStudent(studentId: string, input: StudentInp
     error = fallback.error
   }
 
-  if (error) throw toError(error, 'Nao foi possivel atualizar a crianca no Supabase.')
-  if (!data) throw new Error('Nao foi possivel atualizar a crianca no Supabase.')
+  if (error) throw toError(error, 'Não foi possível atualizar a criança no Supabase.')
+  if (!data) throw new Error('Não foi possível atualizar a criança no Supabase.')
   if (input.photoPosition) savePhotoAdjustment(data.id, input.photoPosition)
   return mapSupabaseStudent(data)
 }
@@ -189,7 +189,7 @@ export async function mapSupabaseStudent(student: SupabaseStudentRow): Promise<S
 
 async function uploadChildPhoto(ownerId: string, studentId: string, file: File) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const path = `${ownerId}/${studentId}/profile-${Date.now()}.${extension}`
@@ -199,7 +199,7 @@ async function uploadChildPhoto(ownerId: string, studentId: string, file: File) 
     contentType: file.type || 'image/jpeg',
   })
 
-  if (error) throw toError(error, 'Nao foi possivel enviar a foto privada da crianca.')
+  if (error) throw toError(error, 'Não foi possível enviar a foto privada da criança.')
   return path
 }
 

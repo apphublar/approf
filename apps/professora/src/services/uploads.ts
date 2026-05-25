@@ -16,7 +16,7 @@ export async function uploadFileToBackend<T>(input: {
   onDebugStep?: (step: VisualUploadDebugStep) => void
 }): Promise<T> {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado para enviar arquivos.')
+  if (!supabase) throw new Error('Supabase não configurado para enviar arquivos.')
 
   input.onDebugStep?.({
     id: 'file-selected',
@@ -25,19 +25,19 @@ export async function uploadFileToBackend<T>(input: {
     detail: stringifyDebug(getUploadDiagnostics(input.file)),
   })
 
-  input.onDebugStep?.({ id: 'auth', label: 'Usuario autenticado', status: 'running' })
+  input.onDebugStep?.({ id: 'auth', label: 'Usuária autenticada', status: 'running' })
   const { data, error } = await supabase.auth.getSession()
   if (error) {
-    input.onDebugStep?.({ id: 'auth', label: 'Usuario autenticado', status: 'error', detail: error.message })
+    input.onDebugStep?.({ id: 'auth', label: 'Usuária autenticada', status: 'error', detail: error.message })
     throw error
   }
   const token = data.session?.access_token
   const userId = data.session?.user.id
   if (!token) {
-    input.onDebugStep?.({ id: 'auth', label: 'Usuario autenticado', status: 'error', detail: 'Token ausente' })
-    throw new Error('Sua sessao expirou. Faca login novamente.')
+    input.onDebugStep?.({ id: 'auth', label: 'Usuária autenticada', status: 'error', detail: 'Token ausente' })
+    throw new Error('Sua sessão expirou. Faça login novamente.')
   }
-  input.onDebugStep?.({ id: 'auth', label: 'Usuario autenticado', status: 'ok', detail: `userId: ${userId}; token: sim` })
+  input.onDebugStep?.({ id: 'auth', label: 'Usuária autenticada', status: 'ok', detail: `userId: ${userId}; token: sim` })
 
   const endpoint = `${getAdminApiUrl()}/api/uploads`
   const formData = new FormData()
@@ -47,7 +47,7 @@ export async function uploadFileToBackend<T>(input: {
 
   input.onDebugStep?.({
     id: 'api-start',
-    label: 'Inicio do upload',
+    label: 'Início do envio',
     status: 'running',
     detail: `${input.module} -> ${endpoint}`,
   })
@@ -69,7 +69,7 @@ export async function uploadFileToBackend<T>(input: {
   } catch (fetchError) {
     input.onDebugStep?.({
       id: 'api-start',
-      label: 'Inicio do upload',
+      label: 'Início do envio',
       status: 'error',
       detail: stringifyDebug(fetchError),
     })
@@ -110,15 +110,15 @@ export async function uploadFileToBackend<T>(input: {
   })
 
   if (!response.ok) {
-    throw new Error(payload?.error || 'Nao foi possivel enviar o arquivo. Tente novamente.')
+    throw new Error(payload?.error || 'Não foi possível enviar o arquivo. Tente novamente.')
   }
-  if (!payload || typeof payload !== 'object') throw new Error('Resposta invalida ao enviar o arquivo.')
+  if (!payload || typeof payload !== 'object') throw new Error('Resposta inválida ao enviar o arquivo.')
   return payload as T
 }
 
 function getAdminApiUrl() {
   const url = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
-  if (!url) throw new Error('Backend de uploads nao configurado. Informe VITE_APPROF_ADMIN_API_URL.')
+  if (!url) throw new Error('Backend de uploads não configurado. Informe VITE_APPROF_ADMIN_API_URL.')
   return url
 }
 

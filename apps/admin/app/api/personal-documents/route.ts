@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
     if (isMissingPersonalDocumentsTable(error)) {
-      return jsonError('Banco de dados ainda nao atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
+      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
     }
     return jsonError(error instanceof Error ? error.message : 'Não foi possível listar seus documentos.', 500)
   }
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
     if (isMissingPersonalDocumentsTable(error)) {
-      return jsonError('Banco de dados ainda nao atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
+      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
     }
     return jsonError(error instanceof Error ? error.message : 'Não foi possível salvar seu documento.', 500)
   }

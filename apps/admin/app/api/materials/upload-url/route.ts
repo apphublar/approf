@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     if (!fileName || !Number.isFinite(fileSize)) {
       console.warn('[materials/upload-url] invalid file params', { fileName, fileSize })
-      return jsonError('Arquivo invalido para upload.', 400)
+      return jsonError('Arquivo inválido para upload.', 400)
     }
 
     const validationError = validateMaterialFile({ name: fileName, type: fileType, size: fileSize })
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       const bucketExists = buckets?.some((b) => b.id === MATERIAL_BUCKET)
       if (!bucketExists) {
         console.error('[materials/upload-url] bucket not found', { MATERIAL_BUCKET, available: buckets?.map((b) => b.id) })
-        return jsonError(`Bucket de storage "${MATERIAL_BUCKET}" nao encontrado. Verifique se a migration 0020 foi aplicada.`, 500)
+        return jsonError(`Bucket de storage "${MATERIAL_BUCKET}" não encontrado. Verifique se a migration 0020 foi aplicada.`, 500)
       }
       console.info('[materials/upload-url] bucket confirmed', { MATERIAL_BUCKET })
     }
@@ -60,12 +60,12 @@ export async function POST(request: Request) {
         message: error.message,
         status: (error as { status?: number }).status,
       })
-      throw new Error(error.message || 'Nao foi possivel preparar o upload do arquivo.')
+      throw new Error(error.message || 'Não foi possível preparar o upload do arquivo.')
     }
 
     if (!data?.token) {
       console.error('[materials/upload-url] signed URL returned no token', { data })
-      throw new Error('Nao foi possivel preparar o upload do arquivo.')
+      throw new Error('Não foi possível preparar o upload do arquivo.')
     }
 
     console.info('[materials/upload-url] signed URL created successfully', { filePath, hasToken: true })
@@ -80,10 +80,10 @@ export async function POST(request: Request) {
     )
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return jsonError('Sessao expirada. Entre novamente.', error.status)
+      return jsonError('Sessão expirada. Entre novamente.', error.status)
     }
     console.error('[materials/upload-url] unhandled error', error instanceof Error ? error.message : error)
-    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel preparar o upload do arquivo.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível preparar o upload do arquivo.', 500)
   }
 }
 

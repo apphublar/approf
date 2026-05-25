@@ -1,70 +1,171 @@
-﻿import { Download, FileUp, FolderPlus, UploadCloud } from 'lucide-react'
+import { revalidatePath } from 'next/cache'
+import type { ReactNode } from 'react'
+import { Eye, FileText, Flag, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
-import { materialCategories, materials } from '../lib/mock-admin-data'
+import { createSupabaseServiceClient } from '../lib/supabase-server'
 
-export default function MaterialsPage() {
+export const dynamic = 'force-dynamic'
+
+type MaterialStatus = 'draft' | 'published' | 'archived' | 'review_required' | 'blocked' | 'em_analise'
+
+type MaterialRecord = {
+  id: string
+  title: string
+  description: string | null
+  type: string | null
+  age_range: string | null
+  pedagogical_objective: string | null
+  file_name: string | null
+  file_type: string | null
+  file_size_bytes: number | null
+  status: MaterialStatus
+  ai_analysis_status: string | null
+  ai_review: Record<string, unknown> | null
+  detected_category: string | null
+  content_preview: string | null
+  author_name: string | null
+  author_avatar: string | null
+  downloads_count: number | null
+  views_count: number | null
+  ratings_count: number | null
+  average_rating: number | null
+  reports_count: number | null
+  auto_hidden_at: string | null
+  published_at: string | null
+  created_at: string
+}
+
+type ReportRecord = {
+  id: string
+  material_id: string
+  reporter_id: string | null
+  reason: string
+  details: string | null
+  status: 'open' | 'reviewed' | 'dismissed'
+  created_at: string
+}
+
+const statusOptions: Array<{ value: MaterialStatus; label: string }> = [
+  { value: 'published', label: 'Aprovado' },
+  { value: 'em_analise', label: 'Em analise' },
+  { value: 'review_required', label: 'Revisao necessaria' },
+  { value: 'blocked', label: 'Bloqueado' },
+  { value: 'archived', label: 'Arquivado' },
+  { value: 'draft', label: 'Rascunho' },
+]
+
+export default async function MaterialsPage() {
+  const supabase = createSupabaseServiceClient()
+  const [{ data: materialsData, error }, { data: categoriesData }, { data: reportsData }] = await Promise.all([
+    supabase
+      .from('materials')
+      .select('id, title, description, type, age_range, pedagogical_objective, file_name, file_type, file_size_bytes, status, ai_analysis_status, ai_review, detected_category, content_preview, author_name, author_avatar, downloads_count, views_count, ratings_count, average_rating, reports_count, auto_hidden_at, published_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    supabase
+      .from('material_categories')
+      .select('id, name, slug, is_active, sort_order')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('material_reports')
+      .select('id, material_id, reporter_id, reason, details, status, created_at')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(80),
+  ])
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const materials = (materialsData ?? []) as MaterialRecord[]
+  const reports = (reportsData ?? []) as ReportRecord[]
+  const metrics = {
+    published: materials.filter((item) => item.status === 'published').length,
+    review: materials.filter((item) => item.status === 'review_required' || item.status === 'em_analise').length,
+    blocked: materials.filter((item) => item.status === 'blocked').length,
+    reports: reports.length,
+  }
+
   return (
     <>
       <PageHeader
         eyebrow="Material de apoio"
-        title="Biblioteca das professoras"
-        description="Suba arquivos por categoria, publique quando estiver pronto e disponibilize para download no app PWA."
+        title="Biblioteca e moderacao"
+        description="Auditoria real dos materiais enviados pelas professoras, com IA, denuncias, status de publicacao e trilha administrativa."
         action={
-          <div className="action-row">
-            <button className="quiet-button secondary-action">
-              <FolderPlus size={15} />
-              Categoria
+          <form action={refreshMaterialModeration}>
+            <button className="quiet-button" type="submit">
+              <ShieldCheck size={15} />
+              Atualizar moderacao
             </button>
-            <button className="quiet-button">
-              <FileUp size={15} />
-              Novo material
-            </button>
-          </div>
+          </form>
         }
       />
+
+      <section className="metrics-grid">
+        <Metric icon={<FileText size={18} />} label="Aprovados" value={metrics.published} />
+        <Metric icon={<Eye size={18} />} label="Em revisao" value={metrics.review} />
+        <Metric icon={<ShieldCheck size={18} />} label="Bloqueados" value={metrics.blocked} />
+        <Metric icon={<Flag size={18} />} label="Denuncias abertas" value={metrics.reports} />
+      </section>
 
       <section className="content-grid">
         <article className="panel panel-wide">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Upload</p>
-              <h2>Enviar novo arquivo</h2>
+              <p className="eyebrow">Moderacao</p>
+              <h2>Materiais cadastrados</h2>
             </div>
-            <UploadCloud size={22} />
           </div>
 
-          <div className="upload-zone">
-            <UploadCloud size={30} />
-            <strong>Arraste o arquivo aqui ou selecione no computador</strong>
-            <span>PDF, DOCX, PPTX, XLSX ou imagem. O upload real entra quando o Supabase Storage estiver conectado.</span>
-          </div>
-
-          <div className="form-grid">
-            <label>
-              Título
-              <input placeholder="Ex.: Modelo de relatório semestral" />
-            </label>
-            <label>
-              Categoria
-              <select defaultValue="Modelos de Relatório">
-                {materialCategories.map((category) => (
-                  <option key={category.name}>{category.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Status
-              <select defaultValue="draft">
-                <option value="draft">Rascunho</option>
-                <option value="published">Publicado</option>
-                <option value="archived">Arquivado</option>
-              </select>
-            </label>
-            <label>
-              Descrição
-              <textarea placeholder="Resumo para orientar a professora sobre quando usar este material." />
-            </label>
+          <div className="table">
+            <div className="table-row table-head admin-materials-grid">
+              <span>Material</span>
+              <span>Autora</span>
+              <span>Status</span>
+              <span>Indicadores</span>
+              <span>Acao</span>
+            </div>
+            {materials.map((material) => (
+              <div className="table-row admin-materials-grid" key={material.id}>
+                <span>
+                  <strong>{material.title}</strong>
+                  <small>{material.description || material.file_name || 'Sem descricao cadastrada'}</small>
+                  <small>
+                    {material.type || inferType(material.file_type, material.file_name)} - {material.age_range || 'faixa etaria nao informada'} - {material.pedagogical_objective || material.detected_category || 'objetivo nao informado'}
+                  </small>
+                  {material.content_preview && <small>Preview: {material.content_preview.slice(0, 180)}</small>}
+                </span>
+                <span>
+                  <strong>{material.author_name || 'Professora'}</strong>
+                  <small>{formatDate(material.created_at)}</small>
+                  {material.auto_hidden_at && <small>Ocultado automaticamente em {formatDate(material.auto_hidden_at)}</small>}
+                </span>
+                <span>
+                  <StatusBadge status={material.status} />
+                  <small>IA: {material.ai_analysis_status || 'nao informada'}</small>
+                  {material.detected_category && <small>{material.detected_category}</small>}
+                </span>
+                <span>
+                  <small>{material.downloads_count ?? 0} downloads</small>
+                  <small>{material.views_count ?? 0} visualizacoes</small>
+                  <small>{Number(material.average_rating ?? 0).toFixed(1)} estrelas ({material.ratings_count ?? 0})</small>
+                  <small>{material.reports_count ?? 0} denuncias</small>
+                </span>
+                <form action={updateMaterialStatus} className="inline-form">
+                  <input type="hidden" name="materialId" value={material.id} />
+                  <select name="status" defaultValue={material.status}>
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <textarea name="notes" placeholder="Nota de moderacao opcional" />
+                  <button className="quiet-button" type="submit">Salvar</button>
+                </form>
+              </div>
+            ))}
           </div>
         </article>
 
@@ -72,19 +173,22 @@ export default function MaterialsPage() {
           <div className="panel-header">
             <div>
               <p className="eyebrow">Categorias</p>
-              <h2>Organização</h2>
+              <h2>Organizacao</h2>
             </div>
           </div>
           <div className="stack-list">
-            {materialCategories.map((category) => (
-              <div className="stack-item" key={category.name}>
+            {(categoriesData ?? []).map((category) => (
+              <div className="stack-item" key={category.id}>
                 <span>
                   <strong>{category.name}</strong>
-                  <small>{category.published} publicados de {category.count}</small>
+                  <small>{category.slug}</small>
                 </span>
-                <span className="mini-count">{category.count}</span>
+                <StatusBadge status={category.is_active ? 'published' : 'archived'} />
               </div>
             ))}
+            {(categoriesData ?? []).length === 0 && (
+              <p className="text-muted-panel">Nenhuma categoria cadastrada em material_categories.</p>
+            )}
           </div>
         </article>
       </section>
@@ -92,38 +196,172 @@ export default function MaterialsPage() {
       <article className="panel spaced-panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Arquivos</p>
-            <h2>Materiais cadastrados</h2>
+            <p className="eyebrow">Denuncias</p>
+            <h2>Fila de revisao</h2>
           </div>
           <span className="status-pill">
-            <Download size={16} />
-            Professoras baixam publicados
+            <Flag size={16} />
+            {reports.length} abertas
           </span>
         </div>
 
         <div className="table">
-          <div className="table-row table-head materials-grid">
+          <div className="table-row table-head reports-grid">
             <span>Material</span>
-            <span>Categoria</span>
-            <span>Tipo</span>
-            <span>Status</span>
-            <span>Downloads</span>
-            <span>Atualizado</span>
+            <span>Motivo</span>
+            <span>Detalhes</span>
+            <span>Acao</span>
           </div>
-          {materials.map((material) => (
-            <div className="table-row materials-grid" key={material.title}>
-              <strong>{material.title}</strong>
-              <span>{material.category}</span>
-              <span>{material.type}</span>
-              <StatusBadge status={material.status} />
-              <span>{material.downloads}</span>
-              <span>{material.updatedAt}</span>
+          {reports.map((report) => {
+            const material = materials.find((item) => item.id === report.material_id)
+            return (
+              <div className="table-row reports-grid" key={report.id}>
+                <span>
+                  <strong>{material?.title || report.material_id}</strong>
+                  <small>{formatDate(report.created_at)}</small>
+                </span>
+                <span>{formatReportReason(report.reason)}</span>
+                <span>{report.details || 'Sem detalhes adicionais'}</span>
+                <form action={reviewReport} className="action-row">
+                  <input type="hidden" name="reportId" value={report.id} />
+                  <input type="hidden" name="materialId" value={report.material_id} />
+                  <button className="quiet-button secondary-action" name="decision" value="dismissed" type="submit">Dispensar</button>
+                  <button className="quiet-button" name="decision" value="reviewed" type="submit">Marcar revisada</button>
+                </form>
+              </div>
+            )
+          })}
+          {reports.length === 0 && (
+            <div className="table-row reports-grid">
+              <strong>Nenhuma denuncia aberta</strong>
+              <span>Fila limpa</span>
+              <span>Materiais permanecem visiveis conforme status atual.</span>
+              <span />
             </div>
-          ))}
+          )}
         </div>
       </article>
     </>
   )
 }
 
+function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
+  return (
+    <article className="metric-card">
+      {icon}
+      <strong>{value}</strong>
+      <p>{label}</p>
+    </article>
+  )
+}
 
+async function updateMaterialStatus(formData: FormData) {
+  'use server'
+  const materialId = String(formData.get('materialId') ?? '').trim()
+  const status = String(formData.get('status') ?? '').trim() as MaterialStatus
+  const notes = String(formData.get('notes') ?? '').trim()
+  if (!materialId || !statusOptions.some((option) => option.value === status)) return
+
+  const supabase = createSupabaseServiceClient()
+  const payload: Record<string, unknown> = {
+    status,
+    ai_analysis_status: status === 'published' ? 'approved_by_admin' : status,
+    reviewed_at: new Date().toISOString(),
+  }
+  if (status === 'published') payload.published_at = new Date().toISOString()
+  if (status === 'blocked' || status === 'review_required') payload.auto_hidden_at = new Date().toISOString()
+
+  const { error } = await supabase.from('materials').update(payload).eq('id', materialId)
+  if (error) throw new Error(error.message)
+
+  await supabase.from('admin_action_logs').insert({
+    actor_id: null,
+    action: 'material_admin_status_updated',
+    target_table: 'materials',
+    target_id: materialId,
+    metadata: { status, notes },
+  })
+  revalidatePath('/materiais')
+}
+
+async function reviewReport(formData: FormData) {
+  'use server'
+  const reportId = String(formData.get('reportId') ?? '').trim()
+  const materialId = String(formData.get('materialId') ?? '').trim()
+  const decision = String(formData.get('decision') ?? '').trim()
+  if (!reportId || !materialId || !['reviewed', 'dismissed'].includes(decision)) return
+
+  const supabase = createSupabaseServiceClient()
+  const { error } = await supabase
+    .from('material_reports')
+    .update({ status: decision, reviewed_at: new Date().toISOString(), reviewed_by: null })
+    .eq('id', reportId)
+  if (error) throw new Error(error.message)
+
+  const { data: openReports, error: countError } = await supabase
+    .from('material_reports')
+    .select('id')
+    .eq('material_id', materialId)
+    .eq('status', 'open')
+  if (countError) throw new Error(countError.message)
+
+  await supabase.from('materials').update({ reports_count: openReports?.length ?? 0 }).eq('id', materialId)
+  await supabase.from('admin_action_logs').insert({
+    actor_id: null,
+    action: 'material_report_reviewed',
+    target_table: 'materials',
+    target_id: materialId,
+    metadata: { reportId, decision },
+  })
+  revalidatePath('/materiais')
+}
+
+async function refreshMaterialModeration() {
+  'use server'
+  const supabase = createSupabaseServiceClient()
+  const { data: groupedReports, error } = await supabase
+    .from('material_reports')
+    .select('material_id')
+    .eq('status', 'open')
+  if (error) throw new Error(error.message)
+
+  const counts = new Map<string, number>()
+  for (const report of groupedReports ?? []) {
+    const materialId = String(report.material_id ?? '')
+    if (!materialId) continue
+    counts.set(materialId, (counts.get(materialId) ?? 0) + 1)
+  }
+
+  await Promise.all(Array.from(counts.entries()).map(([materialId, count]) => {
+    const update: Record<string, unknown> = { reports_count: count }
+    if (count >= 3) {
+      update.status = 'review_required'
+      update.ai_analysis_status = 'reported'
+      update.auto_hidden_at = new Date().toISOString()
+    }
+    return supabase.from('materials').update(update).eq('id', materialId)
+  }))
+  revalidatePath('/materiais')
+}
+
+function inferType(fileType: string | null, fileName: string | null) {
+  if (fileType?.startsWith('image/')) return 'image'
+  if (fileName && /\.(jpg|jpeg|png|webp)$/i.test(fileName)) return 'image'
+  return 'document'
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+}
+
+function formatReportReason(reason: string) {
+  const key = reason.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const labels: Record<string, string> = {
+    dados_pessoais: 'Dados pessoais',
+    imagem_crianca: 'Imagem de crianca',
+    conteudo_inadequado: 'Conteudo inadequado',
+    spam: 'Propaganda ou spam',
+    outro: 'Outro motivo',
+  }
+  return labels[key] ?? reason
+}

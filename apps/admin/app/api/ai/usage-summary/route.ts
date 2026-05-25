@@ -135,7 +135,7 @@ export async function GET(request: Request) {
 
     console.error('[ai/usage-summary] erro interno', error)
     return NextResponse.json(
-      { error: 'Nao foi possivel consultar o saldo de IA agora.' },
+      { error: 'Não foi possível consultar o saldo de IA agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }

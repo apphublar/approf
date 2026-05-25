@@ -93,18 +93,18 @@ function buildQuery(filters: ListReportsFilters) {
 async function callReportsApi<T>(path: string, init: RequestInit): Promise<T> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) {
-    throw new Error('Backend de documentos nao configurado. Informe VITE_APPROF_ADMIN_API_URL.')
+    throw new Error('Backend de documentos não configurado. Informe VITE_APPROF_ADMIN_API_URL.')
   }
 
   const supabase = getSupabaseClient()
   if (!supabase) {
-    throw new Error('Supabase nao configurado para acessar documentos.')
+    throw new Error('Supabase não configurado para acessar documentos.')
   }
 
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
   const token = data.session?.access_token
-  if (!token) throw new Error('Sessao expirada. Entre novamente.')
+  if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
@@ -123,7 +123,7 @@ async function callReportsApi<T>(path: string, init: RequestInit): Promise<T> {
   }
 
   if (!payload || typeof payload !== 'object') {
-    throw new Error('Resposta invalida ao acessar documentos.')
+    throw new Error('Resposta inválida ao acessar documentos.')
   }
 
   return payload as T

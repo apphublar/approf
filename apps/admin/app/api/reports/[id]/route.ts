@@ -18,18 +18,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params
     const report = await getOwnerReportById(ownerId, id)
     if (!report) {
-      return NextResponse.json({ error: 'Documento nao encontrado.' }, { status: 404, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: CORS_HEADERS })
     }
 
     return NextResponse.json({ report }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
 
     console.error('[reports/get] erro interno', error)
     return NextResponse.json(
-      { error: 'Nao foi possivel carregar o documento agora.' },
+      { error: 'Não foi possível carregar o documento agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }
@@ -48,7 +48,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const isFinalVersion = typeof body.isFinalVersion === 'boolean' ? body.isFinalVersion : undefined
 
     if (!nextStatus && patchBody === undefined && isFinalVersion === undefined) {
-      return NextResponse.json({ error: 'Nenhuma alteracao valida enviada.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Nenhuma alteracao válida enviada.' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const updated = await updateOwnerReport({
@@ -60,18 +60,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     })
 
     if (!updated) {
-      return NextResponse.json({ error: 'Documento nao encontrado.' }, { status: 404, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: CORS_HEADERS })
     }
 
     return NextResponse.json({ report: updated }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
 
     console.error('[reports/update] erro interno', error)
     return NextResponse.json(
-      { error: 'Nao foi possivel salvar o documento agora.' },
+      { error: 'Não foi possível salvar o documento agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }
@@ -85,12 +85,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const action = typeof body.action === 'string' ? body.action : ''
 
     if (action !== 'create-share-link') {
-      return NextResponse.json({ error: 'Acao invalida.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Ação inválida.' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const report = await getOwnerReportById(ownerId, id)
     if (!report) {
-      return NextResponse.json({ error: 'Documento nao encontrado.' }, { status: 404, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: CORS_HEADERS })
     }
 
     const token = createReportShareToken(id)
@@ -100,12 +100,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ shareUrl }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
 
     console.error('[reports/share] erro interno', error)
     return NextResponse.json(
-      { error: 'Nao foi possivel criar o link de compartilhamento agora.' },
+      { error: 'Não foi possível criar o link de compartilhamento agora.' },
       { status: 500, headers: CORS_HEADERS },
     )
   }

@@ -58,11 +58,11 @@ No frontend, usar somente anon key. Service role fica apenas server-side no Admi
 
 Antes de colocar usuarias reais:
 
-- Professora A nao pode ver alunos da professora B.
-- Professora A nao pode ver fotos da professora B.
-- Professora nao pode alterar `subscriptions` diretamente.
+- Professora A não pode ver alunos da professora B.
+- Professora A não pode ver fotos da professora B.
+- Professora não pode alterar `subscriptions` diretamente.
 - Admin consegue listar professoras, assinaturas e uso de IA.
-- Buckets `child-photos` e `report-exports` nao podem ter URL publica.
+- Buckets `child-photos` e `report-exports` não podem ter URL publica.
 
 ## 5. Trocar camada de dados
 
@@ -85,7 +85,7 @@ VITE_APPROF_DATA_MODE=supabase
 
 - Criar tabela `waitlist`.
 - Conectar formulario do site.
-- Registrar origem/campanha se houver.
+- Registrar origem/campanhá se houver.
 
 ## 7. Assinatura manual
 
@@ -103,50 +103,50 @@ VITE_APPROF_DATA_MODE=supabase
 - Permitir download dos arquivos publicados.
 - Registrar ou incrementar `downloads_count` quando a professora baixar.
 
-## 9. Timeline e memoria pedagogica
+## 9. Timeline e memoria pedagógica
 
 - Conectar `student_timeline_events`. (iniciado: listagem e criacao de marcos no app das professoras)
-- Persistir eventos criados diretamente no perfil da crianca. (iniciado)
-- Transformar anotacoes relevantes em eventos de timeline.
-- Persistir `tags` e `persistence` nas anotacoes. (iniciado: criacao e listagem conectadas a `annotations`)
-- Persistir `attachment_path` nas anotacoes com upload privado de anexo.
+- Persistir eventos criados diretamente no perfil da criança. (iniciado)
+- Transformar anotações relevantes em eventos de timeline.
+- Persistir `tags` e `persistence` nas anotações. (iniciado: criacao e listagem conectadas a `annotations`)
+- Persistir `attachment_path` nas anotações com upload privado de anexo.
 - Persistir anexos de timeline em bucket privado.
-- Garantir que anexos sensiveis usem bucket privado.
-- Nunca criar comparacao entre criancas.
+- Garantir que anexos sensíveis usem bucket privado.
+- Nunca criar comparação entre crianças.
 
-## 10. Turmas e criancas
+## 10. Turmas e crianças
 
 - Trocar cadastro e edicao local de turmas por insert/update em `classes`. (iniciado: criacao, edicao e listagem real de turmas conectadas)
-- Trocar cadastro e edicao local de criancas por insert/update em `students`. (iniciado: criacao, edicao e listagem real de criancas conectadas)
+- Trocar cadastro e edicao local de crianças por insert/update em `students`. (iniciado: criacao, edicao e listagem real de crianças conectadas)
 - Manter separacao por professora via RLS.
-- Foto opcional da crianca conectada ao bucket privado `child-photos` no app das professoras.
+- Foto opcional da criança conectada ao bucket privado `child-photos` no app das professoras.
 - Gerar URL assinada somente para a professora autorizada. (iniciado no app das professoras)
 - Persistir ajuste de posicao da foto para avatar redondo com `students.photo_position`.
-- Garantir auditoria minima de alteracoes sensiveis em criancas.
+- Garantir auditoria minima de alteracoes sensíveis em crianças.
 
-## 11. Relatorios com IA
+## 11. Relatórios com IA
 
 - Criar backend/API server-side para chamadas de Claude e OpenAI.
 - Garantir que `ANTHROPIC_API_KEY` e `OPENAI_API_KEY` nunca sejam expostas ao frontend.
-- Criar prompts pedagogicos versionados para relatorios, planejamentos e encaminhamentos.
+- Criar prompts pedagogicos versionados para relatórios, planejamentos e encaminhamentos.
 - Definir `prompt_version` em cada documento gerado.
-- Validar que todo prompt siga BNCC, Educacao Infantil 0 a 5 anos e linguagem nao clinica.
-- Registrar modelo usado, tokens, custo e dados usados na geracao.
-- Persistir o contexto adicional informado antes da geracao.
-- Conectar anexos de relatorio a bucket privado.
+- Validar que todo prompt siga BNCC, Educação Infantil 0 a 5 anos e linguagem nao clínica.
+- Registrar modelo usado, tokens, custo e dados usados na geração.
+- Persistir o contexto adicional informado antes da geração.
+- Conectar anexos de relatório a bucket privado.
 - Enviar para a IA somente anexos autorizados e necessarios.
-- Registrar quais dados/anexos foram usados em cada geracao.
+- Registrar quais dados/anexos foram usados em cada geração.
 - Manter historico para auditoria e transparencia com a professora.
 
 ## 11.1 Proxima fase recomendada
 
 Prioridade tecnica imediata:
 
-1. Conectar anotacoes reais em `annotations` e `annotation_targets`.
-2. Testar anotacoes reais com duas professoras para validar RLS.
+1. Conectar anotações reais em `annotations` e `annotation_targets`.
+2. Testar anotações reais com duas professoras para válidar RLS.
 3. Criar API server-side de IA.
 4. Versionar prompts pedagogicos.
-5. Gerar e salvar relatorios/planejamentos reais em `reports`.
+5. Gerar e salvar relatórios/planejamentos reais em `reports`.
 6. Testar RLS e auditoria antes de liberar para uso real.
 
 ## 12. Calendario e Telegram
@@ -154,20 +154,20 @@ Prioridade tecnica imediata:
 - Eventos manuais do calendario conectados a `calendar_events`. (iniciado)
 - Criar rotina server-side para enviar lembretes via Telegram.
 - Usar `calendar_events.telegram_notified_at` para evitar notificacoes duplicadas.
-- Incluir datas comemorativas e pedagogicas anuais na rotina de notificacao.
+- Incluir datas comemorativas e pedagógicas anuais na rotina de notificacao.
 - Permitir configurar antecedencia do lembrete por professora.
 
-## 13. Continuidade pedagogica
+## 13. Continuidade pedagógica
 
 - Criar codigo unico da professora em `profiles`.
-- Criar identidade continua da crianca em tabela propria, como `child_profiles`.
-- Criar codigo unico da crianca.
-- Separar identidade da crianca do vinculo com turma/professora.
+- Criar identidade continua da criança em tabela propria, como `child_profiles`.
+- Criar codigo unico da criança.
+- Separar identidade da criança do vinculo com turma/professora.
 - Criar tabela de transferencias, como `child_transfers`.
 - Criar tabela de permissoes de acesso, como `child_access_grants`.
-- Permitir busca por codigo da crianca.
+- Permitir busca por codigo da criança.
 - Permitir busca segura por nome + data de nascimento com previa limitada.
 - Permitir transferencia por codigo da professora.
 - Registrar todas as buscas, solicitacoes, aprovacoes e transferencias em auditoria.
-- Nunca liberar fotos, anexos ou relatorios completos sem vinculo aprovado.
+- Nunca liberar fotos, anexos ou relatórios completos sem vinculo aprovado.
 - Timeline deve acompanhar `child_profiles` para manter continuidade entre professoras.

@@ -18,7 +18,7 @@ export interface AttendanceInput {
 
 export async function loadSupabaseAttendanceRecords(ownerId: string) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data, error } = await supabase
     .from('attendance_records')
@@ -26,18 +26,18 @@ export async function loadSupabaseAttendanceRecords(ownerId: string) {
     .eq('owner_id', ownerId)
     .order('attendance_date', { ascending: false })
 
-  if (error) throw toError(error, 'Nao foi possivel carregar as chamadas.')
+  if (error) throw toError(error, 'Não foi possível carregar as chamadas.')
   return (data ?? []).map(mapAttendanceRecord)
 }
 
 export async function saveSupabaseAttendanceRecord(input: AttendanceInput) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('Sessao nao encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const { data, error } = await supabase
     .from('attendance_records')
@@ -54,7 +54,7 @@ export async function saveSupabaseAttendanceRecord(input: AttendanceInput) {
     .select('id, class_id, attendance_date, present_student_ids, created_at, updated_at')
     .single()
 
-  if (error) throw toError(error, 'Nao foi possivel salvar a chamada.')
+  if (error) throw toError(error, 'Não foi possível salvar a chamada.')
   return mapAttendanceRecord(data)
 }
 

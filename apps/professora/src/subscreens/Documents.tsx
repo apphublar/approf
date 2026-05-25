@@ -40,7 +40,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
       setDocuments(await listPersonalDocuments())
     } catch (error) {
       setDocuments([])
-      setLoadError(error instanceof Error ? error.message : 'Nao foi possivel carregar seus documentos.')
+      setLoadError(error instanceof Error ? error.message : 'Não foi possível carregar seus documentos.')
     } finally {
       setLoading(false)
     }
@@ -84,7 +84,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
       setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
       setSelectedFile(null)
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Nao foi possivel anexar o arquivo. Tente novamente.')
+      setUploadError(error instanceof Error ? error.message : 'Não foi possível anexar o arquivo. Tente novamente.')
     } finally {
       setUploading(false)
     }
@@ -106,7 +106,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
       await deletePersonalDocument(id)
       setDocuments((current) => current.filter((doc) => doc.id !== id))
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Nao foi possivel remover o documento.')
+      setUploadError(error instanceof Error ? error.message : 'Não foi possível remover o documento.')
     }
   }
 
@@ -124,8 +124,8 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
           <div className="bg-gbg border border-gp rounded-app p-4 mb-4">
             <p className="text-[13px] font-bold text-gd mb-2">Seus arquivos pessoais</p>
             <p className="text-[12px] text-muted leading-[1.6]">
-              Guarde aqui certificados de cursos, diplomas, historico escolar, comprovantes e outros documentos da sua
-              trajetoria profissional. Eles ficam salvos com seguranca na sua conta e aparecem em todos os seus aparelhos.
+              Guarde aqui certificados de cursos, diplomas, histórico escolar, comprovantes e outros documentos da sua
+              trajetoria profissional. Eles ficam salvos com segurança na sua conta e aparecem em todos os seus aparelhos.
             </p>
             <p className="text-[11px] text-muted mt-2 leading-[1.5]">
               Formatos: JPG, PNG, WEBP, PDF, DOCX, XLSX e PPTX. Tamanho maximo por arquivo: 15 MB.
@@ -159,7 +159,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
               <div className="flex items-center gap-3">
                 <FileText size={20} className="text-gm" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-bold text-ink">{selectedFile.name}</p>
+                  <p className="truncaté text-[13px] font-bold text-ink">{selectedFile.name}</p>
                   <p className="text-[11px] text-muted">{formatFileSize(selectedFile.size)} - {selectedFile.type || 'MIME vazio'}</p>
                 </div>
               </div>
@@ -271,7 +271,7 @@ function formatDate(iso: string) {
 
 function dataUrlToFile(dataUrl: string, fileName: string, mimeType: string) {
   const [header, base64] = dataUrl.split(',')
-  if (!base64) throw new Error('Arquivo local invalido.')
+  if (!base64) throw new Error('Arquivo local inválido.')
   const detectedMime = /data:(.*?);base64/.exec(header)?.[1] || mimeType || 'application/octet-stream'
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)

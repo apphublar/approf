@@ -21,6 +21,8 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
     const title = typeof body.title === 'string' ? body.title.trim() : ''
     const description = typeof body.description === 'string' ? body.description.trim() : ''
+    const ageRange = typeof body.ageRange === 'string' ? body.ageRange.trim() : ''
+    const pedagogicalObjective = typeof body.pedagogicalObjective === 'string' ? body.pedagogicalObjective.trim() : ''
     const fileName = typeof body.fileName === 'string' ? body.fileName.trim() : ''
     const fileType = typeof body.fileType === 'string' ? body.fileType.trim() : ''
     const fileSize = typeof body.fileSize === 'number' ? body.fileSize : Number(body.fileSize)
@@ -29,14 +31,14 @@ export async function POST(request: Request) {
     console.info('[materials/analyze-stored] request received', { ownerId, fileName, fileType, fileSize, filePath })
 
     if (!title) return jsonError('Informe o tema ou nome do arquivo.', 400)
-    if (!description) return jsonError('Informe a descricao do material.', 400)
+    if (!description) return jsonError('Informe a descrição do material.', 400)
     if (!fileName || !filePath || !Number.isFinite(fileSize)) {
       console.warn('[materials/analyze-stored] invalid file params', { fileName, filePath, fileSize })
-      return jsonError('Arquivo invalido para analise.', 400)
+      return jsonError('Arquivo inválido para analise.', 400)
     }
     if (!filePath.startsWith(`${ownerId}/`)) {
       console.warn('[materials/analyze-stored] filePath does not belong to user', { filePath, ownerId })
-      return jsonError('Arquivo temporario invalido.', 400)
+      return jsonError('Arquivo temporario inválido.', 400)
     }
 
     const materialFile = {
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
         message: error?.message,
         filePath,
       })
-      throw toError(error, 'Nao foi possivel ler o arquivo enviado. Verifique se o upload ao storage foi concluido.')
+      throw toError(error, 'Não foi possível ler o arquivo enviado. Verifique se o upload ao storage foi concluido.')
     }
 
     const bytes = Buffer.from(await data.arrayBuffer())
@@ -71,6 +73,8 @@ export async function POST(request: Request) {
       ownerId,
       title,
       description,
+      ageRange,
+      pedagogicalObjective,
       file: { ...materialFile, size: bytes.byteLength || fileSize },
       bytes,
       tempPath: filePath,
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result.payload, { status: 200, headers: MATERIALS_CORS_HEADERS })
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Nao foi possivel analisar o material agora.'
+    const errorMessage = error instanceof Error ? error.message : 'Não foi possível analisar o material agora.'
     console.error('[materials/analyze-stored] unhandled error', { errorMessage, tempPath })
 
     if (tempPath) {
@@ -96,7 +100,7 @@ export async function POST(request: Request) {
       }
     }
     if (error instanceof AiAuthError) {
-      return jsonError('Sessao expirada. Entre novamente.', error.status)
+      return jsonError('Sessão expirada. Entre novamente.', error.status)
     }
     return jsonError(errorMessage, 500)
   }

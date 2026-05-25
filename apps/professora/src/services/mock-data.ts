@@ -10,7 +10,7 @@ export function getMockAppData(): AppDataSnapshot {
     boardNotes: [
       {
         id: 'demo1',
-        title: 'Reuniao de pais',
+        title: 'Reunião de pais',
         body: 'Sexta-feira as 19h na sala 3. Confirmar presenca.',
         chalk: true,
         expiresAt: '2026-05-09',

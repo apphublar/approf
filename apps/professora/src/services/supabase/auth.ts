@@ -2,7 +2,7 @@ import { getSupabaseClient } from './client'
 
 export async function signInWithEmail(email: string, password: string) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error
@@ -11,7 +11,7 @@ export async function signInWithEmail(email: string, password: string) {
 
 export async function signUpTeacher(input: { fullName: string; email: string; password: string }) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data, error } = await supabase.auth.signUp({
     email: input.email,
@@ -30,7 +30,7 @@ export async function signUpTeacher(input: { fullName: string; email: string; pa
 
 export async function requestPasswordReset(email: string) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin,
@@ -40,7 +40,7 @@ export async function requestPasswordReset(email: string) {
 
 export async function updatePassword(password: string) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   await ensurePasswordRecoverySession()
 
@@ -51,7 +51,7 @@ export async function updatePassword(password: string) {
 
 export async function ensurePasswordRecoverySession() {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao esta configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const searchParams = new URLSearchParams(window.location.search)
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))

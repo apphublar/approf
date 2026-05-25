@@ -5,7 +5,7 @@ export type AiGenerationType =
   | 'class_diary'
   | 'weekly_planning'
   | 'daily_lesson_plan'
-  | 'pedagogical_project'
+  | 'pedagógical_project'
   | 'specialist_referral'
   | 'parents_meeting_record'
   | 'portfolio_text'
@@ -456,7 +456,7 @@ export async function generateAiChatReply(input: AiChatGenerationInput): Promise
 
   const token = data.session?.access_token
   if (!token) {
-    throw new Error('Sessao expirada. Entre novamente para usar o chat.')
+    throw new Error('Sessão expirada. Entre novamente para usar o chat.')
   }
 
   const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
@@ -473,7 +473,7 @@ export async function generateAiChatReply(input: AiChatGenerationInput): Promise
   if (!response.ok && response.status !== 402) {
     const message = result && 'error' in result && typeof result.error === 'string'
       ? result.error
-      : 'Nao foi possivel responder no chat agora.'
+      : 'Não foi possível responder no chat agora.'
     throw new Error(message)
   }
 
@@ -515,7 +515,7 @@ export async function transcribeAnnotationAudio(input: {
 
   const token = data.session?.access_token
   if (!token) {
-    throw new Error('Sessao expirada. Entre novamente para transcrever o audio.')
+    throw new Error('Sessão expirada. Entre novamente para transcrever o áudio.')
   }
 
   const form = new FormData()
@@ -561,15 +561,15 @@ export async function transcribeAnnotationAudio(input: {
 }
 
 function getAudioFilename(mimeType: string) {
-  if (mimeType.includes('mp4')) return 'anotacao.mp4'
-  if (mimeType.includes('mpeg')) return 'anotacao.mp3'
-  if (mimeType.includes('wav')) return 'anotacao.wav'
-  if (mimeType.includes('ogg')) return 'anotacao.ogg'
-  return 'anotacao.webm'
+  if (mimeType.includes('mp4')) return 'anotação.mp4'
+  if (mimeType.includes('mpeg')) return 'anotação.mp3'
+  if (mimeType.includes('wav')) return 'anotação.wav'
+  if (mimeType.includes('ogg')) return 'anotação.ogg'
+  return 'anotação.webm'
 }
 
 export function formatAiUsageMessage(result: AiUsageReservationResult) {
-  if (!result.allowed) return result.message || 'Esta geracao precisa de pacote extra.'
+  if (!result.allowed) return result.message || 'Esta geração precisa de pacote extra.'
 
   if (result.chargeSource === 'semester_entitlement' && result.entitlement) {
     return `Cota semestral usada: ${result.entitlement.usedQuantity}/${result.entitlement.includedQuantity}.`

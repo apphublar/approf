@@ -20,13 +20,13 @@ export async function uploadPersonalDocument(
   validatePersonalDocumentFile(file)
 
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado para enviar documentos.')
+  if (!supabase) throw new Error('Supabase não configurado para enviar documentos.')
 
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
   const token = data.session?.access_token
   const userId = data.session?.user.id
-  if (!token) throw new Error('Voce precisa estar logada para enviar documentos.')
+  if (!token) throw new Error('Você precisa estar logada para enviar documentos.')
 
   console.info('[personal-documents/mobile-diagnostics]', getMobileUploadDiagnostics(file, userId, Boolean(token)))
 
@@ -35,7 +35,7 @@ export async function uploadPersonalDocument(
     file,
     onDebugStep,
   })
-  if (!payload.document) throw new Error('Documento enviado, mas a resposta do servidor foi invalida.')
+  if (!payload.document) throw new Error('Documento enviado, mas a resposta do servidor foi inválida.')
   return payload.document
 }
 
@@ -49,18 +49,18 @@ function validatePersonalDocumentFile(file: File) {
   const allowed = ALLOWED_IMAGE_MIME_TYPES.includes(mimeType)
     || mimeType === 'application/pdf'
     || ALLOWED_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
-  if (!allowed) throw new Error('Arquivo nao permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
-  if (file.size > MAX_PERSONAL_DOCUMENT_SIZE_BYTES) throw new Error('Arquivo muito grande. Use arquivos de ate 15 MB.')
+  if (!allowed) throw new Error('Arquivo não permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
+  if (file.size > MAX_PERSONAL_DOCUMENT_SIZE_BYTES) throw new Error('Arquivo muito grande. Use arquivos de até 15 MB.')
 }
 
 async function callPersonalDocumentsApi<T>(path: string, init: RequestInit): Promise<T> {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nao configurado para enviar documentos.')
+  if (!supabase) throw new Error('Supabase não configurado para enviar documentos.')
 
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
   const token = data.session?.access_token
-  if (!token) throw new Error('Voce precisa estar logada para acessar seus documentos.')
+  if (!token) throw new Error('Você precisa estar logada para acessar seus documentos.')
 
   const url = `${getAdminApiUrl()}${path}`
   console.info('[personal-documents] API call', { method: init.method, url })
@@ -75,14 +75,14 @@ async function callPersonalDocumentsApi<T>(path: string, init: RequestInit): Pro
   const payload = parseJsonBody(rawBody) as ({ error?: string } & Record<string, unknown>) | null
   console.info('[personal-documents] API response', { url, status: response.status, ok: response.ok, raw: rawBody, payload })
 
-  if (!response.ok) throw new Error(payload?.error || 'Nao foi possivel acessar seus documentos agora.')
-  if (!payload || typeof payload !== 'object') throw new Error('Resposta invalida ao acessar seus documentos.')
+  if (!response.ok) throw new Error(payload?.error || 'Não foi possível acessar seus documentos agora.')
+  if (!payload || typeof payload !== 'object') throw new Error('Resposta inválida ao acessar seus documentos.')
   return payload as T
 }
 
 function getAdminApiUrl() {
   const url = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
-  if (!url) throw new Error('Backend de documentos nao configurado. Informe VITE_APPROF_ADMIN_API_URL.')
+  if (!url) throw new Error('Backend de documentos não configurado. Informe VITE_APPROF_ADMIN_API_URL.')
   return url
 }
 

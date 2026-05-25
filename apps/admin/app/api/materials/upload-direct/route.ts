@@ -20,11 +20,13 @@ export async function POST(request: Request) {
     const formData = await request.formData()
     const title = String(formData.get('title') ?? '').trim()
     const description = String(formData.get('description') ?? '').trim()
+    const ageRange = String(formData.get('ageRange') ?? '').trim()
+    const pedagogicalObjective = String(formData.get('pedagogicalObjective') ?? '').trim()
     const file = formData.get('file')
 
     if (!title) return jsonError('Informe o tema ou nome do arquivo.', 400)
-    if (!description) return jsonError('Informe a descricao do material.', 400)
-    if (!(file instanceof File)) return jsonError('Arquivo nao recebido pelo servidor.', 400)
+    if (!description) return jsonError('Informe a descrição do material.', 400)
+    if (!(file instanceof File)) return jsonError('Arquivo não recebido pelo servidor.', 400)
 
     const fileName = file.name || 'arquivo'
     const fileType = file.type || inferMimeType(fileName)
@@ -50,12 +52,14 @@ export async function POST(request: Request) {
         contentType: fileType,
         upsert: false,
       })
-    if (uploadError) throw toError(uploadError, 'Nao foi possivel salvar o arquivo no storage.')
+    if (uploadError) throw toError(uploadError, 'Não foi possível salvar o arquivo no storage.')
 
     const result = await finalizeMaterialUpload({
       ownerId,
       title,
       description,
+      ageRange,
+      pedagogicalObjective,
       file: {
         name: fileName,
         type: fileType,
@@ -74,9 +78,9 @@ export async function POST(request: Request) {
       { status: 200, headers: MATERIALS_CORS_HEADERS },
     )
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessao expirada. Entre novamente.', error.status)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', error.status)
     console.error('[materials/upload-direct] unhandled error', error instanceof Error ? error.message : error)
-    return jsonError(toError(error, 'Nao foi possivel enviar o material.').message, 500)
+    return jsonError(toError(error, 'Não foi possível enviar o material.').message, 500)
   }
 }
 

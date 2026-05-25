@@ -197,7 +197,7 @@ async function requestOpenAiImage(input: {
 }) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new PublicAiGenerationError('Servico de imagem indisponivel no momento. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Servico de imagem indisponível no momento. Tente novamente em instantes.')
   }
 
   const models = [input.model, ...(input.fallbackModels ?? [])]
@@ -282,7 +282,7 @@ async function requestOpenAiImage(input: {
 }
 
 function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: string) {
-  const studentName = asString(summary.studentName) ?? 'crianca'
+  const studentName = asString(summary.studentName) ?? 'criança'
   const className = asString(summary.className) ?? 'turma'
   const selectedAnnotations = asObjectArray(summary.selectedAnnotations)
   const extraContext = asString(summary.extraContext)
@@ -295,25 +295,25 @@ function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: strin
         const text = asString(item.text) ?? ''
         return `- ${label}: ${text}`
       }).join('\n')
-    : blankContext || 'Use as informacoes pedagogicas fornecidas pela professora.'
+    : blankContext || 'Use as informações pedagógicas fornecidas pela professora.'
 
   const attachmentList = attachments.length
     ? attachments.map((item) => `- ${asString(item.name) ?? 'arquivo anexado'}`).join('\n')
     : 'Sem anexos visuais autorizados.'
 
   const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
-  return `Ilustracao de portfolio pedagogico (${formatLabel}, ${size}) para Educacao Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
+  return `Ilustracao de portfolio pedagogico (${formatLabel}, ${size}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
 
 Texto visivel em portugues:
-- Titulo: PORTFOLIO PEDAGOGICO DE DESENVOLVIMENTO
-- Subtitulo: EDUCACAO INFANTIL
-- Crianca: ${studentName}
+- Título: PORTFOLIO PEDAGOGICO DE DESENVOLVIMENTO
+- Subtítulo: EDUCACAO INFANTIL
+- Criança: ${studentName}
 - Turma: ${className}
 - Blocos curtos: campos de experiencia BNCC, Avancos e conquistas, Proximos passos
 
-Regras: sem diagnostico, sem comparacao entre criancas, sem nota/ranking, sem marcas d'agua ou QR code, sem outras criancas identificaveis. Pouco texto, letras legiveis.
+Regras: sem diagnóstico, sem comparação entre crianças, sem nota/ranking, sem marcas d'agua ou QR code, sem outras crianças identificáveis. Pouco texto, letras legiveis.
 
-Conteudo pedagogico:
+Conteúdo pedagogico:
 ${observations}
 
 Extra: ${extraContext || 'Destacar conquistas e proximos passos da rotina.'}
@@ -450,7 +450,7 @@ async function persistGeneratedReport(
     .single()
 
   if (error || !data?.id) {
-    throw new PublicAiGenerationError('Nao foi possivel salvar a imagem gerada. Tente novamente.')
+    throw new PublicAiGenerationError('Não foi possível salvar a imagem gerada. Tente novamente.')
   }
 
   return data.id
@@ -476,7 +476,7 @@ async function persistUsage(
     cost_cents: costCents,
   })
 
-  if (error) throw toError(error, 'Nao foi possivel registrar consumo da imagem.')
+  if (error) throw toError(error, 'Não foi possível registrar consumo da imagem.')
 }
 
 function resolveOpenAiImageCostCents(profile: 'portfolio' | 'standalone') {

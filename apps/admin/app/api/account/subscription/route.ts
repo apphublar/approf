@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
     const action = typeof body.action === 'string' ? body.action : ''
     if (action !== 'cancel') {
-      return NextResponse.json({ error: 'Acao invalida.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Ação inválida.' }, { status: 400, headers: CORS_HEADERS })
     }
 
     await cancelTeacherSubscription(ownerId)
@@ -26,9 +26,9 @@ export async function POST(request: Request) {
     return NextResponse.json(account, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessao expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
     }
     console.error('[account/subscription/cancel] erro interno', error)
-    return NextResponse.json({ error: 'Nao foi possivel cancelar a assinatura agora.' }, { status: 500, headers: CORS_HEADERS })
+    return NextResponse.json({ error: 'Não foi possível cancelar a assinatura agora.' }, { status: 500, headers: CORS_HEADERS })
   }
 }

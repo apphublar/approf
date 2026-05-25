@@ -39,7 +39,7 @@ const REPORT_MODELS: ModelOption[] = [
   { id: 'portfolio', label: 'Portfólio pedagógico', desc: 'Evidências, produções, fotos e jornada individual.', scope: 'child' },
   { id: 'especialista', label: 'Relatório para especialista', desc: 'Neuropediatra, fono, TO, psicólogo ou psicopedagogo.', scope: 'child' },
   { id: 'encaminhamento', label: 'Encaminhamento pedagógico', desc: 'Registro para orientar família ou especialista.', scope: 'child' },
-  { id: 'reuniao-pais', label: 'Registro de reunião de pais', desc: 'Pontos tratados com a família.', scope: 'child' },
+  { id: 'reunião-pais', label: 'Registro de reunião de pais', desc: 'Pontos tratados com a família.', scope: 'child' },
 ]
 
 const PLANNING_MODELS: ModelOption[] = [
@@ -734,7 +734,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
             {workKind && (
               <>
-                <StepTitle number="2" title="Escolha o tipo correto" />
+                <StepTitle number="2" title="Escolhá o tipo correto" />
                 <select
                   className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
                   value={modelId}
@@ -755,7 +755,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
         {!isDirectStudentNote && (selectedModel || isDirectStudentNote) && needsClass && (
           <>
-            <StepTitle number={isDirectStudentNote ? '1' : '3'} title={needsStudent || isDirectStudentNote ? 'Escolha a criança' : 'Escolha a turma'} />
+            <StepTitle number={isDirectStudentNote ? '1' : '3'} title={needsStudent || isDirectStudentNote ? 'Escolhá a criança' : 'Escolhá a turma'} />
             <select
               className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
               value={classId}
@@ -900,7 +900,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                       onClick={() => openChatConversation(conversation.id)}
                       className="flex-1 text-left min-w-0"
                     >
-                      <p className={`text-[12px] font-bold truncate ${activeChat?.id === conversation.id ? 'text-gd' : 'text-ink'}`}>
+                      <p className={`text-[12px] font-bold truncaté ${activeChat?.id === conversation.id ? 'text-gd' : 'text-ink'}`}>
                         {conversation.title}
                       </p>
                       <p className="text-[10px] text-muted mt-1">
