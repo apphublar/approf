@@ -6,6 +6,102 @@ export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: MATERIALS_CORS_HEADERS })
 }
 
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
+    const { id } = await params
+    const materialId = id?.trim()
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
+    const action = typeof body.action === 'string' ? body.action : ''
+
+    if (!materialId) return jsonError('ID do material nao informado.', 400)
+
+    const supabase = createSupabaseServiceClient()
+    const { data: material, error: materialError } = await supabase
+      .from('materials')
+      .select('id, status, submitted_by, author_id')
+      .eq('id', materialId)
+      .maybeSingle()
+
+    if (materialError) throw new Error(materialError.message)
+    if (!material) return jsonError('Material nao encontrado.', 404)
+
+    const canInteract = material.status === 'published'
+      || material.submitted_by === ownerId
+      || material.author_id === ownerId
+    if (!canInteract) return jsonError('Material indisponivel.', 403)
+
+    if (action === 'view') {
+      await incrementMaterialCounter(supabase, materialId, 'views_count')
+      await logMaterialAction(supabase, ownerId, 'material_viewed', materialId)
+      return NextResponse.json({ ok: true }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+    }
+
+    if (action === 'download') {
+      await incrementMaterialCounter(supabase, materialId, 'downloads_count')
+      await logMaterialAction(supabase, ownerId, 'material_downloaded', materialId)
+      return NextResponse.json({ ok: true }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+    }
+
+    if (action === 'favorite') {
+      const favorite = Boolean(body.favorite)
+      if (favorite) {
+        const { error } = await supabase
+          .from('material_favorites')
+          .upsert({ material_id: materialId, owner_id: ownerId }, { onConflict: 'material_id,owner_id' })
+        if (error) throw new Error(error.message)
+      } else {
+        const { error } = await supabase
+          .from('material_favorites')
+          .delete()
+          .eq('material_id', materialId)
+          .eq('owner_id', ownerId)
+        if (error) throw new Error(error.message)
+      }
+      await logMaterialAction(supabase, ownerId, favorite ? 'material_favorited' : 'material_unfavorited', materialId)
+      return NextResponse.json({ ok: true, favorite }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+    }
+
+    if (action === 'rate') {
+      const rating = Number(body.rating)
+      const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 800) : ''
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) return jsonError('Informe uma avaliacao de 1 a 5 estrelas.', 400)
+      const { error } = await supabase
+        .from('material_ratings')
+        .upsert(
+          { material_id: materialId, owner_id: ownerId, rating, comment: comment || null },
+          { onConflict: 'material_id,owner_id' },
+        )
+      if (error) throw new Error(error.message)
+      await refreshMaterialRatingSummary(supabase, materialId)
+      await logMaterialAction(supabase, ownerId, 'material_rated', materialId, { rating })
+      return NextResponse.json({ ok: true }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+    }
+
+    if (action === 'report') {
+      const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 120) : ''
+      const details = typeof body.details === 'string' ? body.details.trim().slice(0, 800) : ''
+      if (!reason) return jsonError('Informe o motivo da denuncia.', 400)
+      const { error } = await supabase
+        .from('material_reports')
+        .upsert(
+          { material_id: materialId, reporter_id: ownerId, reason, details: details || null, status: 'open' },
+          { onConflict: 'material_id,reporter_id' },
+        )
+      if (error) throw new Error(error.message)
+      const reportsCount = await refreshMaterialReportsSummary(supabase, materialId)
+      await logMaterialAction(supabase, ownerId, 'material_reported', materialId, { reason, reportsCount })
+      return NextResponse.json({ ok: true, reportsCount }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+    }
+
+    return jsonError('Acao invalida.', 400)
+  } catch (error) {
+    if (error instanceof AiAuthError) return jsonError('Sessao expirada. Entre novamente.', error.status)
+    console.error('[materials/action] unhandled error', error instanceof Error ? error.message : error)
+    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel atualizar o material.', 500)
+  }
+}
+
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
@@ -72,4 +168,90 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
 function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status, headers: MATERIALS_CORS_HEADERS })
+}
+
+async function incrementMaterialCounter(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  materialId: string,
+  column: 'views_count' | 'downloads_count',
+) {
+  const { data, error } = await supabase
+    .from('materials')
+    .select(column)
+    .eq('id', materialId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  const current = Number((data as Record<string, unknown> | null)?.[column] ?? 0)
+  const update = await supabase
+    .from('materials')
+    .update({ [column]: current + 1 })
+    .eq('id', materialId)
+  if (update.error) throw new Error(update.error.message)
+}
+
+async function refreshMaterialRatingSummary(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  materialId: string,
+) {
+  const { data, error } = await supabase
+    .from('material_ratings')
+    .select('rating')
+    .eq('material_id', materialId)
+  if (error) throw new Error(error.message)
+  const ratings = data ?? []
+  const ratingsCount = ratings.length
+  const averageRating = ratingsCount
+    ? Number((ratings.reduce((sum, item) => sum + Number(item.rating ?? 0), 0) / ratingsCount).toFixed(2))
+    : 0
+  const update = await supabase
+    .from('materials')
+    .update({ ratings_count: ratingsCount, average_rating: averageRating })
+    .eq('id', materialId)
+  if (update.error) throw new Error(update.error.message)
+}
+
+async function refreshMaterialReportsSummary(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  materialId: string,
+) {
+  const { data, error } = await supabase
+    .from('material_reports')
+    .select('id')
+    .eq('material_id', materialId)
+    .eq('status', 'open')
+  if (error) throw new Error(error.message)
+  const reportsCount = data?.length ?? 0
+  const update: Record<string, unknown> = { reports_count: reportsCount }
+  if (reportsCount >= 3) {
+    update.status = 'review_required'
+    update.ai_analysis_status = 'reported'
+    update.auto_hidden_at = new Date().toISOString()
+  }
+  const result = await supabase
+    .from('materials')
+    .update(update)
+    .eq('id', materialId)
+  if (result.error) throw new Error(result.error.message)
+  return reportsCount
+}
+
+async function logMaterialAction(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  actorId: string,
+  action: string,
+  materialId: string,
+  metadata: Record<string, unknown> = {},
+) {
+  const { error } = await supabase
+    .from('admin_action_logs')
+    .insert({
+      actor_id: actorId,
+      action,
+      target_table: 'materials',
+      target_id: materialId,
+      metadata,
+    })
+  if (error) {
+    console.warn('[materials/action] audit log failed', error.message)
+  }
 }

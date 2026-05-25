@@ -5,6 +5,7 @@ import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { createSupabaseStudent } from '@/services/supabase/students'
 import type { Student } from '@/types'
 import { birthDateInputToIso, formatBirthDateInput } from '@/utils/date'
+import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import { getAdjustedPhotoStyle, serializePhotoAdjustment } from '@/utils/photo'
 
 const TAGS = ['Sem tag', 'TEA', 'TDAH', 'Acompanhamento', 'Adaptacao']
@@ -39,8 +40,9 @@ function calculateAgeParts(birthDate: string) {
 
 export default function NewStudentSubscreen() {
   const { closeSubscreen } = useNavStore()
-  const { classes, activeClassId, addStudent, setActiveStudent } = useAppStore()
+  const { classes, activeClassId, addStudent, setActiveStudent, userId } = useAppStore()
   const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
+  const draftKey = `approf:draft:new-student:${userId}:${cls?.id ?? 'sem-turma'}`
   const [name, setName] = useState('')
   const [birthDateInput, setBirthDateInput] = useState('')
   const [tag, setTag] = useState(TAGS[0])
@@ -53,7 +55,50 @@ export default function NewStudentSubscreen() {
   const [photoZoom, setPhotoZoom] = useState(120)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [draftMessage, setDraftMessage] = useState('')
   const photoInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const draft = loadDraft<{
+      name: string
+      birthDateInput: string
+      tag: string
+      generalNotes: string
+      photoPositionX: number
+      photoPositionY: number
+      photoZoom: number
+    }>(draftKey)
+    if (!draft) return
+    setName(draft.name || '')
+    setBirthDateInput(draft.birthDateInput || '')
+    setTag(draft.tag || TAGS[0])
+    setGeneralNotes(draft.generalNotes || '')
+    setPhotoPositionX(typeof draft.photoPositionX === 'number' ? draft.photoPositionX : 50)
+    setPhotoPositionY(typeof draft.photoPositionY === 'number' ? draft.photoPositionY : 50)
+    setPhotoZoom(typeof draft.photoZoom === 'number' ? draft.photoZoom : 120)
+    setDraftMessage('Rascunho recuperado')
+  }, [draftKey])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      saveDraft(draftKey, {
+        name,
+        birthDateInput,
+        tag,
+        generalNotes,
+        photoPositionX,
+        photoPositionY,
+        photoZoom,
+      })
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [birthDateInput, draftKey, generalNotes, name, photoPositionX, photoPositionY, photoZoom, tag])
+
+  useEffect(() => {
+    if (!draftMessage) return
+    const timeout = window.setTimeout(() => setDraftMessage(''), 3500)
+    return () => window.clearTimeout(timeout)
+  }, [draftMessage])
 
   useEffect(() => {
     return () => {
@@ -113,6 +158,7 @@ export default function NewStudentSubscreen() {
 
       addStudent(cls.id, student)
       setActiveStudent(student.id)
+      clearDraft(draftKey)
       closeSubscreen()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar a criança.')
@@ -213,6 +259,7 @@ export default function NewStudentSubscreen() {
           onChange={(event) => setGeneralNotes(event.target.value)}
         />
         {error && <p className="text-[12px] text-[#C1440E] mt-3 leading-[1.5]">{error}</p>}
+        {draftMessage && <p className="text-[12px] text-gm mt-3 leading-[1.5]">{draftMessage}</p>}
       </div>
 
       <div className="p-[18px] bg-white border-t border-border flex-shrink-0 shadow-card" style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom, 0px))' }}>
@@ -294,4 +341,3 @@ function PhotoPositionSlider({
     </label>
   )
 }
-

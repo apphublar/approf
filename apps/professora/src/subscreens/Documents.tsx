@@ -294,7 +294,7 @@ function UploadDesktopOnlyNotice() {
     <div className="mb-4 rounded-app-sm border border-gp bg-gbg px-4 py-4">
       <p className="text-[13px] font-bold text-gd">Envio disponível pelo computador</p>
       <p className="mt-1 text-[12px] leading-[1.55] text-muted">
-        Para garantir a segurança, a validação correta dos arquivos e evitar falhas no PWA mobile, o envio de documentos deve ser feito pelo computador por enquanto. Você pode visualizar seus arquivos normalmente pelo celular.
+        Para proteger seus arquivos pessoais, o envio de documentos deve ser feito pelo computador. Pelo celular, você pode visualizar e baixar seus arquivos normalmente.
       </p>
     </div>
   )

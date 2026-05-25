@@ -18,12 +18,36 @@ export async function GET(request: Request) {
     const supabase = createSupabaseServiceClient()
     const { data, error } = await supabase
       .from('materials')
-      .select('id, title, description, type, age_range, pedagogical_objective, file_path, file_name, file_type, file_size_bytes, mime_type, status, ai_analysis_status, detected_category, content_preview, published_at, submitted_by, author_id, author_name, author_avatar, created_at')
+      .select('id, title, description, type, age_range, pedagogical_objective, file_path, file_name, file_type, file_size_bytes, mime_type, status, ai_analysis_status, detected_category, content_preview, published_at, submitted_by, author_id, author_name, author_avatar, downloads_count, views_count, ratings_count, average_rating, reports_count, created_at')
       .or(`status.eq.published,submitted_by.eq.${ownerId}`)
       .order('created_at', { ascending: false })
       .limit(80)
 
     if (error) throw toError(error, 'Nao foi possivel listar os materiais de apoio.')
+
+    const materialIds = (data ?? []).map((item) => item.id).filter(Boolean)
+    const [favoritesResult, ratingsResult] = materialIds.length
+      ? await Promise.all([
+        supabase
+          .from('material_favorites')
+          .select('material_id')
+          .eq('owner_id', ownerId)
+          .in('material_id', materialIds),
+        supabase
+          .from('material_ratings')
+          .select('material_id, rating, comment')
+          .eq('owner_id', ownerId)
+          .in('material_id', materialIds),
+      ])
+      : [{ data: [] }, { data: [] }]
+
+    const favoriteIds = new Set((favoritesResult.data ?? []).map((item) => item.material_id))
+    const ratingByMaterial = new Map(
+      (ratingsResult.data ?? []).map((item) => [
+        item.material_id,
+        { rating: item.rating as number, comment: item.comment as string | null },
+      ]),
+    )
 
     const materials = await Promise.all((data ?? []).map(async (item) => {
       const filePath = typeof item.file_path === 'string' ? item.file_path : ''
@@ -33,7 +57,14 @@ export async function GET(request: Request) {
         downloadUrl = signed.data?.signedUrl ?? null
       }
       const { file_path: _filePath, submitted_by: _submittedBy, created_at: _createdAt, ...safeItem } = item
-      return { ...safeItem, downloadUrl }
+      const myRating = ratingByMaterial.get(item.id)
+      return {
+        ...safeItem,
+        downloadUrl,
+        is_favorite: favoriteIds.has(item.id),
+        my_rating: myRating?.rating ?? null,
+        my_rating_comment: myRating?.comment ?? null,
+      }
     }))
 
     return NextResponse.json({ materials }, { status: 200, headers: CORS_HEADERS })

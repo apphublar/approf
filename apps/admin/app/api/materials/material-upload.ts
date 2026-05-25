@@ -331,9 +331,10 @@ function buildMaterialReviewPrompt(title: string, description: string, file: Mat
     '- CPF, telefone, e-mail, endereco, nomes completos de criancas e dados pessoais;',
     '- linguagem inadequada, ofensiva, propaganda ou spam;',
     '- imagem sensivel;',
-    '- suspeita de direito autoral;',
+    '- suspeita de direito autoral, apenas como informacao complementar;',
     '- correspondencia entre conteudo, titulo e descricao.',
     '',
+    'Direito autoral suspeito nao deve impedir aprovacao automatica. O ponto critico e impedir dados pessoais e imagens sensiveis/criancas identificaveis.',
     'Bloqueie conteudo inadequado. Use confianca baixa quando o conteudo nao puder ser inspecionado suficientemente.',
   ].join('\n')
 }
@@ -351,9 +352,10 @@ function extractReadableText(file: MaterialFileInfo, bytes: Buffer) {
 }
 
 function resolveMaterialStatus(review: MaterialReview): 'published' | 'review_required' | 'blocked' {
-  const minimumConfidence = Number(process.env.MATERIAL_AI_CONFIDENCE_THRESHOLD ?? 0.82)
-  if (review.possui_conteudo_inadequado || review.possui_imagem_sensivel || review.possui_dados_pessoais || review.aprovado === false) return 'blocked'
-  if (review.confianca < minimumConfidence || review.possui_direito_autoral_suspeito) return 'review_required'
+  const minimumConfidence = Number(process.env.MATERIAL_AI_CONFIDENCE_THRESHOLD ?? 0.6)
+  if (review.possui_conteudo_inadequado || review.aprovado === false) return 'blocked'
+  if (review.possui_imagem_sensivel || review.possui_dados_pessoais) return 'review_required'
+  if (review.confianca < minimumConfidence) return 'review_required'
   return 'published'
 }
 

@@ -40,6 +40,14 @@ export interface SupportMaterial {
   downloadUrl?: string | null
   author_id?: string | null
   author_name?: string | null
+  downloads_count?: number | null
+  views_count?: number | null
+  ratings_count?: number | null
+  average_rating?: number | null
+  reports_count?: number | null
+  is_favorite?: boolean | null
+  my_rating?: number | null
+  my_rating_comment?: string | null
 }
 
 export interface GeneratedMaterialPreview {
@@ -222,6 +230,26 @@ export async function deleteMaterial(id: string): Promise<void> {
   await callMaterialsApi<{ ok: boolean }>(`/api/materials/${id}`, { method: 'DELETE' })
 }
 
+export async function registerMaterialView(id: string): Promise<void> {
+  await materialAction(id, { action: 'view' })
+}
+
+export async function registerMaterialDownload(id: string): Promise<void> {
+  await materialAction(id, { action: 'download' })
+}
+
+export async function setMaterialFavorite(id: string, favorite: boolean): Promise<void> {
+  await materialAction(id, { action: 'favorite', favorite })
+}
+
+export async function rateMaterial(id: string, rating: number, comment: string): Promise<void> {
+  await materialAction(id, { action: 'rate', rating, comment })
+}
+
+export async function reportMaterial(id: string, reason: string, details: string): Promise<void> {
+  await materialAction(id, { action: 'report', reason, details })
+}
+
 export async function previewGeneratedMaterialShare(input: {
   reportId: string
   title?: string
@@ -294,6 +322,14 @@ async function callMaterialsApi<T>(path: string, init: RequestInit): Promise<T> 
   if (!response.ok) throw new Error(payload?.error || 'Nao foi possivel acessar os materiais agora.')
   if (!payload || typeof payload !== 'object') throw new Error('Resposta invalida ao acessar materiais.')
   return payload as T
+}
+
+async function materialAction(id: string, body: Record<string, unknown>) {
+  await callMaterialsApi<{ ok: boolean }>(`/api/materials/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 
 function inferMimeType(fileName: string) {

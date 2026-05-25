@@ -170,7 +170,7 @@ async function reviewShareableText(preview: SharePreview) {
               type: 'input_text',
               text: [
                 'Valide a versao final antes de publicar como material de apoio.',
-                'Ela deve estar anonimizada e nao pode conter nomes reais de criancas, escola, responsaveis, endereco, telefone, email, documentos, imagem sensivel, propaganda, conteudo inadequado ou direito autoral suspeito.',
+                'Ela deve estar anonimizada e nao pode conter nomes reais de criancas, escola, responsaveis, endereco, telefone, email, documentos, imagem sensivel, propaganda ou conteudo inadequado. Direito autoral suspeito deve ser sinalizado apenas como informacao complementar.',
                 '',
                 `Titulo: ${preview.title}`,
                 `Descricao: ${preview.description}`,
@@ -372,16 +372,17 @@ function sanitizeSharePreview(value: {
 }
 
 function resolveMaterialStatus(review: MaterialReview): 'published' | 'review_required' | 'blocked' {
-  const minimumConfidence = Number(process.env.MATERIAL_AI_CONFIDENCE_THRESHOLD ?? 0.82)
+  const minimumConfidence = Number(process.env.MATERIAL_AI_CONFIDENCE_THRESHOLD ?? 0.6)
   if (
     review.possui_conteudo_inadequado ||
-    review.possui_imagem_sensivel ||
-    review.possui_dados_pessoais ||
     review.aprovado === false
   ) {
     return 'blocked'
   }
-  if (review.confianca < minimumConfidence || review.possui_direito_autoral_suspeito) {
+  if (review.possui_imagem_sensivel || review.possui_dados_pessoais) {
+    return 'review_required'
+  }
+  if (review.confianca < minimumConfidence) {
     return 'review_required'
   }
   return 'published'

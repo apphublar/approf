@@ -1,16 +1,19 @@
 ﻿import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
+import { useEffect } from 'react'
 import { useAppStore, useNavStore } from '@/store'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { createSupabaseClass } from '@/services/supabase/classes'
 import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 import type { ClassData } from '@/types'
+import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 
 const SHIFTS = ['Manhã', 'Tarde', 'Integral']
 
 export default function NewClassSubscreen() {
   const { closeSubscreen } = useNavStore()
-  const { schoolName, addClass, setActiveClass } = useAppStore()
+  const { schoolName, addClass, setActiveClass, userId } = useAppStore()
+  const draftKey = `approf:draft:new-class:${userId}`
   const [name, setName] = useState('')
   const [school, setSchool] = useState(schoolName)
   const [shift, setShift] = useState(SHIFTS[0])
@@ -18,8 +21,39 @@ export default function NewClassSubscreen() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [draftMessage, setDraftMessage] = useState('')
 
   const canSave = name.trim().length >= 2 && school.trim().length >= 2
+
+  useEffect(() => {
+    const draft = loadDraft<{
+      name: string
+      school: string
+      shift: string
+      ageGroup: string
+      notes: string
+    }>(draftKey)
+    if (!draft) return
+    setName(draft.name || '')
+    setSchool(draft.school || schoolName)
+    setShift(draft.shift || SHIFTS[0])
+    setAgeGroup(draft.ageGroup || '0 a 5 anos')
+    setNotes(draft.notes || '')
+    setDraftMessage('Rascunho recuperado')
+  }, [draftKey, schoolName])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      saveDraft(draftKey, { name, school, shift, ageGroup, notes })
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [ageGroup, draftKey, name, notes, school, shift])
+
+  useEffect(() => {
+    if (!draftMessage) return
+    const timeout = window.setTimeout(() => setDraftMessage(''), 3500)
+    return () => window.clearTimeout(timeout)
+  }, [draftMessage])
 
   async function saveClass() {
     if (!canSave) return
@@ -45,6 +79,7 @@ export default function NewClassSubscreen() {
 
       addClass(newClass)
       setActiveClass(newClass.id)
+      clearDraft(draftKey)
       closeSubscreen()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar a turma.')
@@ -108,6 +143,7 @@ export default function NewClassSubscreen() {
           onChange={(event) => setNotes(event.target.value)}
         />
         {error && <p className="text-[12px] text-[#C1440E] mt-3 leading-[1.5]">{error}</p>}
+        {draftMessage && <p className="text-[12px] text-gm mt-3 leading-[1.5]">{draftMessage}</p>}
       </div>
 
       <div className="p-[18px] bg-white border-t border-border flex-shrink-0 shadow-card" style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom, 0px))' }}>
