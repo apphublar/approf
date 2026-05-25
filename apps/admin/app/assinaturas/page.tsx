@@ -1,5 +1,5 @@
 import { revalidatePath } from 'next/cache'
-import { CreditCard, LinkIcon } from 'lucide-react'
+import { CreditCard, Unlock } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
@@ -25,6 +25,7 @@ type TeacherSubscriptionRow = {
 }
 
 const planOptions = [
+  { value: 'free', label: 'Gratuito' },
   { value: 'trial_15_days', label: 'Teste 15 dias' },
   { value: 'monthly', label: 'Mensal' },
   { value: 'annual', label: 'Anual' },
@@ -56,7 +57,7 @@ export default async function SubscriptionsPage() {
       <PageHeader
         eyebrow="Assinaturas"
         title="Controle de acesso e pagamento"
-        description="Altere plano mensal/anual, status de acesso e link de pagamento enviado para a professora."
+        description="Libere acesso gratuito ou defina plano pago, status e link de pagamento por professora."
         action={
           <span className="status-pill">
             <CreditCard size={16} />
@@ -71,8 +72,7 @@ export default async function SubscriptionsPage() {
             <div className="table-row table-head subscriptions-admin-grid">
               <span>Professora</span>
               <span>Status atual</span>
-              <span>Plano e pagamento</span>
-              <span>Salvar</span>
+              <span>Editar plano</span>
             </div>
             {teachers.map((teacher) => {
               const subscription = teacher.subscriptions?.[0]
@@ -92,29 +92,34 @@ export default async function SubscriptionsPage() {
                       </a>
                     )}
                   </span>
-                  <form action={updateTeacherSubscription} className="inline-form">
-                    <input type="hidden" name="teacherId" value={teacher.id} />
-                    <select name="status" defaultValue={subscription?.status ?? 'blocked'}>
-                      {statusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                    <select name="plan" defaultValue={subscription?.plan ?? 'verification_required'}>
-                      {planOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                    <input name="paymentLink" defaultValue={subscription?.external_reference ?? ''} placeholder="https://link-de-pagamento..." />
-                    <input name="currentPeriodEnd" type="date" defaultValue={toDateInput(subscription?.current_period_end)} />
-                    <textarea name="notes" defaultValue={subscription?.notes ?? ''} placeholder="Observações internas" />
-                    <button className="quiet-button" type="submit">
-                      <LinkIcon size={14} />
-                      Salvar plano
-                    </button>
-                  </form>
-                  <span>
-                    <small>Mensal/anual fica em `subscriptions.plan`.</small>
-                    <small>Link de pagamento fica em `external_reference`.</small>
+                  <span className="edit-plan-cell">
+                    <form action={liberarAcessoGratuito} className="release-free-form">
+                      <input type="hidden" name="teacherId" value={teacher.id} />
+                      <button className="quiet-button secondary-action" type="submit">
+                        <Unlock size={14} />
+                        Liberar acesso gratuito
+                      </button>
+                    </form>
+                    <div className="cell-divider" />
+                    <form action={updateTeacherSubscription} className="inline-form">
+                      <input type="hidden" name="teacherId" value={teacher.id} />
+                      <select name="status" defaultValue={subscription?.status ?? 'blocked'}>
+                        {statusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <select name="plan" defaultValue={subscription?.plan ?? 'verification_required'}>
+                        {planOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <input name="paymentLink" defaultValue={subscription?.external_reference ?? ''} placeholder="https://link-de-pagamento..." />
+                      <input name="currentPeriodEnd" type="date" defaultValue={toDateInput(subscription?.current_period_end)} />
+                      <textarea name="notes" defaultValue={subscription?.notes ?? ''} placeholder="Observações internas" />
+                      <button className="quiet-button" type="submit">
+                        Salvar plano
+                      </button>
+                    </form>
                   </span>
                 </div>
               )
@@ -125,20 +130,52 @@ export default async function SubscriptionsPage() {
         <article className="panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Fluxo definitivo</p>
-              <h2>Pagamento manual</h2>
+              <p className="eyebrow">Fluxo de acesso</p>
+              <h2>Como liberar</h2>
             </div>
           </div>
           <ol className="number-list">
-            <li>Escolha Mensal ou Anual.</li>
-            <li>Cole o link de pagamento.</li>
-            <li>Use status Ativa após confirmação do pagamento.</li>
-            <li>Bloqueada impede acesso no app da professora.</li>
+            <li><strong>Gratuito:</strong> clique "Liberar acesso gratuito" — sem plano nem pagamento.</li>
+            <li><strong>Pago:</strong> escolha Mensal ou Anual, cole o link de pagamento e salve.</li>
+            <li>Use status <strong>Ativa</strong> após confirmação do pagamento.</li>
+            <li><strong>Bloqueada</strong> impede acesso no app da professora.</li>
           </ol>
         </article>
       </section>
     </>
   )
+}
+
+async function liberarAcessoGratuito(formData: FormData) {
+  'use server'
+  const teacherId = String(formData.get('teacherId') ?? '').trim()
+  if (!teacherId) return
+
+  const supabase = createSupabaseServiceClient()
+  const { error } = await supabase
+    .from('subscriptions')
+    .upsert({
+      user_id: teacherId,
+      status: 'active',
+      plan: 'free',
+      provider: 'manual',
+      external_reference: null,
+      trial_expires_at: null,
+      current_period_end: null,
+      notes: 'Acesso gratuito liberado pelo admin.',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+  if (error) throw new Error(error.message)
+
+  await supabase.from('admin_action_logs').insert({
+    actor_id: null,
+    action: 'teacher_access_granted_free',
+    target_table: 'subscriptions',
+    target_id: null,
+    metadata: { teacherId, status: 'active', plan: 'free' },
+  })
+  revalidatePath('/assinaturas')
+  revalidatePath('/professoras')
 }
 
 async function updateTeacherSubscription(formData: FormData) {
@@ -161,9 +198,9 @@ async function updateTeacherSubscription(formData: FormData) {
       status,
       plan,
       provider: 'manual',
-      external_reference: paymentLink || null,
+      external_reference: plan === 'free' ? null : (paymentLink || null),
       trial_expires_at: plan === 'trial_15_days' && currentPeriodEnd ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString() : null,
-      current_period_end: currentPeriodEnd ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString() : null,
+      current_period_end: plan !== 'free' && currentPeriodEnd ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString() : null,
       notes: notes || null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })

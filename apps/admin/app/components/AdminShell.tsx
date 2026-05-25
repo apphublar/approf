@@ -1,8 +1,13 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { ShieldCheck } from 'lucide-react'
 import { adminSections } from '../lib/mock-admin-data'
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+
   return (
     <main className="admin-shell">
       <aside className="sidebar" aria-label="Navegação admin">
@@ -18,8 +23,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <nav className="nav-list">
             {adminSections.map((item) => {
               const Icon = item.icon
+              const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
               return (
-                <Link className="nav-link" href={item.href} key={item.href}>
+                <Link
+                  className={`nav-link${isActive ? ' nav-link-active' : ''}`}
+                  href={item.href}
+                  key={item.href}
+                >
                   <Icon size={16} />
                   {item.label}
                 </Link>

@@ -7,6 +7,7 @@ export function StatusBadge({ status }: { status: string }) {
     blocked: 'Bloqueado',
     review_required: 'Revisao necessaria',
     em_analise: 'Em analise',
+    free: 'Gratuito',
     active: 'Ativa',
     trial: 'Teste',
     overdue: 'Em atraso',

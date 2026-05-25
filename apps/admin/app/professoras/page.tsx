@@ -110,6 +110,7 @@ function latestVerification(items: Array<{ status: string; updated_at: string }>
 function formatPlan(plan?: string | null) {
   if (!plan) return 'Sem plano'
   const labels: Record<string, string> = {
+    free: 'Gratuito',
     trial_15_days: 'Teste 15 dias',
     monthly: 'Mensal',
     annual: 'Anual',

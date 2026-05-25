@@ -326,7 +326,7 @@ a {
 }
 
 .subscriptions-admin-grid {
-  grid-template-columns: minmax(220px, 1fr) minmax(170px, 0.75fr) minmax(240px, 1.1fr) minmax(180px, 0.7fr);
+  grid-template-columns: 1fr 0.65fr 1.35fr;
 }
 
 .materials-grid {
@@ -390,7 +390,8 @@ a {
   color: var(--blue-700);
 }
 
-.badge-active {
+.badge-active,
+.badge-free {
   background: var(--green-100);
   color: var(--green-700);
 }
@@ -613,6 +614,21 @@ a {
 
 .form-grid label:last-child {
   grid-column: 1 / -1;
+}
+
+.edit-plan-cell {
+  display: grid;
+  gap: 0;
+}
+
+.release-free-form {
+  padding-bottom: 12px;
+}
+
+.cell-divider {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin-bottom: 12px;
 }
 
 .inline-form {
