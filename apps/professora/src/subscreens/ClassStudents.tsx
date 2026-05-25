@@ -70,10 +70,11 @@ export default function ClassStudentsSubscreen() {
 
   if (!cls) return null
 
-  const filteredStudents = cls.students.filter((student) => {
+  const sortedStudents = [...cls.students].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  const filteredStudents = sortedStudents.filter((student) => {
     return student.name.toLowerCase().includes(query.toLowerCase())
   })
-  const reportRows = buildAttendanceReport(cls.students, classAttendanceRecords)
+  const reportRows = buildAttendanceReport(sortedStudents, classAttendanceRecords)
   const selectedCalendarRecord = attendanceByDate.get(selectedCalendarDate)
 
   function openStudent(id: string) {
@@ -93,7 +94,7 @@ export default function ClassStudentsSubscreen() {
 
   function markAllPresent() {
     setSavedMessage('')
-    setPresentStudentIds(cls.students.map((student) => student.id))
+    setPresentStudentIds(sortedStudents.map((student) => student.id))
   }
 
   function clearAttendance() {
@@ -130,7 +131,7 @@ export default function ClassStudentsSubscreen() {
     }
   }
 
-  const absentCount = Math.max(cls.students.length - presentStudentIds.length, 0)
+  const absentCount = Math.max(sortedStudents.length - presentStudentIds.length, 0)
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
@@ -197,7 +198,7 @@ export default function ClassStudentsSubscreen() {
               </div>
             </div>
             <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mt-[14px] mb-[10px]">
-              {filteredStudents.length} de {cls.students.length} alunos
+              {filteredStudents.length} de {sortedStudents.length} alunos
             </p>
             <div className="flex flex-col gap-[9px] pb-8">
               {filteredStudents.map((student) => (
@@ -243,7 +244,7 @@ export default function ClassStudentsSubscreen() {
               <div className="grid grid-cols-3 gap-2 mt-3">
                 <SummaryPill label="Presentes" value={presentStudentIds.length} tone="good" />
                 <SummaryPill label="Faltas" value={absentCount} tone="warn" />
-                <SummaryPill label="Alunos" value={cls.students.length} tone="neutral" />
+                <SummaryPill label="Alunos" value={sortedStudents.length} tone="neutral" />
               </div>
             </div>
 
@@ -257,7 +258,7 @@ export default function ClassStudentsSubscreen() {
             </div>
 
             <div className="flex flex-col gap-[9px]">
-              {cls.students.map((student) => {
+              {sortedStudents.map((student) => {
                 const present = presentStudentIds.includes(student.id)
                 return (
                   <StudentRow
@@ -343,7 +344,7 @@ export default function ClassStudentsSubscreen() {
             <AttendanceDayDetails
               date={selectedCalendarDate}
               record={selectedCalendarRecord}
-              students={cls.students}
+              students={sortedStudents}
               onEdit={() => {
                 setAttendanceDate(selectedCalendarDate)
                 setActiveTool('attendance')
@@ -529,7 +530,7 @@ function buildAttendanceReport(students: Student[], records: AttendanceRecord[])
         rate: summary.rate,
       }
     })
-    .sort((a, b) => b.absences - a.absences || b.presences - a.presences || a.student.name.localeCompare(b.student.name))
+    .sort((a, b) => a.student.name.localeCompare(b.student.name, 'pt-BR'))
 }
 
 function buildCalendarDays(monthDate: Date) {

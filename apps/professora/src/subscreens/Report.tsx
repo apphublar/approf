@@ -3,6 +3,7 @@ import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
 import { listReports, updateReport } from '@/services/reports'
+import { listSupportMaterials, type SupportMaterial } from '@/services/materials'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import { loadDocumentStyleSettings } from '@/utils/document-style'
@@ -72,6 +73,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [blankContext, setBlankContext] = useState('')
   const [extraContext, setExtraContext] = useState('')
   const [attachments, setAttachments] = useState<ReportAttachment[]>([])
+  const [supportMaterials, setSupportMaterials] = useState<SupportMaterial[]>([])
+  const [selectedSupportMaterialIds, setSelectedSupportMaterialIds] = useState<string[]>([])
+  const [loadingSupportMaterials, setLoadingSupportMaterials] = useState(false)
   const [portfolioOutput, setPortfolioOutput] = useState<PortfolioOutput>('text')
   const [portfolioImageFormat, setPortfolioImageFormat] = useState<PortfolioImageFormat>('portrait')
   const [generating, setGenerating] = useState(false)
@@ -120,6 +124,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     return filtered.length ? filtered : studentAnnotations
   }, [studentAnnotations])
   const selectedMilestones = milestoneAnnotations.filter((annotation) => selectedMilestoneIds.includes(annotation.id))
+  const selectedSupportMaterials = supportMaterials.filter((material) => selectedSupportMaterialIds.includes(material.id))
   const firstName = selectedStudent?.name.split(' ')[0] ?? 'A criança'
   const isPortfolio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
   const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
@@ -366,6 +371,26 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setMode('blank')
   }, [assistantMode])
 
+  useEffect(() => {
+    let active = true
+    setLoadingSupportMaterials(true)
+    listSupportMaterials()
+      .then((items) => {
+        if (!active) return
+        setSupportMaterials(items)
+      })
+      .catch(() => {
+        if (!active) return
+        setSupportMaterials([])
+      })
+      .finally(() => {
+        if (active) setLoadingSupportMaterials(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
   const mockReport = createReportPreview({
     reportKind,
     studentName: isClassDiary || isParentsMeeting ? '-' : (selectedStudent?.name ?? '-'),
@@ -437,12 +462,19 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setAttachments((current) => current.filter((item) => item.id !== id))
   }
 
+  function toggleSupportMaterial(id: string) {
+    setSelectedSupportMaterialIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    )
+  }
+
   function resetReportFormAfterGeneration() {
     setSelectedAnnotationIds([])
     setIgnoredNotes('')
     setBlankContext('')
     setExtraContext('')
     setAttachments([])
+    setSelectedSupportMaterialIds([])
     setDiaryTheme('')
     setDiaryRawText('')
     setAgeGroup('')
@@ -474,6 +506,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
     try {
       const styleSettings = loadDocumentStyleSettings()
+      const materialExampleContext = formatSupportMaterialExamples(selectedSupportMaterials)
       const requestSummary = {
         reportKind,
         portfolioOutput,
@@ -513,7 +546,13 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         })),
         ignoredNotes,
         blankContext,
-        extraContext,
+        extraContext: [extraContext.trim(), materialExampleContext].filter(Boolean).join('\n\n'),
+        materialExamples: selectedSupportMaterials.map((material) => ({
+          title: material.title,
+          description: material.description,
+          category: material.detected_category,
+          preview: material.content_preview,
+        })),
         attachments: attachments.map((item) => ({
           name: item.name,
           type: item.type,
@@ -1246,6 +1285,15 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
+            {!isParentsMeeting && (
+              <SupportMaterialPicker
+                materials={supportMaterials}
+                selectedIds={selectedSupportMaterialIds}
+                loading={loadingSupportMaterials}
+                onToggle={toggleSupportMaterial}
+              />
+            )}
+
             {isPortfolio && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-start gap-3">
@@ -1699,6 +1747,68 @@ Documento gerado a partir das informações autorizadas pela professora.`
 function formatAttachments(attachments: ReportAttachment[]) {
   if (!attachments.length) return ''
   return `\n\nANEXOS CONSIDERADOS\n\n${attachments.map((item) => `- ${item.name} (${formatFileSize(item.size)})`).join('\n')}`
+}
+
+function formatSupportMaterialExamples(materials: SupportMaterial[]) {
+  if (!materials.length) return ''
+  return [
+    'MATERIAIS DE APOIO USADOS COMO REFERENCIA',
+    '',
+    ...materials.map((material, index) => [
+      `${index + 1}. ${material.title}`,
+      material.description ? `Descricao: ${material.description}` : '',
+      material.detected_category ? `Categoria: ${material.detected_category}` : '',
+      material.content_preview ? `Trecho seguro: ${material.content_preview.slice(0, 900)}` : '',
+    ].filter(Boolean).join('\n')),
+    '',
+    'Use estes materiais apenas como referencia de estrutura, linguagem, ideias pedagogicas e exemplos. Nao copie dados pessoais e nao invente que a crianca realizou algo sem base nas informacoes do formulario.',
+  ].join('\n')
+}
+
+function SupportMaterialPicker(props: {
+  materials: SupportMaterial[]
+  selectedIds: string[]
+  loading: boolean
+  onToggle: (id: string) => void
+}) {
+  if (props.loading) {
+    return (
+      <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+        <p className="text-[13px] font-bold text-ink">Material de apoio como exemplo</p>
+        <p className="text-[12px] text-muted mt-1">Carregando materiais aprovados...</p>
+      </div>
+    )
+  }
+
+  if (!props.materials.length) return null
+
+  return (
+    <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+      <p className="text-[13px] font-bold text-ink">Material de apoio como exemplo</p>
+      <p className="text-[11px] text-muted leading-[1.5] mt-1 mb-3">
+        Selecione materiais aprovados para a IA usar como referencia na estrutura e nas ideias do documento.
+      </p>
+      <div className="flex flex-col gap-2">
+        {props.materials.slice(0, 8).map((material) => {
+          const selected = props.selectedIds.includes(material.id)
+          return (
+            <button
+              key={material.id}
+              onClick={() => props.onToggle(material.id)}
+              className={`w-full rounded-app-sm border px-3 py-3 text-left ${
+                selected ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+              }`}
+            >
+              <span className="block text-[12px] font-bold text-ink">{selected ? '[x] ' : '[ ] '}{material.title}</span>
+              <span className="block text-[11px] mt-1 line-clamp-2">
+                {material.description || material.content_preview || 'Material aprovado para referencia.'}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function isSpecialistReport(reportKind: string) {

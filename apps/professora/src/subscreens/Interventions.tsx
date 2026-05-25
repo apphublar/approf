@@ -14,7 +14,7 @@ type Step = 'form' | 'suggestions' | 'chosen' | 'feedback' | 'analysis'
 
 export default function InterventionsSubscreen() {
   const { closeSubscreen } = useNavStore()
-  const { classes, activeStudentId, interventions, addIntervention, updateIntervention, addAnnotation, userId } = useAppStore()
+  const { classes, activeStudentId, interventions, addIntervention, updateIntervention, removeIntervention, addAnnotation, userId } = useAppStore()
 
   const allStudents = useMemo(
     () => classes.flatMap((classData) => classData.students.map((student) => ({ ...student, classId: classData.id, className: classData.name }))),
@@ -151,10 +151,11 @@ export default function InterventionsSubscreen() {
   }
 
   function closeWithoutRegistering() {
-    if (!selectedStudent || !chosenSuggestion || !activeInterventionId) {
-      closeSubscreen()
-      return
-    }
+    closeSubscreen()
+  }
+
+  function savePendingIntervention() {
+    if (!selectedStudent || !chosenSuggestion || !activeInterventionId) return
 
     const item: InterventionHistoryItem = {
       id: activeInterventionId,
@@ -170,6 +171,36 @@ export default function InterventionsSubscreen() {
     }
     upsertIntervention(item)
     closeSubscreen()
+  }
+
+  function resumeIntervention(item: InterventionHistoryItem) {
+    if (!item.chosenIntervention) return
+    setSelectedStudentId(item.studentId)
+    setGeneratedObservation(item.observationInitial)
+    setObservation(item.observationInitial)
+    setSuggestions(item.suggestions)
+    setChosenSuggestion(item.chosenIntervention)
+    setActiveInterventionId(item.id)
+    setTeacherReturn(item.teacherReturn ?? '')
+    setReturnChoice(item.returnChoice ?? 'houve_avanco')
+    setError('')
+    setStep('feedback')
+  }
+
+  function completeWithoutAnalysis(item: InterventionHistoryItem) {
+    updateIntervention({
+      ...item,
+      status: 'concluida',
+      teacherReturn: item.teacherReturn ?? 'Intervenção concluída manualmente pela professora.',
+      returnChoice: item.returnChoice ?? 'houve_avanco',
+      aiAnalysis: item.aiAnalysis ?? '',
+    })
+  }
+
+  function discardIntervention(item: InterventionHistoryItem) {
+    const confirmed = window.confirm('Deseja remover esta intervenção do histórico da criança?')
+    if (!confirmed) return
+    removeIntervention(item.id)
   }
 
   async function handleAnalyzeReturn() {
@@ -365,6 +396,12 @@ export default function InterventionsSubscreen() {
             >
               Fechar sem registrar
             </button>
+            <button
+              onClick={savePendingIntervention}
+              className="w-full mt-2 py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[13px] font-bold"
+            >
+              Salvar para acompanhar depois
+            </button>
           </div>
         )}
 
@@ -470,6 +507,29 @@ export default function InterventionsSubscreen() {
                     </span>
                   </div>
                   <p className="text-[11px] text-muted mt-1 line-clamp-2">{item.observationInitial}</p>
+                  {item.status !== 'concluida' && (
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                      <button
+                        onClick={() => resumeIntervention(item)}
+                        disabled={!item.chosenIntervention}
+                        className="rounded-app-sm border border-gp bg-gbg px-2 py-2 text-[10px] font-bold text-gd disabled:opacity-50"
+                      >
+                        Retomar
+                      </button>
+                      <button
+                        onClick={() => completeWithoutAnalysis(item)}
+                        className="rounded-app-sm border border-border bg-white px-2 py-2 text-[10px] font-bold text-muted"
+                      >
+                        Finalizar
+                      </button>
+                      <button
+                        onClick={() => discardIntervention(item)}
+                        className="rounded-app-sm border border-red-200 bg-red-50 px-2 py-2 text-[10px] font-bold text-red-700"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -563,5 +623,6 @@ function asText(value: unknown) {
 function formatStatus(status: InterventionHistoryItem['status']) {
   if (status === 'pendente') return 'Pendente'
   if (status === 'em_acompanhamento') return 'Em acompanhamento'
+  if (status === 'descartada') return 'Descartada'
   return 'Concluída'
 }

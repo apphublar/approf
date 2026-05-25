@@ -226,7 +226,7 @@ export interface TeacherPersonalDocument {
   uploadedAt: string
 }
 
-export type InterventionProgressStatus = 'pendente' | 'em_acompanhamento' | 'concluida'
+export type InterventionProgressStatus = 'pendente' | 'em_acompanhamento' | 'concluida' | 'descartada'
 export type InterventionReturnChoice = 'houve_avanco' | 'houve_avanco_parcial' | 'necessita_acompanhamento'
 
 export interface InterventionSuggestion {

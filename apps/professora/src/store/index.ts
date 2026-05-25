@@ -108,6 +108,7 @@ interface AppStore {
   addCommunityPost: (post: CommunityPost) => void
   addIntervention: (item: InterventionHistoryItem) => void
   updateIntervention: (item: InterventionHistoryItem) => void
+  removeIntervention: (id: string) => void
   addPersonalDocument: (doc: TeacherPersonalDocument) => void
   removePersonalDocument: (id: string) => void
   addClass: (classData: ClassData) => void
@@ -235,6 +236,10 @@ export const useAppStore = create<AppStore>()(
       updateIntervention: (item) =>
         set((state) => ({
           interventions: state.interventions.map((current) => (current.id === item.id ? item : current)),
+        })),
+      removeIntervention: (id) =>
+        set((state) => ({
+          interventions: state.interventions.filter((item) => item.id !== id),
         })),
       addPersonalDocument: (doc: TeacherPersonalDocument) =>
         set((state) => ({ personalDocuments: [doc, ...state.personalDocuments] })),

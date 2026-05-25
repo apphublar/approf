@@ -3,6 +3,7 @@ import { ChevronLeft, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { formatAiUsageMessage, generateAiTextDocument } from '@/services/ai-usage'
 import { updateReport } from '@/services/reports'
+import { listSupportMaterials, type SupportMaterial } from '@/services/materials'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import { loadDocumentStyleSettings } from '@/utils/document-style'
@@ -65,11 +66,15 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
   const [usageMessage, setUsageMessage] = useState('')
   const [usageError, setUsageError] = useState('')
   const [draftMessage, setDraftMessage] = useState('')
+  const [supportMaterials, setSupportMaterials] = useState<SupportMaterial[]>([])
+  const [selectedSupportMaterialIds, setSelectedSupportMaterialIds] = useState<string[]>([])
+  const [loadingSupportMaterials, setLoadingSupportMaterials] = useState(false)
   const loadedDraftRef = useRef(false)
   const draftKey = `approf:draft:planning:${userId}:${docKind}`
 
   const selectedClass = classes.find((item) => item.id === selectedClassId) ?? classes[0]
   const selectedClassName = selectedClass?.name ?? ''
+  const selectedSupportMaterials = supportMaterials.filter((material) => selectedSupportMaterialIds.includes(material.id))
 
   const canGenerate = isProject
     ? Boolean(
@@ -180,11 +185,37 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     return () => window.clearTimeout(timeout)
   }, [draftMessage])
 
+  useEffect(() => {
+    let active = true
+    setLoadingSupportMaterials(true)
+    listSupportMaterials()
+      .then((items) => {
+        if (!active) return
+        setSupportMaterials(items)
+      })
+      .catch(() => {
+        if (!active) return
+        setSupportMaterials([])
+      })
+      .finally(() => {
+        if (active) setLoadingSupportMaterials(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
   function toggleValue(value: string, setter: (next: string[]) => void, current: string[]) {
     const next = current.includes(value)
       ? current.filter((item) => item !== value)
       : [...current, value]
     setter(next)
+  }
+
+  function toggleSupportMaterial(id: string) {
+    setSelectedSupportMaterialIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    )
   }
 
   async function generate() {
@@ -199,6 +230,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
 
     try {
       const styleSettings = loadDocumentStyleSettings()
+      const materialExampleContext = formatSupportMaterialExamples(selectedSupportMaterials)
       const generationType = isProject
         ? 'pedagogical_project'
         : planningPeriod === 'diario'
@@ -225,6 +257,13 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
           methodology,
           assessment,
           avaliacaoRegistro: assessment.join(', '),
+          extraContext: materialExampleContext || null,
+          materialExamples: selectedSupportMaterials.map((material) => ({
+            title: material.title,
+            description: material.description,
+            category: material.detected_category,
+            preview: material.content_preview,
+          })),
           documentStyle: styleSettings,
         },
       })
@@ -264,6 +303,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     setBnccFields([])
     setMethodology('')
     setAssessment([])
+    setSelectedSupportMaterialIds([])
   }
 
   async function saveDocument() {
@@ -487,6 +527,13 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                 </>
               )}
 
+              <SupportMaterialPicker
+                materials={supportMaterials}
+                selectedIds={selectedSupportMaterialIds}
+                loading={loadingSupportMaterials}
+                onToggle={toggleSupportMaterial}
+              />
+
               <button
                 onClick={generate}
                 disabled={!canGenerate || generating}
@@ -681,6 +728,68 @@ function Checklist(props: {
       </div>
     </div>
   )
+}
+
+function SupportMaterialPicker(props: {
+  materials: SupportMaterial[]
+  selectedIds: string[]
+  loading: boolean
+  onToggle: (id: string) => void
+}) {
+  if (props.loading) {
+    return (
+      <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+        <p className="text-[13px] font-bold text-ink">Material de apoio como exemplo</p>
+        <p className="text-[12px] text-muted mt-1">Carregando materiais aprovados...</p>
+      </div>
+    )
+  }
+
+  if (!props.materials.length) return null
+
+  return (
+    <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+      <p className="text-[13px] font-bold text-ink">Material de apoio como exemplo</p>
+      <p className="text-[11px] text-muted leading-[1.5] mt-1 mb-3">
+        Selecione materiais aprovados para a IA usar como referencia de estrutura, linguagem e ideias.
+      </p>
+      <div className="flex flex-col gap-2">
+        {props.materials.slice(0, 8).map((material) => {
+          const selected = props.selectedIds.includes(material.id)
+          return (
+            <button
+              key={material.id}
+              onClick={() => props.onToggle(material.id)}
+              className={`w-full rounded-app-sm border px-3 py-3 text-left ${
+                selected ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'
+              }`}
+            >
+              <span className="block text-[12px] font-bold text-ink">{selected ? '[x] ' : '[ ] '}{material.title}</span>
+              <span className="block text-[11px] mt-1">
+                {material.description || material.content_preview || 'Material aprovado para referencia.'}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function formatSupportMaterialExamples(materials: SupportMaterial[]) {
+  if (!materials.length) return ''
+  return [
+    'MATERIAIS DE APOIO USADOS COMO REFERENCIA',
+    '',
+    ...materials.map((material, index) => [
+      `${index + 1}. ${material.title}`,
+      material.description ? `Descricao: ${material.description}` : '',
+      material.detected_category ? `Categoria: ${material.detected_category}` : '',
+      material.content_preview ? `Trecho seguro: ${material.content_preview.slice(0, 900)}` : '',
+    ].filter(Boolean).join('\n')),
+    '',
+    'Use estes materiais apenas como referencia de estrutura, linguagem, ideias pedagogicas e exemplos. Nao copie dados pessoais e adapte ao formulario preenchido pela professora.',
+  ].join('\n')
 }
 
 function createPreview(input: {

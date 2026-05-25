@@ -3,6 +3,7 @@ import { ChevronLeft, Download, FileText, Pencil, Printer, Share2 } from 'lucide
 import { useAppStore, useNavStore } from '@/store'
 import { createReportShareLink, getCachedReportById, getReportById, updateReport } from '@/services/reports'
 import { generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
+import { previewGeneratedMaterialShare, publishGeneratedMaterialShare, type GeneratedMaterialPreview } from '@/services/materials'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument, ReportStatus } from '@/types'
 import { getImageVariants, type ImageVariants } from '@/utils/image-performance'
@@ -32,6 +33,8 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [imageVariants, setImageVariants] = useState<ImageVariants | null>(null)
+  const [materialPreview, setMaterialPreview] = useState<GeneratedMaterialPreview | null>(null)
+  const [sharingAsMaterial, setSharingAsMaterial] = useState(false)
   const [styleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
   const editorRef = useRef<HTMLDivElement>(null)
 
@@ -247,6 +250,57 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     }
   }
 
+  async function prepareMaterialShare() {
+    if (!document) return
+    const confirmed = window.confirm('Para proteger a privacidade das criancas, este material sera anonimizado automaticamente antes de ser compartilhado com a comunidade.')
+    if (!confirmed) return
+    setSharingAsMaterial(true)
+    setError('')
+    setMessage('')
+    try {
+      if (!isImageDocument && hasChanges) {
+        await save('ready')
+      }
+      const preview = await previewGeneratedMaterialShare({
+        reportId: document.id,
+        title: formatReportType(document.report_type),
+        description: isImageDocument
+          ? 'Referencia de exemplo criada a partir de imagem gerada e anonimizada.'
+          : 'Documento pedagogico anonimizado para servir como referencia de exemplo.',
+      })
+      setMaterialPreview(preview)
+      setMessage('Versao anonimizada pronta para sua revisao.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel preparar o material de apoio.')
+    } finally {
+      setSharingAsMaterial(false)
+    }
+  }
+
+  async function publishMaterialShare() {
+    if (!document || !materialPreview) return
+    setSharingAsMaterial(true)
+    setError('')
+    setMessage('')
+    try {
+      const result = await publishGeneratedMaterialShare({
+        reportId: document.id,
+        title: materialPreview.title,
+        description: materialPreview.description,
+        shareableBody: materialPreview.shareableBody,
+        review: materialPreview.review,
+      })
+      setMaterialPreview(null)
+      setMessage(result.status === 'published'
+        ? 'Material de apoio publicado com a versao anonimizada.'
+        : 'Material enviado para revisao antes da publicacao.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel publicar o material de apoio.')
+    } finally {
+      setSharingAsMaterial(false)
+    }
+  }
+
   function downloadWord() {
     if (!document) return
     const title = formatReportType(document.report_type)
@@ -428,6 +482,46 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 <p className="mb-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{error}</p>
               )}
 
+              {materialPreview && (
+                <div className="bg-white rounded-app p-4 border border-gp shadow-card mb-4">
+                  <p className="text-[13px] font-bold text-ink">Revisar material de apoio anonimizado</p>
+                  <p className="text-[11px] text-muted leading-[1.5] mt-1">
+                    Esta e a versao compartilhavel. A imagem ou documento original nao sera publicado.
+                  </p>
+                  <input
+                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-3 text-[13px] outline-none"
+                    value={materialPreview.title}
+                    onChange={(event) => setMaterialPreview((current) => current ? { ...current, title: event.target.value } : current)}
+                  />
+                  <textarea
+                    className="w-full min-h-[72px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[13px] outline-none leading-[1.5]"
+                    value={materialPreview.description}
+                    onChange={(event) => setMaterialPreview((current) => current ? { ...current, description: event.target.value } : current)}
+                  />
+                  <textarea
+                    className="w-full min-h-[220px] resize-y bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[12px] outline-none leading-[1.6]"
+                    value={materialPreview.shareableBody}
+                    onChange={(event) => setMaterialPreview((current) => current ? { ...current, shareableBody: event.target.value } : current)}
+                  />
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <button
+                      onClick={() => setMaterialPreview(null)}
+                      disabled={sharingAsMaterial}
+                      className="py-[11px] rounded-app-sm border border-border bg-white text-muted text-xs font-bold disabled:opacity-50"
+                    >
+                      Fechar
+                    </button>
+                    <button
+                      onClick={publishMaterialShare}
+                      disabled={sharingAsMaterial}
+                      className="py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-xs font-bold disabled:opacity-50"
+                    >
+                      {sharingAsMaterial ? 'Publicando...' : 'Publicar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col gap-2 pb-6">
                 {!isImageDocument && (
                   <button
@@ -452,6 +546,14 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                     Link
                   </button>
                 </div>
+
+                <button
+                  onClick={prepareMaterialShare}
+                  disabled={sharingAsMaterial || saving}
+                  className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold disabled:opacity-50"
+                >
+                  {sharingAsMaterial ? 'Anonimizando...' : 'Compartilhar como material de apoio'}
+                </button>
 
                 {document.report_type === 'development_report' && (
                   <button

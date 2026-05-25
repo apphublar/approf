@@ -1,100 +1,238 @@
-﻿import { useMemo, useState } from 'react'
-import {
-  BarChart3,
-  BookOpen,
-  ChevronRight,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  Handshake,
-  MessageSquareText,
-  Music2,
-  Palette,
-  Search,
-  Sparkles,
-  Stethoscope,
-  type LucideIcon,
-} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { FileText, ImageIcon, Loader2, UploadCloud } from 'lucide-react'
+import { analyzeAndUploadMaterial, type MaterialAnalysisResult } from '@/services/materials'
 
-const CATEGORIES = [
-  { label: 'Plano de aula', icon: FileText, count: 6, bg: '#FFF3CD', isNew: true },
-  { label: 'Lista de chamada', icon: FileSpreadsheet, count: 4, bg: '#D0E8FF' },
-  { label: 'Relatórios', icon: FileText, count: 8, bg: '#D8F3DC', isNew: true },
-  { label: 'Portfólio', icon: BookOpen, count: 5, bg: '#FFE5D9' },
-  { label: 'Atividades', icon: Sparkles, count: 12, bg: '#E3D5F5' },
-  { label: 'Avaliação', icon: BarChart3, count: 7, bg: '#F0E6FF' },
-  { label: 'Comunicados', icon: MessageSquareText, count: 5, bg: '#FFE8CC' },
-  { label: 'Aluno atípico', icon: Stethoscope, count: 6, bg: '#FFD6D6', isNew: true },
-  { label: 'Musicalização', icon: Music2, count: 8, bg: '#E0F2FE' },
-  { label: 'Artes visuais', icon: Palette, count: 10, bg: '#FEF3C7' },
-  { label: 'Reunião de pais', icon: Handshake, count: 3, bg: '#D8F3DC' },
-  { label: 'Imagens e recursos', icon: FileImage, count: 7, bg: '#D0E8FF' },
-]
+type MaterialKind = 'document' | 'image'
+
+const ACCEPTED_MATERIALS = [
+  '.pdf',
+  '.docx',
+  '.xlsx',
+  '.pptx',
+  '.txt',
+  '.csv',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+].join(',')
 
 export default function MaterialsScreen() {
-  const [query, setQuery] = useState('')
-  const filtered = useMemo(
-    () => CATEGORIES.filter((category) => category.label.toLowerCase().includes(query.toLowerCase())),
-    [query],
-  )
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState('')
+  const [analysis, setAnalysis] = useState<MaterialAnalysisResult | null>(null)
+
+  const materialKind = useMemo(() => file ? getMaterialKind(file) : null, [file])
+  const canSubmit = Boolean(title.trim() && description.trim() && file && !submitting)
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl('')
+      return
+    }
+    const nextUrl = URL.createObjectURL(file)
+    setPreviewUrl(nextUrl)
+    return () => URL.revokeObjectURL(nextUrl)
+  }, [file])
+
+  function selectFile(nextFile?: File | null) {
+    if (nextFile && !isAllowedMaterialFile(nextFile)) {
+      setFile(null)
+      setAnalysis(null)
+      setMessage('Apenas documentos e imagens são permitidos em materiais de apoio.')
+      return
+    }
+    setFile(nextFile ?? null)
+    setAnalysis(null)
+    setMessage('')
+  }
+
+  async function submitMaterial() {
+    if (!file || !canSubmit) return
+
+    setSubmitting(true)
+    setMessage('')
+    setAnalysis(null)
+    try {
+      const result = await analyzeAndUploadMaterial({
+        title: title.trim(),
+        description: description.trim(),
+        file,
+      })
+      setAnalysis(result)
+      setMessage(getStatusMessage(result.status))
+      if (result.status === 'published') {
+        setTitle('')
+        setDescription('')
+        setFile(null)
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível enviar o material.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="bg-white px-[18px] pt-12 pb-[14px] border-b border-border flex-shrink-0">
         <span className="font-serif text-[22px] text-gd">Material de Apoio</span>
-        <p className="text-xs text-muted mt-1">Arquivos publicados pelo Approf para baixar e usar</p>
+        <p className="text-xs text-muted mt-1">Envie recursos para análise antes de publicar na comunidade</p>
       </div>
 
-      <div className="scroll-area px-[18px]">
-        <div className="bg-white rounded-app p-3 border border-border shadow-card mt-[14px] mb-[12px]">
-          <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
-            <Search size={16} className="text-muted flex-shrink-0" />
+      <div className="scroll-area px-[18px] pb-8">
+        <div className="bg-white rounded-app p-4 border border-border shadow-card mt-[14px]">
+          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Novo material</p>
+
+          <label className="block mb-3">
+            <span className="block text-[11px] font-bold text-muted mb-1">Tema ou nome do arquivo</span>
             <input
-              className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
-              placeholder="Buscar material..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className="w-full rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none focus:border-gp"
+              placeholder="Ex: Música para roda de acolhimento"
             />
-          </div>
-        </div>
+          </label>
 
-        <div className="flex flex-col gap-[11px]">
-          {filtered.map((cat) => (
-            <button
-              key={cat.label}
-              className="relative bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform"
-            >
-              {renderIcon(cat.icon, cat.bg)}
-              {cat.isNew && (
-                <span className="absolute top-3 right-9 text-[9px] font-bold px-2 py-[2px] rounded-full bg-gbg text-gm">
-                  Novo
-                </span>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-bold text-ink leading-tight">{cat.label}</p>
-                <span className="text-[12px] text-muted">{cat.count} modelos</span>
+          <label className="block mb-3">
+            <span className="block text-[11px] font-bold text-muted mb-1">Descrição</span>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              className="w-full min-h-[96px] resize-none rounded-app-sm border border-border px-3 py-3 text-[13px] leading-[1.5] outline-none focus:border-gp"
+              placeholder="Descreva como esse material ajuda na prática pedagógica."
+            />
+          </label>
+
+          <label className="flex min-h-[136px] cursor-pointer flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center">
+            <UploadCloud size={28} className="text-gm" />
+              <span className="mt-2 text-[13px] font-bold text-gd">Adicionar documento ou imagem</span>
+              <span className="mt-1 text-[11px] leading-[1.5] text-muted">
+              PDF, DOCX, XLSX, PPTX, TXT, CSV, JPG, PNG ou WEBP
+            </span>
+            <input
+              type="file"
+              className="hidden"
+              accept={ACCEPTED_MATERIALS}
+              onChange={(event) => selectFile(event.target.files?.[0])}
+            />
+          </label>
+
+          {file && (
+            <div className="mt-4 rounded-app-sm border border-border bg-cream p-3">
+              <div className="mb-3 flex items-center gap-3">
+                <MaterialIcon kind={materialKind ?? 'document'} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-bold text-ink">{file.name}</p>
+                  <p className="text-[11px] text-muted">{formatFileSize(file.size)}</p>
+                </div>
+                <button onClick={() => selectFile(null)} className="text-[11px] font-bold text-[#C1440E]">
+                  remover
+                </button>
               </div>
-              <ChevronRight size={18} className="text-muted flex-shrink-0" />
-            </button>
-          ))}
+              <MaterialPreview file={file} previewUrl={previewUrl} kind={materialKind ?? 'document'} />
+            </div>
+          )}
+
+          {message && (
+            <p className="mt-4 rounded-app-sm border border-gp bg-gbg px-3 py-3 text-[12px] leading-[1.5] text-gd">
+              {message}
+            </p>
+          )}
+
+          {analysis && (
+            <div className="mt-4 rounded-app-sm border border-border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[12px] font-bold text-ink">Análise da IA</p>
+                <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${getStatusClass(analysis.status)}`}>
+                  {formatStatus(analysis.status)}
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] text-muted">Confiança: {Math.round(analysis.review.confianca * 100)}%</p>
+              <p className="mt-1 text-[11px] text-muted">Categoria detectada: {analysis.review.categoria_detectada}</p>
+              {analysis.review.motivo && (
+                <p className="mt-2 text-[12px] leading-[1.5] text-soft">{analysis.review.motivo}</p>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => void submitMaterial()}
+            disabled={!canSubmit}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-app bg-gd py-4 text-[15px] font-bold text-white disabled:opacity-50"
+          >
+            {submitting ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
+            {submitting ? 'Analisando com IA...' : 'Analisar e enviar'}
+          </button>
         </div>
 
-        {filtered.length === 0 && (
-          <p className="text-[13px] text-muted text-center py-10">Nenhum material encontrado.</p>
-        )}
+        <div className="mt-4 rounded-app border border-border bg-white p-4 shadow-card">
+          <p className="text-[13px] font-bold text-ink">Publicação protegida</p>
+          <p className="mt-1 text-[12px] leading-[1.6] text-muted">
+            Materiais aprovados ficam disponíveis. Materiais bloqueados não são publicados. Quando a confiança da IA é baixa, o arquivo fica em revisão.
+          </p>
+        </div>
       </div>
     </div>
   )
 }
 
-function renderIcon(Icon: LucideIcon, bg: string) {
+function MaterialPreview({ file, previewUrl, kind }: { file: File; previewUrl: string; kind: MaterialKind }) {
+  if (kind === 'image') {
+    return <img src={previewUrl} alt="" className="max-h-64 w-full rounded-app-sm border border-border object-contain bg-white" />
+  }
   return (
-    <div
-      className="w-[48px] h-[48px] rounded-[13px] flex items-center justify-center text-gm flex-shrink-0"
-      style={{ background: bg }}
-    >
-      <Icon size={21} />
+    <div className="flex items-center gap-2 rounded-app-sm border border-border bg-white px-3 py-3">
+      <FileText size={16} className="text-gm" />
+      <span className="min-w-0 flex-1 truncate text-[12px] text-muted">{file.name}</span>
     </div>
   )
 }
 
+function MaterialIcon({ kind }: { kind: MaterialKind }) {
+  const Icon = kind === 'image' ? ImageIcon : FileText
+  return (
+    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[13px] border border-gp bg-gbg text-gm">
+      <Icon size={20} />
+    </div>
+  )
+}
+
+function getMaterialKind(file: File): MaterialKind {
+  if (file.type.startsWith('image/')) return 'image'
+  return 'document'
+}
+
+function isAllowedMaterialFile(file: File) {
+  if (file.type.startsWith('image/')) {
+    return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+  }
+  const name = file.name.toLowerCase()
+  return ['.pdf', '.docx', '.xlsx', '.pptx', '.txt', '.csv'].some((extension) => name.endsWith(extension))
+}
+
+function formatFileSize(size: number) {
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(size / 1024))} KB`
+}
+
+function formatStatus(status: MaterialAnalysisResult['status']) {
+  if (status === 'published') return 'Aprovado'
+  if (status === 'blocked') return 'Bloqueado'
+  return 'Revisão necessária'
+}
+
+function getStatusMessage(status: MaterialAnalysisResult['status']) {
+  if (status === 'published') return 'Material aprovado e publicado com segurança.'
+  if (status === 'blocked') return 'Material bloqueado pela análise de segurança e não publicado.'
+  return 'Material enviado para revisão antes de ficar disponível.'
+}
+
+function getStatusClass(status: MaterialAnalysisResult['status']) {
+  if (status === 'published') return 'bg-gbg text-gd border border-gp'
+  if (status === 'blocked') return 'bg-red-50 text-red-700 border border-red-200'
+  return 'bg-[#FFF3CD] text-[#856404] border border-[#EAD58A]'
+}

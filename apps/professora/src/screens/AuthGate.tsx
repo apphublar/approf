@@ -164,9 +164,17 @@ function AuthScreen({
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   const [showIosInstallHelp, setShowIosInstallHelp] = useState(false)
   const [installMessage, setInstallMessage] = useState('')
+  const [installDismissed, setInstallDismissed] = useState(() => getLocalStorageFlag('approf:pwa-install-dismissed'))
+  const [installInstalled, setInstallInstalled] = useState(() => isRunningStandalone() || getLocalStorageFlag('approf:pwa-installed'))
+  const [isStandalone, setIsStandalone] = useState(() => isRunningStandalone())
 
   const isIos = isIosDevice()
-  const isStandalone = isRunningStandalone()
+  const shouldShowInstallPopup =
+    !isStandalone &&
+    !installInstalled &&
+    !installDismissed &&
+    (Boolean(installPrompt) || isIos) &&
+    (mode === 'signin' || mode === 'signup')
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -175,6 +183,10 @@ function AuthScreen({
     }
     const handleInstalled = () => {
       setInstallPrompt(null)
+      setInstallInstalled(true)
+      setInstallDismissed(true)
+      setLocalStorageFlag('approf:pwa-installed', true)
+      setLocalStorageFlag('approf:pwa-install-dismissed', true)
       setInstallMessage('App instalado com sucesso.')
     }
 
@@ -184,6 +196,24 @@ function AuthScreen({
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleInstalled)
     }
+  }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia('(display-mode: standalone)')
+    const updateStandaloneState = () => {
+      const nextStandalone = isRunningStandalone()
+      setIsStandalone(nextStandalone)
+      if (nextStandalone) {
+        setInstallInstalled(true)
+        setInstallDismissed(true)
+        setLocalStorageFlag('approf:pwa-installed', true)
+        setLocalStorageFlag('approf:pwa-install-dismissed', true)
+      }
+    }
+
+    updateStandaloneState()
+    media.addEventListener?.('change', updateStandaloneState)
+    return () => media.removeEventListener?.('change', updateStandaloneState)
   }, [])
 
   async function submit() {
@@ -247,13 +277,20 @@ function AuthScreen({
     setInstallMessage('')
     try {
       if (isStandalone) {
+        setInstallInstalled(true)
+        setLocalStorageFlag('approf:pwa-installed', true)
         setInstallMessage('O app já está instalado neste dispositivo.')
         return
       }
       if (installPrompt) {
         await installPrompt.prompt()
         const choice = await installPrompt.userChoice
+        setInstallPrompt(null)
         if (choice.outcome === 'accepted') {
+          setInstallInstalled(true)
+          setInstallDismissed(true)
+          setLocalStorageFlag('approf:pwa-installed', true)
+          setLocalStorageFlag('approf:pwa-install-dismissed', true)
           setInstallMessage('Instalação iniciada.')
         }
         return
@@ -266,6 +303,12 @@ function AuthScreen({
     } catch {
       setInstallMessage('Não foi possível iniciar a instalação agora.')
     }
+  }
+
+  function dismissInstallPopup() {
+    setInstallDismissed(true)
+    setShowIosInstallHelp(false)
+    setLocalStorageFlag('approf:pwa-install-dismissed', true)
   }
 
   return (
@@ -299,24 +342,8 @@ function AuthScreen({
             </div>
           )}
 
-          <button
-            onClick={() => void installApp()}
-            className="mb-4 w-full py-3 rounded-app-sm text-sm font-bold border border-gp bg-gbg text-gd"
-          >
-            Baixar app
-          </button>
-
           {installMessage && (
             <p className="mb-4 text-xs text-gd bg-gbg border border-gp rounded-app-sm p-3">{installMessage}</p>
-          )}
-
-          {showIosInstallHelp && isIos && (
-            <div className="mb-4 rounded-app-sm border border-border bg-cream p-3 text-xs text-muted leading-relaxed">
-              <p className="font-bold text-ink mb-1">Instalar no iPhone</p>
-              <p>1. Toque no botão compartilhar do Safari.</p>
-              <p>2. Toque em "Adicionar à Tela de Início".</p>
-              <p>3. Confirme em "Adicionar".</p>
-            </div>
           )}
 
           {mode === 'signup' && (
@@ -414,6 +441,41 @@ function AuthScreen({
           </div>
         </div>
       </div>
+
+      {shouldShowInstallPopup && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 px-4 pb-5">
+          <div className="w-full max-w-sm rounded-app bg-white p-5 shadow-xl">
+            <p className="text-[15px] font-bold text-ink">Instalar o Approf</p>
+            <p className="mt-2 text-[12px] leading-relaxed text-muted">
+              Acesse o app pela tela inicial do celular, com abertura mais rápida e experiência de aplicativo.
+            </p>
+
+            {showIosInstallHelp && isIos && (
+              <div className="mt-4 rounded-app-sm border border-border bg-cream p-3 text-xs text-muted leading-relaxed">
+                <p className="font-bold text-ink mb-1">Instalar no iPhone</p>
+                <p>1. Toque no botão compartilhar do Safari.</p>
+                <p>2. Toque em "Adicionar à Tela de Início".</p>
+                <p>3. Confirme em "Adicionar".</p>
+              </div>
+            )}
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                onClick={dismissInstallPopup}
+                className="py-3 rounded-app-sm border border-border bg-white text-muted text-sm font-bold"
+              >
+                Agora não
+              </button>
+              <button
+                onClick={() => void installApp()}
+                className="py-3 rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold"
+              >
+                Instalar app
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -426,6 +488,26 @@ function isIosDevice() {
 function isRunningStandalone() {
   const standalone = (window.navigator as Navigator & { standalone?: boolean }).standalone
   return standalone === true || window.matchMedia('(display-mode: standalone)').matches
+}
+
+function getLocalStorageFlag(key: string) {
+  try {
+    return window.localStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+
+function setLocalStorageFlag(key: string, value: boolean) {
+  try {
+    if (value) {
+      window.localStorage.setItem(key, '1')
+    } else {
+      window.localStorage.removeItem(key)
+    }
+  } catch {
+    // localStorage can be unavailable in private browsing.
+  }
 }
 
 function hasPasswordRecoveryUrl() {
@@ -456,4 +538,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   )
 }
-
