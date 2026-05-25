@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { ChevronLeft, FileText, Loader2, Paperclip, Search, Trash2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument } from '@/services/personal-documents'
-import { pickFileFromDevice } from '@/services/file-picker'
+import { UploadDebugPanel } from '@/components/UploadDebugPanel'
 import type { TeacherPersonalDocument } from '@/types'
+import type { VisualUploadDebugStep } from '@/services/uploads'
 
 const ACCEPTED_TYPES = '.pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp,application/pdf'
 
@@ -14,6 +15,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState('')
   const [uploadError, setUploadError] = useState('')
+  const [debugSteps, setDebugSteps] = useState<VisualUploadDebugStep[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
 
@@ -66,29 +68,67 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   }
 
   async function handleFileSelect(selectedFile: File | null) {
-    if (!selectedFile) return
+    if (!selectedFile) {
+      upsertDebugStep({
+        id: 'file-selected',
+        label: 'Arquivo selecionado',
+        status: 'error',
+        detail: 'Nenhum arquivo retornou do seletor.',
+      })
+      return
+    }
 
     setUploadError('')
     setUploading(true)
+    upsertDebugStep({
+      id: 'file-selected',
+      label: 'Arquivo selecionado',
+      status: 'ok',
+      detail: formatFileDebug(selectedFile),
+    })
     try {
-      const uploaded = await uploadPersonalDocument(selectedFile)
+      const uploaded = await uploadPersonalDocument(selectedFile, upsertDebugStep)
       setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
+      upsertDebugStep({
+        id: 'done',
+        label: 'Arquivo enviado com sucesso',
+        status: 'ok',
+        detail: `documento: ${uploaded.id}`,
+      })
     } catch (error) {
+      upsertDebugStep({
+        id: 'error',
+        label: 'Erro completo caso exista',
+        status: 'error',
+        detail: error instanceof Error ? error.stack || error.message : String(error),
+      })
       setUploadError(error instanceof Error ? error.message : 'Nao foi possivel anexar o arquivo. Tente novamente.')
     } finally {
       setUploading(false)
     }
   }
 
-  async function openDocumentPicker() {
-    if (uploading) return
-    setUploadError('')
-    try {
-      const selectedFile = await pickFileFromDevice({ accept: ACCEPTED_TYPES, debugKey: 'meus-documentos' })
-      await handleFileSelect(selectedFile)
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Nao foi possivel abrir o seletor de arquivos.')
-    }
+  async function onNativeDocumentChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFile = event.currentTarget.files?.[0] ?? null
+    event.currentTarget.value = ''
+    setDebugSteps([])
+    upsertDebugStep({
+      id: 'native-input',
+      label: 'Input nativo do celular',
+      status: selectedFile ? 'ok' : 'error',
+      detail: selectedFile ? 'Evento change disparou.' : 'Evento change disparou sem arquivo.',
+    })
+    await handleFileSelect(selectedFile)
+  }
+
+  function upsertDebugStep(step: VisualUploadDebugStep) {
+    setDebugSteps((current) => {
+      const index = current.findIndex((item) => item.id === step.id)
+      if (index < 0) return [...current, step]
+      const next = [...current]
+      next[index] = step
+      return next
+    })
   }
 
   async function handleRemove(id: string) {
@@ -124,19 +164,29 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void openDocumentPicker()}
-            disabled={uploading}
-            className="mb-4 flex w-full items-center justify-center gap-2 rounded-app-sm border-[1.5px] border-gp bg-white px-3 py-[13px] text-[13px] font-bold text-gm disabled:opacity-50"
+          <label
+            className={`relative mb-4 flex w-full items-center justify-center gap-2 rounded-app-sm border-[1.5px] border-gp bg-white px-3 py-[13px] text-[13px] font-bold text-gm ${
+              uploading ? 'opacity-50' : ''
+            }`}
           >
+            <input
+              type="file"
+              accept={ACCEPTED_TYPES}
+              disabled={uploading}
+              onChange={(event) => void onNativeDocumentChange(event)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
             {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
             {uploading ? 'Anexando...' : 'Anexar documento'}
-          </button>
+          </label>
 
           {(uploadError || loadError) && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>
           )}
+
+          <div className="mb-4">
+            <UploadDebugPanel steps={debugSteps} />
+          </div>
 
           <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
             <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
@@ -230,6 +280,14 @@ function formatDate(iso: string) {
     month: '2-digit',
     year: 'numeric',
   })
+}
+
+function formatFileDebug(file: File) {
+  return [
+    `Nome do arquivo: ${file.name}`,
+    `Tamanho: ${formatFileSize(file.size)}`,
+    `MIME Type: ${file.type || '(vazio)'}`,
+  ].join('\n')
 }
 
 function dataUrlToFile(dataUrl: string, fileName: string, mimeType: string) {

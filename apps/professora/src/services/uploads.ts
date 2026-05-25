@@ -2,25 +2,55 @@ import { getSupabaseClient } from './supabase/client'
 
 export type UploadModule = 'material_apoio' | 'meus_documentos'
 
+export interface VisualUploadDebugStep {
+  id: string
+  label: string
+  status: 'running' | 'ok' | 'error'
+  detail?: string
+}
+
 export async function uploadFileToBackend<T>(input: {
   file: File
   module: UploadModule
   metadata?: Record<string, unknown>
+  onDebugStep?: (step: VisualUploadDebugStep) => void
 }): Promise<T> {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase nao configurado para enviar arquivos.')
 
+  input.onDebugStep?.({
+    id: 'file-selected',
+    label: 'Arquivo selecionado',
+    status: 'ok',
+    detail: stringifyDebug(getUploadDiagnostics(input.file)),
+  })
+
+  input.onDebugStep?.({ id: 'auth', label: 'Usuario autenticado', status: 'running' })
   const { data, error } = await supabase.auth.getSession()
-  if (error) throw error
+  if (error) {
+    input.onDebugStep?.({ id: 'auth', label: 'Usuario autenticado', status: 'error', detail: error.message })
+    throw error
+  }
   const token = data.session?.access_token
   const userId = data.session?.user.id
-  if (!token) throw new Error('Sua sessao expirou. Faca login novamente.')
+  if (!token) {
+    input.onDebugStep?.({ id: 'auth', label: 'Usuario autenticado', status: 'error', detail: 'Token ausente' })
+    throw new Error('Sua sessao expirou. Faca login novamente.')
+  }
+  input.onDebugStep?.({ id: 'auth', label: 'Usuario autenticado', status: 'ok', detail: `userId: ${userId}; token: sim` })
 
   const endpoint = `${getAdminApiUrl()}/api/uploads`
   const formData = new FormData()
   formData.append('module', input.module)
   formData.append('metadata', JSON.stringify(input.metadata ?? {}))
   formData.append('file', input.file, input.file.name)
+
+  input.onDebugStep?.({
+    id: 'api-start',
+    label: 'Inicio do upload',
+    status: 'running',
+    detail: `${input.module} -> ${endpoint}`,
+  })
 
   console.info('[uploads/frontend]', {
     endpoint,
@@ -29,13 +59,46 @@ export async function uploadFileToBackend<T>(input: {
     metadata: input.metadata ?? {},
   })
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  })
+  let response: Response
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    })
+  } catch (fetchError) {
+    input.onDebugStep?.({
+      id: 'api-start',
+      label: 'Inicio do upload',
+      status: 'error',
+      detail: stringifyDebug(fetchError),
+    })
+    throw fetchError
+  }
   const rawBody = await response.text().catch((readError) => `__READ_ERROR__:${String(readError)}`)
   const payload = parseJsonBody(rawBody) as ({ error?: string } & Record<string, unknown>) | null
+  input.onDebugStep?.({
+    id: 'api-response',
+    label: 'Resposta da API',
+    status: response.ok ? 'ok' : 'error',
+    detail: stringifyDebug({
+      status: response.status,
+      ok: response.ok,
+      raw: rawBody,
+    }),
+  })
+
+  const serverDebug = Array.isArray(payload?.debug) ? payload.debug : []
+  serverDebug.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return
+    const debugItem = item as { id?: unknown; label?: unknown; status?: unknown; detail?: unknown }
+    input.onDebugStep?.({
+      id: `server-${typeof debugItem.id === 'string' ? debugItem.id : index}`,
+      label: typeof debugItem.label === 'string' ? debugItem.label : `Backend ${index + 1}`,
+      status: debugItem.status === 'error' ? 'error' : debugItem.status === 'running' ? 'running' : 'ok',
+      detail: stringifyDebug(debugItem.detail ?? debugItem),
+    })
+  })
 
   console.info('[uploads/frontend] response', {
     endpoint,
@@ -64,6 +127,15 @@ function parseJsonBody(raw: string) {
     return JSON.parse(raw)
   } catch {
     return null
+  }
+}
+
+function stringifyDebug(value: unknown) {
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
   }
 }
 

@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type MouseEvent } from 'react'
 import {
-  CheckCircle2,
   ExternalLink,
   FileText,
   ImageIcon,
@@ -11,7 +10,6 @@ import {
   Trash2,
   UploadCloud,
   X,
-  XCircle,
 } from 'lucide-react'
 import {
   analyzeAndUploadMaterial,
@@ -23,7 +21,7 @@ import {
   type UploadDebugStep,
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
-import { pickFileFromDevice } from '@/services/file-picker'
+import { UploadDebugPanel } from '@/components/UploadDebugPanel'
 
 type TabId = 'all' | 'mine' | 'blocked'
 type SortBy = 'newest' | 'oldest' | 'name'
@@ -61,6 +59,7 @@ export default function MaterialsScreen() {
   const [debugSteps, setDebugSteps] = useState<UploadDebugStep[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [adminUrl, setAdminUrl] = useState<string | null>(null)
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
 
   const canSubmit = Boolean(title.trim() && desc.trim() && file && !submitting)
 
@@ -96,6 +95,16 @@ export default function MaterialsScreen() {
     void init()
   }, [])
 
+  useEffect(() => {
+    if (!file || getKindFromFile(file) !== 'image') {
+      setFilePreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setFilePreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
   async function init() {
     setAdminUrl(import.meta.env.VITE_APPROF_ADMIN_API_URL ?? '(não configurado)')
     const supabase = getSupabaseClient()
@@ -124,7 +133,7 @@ export default function MaterialsScreen() {
     setUploadMsg('')
     setAnalysis(null)
     setDebugSteps([])
-    setShowDebug(false)
+    setShowDebug(true)
     setShowUpload(true)
   }
 
@@ -141,18 +150,39 @@ export default function MaterialsScreen() {
     }
     setFile(f ?? null)
     setUploadMsg('')
-    setDebugSteps([])
+    if (f) {
+      setUploadDebugStep({
+        id: 'file-selected',
+        label: 'Arquivo selecionado',
+        status: 'ok',
+        detail: formatFileDebug(f),
+      })
+    } else {
+      setDebugSteps([])
+    }
   }
 
-  async function openMaterialPicker() {
-    if (submitting) return
-    try {
-      const selectedFile = await pickFileFromDevice({ accept: ACCEPTED_MATERIALS, debugKey: 'material-apoio' })
-      if (selectedFile) pickFile(selectedFile)
-    } catch (error) {
-      setUploadMsg(error instanceof Error ? error.message : 'Nao foi possivel abrir o seletor de arquivos.')
-      setShowDebug(true)
-    }
+  function setUploadDebugStep(step: UploadDebugStep) {
+    setDebugSteps((current) => {
+      const index = current.findIndex((item) => item.id === step.id)
+      if (index < 0) return [...current, step]
+      const next = [...current]
+      next[index] = step
+      return next
+    })
+  }
+
+  function onNativeMaterialChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFile = event.currentTarget.files?.[0] ?? null
+    event.currentTarget.value = ''
+    setShowDebug(true)
+    setUploadDebugStep({
+      id: 'native-input',
+      label: 'Input nativo do celular',
+      status: selectedFile ? 'ok' : 'error',
+      detail: selectedFile ? 'Evento change disparou.' : 'Evento change disparou sem arquivo.',
+    })
+    if (selectedFile) pickFile(selectedFile)
   }
 
   async function submitMaterial() {
@@ -336,12 +366,18 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              <button
-                type="button"
-                onClick={() => void openMaterialPicker()}
-                disabled={submitting}
-                className="flex min-h-[120px] w-full flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center disabled:opacity-50"
+              <label
+                className={`relative flex min-h-[120px] w-full flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${
+                  submitting ? 'opacity-50' : ''
+                }`}
               >
+                <input
+                  type="file"
+                  accept={ACCEPTED_MATERIALS}
+                  disabled={submitting}
+                  onChange={onNativeMaterialChange}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
                 <UploadCloud size={26} className="text-gm" />
                 <span className="mt-2 text-[13px] font-bold text-gd">
                   {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
@@ -349,14 +385,22 @@ export default function MaterialsScreen() {
                 <span className="mt-1 text-[11px] leading-[1.5] text-muted">
                   PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
                 </span>
-              </button>
+              </label>
 
               {file && (
                 <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
                   <MaterialIcon kind={getKindFromFile(file)} />
+                  {filePreviewUrl && (
+                    <img
+                      src={filePreviewUrl}
+                      alt=""
+                      className="h-14 w-14 flex-shrink-0 rounded-app-sm border border-border object-cover bg-white"
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-bold text-ink truncate">{file.name}</p>
                     <p className="text-[11px] text-muted">{formatFileSize(file.size)}</p>
+                    <p className="text-[10px] text-muted truncate">{file.type || 'MIME vazio'}</p>
                   </div>
                   <button type="button" onClick={() => pickFile(null)} className="text-[11px] font-bold text-[#C1440E]">
                     remover
@@ -402,54 +446,16 @@ export default function MaterialsScreen() {
                 {submitting
                   ? uploadPhase === 'uploading'
                     ? 'Enviando arquivo...'
-                    : 'Analisando com IA...'
+                    : 'Analisando arquivo...'
                   : 'Enviar material'}
               </button>
 
-              {/* Debug panel */}
-              <div className="rounded-app border border-amber-200 bg-amber-50 p-3">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between text-left"
-                  onClick={() => setShowDebug((v) => !v)}
-                >
-                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Diagnóstico de upload</span>
-                  <span className="text-[10px] text-amber-600">{showDebug ? 'ocultar' : 'mostrar'}</span>
-                </button>
-                {showDebug && (
-                  <div className="mt-3 space-y-1.5">
-                    <DebugRow label="Admin URL" value={adminUrl ?? '...'} />
-                    <DebugRow label="Usuário ID" value={userId ?? '(sem sessão)'} />
-                    {file && (
-                      <>
-                        <DebugRow label="Arquivo" value={file.name} />
-                        <DebugRow label="MIME" value={file.type || '(vazio)'} warn={!file.type} />
-                        <DebugRow label="Tamanho" value={formatFileSize(file.size)} />
-                      </>
-                    )}
-                    {debugSteps.length > 0 && (
-                      <div className="mt-2 space-y-1 pt-1 border-t border-amber-200">
-                        <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">Etapas</p>
-                        {debugSteps.map((step) => (
-                          <div key={step.id} className="flex items-start gap-2">
-                            {step.status === 'ok' && <CheckCircle2 size={13} className="mt-[2px] shrink-0 text-green-600" />}
-                            {step.status === 'error' && <XCircle size={13} className="mt-[2px] shrink-0 text-red-600" />}
-                            {step.status === 'running' && <Loader2 size={13} className="mt-[2px] shrink-0 animate-spin text-amber-600" />}
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-bold text-ink">{step.label}</p>
-                              {step.detail && (
-                                <p className={`mt-0.5 break-all text-[10px] leading-[1.4] ${step.status === 'error' ? 'text-red-700' : 'text-muted'}`}>
-                                  {step.detail}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {showDebug && (
+                <UploadDebugPanel
+                  title={`Debug temporario de upload - Admin: ${adminUrl ?? '...'}`}
+                  steps={debugSteps}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -686,15 +692,6 @@ function MaterialIcon({ kind }: { kind: MaterialKind }) {
   )
 }
 
-function DebugRow({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
-  return (
-    <div>
-      <span className="text-[10px] font-bold text-amber-700">{label}: </span>
-      <span className={`break-all text-[10px] ${warn ? 'text-red-700 font-bold' : 'text-ink'}`}>{value}</span>
-    </div>
-  )
-}
-
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start gap-2 px-3 py-2">
@@ -734,6 +731,7 @@ function DeleteButton({ onDelete }: { onDelete: () => Promise<void> }) {
 
 function getKindFromFile(file: File): MaterialKind {
   if (file.type.startsWith('image/')) return 'image'
+  if (['.jpg', '.jpeg', '.png', '.webp'].some((ext) => file.name.toLowerCase().endsWith(ext))) return 'image'
   return 'document'
 }
 
@@ -754,6 +752,14 @@ function isAllowedMaterialFile(file: File) {
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
   return `${Math.max(1, Math.round(size / 1024))} KB`
+}
+
+function formatFileDebug(file: File) {
+  return [
+    `Nome do arquivo: ${file.name}`,
+    `Tamanho: ${formatFileSize(file.size)}`,
+    `MIME Type: ${file.type || '(vazio)'}`,
+  ].join('\n')
 }
 
 function formatStatus(status: MaterialUploadStatus) {

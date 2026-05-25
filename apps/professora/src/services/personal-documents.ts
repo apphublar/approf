@@ -1,6 +1,6 @@
 import type { TeacherPersonalDocument } from '@/types'
 import { getSupabaseClient } from './supabase/client'
-import { uploadFileToBackend } from './uploads'
+import { uploadFileToBackend, type VisualUploadDebugStep } from './uploads'
 
 const MAX_PERSONAL_DOCUMENT_SIZE_BYTES = 15 * 1024 * 1024
 const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -13,7 +13,10 @@ export async function listPersonalDocuments(): Promise<TeacherPersonalDocument[]
   return Array.isArray(payload.documents) ? payload.documents : []
 }
 
-export async function uploadPersonalDocument(file: File): Promise<TeacherPersonalDocument> {
+export async function uploadPersonalDocument(
+  file: File,
+  onDebugStep?: (step: VisualUploadDebugStep) => void,
+): Promise<TeacherPersonalDocument> {
   validatePersonalDocumentFile(file)
 
   const supabase = getSupabaseClient()
@@ -30,6 +33,7 @@ export async function uploadPersonalDocument(file: File): Promise<TeacherPersona
   const payload = await uploadFileToBackend<{ document?: TeacherPersonalDocument; error?: string }>({
     module: 'meus_documentos',
     file,
+    onDebugStep,
   })
   if (!payload.document) throw new Error('Documento enviado, mas a resposta do servidor foi invalida.')
   return payload.document

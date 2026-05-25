@@ -1,5 +1,5 @@
 import { getSupabaseClient } from './supabase/client'
-import { uploadFileToBackend } from './uploads'
+import { uploadFileToBackend, type VisualUploadDebugStep } from './uploads'
 
 export type MaterialUploadStatus = 'published' | 'review_required' | 'blocked' | 'em_analise'
 
@@ -61,6 +61,10 @@ export interface UploadDebugStep {
   detail?: string
 }
 
+function toUploadDebugStep(step: VisualUploadDebugStep): UploadDebugStep {
+  return step
+}
+
 const MAX_MATERIAL_SIZE_BYTES = 10 * 1024 * 1024
 const ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.pptx']
 const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -106,6 +110,13 @@ export async function analyzeAndUploadMaterial(input: {
       metadata: {
         title: input.title,
         description: input.description,
+      },
+      onDebugStep: (step) => {
+        const normalized = toUploadDebugStep(step)
+        const existing = steps.findIndex((item) => item.id === normalized.id)
+        if (existing >= 0) steps[existing] = normalized
+        else steps.push(normalized)
+        emit?.([...steps])
       },
     })
     if (!payload?.status || !payload.review) throw new Error('Resposta invalida da analise do material.')

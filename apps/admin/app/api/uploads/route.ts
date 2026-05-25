@@ -32,15 +32,34 @@ export function OPTIONS() {
 
 export async function POST(request: Request) {
   const startedAt = Date.now()
+  const debug: UploadDebugItem[] = []
+  const setDebug = (id: string, label: string, status: UploadDebugItem['status'], detail?: unknown) => {
+    const existing = debug.findIndex((item) => item.id === id)
+    const item = { id, label, status, detail, at: new Date().toISOString() }
+    if (existing >= 0) debug[existing] = item
+    else debug.push(item)
+  }
+
   try {
+    setDebug('request', 'Requisicao recebida', 'running', {
+      origin: request.headers.get('origin'),
+      userAgent: request.headers.get('user-agent'),
+    })
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
+    setDebug('auth', 'Usuario autenticado no backend', 'ok', { ownerId })
     const formData = await request.formData()
     const module = String(formData.get('module') ?? '').trim() as UploadModule
     const metadata = parseMetadata(formData.get('metadata'))
     const file = formData.get('file')
 
-    if (!(file instanceof File)) return jsonError('Arquivo nao recebido pelo servidor.', 400)
-    if (module !== 'material_apoio' && module !== 'meus_documentos') return jsonError('Modulo de upload invalido.', 400)
+    if (!(file instanceof File)) {
+      setDebug('file', 'Arquivo recebido no backend', 'error', 'FormData nao contem File')
+      return jsonError('Arquivo nao recebido pelo servidor.', 400, debug)
+    }
+    if (module !== 'material_apoio' && module !== 'meus_documentos') {
+      setDebug('module', 'Modulo de upload', 'error', { module })
+      return jsonError('Modulo de upload invalido.', 400, debug)
+    }
 
     const fileName = file.name || 'arquivo'
     const mimeType = file.type || inferUploadMimeType(fileName)
@@ -50,6 +69,15 @@ export async function POST(request: Request) {
     const filePath = module === 'material_apoio'
       ? `${ownerId}/${Date.now()}-${safeFileName(fileName)}`
       : buildPersonalDocumentPath(ownerId, fileName)
+
+    setDebug('file', 'Arquivo recebido no backend', 'ok', {
+      fileName,
+      fileSize,
+      mimeType,
+      extension,
+      module,
+    })
+    setDebug('storage-path', 'Caminho do Storage', 'ok', { bucket, filePath })
 
     console.info('[uploads] request received', {
       origin: request.headers.get('origin'),
@@ -68,10 +96,15 @@ export async function POST(request: Request) {
     const validationError = module === 'material_apoio'
       ? validateMaterialFile({ name: fileName, type: mimeType, size: fileSize })
       : validatePersonalDocument({ fileName, fileType: mimeType, fileSize })
-    if (validationError) return jsonError(validationError, 400)
+    if (validationError) {
+      setDebug('validation', 'Validacao do arquivo', 'error', validationError)
+      return jsonError(validationError, 400, debug)
+    }
+    setDebug('validation', 'Validacao do arquivo', 'ok')
 
     const bytes = Buffer.from(await file.arrayBuffer())
     const supabase = createSupabaseServiceClient()
+    setDebug('storage', 'Resposta do Storage', 'running', { bucket, filePath, bytes: bytes.byteLength })
     const upload = await supabase.storage.from(bucket).upload(filePath, bytes, {
       contentType: mimeType,
       upsert: false,
@@ -85,14 +118,26 @@ export async function POST(request: Request) {
       durationMs: Date.now() - startedAt,
     })
 
-    if (upload.error) throw toError(upload.error, 'Nao foi possivel salvar o arquivo no storage.')
+    if (upload.error) {
+      setDebug('storage', 'Resposta do Storage', 'error', serializeError(upload.error))
+      throw toError(upload.error, 'Nao foi possivel salvar o arquivo no storage.')
+    }
+    setDebug('storage', 'Resposta do Storage', 'ok', { path: upload.data?.path ?? filePath })
 
     if (module === 'material_apoio') {
       const title = typeof metadata.title === 'string' ? metadata.title.trim() : ''
       const description = typeof metadata.description === 'string' ? metadata.description.trim() : ''
-      if (!title) return jsonError('Informe o tema ou nome do arquivo.', 400)
-      if (!description) return jsonError('Informe a descricao do material.', 400)
+      if (!title) {
+        setDebug('metadata', 'Dados do material', 'error', 'Titulo ausente')
+        return jsonError('Informe o tema ou nome do arquivo.', 400, debug)
+      }
+      if (!description) {
+        setDebug('metadata', 'Dados do material', 'error', 'Descricao ausente')
+        return jsonError('Informe a descricao do material.', 400, debug)
+      }
+      setDebug('metadata', 'Dados do material', 'ok', { title, descriptionLength: description.length })
 
+      setDebug('database', 'Resposta do banco', 'running', 'Criando registro do material')
       const result = await finalizeMaterialUpload({
         ownerId,
         title,
@@ -111,15 +156,21 @@ export async function POST(request: Request) {
         status: result.payload.status,
         durationMs: Date.now() - startedAt,
       })
+      setDebug('database', 'Resposta do banco', 'ok', {
+        materialId: result.payload.materialId,
+        status: result.payload.status,
+      })
 
       return NextResponse.json({
         module,
         uploadedVia: 'global-backend',
         filePath,
+        debug,
         ...result.payload,
       }, { status: 200, headers: UPLOAD_CORS_HEADERS })
     }
 
+    setDebug('database', 'Resposta do banco', 'running', 'Criando registro do documento')
     const insert = await supabase
       .from('teacher_personal_documents')
       .insert({
@@ -139,11 +190,16 @@ export async function POST(request: Request) {
       durationMs: Date.now() - startedAt,
     })
 
-    if (insert.error) throw toError(insert.error, 'Nao foi possivel salvar o registro do documento.')
+    if (insert.error) {
+      setDebug('database', 'Resposta do banco', 'error', serializeError(insert.error))
+      throw toError(insert.error, 'Nao foi possivel salvar o registro do documento.')
+    }
+    setDebug('database', 'Resposta do banco', 'ok', { id: insert.data.id, filePath: insert.data.file_path })
 
     return NextResponse.json({
       module,
       uploadedVia: 'global-backend',
+      debug,
       document: {
         id: insert.data.id,
         name: insert.data.file_name,
@@ -156,10 +212,22 @@ export async function POST(request: Request) {
       },
     }, { status: 200, headers: UPLOAD_CORS_HEADERS })
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sua sessao expirou. Faca login novamente.', error.status)
+    if (error instanceof AiAuthError) {
+      setDebug('auth', 'Usuario autenticado no backend', 'error', serializeError(error))
+      return jsonError('Sua sessao expirou. Faca login novamente.', error.status, debug)
+    }
+    setDebug('error', 'Erro completo', 'error', serializeError(error))
     console.error('[uploads] unhandled error', serializeError(error))
-    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel enviar o arquivo. Tente novamente.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Nao foi possivel enviar o arquivo. Tente novamente.', 500, debug)
   }
+}
+
+interface UploadDebugItem {
+  id: string
+  label: string
+  status: 'running' | 'ok' | 'error'
+  detail?: unknown
+  at: string
 }
 
 function parseMetadata(value: FormDataEntryValue | null) {
@@ -191,6 +259,6 @@ function serializeError(error: unknown) {
   return { message: String(error) }
 }
 
-function jsonError(error: string, status: number) {
-  return NextResponse.json({ error }, { status, headers: UPLOAD_CORS_HEADERS })
+function jsonError(error: string, status: number, debug?: UploadDebugItem[]) {
+  return NextResponse.json({ error, debug: debug ?? [] }, { status, headers: UPLOAD_CORS_HEADERS })
 }
