@@ -22,6 +22,12 @@ import {
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
 import { UploadDebugPanel } from '@/components/UploadDebugPanel'
+import {
+  clearUploadDebugSteps,
+  loadUploadDebugSteps,
+  saveUploadDebugSteps,
+  upsertUploadDebugStep,
+} from '@/services/upload-debug-store'
 
 type TabId = 'all' | 'mine' | 'blocked'
 type SortBy = 'newest' | 'oldest' | 'name'
@@ -31,6 +37,7 @@ type MaterialKind = 'document' | 'image'
 const ACCEPTED_MATERIALS = ['.pdf', '.docx', '.xlsx', '.pptx', '.jpg', '.jpeg', '.png', '.webp', 'image/jpeg', 'image/png', 'image/webp'].join(',')
 const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
+const DEBUG_KEY = 'material-apoio'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -56,7 +63,7 @@ export default function MaterialsScreen() {
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'analyzing'>('idle')
   const [uploadMsg, setUploadMsg] = useState('')
   const [analysis, setAnalysis] = useState<MaterialAnalysisResult | null>(null)
-  const [debugSteps, setDebugSteps] = useState<UploadDebugStep[]>([])
+  const [debugSteps, setDebugSteps] = useState<UploadDebugStep[]>(() => loadUploadDebugSteps(DEBUG_KEY))
   const [showDebug, setShowDebug] = useState(false)
   const [adminUrl, setAdminUrl] = useState<string | null>(null)
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
@@ -132,6 +139,7 @@ export default function MaterialsScreen() {
     setFile(null)
     setUploadMsg('')
     setAnalysis(null)
+    clearUploadDebugSteps(DEBUG_KEY)
     setDebugSteps([])
     setShowDebug(true)
     setShowUpload(true)
@@ -164,15 +172,15 @@ export default function MaterialsScreen() {
 
   function setUploadDebugStep(step: UploadDebugStep) {
     setDebugSteps((current) => {
-      const index = current.findIndex((item) => item.id === step.id)
-      if (index < 0) return [...current, step]
-      const next = [...current]
-      next[index] = step
+      const next = upsertUploadDebugStep(current, step)
+      saveUploadDebugSteps(DEBUG_KEY, next)
       return next
     })
   }
 
   function onNativeMaterialChange(event: ChangeEvent<HTMLInputElement>) {
+    event.preventDefault()
+    event.stopPropagation()
     const selectedFile = event.currentTarget.files?.[0] ?? null
     event.currentTarget.value = ''
     setShowDebug(true)
@@ -191,14 +199,22 @@ export default function MaterialsScreen() {
     setUploadPhase('uploading')
     setUploadMsg('')
     setAnalysis(null)
-    setDebugSteps([])
+    setUploadDebugStep({
+      id: 'manual-upload',
+      label: 'Inicio do upload',
+      status: 'running',
+      detail: 'Botao Enviar material pressionado.',
+    })
     try {
       window.setTimeout(() => setUploadPhase((p) => (p === 'uploading' ? 'analyzing' : p)), 800)
       const result = await analyzeAndUploadMaterial({
         title: title.trim(),
         description: desc.trim(),
         file,
-        onDebugStep: setDebugSteps,
+        onDebugStep: (steps) => {
+          setDebugSteps(steps)
+          saveUploadDebugSteps(DEBUG_KEY, steps)
+        },
       })
       setAnalysis(result)
       setUploadMsg(getStatusMessage(result.status))
@@ -313,6 +329,11 @@ export default function MaterialsScreen() {
 
       {/* ── Grid ── */}
       <div className="flex-1 min-h-0 overflow-y-auto px-[14px] pb-28 pt-1 overscroll-contain">
+        {!showUpload && debugSteps.length > 0 && (
+          <div className="mb-3">
+            <UploadDebugPanel title="Ultimo debug de upload" steps={debugSteps} />
+          </div>
+        )}
         {filtered.length === 0 ? (
           <EmptyState tab={tab} hasSearch={Boolean(query.trim())} onAdd={openUpload} />
         ) : (
@@ -375,6 +396,16 @@ export default function MaterialsScreen() {
                   type="file"
                   accept={ACCEPTED_MATERIALS}
                   disabled={submitting}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setShowDebug(true)
+                    setUploadDebugStep({
+                      id: 'native-input-open',
+                      label: 'Abrindo seletor nativo',
+                      status: 'running',
+                      detail: ACCEPTED_MATERIALS,
+                    })
+                  }}
                   onChange={onNativeMaterialChange}
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 />

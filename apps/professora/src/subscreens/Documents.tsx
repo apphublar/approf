@@ -5,8 +5,15 @@ import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument }
 import { UploadDebugPanel } from '@/components/UploadDebugPanel'
 import type { TeacherPersonalDocument } from '@/types'
 import type { VisualUploadDebugStep } from '@/services/uploads'
+import {
+  clearUploadDebugSteps,
+  loadUploadDebugSteps,
+  saveUploadDebugSteps,
+  upsertUploadDebugStep,
+} from '@/services/upload-debug-store'
 
 const ACCEPTED_TYPES = '.pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp,application/pdf'
+const DEBUG_KEY = 'meus-documentos'
 
 export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
@@ -15,7 +22,8 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState('')
   const [uploadError, setUploadError] = useState('')
-  const [debugSteps, setDebugSteps] = useState<VisualUploadDebugStep[]>([])
+  const [debugSteps, setDebugSteps] = useState<VisualUploadDebugStep[]>(() => loadUploadDebugSteps(DEBUG_KEY))
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
 
@@ -67,8 +75,8 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     }
   }
 
-  async function handleFileSelect(selectedFile: File | null) {
-    if (!selectedFile) {
+  function handleFileSelect(file: File | null) {
+    if (!file) {
       upsertDebugStep({
         id: 'file-selected',
         label: 'Arquivo selecionado',
@@ -79,16 +87,29 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     }
 
     setUploadError('')
-    setUploading(true)
+    setSelectedFile(file)
     upsertDebugStep({
       id: 'file-selected',
       label: 'Arquivo selecionado',
       status: 'ok',
-      detail: formatFileDebug(selectedFile),
+      detail: formatFileDebug(file),
+    })
+  }
+
+  async function uploadSelectedDocument() {
+    if (!selectedFile || uploading) return
+    setUploadError('')
+    setUploading(true)
+    upsertDebugStep({
+      id: 'manual-upload',
+      label: 'Inicio do upload',
+      status: 'running',
+      detail: 'Botao Adicionar arquivo pressionado.',
     })
     try {
       const uploaded = await uploadPersonalDocument(selectedFile, upsertDebugStep)
       setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
+      setSelectedFile(null)
       upsertDebugStep({
         id: 'done',
         label: 'Arquivo enviado com sucesso',
@@ -108,9 +129,12 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     }
   }
 
-  async function onNativeDocumentChange(event: ChangeEvent<HTMLInputElement>) {
+  function onNativeDocumentChange(event: ChangeEvent<HTMLInputElement>) {
+    event.preventDefault()
+    event.stopPropagation()
     const selectedFile = event.currentTarget.files?.[0] ?? null
     event.currentTarget.value = ''
+    clearUploadDebugSteps(DEBUG_KEY)
     setDebugSteps([])
     upsertDebugStep({
       id: 'native-input',
@@ -118,15 +142,13 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
       status: selectedFile ? 'ok' : 'error',
       detail: selectedFile ? 'Evento change disparou.' : 'Evento change disparou sem arquivo.',
     })
-    await handleFileSelect(selectedFile)
+    handleFileSelect(selectedFile)
   }
 
   function upsertDebugStep(step: VisualUploadDebugStep) {
     setDebugSteps((current) => {
-      const index = current.findIndex((item) => item.id === step.id)
-      if (index < 0) return [...current, step]
-      const next = [...current]
-      next[index] = step
+      const next = upsertUploadDebugStep(current, step)
+      saveUploadDebugSteps(DEBUG_KEY, next)
       return next
     })
   }
@@ -173,6 +195,17 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
               type="file"
               accept={ACCEPTED_TYPES}
               disabled={uploading}
+              onClick={(event) => {
+                event.stopPropagation()
+                clearUploadDebugSteps(DEBUG_KEY)
+                setDebugSteps([])
+                upsertDebugStep({
+                  id: 'native-input-open',
+                  label: 'Abrindo seletor nativo',
+                  status: 'running',
+                  detail: ACCEPTED_TYPES,
+                })
+              }}
               onChange={(event) => void onNativeDocumentChange(event)}
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
@@ -182,6 +215,27 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
 
           {(uploadError || loadError) && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>
+          )}
+
+          {selectedFile && (
+            <div className="mb-4 rounded-app-sm border border-border bg-white p-3">
+              <div className="flex items-center gap-3">
+                <FileText size={20} className="text-gm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-bold text-ink">{selectedFile.name}</p>
+                  <p className="text-[11px] text-muted">{formatFileSize(selectedFile.size)} - {selectedFile.type || 'MIME vazio'}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void uploadSelectedDocument()}
+                disabled={uploading}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd py-3 text-[13px] font-bold text-white disabled:opacity-50"
+              >
+                {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
+                {uploading ? 'Enviando arquivo...' : 'Adicionar arquivo'}
+              </button>
+            </div>
           )}
 
           <div className="mb-4">
