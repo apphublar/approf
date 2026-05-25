@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, FileText, Loader2, Paperclip, Search, Trash2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument } from '@/services/personal-documents'
+import { pickFileFromDevice } from '@/services/file-picker'
 import type { TeacherPersonalDocument } from '@/types'
 
 const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.txt,.odt,.rtf'
@@ -15,7 +16,6 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const [uploadError, setUploadError] = useState('')
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     void refreshDocuments()
@@ -65,8 +65,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     }
   }
 
-  async function handleFileSelect(files: FileList | null) {
-    const selectedFile = files?.[0]
+  async function handleFileSelect(selectedFile: File | null) {
     if (!selectedFile) return
 
     setUploadError('')
@@ -78,7 +77,17 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
       setUploadError(error instanceof Error ? error.message : 'Nao foi possivel anexar o arquivo. Tente novamente.')
     } finally {
       setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function openDocumentPicker() {
+    if (uploading) return
+    setUploadError('')
+    try {
+      const selectedFile = await pickFileFromDevice({ accept: ACCEPTED_TYPES, debugKey: 'meus-documentos' })
+      await handleFileSelect(selectedFile)
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Nao foi possivel abrir o seletor de arquivos.')
     }
   }
 
@@ -115,26 +124,15 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </p>
           </div>
 
-          <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white px-3 py-3">
-            <div className="mb-2 flex items-center justify-center gap-2 text-[13px] font-bold text-gm">
+          <button
+            type="button"
+            onClick={() => void openDocumentPicker()}
+            disabled={uploading}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-app-sm border-[1.5px] border-gp bg-white px-3 py-[13px] text-[13px] font-bold text-gm disabled:opacity-50"
+          >
             {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
             {uploading ? 'Anexando...' : 'Anexar documento'}
-            </div>
-            <input
-              id="doc-file-input"
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_TYPES}
-              className="block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-gbg file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-gd"
-              disabled={uploading}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                void handleFileSelect(event.currentTarget.files)
-              }}
-            />
-          </div>
+          </button>
 
           {(uploadError || loadError) && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>

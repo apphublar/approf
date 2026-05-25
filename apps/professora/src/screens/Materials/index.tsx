@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import {
   CheckCircle2,
   ExternalLink,
@@ -23,6 +23,7 @@ import {
   type UploadDebugStep,
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
+import { pickFileFromDevice } from '@/services/file-picker'
 
 type TabId = 'all' | 'mine' | 'blocked'
 type SortBy = 'newest' | 'oldest' | 'name'
@@ -60,7 +61,6 @@ export default function MaterialsScreen() {
   const [debugSteps, setDebugSteps] = useState<UploadDebugStep[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [adminUrl, setAdminUrl] = useState<string | null>(null)
-  const materialFileInputRef = useRef<HTMLInputElement | null>(null)
 
   const canSubmit = Boolean(title.trim() && desc.trim() && file && !submitting)
 
@@ -142,6 +142,17 @@ export default function MaterialsScreen() {
     setFile(f ?? null)
     setUploadMsg('')
     setDebugSteps([])
+  }
+
+  async function openMaterialPicker() {
+    if (submitting) return
+    try {
+      const selectedFile = await pickFileFromDevice({ accept: ACCEPTED_MATERIALS, debugKey: 'material-apoio' })
+      pickFile(selectedFile)
+    } catch (error) {
+      setUploadMsg(error instanceof Error ? error.message : 'Nao foi possivel abrir o seletor de arquivos.')
+      setShowDebug(true)
+    }
   }
 
   async function submitMaterial() {
@@ -325,7 +336,12 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              <div className="flex min-h-[120px] flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center">
+              <button
+                type="button"
+                onClick={() => void openMaterialPicker()}
+                disabled={submitting}
+                className="flex min-h-[120px] w-full flex-col items-center justify-center rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center disabled:opacity-50"
+              >
                 <UploadCloud size={26} className="text-gm" />
                 <span className="mt-2 text-[13px] font-bold text-gd">
                   {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
@@ -333,21 +349,7 @@ export default function MaterialsScreen() {
                 <span className="mt-1 text-[11px] leading-[1.5] text-muted">
                   PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
                 </span>
-                <input
-                  ref={materialFileInputRef}
-                  type="file"
-                  className="mt-3 block w-full text-[12px] text-muted file:mr-3 file:rounded-app-sm file:border-0 file:bg-white file:px-3 file:py-2 file:text-[12px] file:font-bold file:text-gd"
-                  accept={ACCEPTED_MATERIALS}
-                  disabled={submitting}
-                  onChange={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    pickFile(e.currentTarget.files?.[0])
-                    e.currentTarget.value = ''
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
+              </button>
 
               {file && (
                 <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
