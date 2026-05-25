@@ -214,6 +214,44 @@ export default function MaterialsScreen() {
     if (selectedFile) pickFile(selectedFile)
   }
 
+  async function openSystemMaterialPicker() {
+    setShowDebug(true)
+    setUploadDebugStep({
+      id: 'system-picker-open',
+      label: 'Abrindo seletor alternativo',
+      status: 'running',
+      detail: 'Tentando showOpenFilePicker sem filtro accept.',
+    })
+    const picker = getSystemFilePicker()
+    if (!picker) {
+      setUploadDebugStep({
+        id: 'system-picker-open',
+        label: 'Abrindo seletor alternativo',
+        status: 'error',
+        detail: 'showOpenFilePicker nao esta disponivel neste navegador/PWA.',
+      })
+      return
+    }
+    try {
+      const handles = await picker({ multiple: false })
+      const selectedFile = handles[0] ? await handles[0].getFile() : null
+      setUploadDebugStep({
+        id: 'system-picker-open',
+        label: 'Abrindo seletor alternativo',
+        status: selectedFile ? 'ok' : 'error',
+        detail: selectedFile ? 'Arquivo retornou pelo seletor alternativo.' : 'Nenhum arquivo retornou pelo seletor alternativo.',
+      })
+      if (selectedFile) pickFile(selectedFile)
+    } catch (error) {
+      setUploadDebugStep({
+        id: 'system-picker-open',
+        label: 'Abrindo seletor alternativo',
+        status: 'error',
+        detail: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   async function submitMaterial() {
     if (!file || !canSubmit) return
     setSubmitting(true)
@@ -416,9 +454,17 @@ export default function MaterialsScreen() {
                 <p className="mb-3 mt-1 text-[11px] leading-[1.5] text-muted">
                   PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP ate {MAX_MB} MB
                 </p>
+                <button
+                  type="button"
+                  onClick={() => void openSystemMaterialPicker()}
+                  disabled={submitting}
+                  className="mb-3 flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+                >
+                  <UploadCloud size={14} />
+                  Escolher pelo seletor alternativo
+                </button>
                 <input
                   type="file"
-                  accept={ACCEPTED_MATERIALS}
                   disabled={submitting}
                   onClick={(event) => {
                     event.stopPropagation()
@@ -837,4 +883,12 @@ function normalizeText(value: string) {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .trim()
+}
+
+type SystemFileHandle = { getFile: () => Promise<File> }
+type SystemFilePicker = (options?: { multiple?: boolean }) => Promise<SystemFileHandle[]>
+
+function getSystemFilePicker(): SystemFilePicker | null {
+  const candidate = (window as unknown as { showOpenFilePicker?: SystemFilePicker }).showOpenFilePicker
+  return typeof candidate === 'function' ? candidate.bind(window) : null
 }

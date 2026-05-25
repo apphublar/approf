@@ -166,6 +166,45 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     handleFileSelect(selectedFile)
   }
 
+  async function openSystemDocumentPicker() {
+    clearUploadDebugSteps(DEBUG_KEY)
+    setDebugSteps([])
+    upsertDebugStep({
+      id: 'system-picker-open',
+      label: 'Abrindo seletor alternativo',
+      status: 'running',
+      detail: 'Tentando showOpenFilePicker sem filtro accept.',
+    })
+    const picker = getSystemFilePicker()
+    if (!picker) {
+      upsertDebugStep({
+        id: 'system-picker-open',
+        label: 'Abrindo seletor alternativo',
+        status: 'error',
+        detail: 'showOpenFilePicker nao esta disponivel neste navegador/PWA.',
+      })
+      return
+    }
+    try {
+      const handles = await picker({ multiple: false })
+      const file = handles[0] ? await handles[0].getFile() : null
+      upsertDebugStep({
+        id: 'system-picker-open',
+        label: 'Abrindo seletor alternativo',
+        status: file ? 'ok' : 'error',
+        detail: file ? 'Arquivo retornou pelo seletor alternativo.' : 'Nenhum arquivo retornou pelo seletor alternativo.',
+      })
+      handleFileSelect(file)
+    } catch (error) {
+      upsertDebugStep({
+        id: 'system-picker-open',
+        label: 'Abrindo seletor alternativo',
+        status: 'error',
+        detail: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   function upsertDebugStep(step: VisualUploadDebugStep) {
     setDebugSteps((current) => {
       const next = upsertUploadDebugStep(current, step)
@@ -212,9 +251,17 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
               {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
               {uploading ? 'Anexando...' : 'Escolher documento'}
             </div>
+            <button
+              type="button"
+              onClick={() => void openSystemDocumentPicker()}
+              disabled={uploading}
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+            >
+              <Paperclip size={14} />
+              Escolher pelo seletor alternativo
+            </button>
             <input
               type="file"
-              accept={ACCEPTED_TYPES}
               disabled={uploading}
               onClick={(event) => {
                 event.stopPropagation()
@@ -382,4 +429,12 @@ function normalizeText(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
+}
+
+type SystemFileHandle = { getFile: () => Promise<File> }
+type SystemFilePicker = (options?: { multiple?: boolean }) => Promise<SystemFileHandle[]>
+
+function getSystemFilePicker(): SystemFilePicker | null {
+  const candidate = (window as unknown as { showOpenFilePicker?: SystemFilePicker }).showOpenFilePicker
+  return typeof candidate === 'function' ? candidate.bind(window) : null
 }
