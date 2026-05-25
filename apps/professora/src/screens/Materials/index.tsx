@@ -574,6 +574,7 @@ export default function MaterialsScreen() {
               </button>
 
               <RatingBox material={preview} onRate={handleRating} />
+              <RatingComments material={preview} />
               <ReportBox material={preview} onReport={handleReport} />
 
               <div className="flex gap-2">
@@ -590,8 +591,7 @@ export default function MaterialsScreen() {
                       Visualizar
                     </a>
                     <a
-                      href={preview.downloadUrl}
-                      download={preview.file_name ?? preview.title}
+                      href={preview.fileDownloadUrl ?? preview.downloadUrl}
                       onClick={() => void handleDownload(preview)}
                       className="flex-1 flex items-center justify-center gap-2 rounded-app-sm bg-gd py-3 text-[13px] font-bold text-white"
                     >
@@ -600,10 +600,9 @@ export default function MaterialsScreen() {
                     </a>
                   </>
                 )}
-                {(preview.status === 'blocked' || preview.status === 'em_analise') &&
-                  preview.author_id === userId && (
-                    <DeleteButton onDelete={() => handleDelete(preview.id)} />
-                  )}
+                {preview.author_id === userId && (
+                  <DeleteButton onDelete={() => handleDelete(preview.id)} />
+                )}
               </div>
             </div>
           </div>
@@ -630,8 +629,7 @@ function MaterialCard({
 }) {
   const [deleting, setDeleting] = useState(false)
   const kind = getKindFromMaterial(material)
-  const isDeletable =
-    (material.status === 'blocked' || material.status === 'em_analise') && material.author_id === userId
+  const isDeletable = material.author_id === userId
 
   async function doDelete(e: MouseEvent) {
     e.stopPropagation()
@@ -811,6 +809,12 @@ function RatingBox({
   const [rating, setRating] = useState(material.my_rating ?? 0)
   const [comment, setComment] = useState(material.my_rating_comment ?? '')
   const [saving, setSaving] = useState(false)
+  const hasExistingRating = Boolean(material.my_rating)
+
+  useEffect(() => {
+    setRating(material.my_rating ?? 0)
+    setComment(material.my_rating_comment ?? '')
+  }, [material.id, material.my_rating, material.my_rating_comment])
 
   async function submit() {
     if (!rating) return
@@ -826,7 +830,12 @@ function RatingBox({
 
   return (
     <div className="rounded-app-sm border border-border bg-white p-3">
-      <p className="text-[12px] font-bold text-ink">Avaliar material</p>
+      <p className="text-[12px] font-bold text-ink">{hasExistingRating ? 'Sua avaliacao' : 'Avaliar material'}</p>
+      {hasExistingRating && (
+        <p className="mt-1 text-[11px] leading-[1.5] text-muted">
+          Voce ja avaliou este material. Ajuste as estrelas ou o comentario e salve novamente se quiser atualizar.
+        </p>
+      )}
       <div className="mt-2 flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((value) => (
           <button
@@ -845,7 +854,7 @@ function RatingBox({
         onChange={(event) => setComment(event.target.value)}
         maxLength={800}
         className="mt-2 w-full min-h-[72px] resize-none rounded-app-sm border border-border px-3 py-2 text-[12px] leading-[1.5] outline-none focus:border-gp"
-        placeholder="Comentario opcional sobre o material"
+        placeholder="Comentario opcional sobre sua avaliacao"
       />
       <button
         type="button"
@@ -854,8 +863,42 @@ function RatingBox({
         className="mt-2 flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd py-2.5 text-[12px] font-bold text-white disabled:opacity-50"
       >
         {saving && <Loader2 size={14} className="animate-spin" />}
-        Salvar avaliacao
+        {hasExistingRating ? 'Atualizar avaliacao' : 'Salvar avaliacao'}
       </button>
+    </div>
+  )
+}
+
+function RatingComments({ material }: { material: SupportMaterial }) {
+  const comments = material.rating_comments ?? []
+
+  return (
+    <div className="rounded-app-sm border border-border bg-white p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[12px] font-bold text-ink">Comentarios das avaliacoes</p>
+        <span className="text-[11px] text-muted">{comments.length}</span>
+      </div>
+
+      {comments.length === 0 ? (
+        <p className="mt-2 text-[12px] leading-[1.5] text-muted">
+          Ainda nao ha comentarios de avaliacao para este material.
+        </p>
+      ) : (
+        <div className="mt-3 flex flex-col gap-2">
+          {comments.slice(0, 6).map((item, index) => (
+            <div key={`${item.author_id ?? 'prof'}-${item.created_at ?? index}`} className="rounded-app-sm bg-cream px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-bold text-ink truncate">{item.author_name || 'Professora'}</p>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#B7791F]">
+                  <Star size={12} fill="currentColor" />
+                  {Number(item.rating ?? 0)}
+                </span>
+              </div>
+              <p className="mt-1 text-[12px] leading-[1.5] text-soft">{item.comment}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

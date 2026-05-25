@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     if (error) throw toError(error, 'Nao foi possivel listar os materiais de apoio.')
 
     const materialIds = (data ?? []).map((item) => item.id).filter(Boolean)
-    const [favoritesResult, ratingsResult] = materialIds.length
+    const [favoritesResult, ratingsResult, allRatingsResult] = materialIds.length
       ? await Promise.all([
         supabase
           .from('material_favorites')
@@ -38,8 +38,13 @@ export async function GET(request: Request) {
           .select('material_id, rating, comment')
           .eq('owner_id', ownerId)
           .in('material_id', materialIds),
+        supabase
+          .from('material_ratings')
+          .select('material_id, owner_id, rating, comment, created_at')
+          .in('material_id', materialIds)
+          .order('created_at', { ascending: false }),
       ])
-      : [{ data: [] }, { data: [] }]
+      : [{ data: [] }, { data: [] }, { data: [] }]
 
     const favoriteIds = new Set((favoritesResult.data ?? []).map((item) => item.material_id))
     const ratingByMaterial = new Map(
@@ -48,22 +53,53 @@ export async function GET(request: Request) {
         { rating: item.rating as number, comment: item.comment as string | null },
       ]),
     )
+    const ratingOwnerIds = Array.from(new Set((allRatingsResult.data ?? [])
+      .map((item) => item.owner_id)
+      .filter((id): id is string => typeof id === 'string' && Boolean(id))))
+    const profilesResult = ratingOwnerIds.length
+      ? await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', ratingOwnerIds)
+      : { data: [] }
+    const profileNameById = new Map((profilesResult.data ?? []).map((item) => [item.id, item.full_name]))
+    const ratingCommentsByMaterial = new Map<string, Array<Record<string, unknown>>>()
+    for (const item of allRatingsResult.data ?? []) {
+      const materialId = typeof item.material_id === 'string' ? item.material_id : ''
+      if (!materialId || typeof item.comment !== 'string' || !item.comment.trim()) continue
+      const list = ratingCommentsByMaterial.get(materialId) ?? []
+      list.push({
+        rating: item.rating,
+        comment: item.comment.trim(),
+        author_id: item.owner_id,
+        author_name: item.owner_id === ownerId ? 'Voce' : profileNameById.get(item.owner_id) ?? 'Professora',
+        created_at: item.created_at,
+      })
+      ratingCommentsByMaterial.set(materialId, list)
+    }
 
     const materials = await Promise.all((data ?? []).map(async (item) => {
       const filePath = typeof item.file_path === 'string' ? item.file_path : ''
       let downloadUrl: string | null = null
+      let fileDownloadUrl: string | null = null
       if (filePath) {
         const signed = await supabase.storage.from(MATERIAL_BUCKET).createSignedUrl(filePath, 60 * 10)
         downloadUrl = signed.data?.signedUrl ?? null
+        const downloadSigned = await supabase.storage
+          .from(MATERIAL_BUCKET)
+          .createSignedUrl(filePath, 60 * 10, { download: item.file_name || item.title || 'material-approf' })
+        fileDownloadUrl = downloadSigned.data?.signedUrl ?? downloadUrl
       }
       const { file_path: _filePath, submitted_by: _submittedBy, created_at: _createdAt, ...safeItem } = item
       const myRating = ratingByMaterial.get(item.id)
       return {
         ...safeItem,
         downloadUrl,
+        fileDownloadUrl,
         is_favorite: favoriteIds.has(item.id),
         my_rating: myRating?.rating ?? null,
         my_rating_comment: myRating?.comment ?? null,
+        rating_comments: ratingCommentsByMaterial.get(item.id) ?? [],
       }
     }))
 

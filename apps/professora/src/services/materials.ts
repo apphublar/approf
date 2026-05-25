@@ -38,6 +38,7 @@ export interface SupportMaterial {
   content_preview: string | null
   published_at: string | null
   downloadUrl?: string | null
+  fileDownloadUrl?: string | null
   author_id?: string | null
   author_name?: string | null
   downloads_count?: number | null
@@ -48,6 +49,15 @@ export interface SupportMaterial {
   is_favorite?: boolean | null
   my_rating?: number | null
   my_rating_comment?: string | null
+  rating_comments?: MaterialRatingComment[]
+}
+
+export interface MaterialRatingComment {
+  rating: number
+  comment: string
+  author_id?: string | null
+  author_name?: string | null
+  created_at?: string | null
 }
 
 export interface GeneratedMaterialPreview {
