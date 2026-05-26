@@ -442,45 +442,50 @@ h1, h2, h3, h4 {
 
 .how-it-works {
   background: var(--cream);
-  padding: 80px 0;
+  padding: 84px 0;
 }
 
 .steps {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
-  gap: 0;
+  gap: 18px;
 }
 
 .step {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 0 28px;
-  max-width: 320px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 28px;
+  max-width: 330px;
+  min-height: 310px;
+  background: var(--white);
+  border: 1px solid rgba(212, 235, 200, 0.78);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .step__num {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   background: var(--gd);
   color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 800;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   flex-shrink: 0;
   letter-spacing: -0.02em;
 }
 
 .step__icon {
-  width: 68px;
-  height: 68px;
+  width: 58px;
+  height: 58px;
   background: #f0faf4;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -488,28 +493,29 @@ h1, h2, h3, h4 {
   align-items: center;
   justify-content: center;
   color: #4f8341;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .step__title {
-  font-size: 1.0625rem; /* 17px */
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--gd);
   margin-bottom: 10px;
 }
 
 .step__desc {
-  font-size: 0.875rem; /* 14px */
+  font-size: 0.9375rem;
   color: var(--soft);
-  line-height: 1.7;
-  max-width: 200px;
+  line-height: 1.65;
+  max-width: 100%;
 }
 
 .step__connector {
   display: flex;
-  align-items: flex-start;
-  padding-top: 84px; /* alinha com o centro do ícone */
+  align-items: center;
+  padding-top: 0;
   flex-shrink: 0;
+  color: #9ed29b;
 }
 
 .steps-hint {

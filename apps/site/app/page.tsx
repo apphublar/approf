@@ -6,7 +6,6 @@ import {
   ClipboardCheck,
   Image,
   ArrowDown,
-  LayoutGrid,
 } from 'lucide-react'
 import Navbar from './components/Navbar'
 import PricingSection from './components/PricingSection'
@@ -156,10 +155,10 @@ export default function Home() {
         <section id="como-funciona" className="how-it-works">
           <div className="container">
             <div className="section-header">
-              <h2>Três passos. Sem complicação.</h2>
+              <h2>Como o Approf funciona na rotina</h2>
               <p>
-                Você faz o que sempre fez — anotar.
-                O Approf cuida do resto.
+                Do cadastro da turma aos documentos com IA, tudo fica conectado
+                em um só lugar.
               </p>
             </div>
 
@@ -168,13 +167,13 @@ export default function Home() {
               <div className="step">
                 <div className="step__num">1</div>
                 <div className="step__icon">
-                  <PenLine size={28} strokeWidth={1.8} />
+                  <Users size={28} strokeWidth={1.8} />
                 </div>
-                <h3 className="step__title">Anote do seu jeito</h3>
+                <h3 className="step__title">Organize sua turma</h3>
                 <p className="step__desc">
-                  Texto livre, sem formulário, sem campo obrigatório. Escreva
-                  como você pensa — sobre um aluno, uma aula, um projeto.
-                  O Approf entende.
+                  Cadastre turmas e alunos, acompanhe a lista de chamada,
+                  mantenha o perfil de cada criança e visualize tudo com
+                  rapidez.
                 </p>
               </div>
 
@@ -184,12 +183,13 @@ export default function Home() {
               <div className="step">
                 <div className="step__num">2</div>
                 <div className="step__icon">
-                  <LayoutGrid size={28} strokeWidth={1.8} />
+                  <ClipboardCheck size={28} strokeWidth={1.8} />
                 </div>
-                <h3 className="step__title">Tudo no lugar certo</h3>
+                <h3 className="step__title">Registre e acompanhe</h3>
                 <p className="step__desc">
-                  Por aluno, por turma, por categoria — organizado
-                  automaticamente. Sem você mover um dedo.
+                  Faça anotações pedagógicas, use o calendário, acompanhe a
+                  linha do tempo da criança e planeje intervenções quando
+                  precisar.
                 </p>
               </div>
 
@@ -201,18 +201,18 @@ export default function Home() {
                 <div className="step__icon">
                   <Sparkles size={28} strokeWidth={1.8} />
                 </div>
-                <h3 className="step__title">Documento pronto com IA</h3>
+                <h3 className="step__title">Use a IA como apoio</h3>
                 <p className="step__desc">
-                  Quando precisar do relatório, a IA lê tudo que você
-                  anotou e entrega o documento estruturado — pronto para
-                  assinar e entregar.
+                  Gere relatórios, portfólios, planejamentos, imagens
+                  pedagógicas e converse com o chat para tirar dúvidas e criar
+                  ideias.
                 </p>
               </div>
             </div>
 
             <p className="steps-hint">
-              E o melhor: funciona direto no celular, sem precisar baixar
-              nada.
+              Funciona direto no celular e acompanha a professora do registro
+              rápido ao documento final.
             </p>
           </div>
         </section>
