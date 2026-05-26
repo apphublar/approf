@@ -276,12 +276,14 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
     user.push('Tamanho final: 1 a 3 parágrafos, sem lista longa e sem linguagem acadêmica.')
   } else if (type === 'development_report' || type === 'general_report') {
     system.push(
-      'Este relatório é individual, médio e empático. Valorize avanços, interesses, participação e pontos de continuidade.',
-      'A introdução deve mencionar naturalmente que o relatório considera BNCC, PPP e Currículo da Cidade.',
-      'A BNCC pode aparecer de modo contextual e discreto, nunca como bloco dominante ou lista teórica.',
+      'Este relatório é individual, médio e empático. Use somente informações reais fornecidas pela professora, anotações selecionadas, marcos selecionados, contexto livre e orientações adicionais.',
+      'Não invente acontecimentos, falas, preferências, dificuldades, avanços, participação familiar ou características da criança. Se uma seção não tiver evidência suficiente, escreva que não há registros suficientes para afirmar aquele ponto.',
+      'Não organize o relatório por campos de experiência da BNCC e não crie seção chamada Campos de experiência.',
+      'A BNCC, PPP e Currículo da Cidade podem sustentar o olhar pedagógico, mas não devem aparecer como lista, bloco dominante ou eixo de organização.',
+      'Organize obrigatoriamente por: Adaptação e convivência; Desenvolvimento da linguagem; Desenvolvimento motor; Desenvolvimento cognitivo e autonomia; Interesses e preferências; Participação da família; Considerações finais.',
       'Evite conclusões fechadas; prefira observou-se, percebe-se, vem demonstrando, segue em acompanhamento.',
     )
-    user.push('Tamanho final: relatório médio, com seções curtas e linguagem compreensível para escola e família.')
+    user.push('Tamanho final: relatório médio, com as seções obrigatórias solicitadas, linguagem compreensível para escola e família, e sem separar por campos de experiência.')
   } else if (type === 'weekly_planning') {
     system.push(
       'Este documento é um planejamento semanal prático, escaneável e aplicável na rotina.',
@@ -414,11 +416,16 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
 
   if (input.generationType === 'development_report' || input.generationType === 'general_report') {
     return [
-      'Informações básicas (criança, faixa etária BNCC, turma, período)',
-      'Descrição geral e adaptação',
-      'Desenvolvimento nos Campos de Experiencia da BNCC',
-      'Conquistas e pontos de atenção em linguagem construtiva',
-      'Observações finais',
+      'Informações básicas (criança, turma e período)',
+      'Adaptação e convivência',
+      'Desenvolvimento da linguagem',
+      'Desenvolvimento motor',
+      'Desenvolvimento cognitivo e autonomia',
+      'Interesses e preferências',
+      'Participação da família',
+      'Considerações finais',
+      'Não incluir seção de campos de experiência da BNCC',
+      'Não inventar informações ausentes; quando faltar evidência, declarar que não há registro suficiente',
     ]
   }
 

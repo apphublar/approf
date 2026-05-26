@@ -1583,17 +1583,19 @@ MARCOS IMPORTANTES
 ${milestones}
 
 Objetivo da imagem:
-Gerar uma capa ou painel visual para o portfólio pedagógico de ${input.firstName}, usando apenas informações e anexos autorizados pela professora.
+Gerar uma capa ou painel visual para o relatório de desenvolvimento de ${input.firstName}, usando apenas informações reais, anotações e anexos autorizados pela professora.
 
 Direção visual:
 - composição clara, delicada e apropriada para educação infantil;
 - espaços para título, nome da criança, turma e período;
-- elementos de aprendizagem, brincadeira, natureza, artes e descobertas;
+- blocos visuais para adaptação e convivência, linguagem, movimento/autonomia, interesses, família e considerações finais;
 - não expor outras crianças;
+- não separar por campos de experiência;
+- não inventar informações sobre a criança;
 - usar fotos e documentos anexados apenas como referência autorizada.
 
 Prompt base para imagem:
-"Criar uma capa de portfólio pedagógico infantil para ${input.firstName}, turma ${input.className}, em formato ${formatPortfolioImageFormat(input.portfolioImageFormat)}, com estética acolhedora, organizada e profissional para educação infantil. Usar tons suaves, elementos de aprendizagem, brincadeira, natureza, artes e descobertas. Evitar texto pequeno ilegível e não expor outras crianças."
+"Criar uma capa ou painel visual de relatório de desenvolvimento infantil para ${input.firstName}, turma ${input.className}, em formato ${formatPortfolioImageFormat(input.portfolioImageFormat)}, com estética acolhedora, organizada e profissional para educação infantil. Usar apenas evidências reais informadas pela professora. Incluir blocos curtos sobre adaptação e convivência, linguagem, movimento e autonomia, interesses, família e considerações finais. Não separar por campos de experiência. Evitar texto pequeno ilegível e não expor outras crianças."
 
 Observação:
 Quando a geração de imagem estiver disponível, esta opção criará a imagem do portfólio com base no contexto informado.${formatAttachments(input.attachments)}
@@ -1667,31 +1669,31 @@ Documento gerado a partir das informações autorizadas pela professora.`
 
 RELATÓRIO DE DESENVOLVIMENTO
 
-Introdução:
-Este relatório foi elaborado com base nos documentos norteadores: BNCC, PPP (Projeto Político Pedagógico) e Currículo da Cidade.
+Informações básicas:
+Criança: ${input.studentName}
+Turma: ${input.className}
+Período: 2026
 
-Síntese do percurso:
-${input.firstName} vem construindo sua jornada de desenvolvimento de forma única, com registros que ajudam a compreender sua rotina, suas conquistas, seus interesses e os pontos que ainda precisam de acompanhamento.
+Adaptação e convivência:
+Esta seção deve ser escrita somente com base nas anotações, observações e informações reais fornecidas pela professora. Se não houver registro suficiente, a IA deve informar que não há evidência suficiente para afirmar esse ponto.
 
-Aspectos observados:
-- linguagem oral, escuta e comunicação;
-- autonomia nos momentos da rotina;
-- interação com colegas e adultos;
-- participação em brincadeiras e propostas;
-- expressão corporal, movimento e exploração;
-- emoção, segurança e vínculos afetivos.
+Desenvolvimento da linguagem:
+Registrar fala, escuta, comunicação, interação verbal ou outras formas de expressão apenas quando houver evidências informadas.
 
-Avanços percebidos:
-O texto final deve valorizar as evoluções observadas sem transformar o desenvolvimento em comparação ou medida rígida. Cada criança tem seu tempo e sua forma de aprender.
+Desenvolvimento motor:
+Registrar movimento, coordenação, participação corporal, exploração de materiais e brincadeiras apenas com base nos registros reais.
 
-Aspectos em acompanhamento:
-Devem ser descritos com linguagem cuidadosa, indicando possibilidades de apoio, experiências futuras e continuidade entre escola e família.
+Desenvolvimento cognitivo e autonomia:
+Registrar curiosidade, resolução de situações, atenção, participação, escolhas, cuidados pessoais e autonomia na rotina apenas quando houver dados fornecidos.
 
-Encaminhamentos:
-Manter observações frequentes, registrar novas evoluções e alinhar com a família quando houver pontos que precisem de continuidade entre escola e casa.
+Interesses e preferências:
+Descrever brincadeiras, temas, materiais, atividades ou vínculos de interesse apenas se a professora tiver informado.
+
+Participação da família:
+Incluir apenas informações reais sobre família, parceria ou continuidade casa-escola. Não inventar participação familiar.
 
 Considerações finais:
-${input.finalConsiderations.trim() || '-'}${formatAttachments(input.attachments)}
+${input.finalConsiderations.trim() || 'Fechar com síntese cuidadosa do que foi observado e próximos acompanhamentos possíveis, sem criar fatos novos.'}${formatAttachments(input.attachments)}
 
 Documento gerado a partir das informações autorizadas pela professora.`
 }

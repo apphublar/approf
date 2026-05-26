@@ -295,25 +295,25 @@ function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: strin
         const text = asString(item.text) ?? ''
         return `- ${label}: ${text}`
       }).join('\n')
-    : blankContext || 'Use as informações pedagógicas fornecidas pela professora.'
+    : blankContext || 'Nenhuma evidência específica foi informada pela professora. Não inventar conquistas, preferências, dificuldades ou acontecimentos.'
 
   const attachmentList = attachments.length
     ? attachments.map((item) => `- ${asString(item.name) ?? 'arquivo anexado'}`).join('\n')
     : 'Sem anexos visuais autorizados.'
 
   const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
-  return `Ilustracao de portfolio pedagogico (${formatLabel}, ${size}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
+  return `Ilustracao de relatorio de desenvolvimento (${formatLabel}, ${size}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
 
 Texto visivel em portugues:
-- Título: PORTFOLIO PEDAGOGICO DE DESENVOLVIMENTO
+- Título: RELATORIO DE DESENVOLVIMENTO
 - Subtítulo: EDUCACAO INFANTIL
 - Criança: ${studentName}
 - Turma: ${className}
-- Blocos curtos: campos de experiencia BNCC, Avancos e conquistas, Proximos passos
+- Blocos curtos: Adaptacao e convivencia, Linguagem, Movimento e autonomia, Interesses, Familia, Consideracoes finais
 
-Regras: sem diagnóstico, sem comparação entre crianças, sem nota/ranking, sem marcas d'agua ou QR code, sem outras crianças identificáveis. Pouco texto, letras legiveis.
+Regras: usar apenas evidências fornecidas pela professora; não inventar fatos sobre a criança; não separar por campos de experiência BNCC; sem diagnóstico, sem comparação entre crianças, sem nota/ranking, sem marcas d'agua ou QR code, sem outras crianças identificáveis. Pouco texto, letras legiveis.
 
-Conteúdo pedagogico:
+Conteúdo pedagogico real autorizado:
 ${observations}
 
 Extra: ${extraContext || 'Destacar conquistas e proximos passos da rotina.'}

@@ -592,11 +592,13 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
   if (isDevelopmentLike) {
     const missing = [
       !hasAnyHeading(text, ['informações basicas', 'identificacao']) && 'Informações basicas',
-      !hasAnyHeading(text, ['descrição geral', 'adaptacao']) && 'Descrição geral e adaptacao',
-      !hasAnyHeading(text, ['campos de experiencia']) && 'Desenvolvimento nos campos de experiencia',
-      !hasAnyHeading(text, ['conquistas']) && 'Conquistas',
-      !hasAnyHeading(text, ['pontos de atenção', 'apoio', 'acompanhamento']) && 'Pontos de atenção',
-      !hasAnyHeading(text, ['observações finais', 'observações']) && 'Observações finais',
+      !hasAnyHeading(text, ['adaptacao', 'convivencia']) && 'Adaptação e convivência',
+      !hasAnyHeading(text, ['linguagem']) && 'Desenvolvimento da linguagem',
+      !hasAnyHeading(text, ['motor']) && 'Desenvolvimento motor',
+      !hasAnyHeading(text, ['cognitivo', 'autonomia']) && 'Desenvolvimento cognitivo e autonomia',
+      !hasAnyHeading(text, ['interesses', 'preferencias']) && 'Interesses e preferências',
+      !hasAnyHeading(text, ['familia']) && 'Participação da família',
+      !hasAnyHeading(text, ['considerações finais', 'consideracoes finais']) && 'Considerações finais',
     ].filter(Boolean) as string[]
     return { ok: missing.length === 0, missing }
   }
@@ -651,6 +653,10 @@ function validateDocumentQuality(generationType: AiGenerationType, text: string)
 
   if (generationType === 'development_report' && words > 900) {
     issues.push('Reduzir o relatório de desenvolvimento para tamanho médio, preservando avanços e pontos de continuidade.')
+  }
+
+  if (generationType === 'development_report' && normalized.includes('campo de experiencia')) {
+    issues.push('Remover seção de campos de experiência; relatório deve usar adaptação, linguagem, motor, cognitivo/autonomia, interesses, família e considerações finais.')
   }
 
   if (generationType === 'pedagógical_project' && words > 1100) {
