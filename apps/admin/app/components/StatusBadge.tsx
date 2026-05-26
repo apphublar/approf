@@ -8,6 +8,7 @@ export function StatusBadge({ status }: { status: string }) {
     review_required: 'Revisao necessaria',
     em_analise: 'Em analise',
     free: 'Gratuito',
+    paid_ok: 'Em dia',
     active: 'Ativa',
     trial: 'Teste',
     overdue: 'Em atraso',

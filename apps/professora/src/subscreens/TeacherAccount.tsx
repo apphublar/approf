@@ -241,9 +241,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
 
             {blocked && (
               <div className="bg-[#FFF3CD] border border-[#F2D58B] rounded-app p-4 mb-4">
-                <p className="text-[13px] font-bold text-[#856404]">Acesso restrito por assinatura</p>
+                <p className="text-[13px] font-bold text-[#856404]">Acesso restrito pelo admin</p>
                 <p className="text-[12px] text-[#856404] mt-1 leading-[1.5]">
-                  Enquanto a assinatura estiver cancelada ou em atraso, apenas este menu ficará disponível.
+                  Sua conta foi bloqueada manualmente pela equipe. Entre em contato para regularizar o acesso.
                 </p>
               </div>
             )}

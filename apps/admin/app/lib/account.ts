@@ -14,7 +14,7 @@ type VerificationStatus = 'pending' | 'approved' | 'rejected'
 export async function getTeacherAccountData(ownerId: string) {
   const supabase = createSupabaseServiceClient()
 
-  const [profileResult, schoolsResult, subscriptionResult, verificationsResult] = await Promise.all([
+  const [profileResult, schoolsResult, subscriptionResult, verificationsResult, noticesResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('id,full_name,email,phone,avatar_url,notification_preferences')
@@ -36,12 +36,22 @@ export async function getTeacherAccountData(ownerId: string) {
       .eq('owner_id', ownerId)
       .order('created_at', { ascending: false })
       .limit(10),
+    supabase
+      .from('notification_events')
+      .select('id,type,payload,created_at')
+      .eq('user_id', ownerId)
+      .eq('channel', 'system')
+      .eq('status', 'sent')
+      .in('type', ['payment_overdue_notice'])
+      .order('created_at', { ascending: false })
+      .limit(3),
   ])
 
   if (profileResult.error) throw profileResult.error
   if (schoolsResult.error) throw schoolsResult.error
   if (subscriptionResult.error) throw subscriptionResult.error
   if (verificationsResult.error) throw verificationsResult.error
+  if (noticesResult.error) throw noticesResult.error
 
   return {
     profile: profileResult.data,
@@ -51,6 +61,7 @@ export async function getTeacherAccountData(ownerId: string) {
       ...item,
       documents: Array.isArray(item.documents) ? item.documents : [],
     })),
+    notices: noticesResult.data ?? [],
   }
 }
 
@@ -248,19 +259,19 @@ export async function updateTeacherVerificationStatus(input: {
   const subscriptionPatch = input.status === 'approved'
     ? {
         status: 'trial' as const,
-        plan: 'trial_15_days',
+        plan: 'trial_7_days',
         provider: 'manual' as const,
-        trial_expires_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-        current_period_end: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         notes: appendAdminNote(input.reviewNotes, 'Cadastro aprovado pelo admin.'),
       }
     : {
-        status: 'blocked' as const,
+        status: 'trial' as const,
         plan: 'verification_required',
         provider: 'manual' as const,
-        trial_expires_at: null,
-        current_period_end: null,
-        notes: appendAdminNote(input.reviewNotes, input.status === 'rejected' ? 'Cadastro rejeitado pelo admin.' : 'Cadastro mantido em analise.'),
+        trial_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        notes: appendAdminNote(input.reviewNotes, input.status === 'rejected' ? 'Cadastro rejeitado pelo admin, sem bloqueio automatico de acesso.' : 'Cadastro mantido em analise, sem bloqueio automatico de acesso.'),
       }
 
   const { error: subscriptionError } = await supabase

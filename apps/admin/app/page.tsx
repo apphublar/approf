@@ -109,7 +109,7 @@ export default async function AdminHome() {
                     <strong>{teacher.full_name}</strong>
                     <small>{teacher.email}</small>
                   </span>
-                  <StatusBadge status={subscription?.status ?? 'blocked'} />
+                  <StatusBadge status={subscription?.status ?? 'active'} />
                   <span>{teacher.classes?.length ?? 0} turmas</span>
                   <span>{teacher.ai_generation_logs?.length ?? 0} geracoes</span>
                 </div>

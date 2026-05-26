@@ -4,9 +4,18 @@ import { redirect } from 'next/navigation'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
 
 type SubscriptionStatus = 'trial' | 'active' | 'overdue' | 'blocked' | 'canceled'
+type SubscriptionRow = {
+  id: string
+  user_id: string
+  status: SubscriptionStatus
+  plan: string
+  current_period_end: string | null
+  notes: string | null
+}
 
 const planOptions = [
   { value: 'free', label: 'Gratuito' },
+  { value: 'trial_7_days', label: 'Teste 7 dias' },
   { value: 'trial_15_days', label: 'Teste 15 dias' },
   { value: 'monthly', label: 'Mensal' },
   { value: 'annual', label: 'Anual' },
@@ -86,6 +95,34 @@ export async function liberarAcessoGratuito(formData: FormData) {
   redirect('/assinaturas')
 }
 
+export async function sendPaymentOverdueNotice(formData: FormData) {
+  const teacherId = String(formData.get('teacherId') ?? '').trim()
+  if (!teacherId) return
+  await createPaymentNotice([teacherId])
+  redirect('/assinaturas')
+}
+
+export async function sendAllPaymentOverdueNotices() {
+  const supabase = createSupabaseServiceClient()
+  const overdue = await listOverdueSubscriptions(supabase)
+  await createPaymentNotice(overdue.map((item) => item.user_id))
+  redirect('/assinaturas')
+}
+
+export async function blockTeacherAccess(formData: FormData) {
+  const teacherId = String(formData.get('teacherId') ?? '').trim()
+  if (!teacherId) return
+  await blockSubscriptions([teacherId], 'Bloqueio manual individual pelo admin.')
+  redirect('/assinaturas')
+}
+
+export async function blockAllOverdueAccess() {
+  const supabase = createSupabaseServiceClient()
+  const overdue = await listOverdueSubscriptions(supabase)
+  await blockSubscriptions(overdue.map((item) => item.user_id), 'Bloqueio manual em massa de contas em atraso pelo admin.')
+  redirect('/assinaturas')
+}
+
 export async function updateTeacherSubscription(formData: FormData) {
   const teacherId = String(formData.get('teacherId') ?? '').trim()
   const status = String(formData.get('status') ?? '').trim() as SubscriptionStatus
@@ -108,7 +145,7 @@ export async function updateTeacherSubscription(formData: FormData) {
         provider: 'manual',
         external_reference: plan === 'free' ? null : paymentLink || null,
         trial_expires_at:
-          plan === 'trial_15_days' && currentPeriodEnd
+          (plan === 'trial_7_days' || plan === 'trial_15_days') && currentPeriodEnd
             ? new Date(`${currentPeriodEnd}T23:59:59`).toISOString()
             : null,
         current_period_end:
@@ -131,4 +168,90 @@ export async function updateTeacherSubscription(formData: FormData) {
   })
 
   redirect('/assinaturas')
+}
+
+async function createPaymentNotice(teacherIds: string[]) {
+  const uniqueIds = Array.from(new Set(teacherIds.filter(Boolean)))
+  if (!uniqueIds.length) return
+
+  const supabase = createSupabaseServiceClient()
+  const now = new Date().toISOString()
+  const { error } = await supabase.from('notification_events').insert(
+    uniqueIds.map((teacherId) => ({
+      user_id: teacherId,
+      channel: 'system',
+      type: 'payment_overdue_notice',
+      status: 'sent',
+      sent_at: now,
+      payload: {
+        title: 'Pagamento em atraso',
+        message: 'Identificamos uma pendencia no pagamento do Approf. O acesso continua liberado por enquanto, mas regularize para evitar bloqueio manual pelo admin.',
+      },
+    })),
+  )
+  if (error) throw new Error(`Notification error: ${error.message}`)
+
+  await supabase.from('admin_action_logs').insert({
+    actor_id: null,
+    action: 'teacher_payment_overdue_notice_sent',
+    target_table: 'notification_events',
+    target_id: null,
+    metadata: { teacherIds: uniqueIds },
+  })
+}
+
+async function blockSubscriptions(teacherIds: string[], note: string) {
+  const uniqueIds = Array.from(new Set(teacherIds.filter(Boolean)))
+  if (!uniqueIds.length) return
+
+  const supabase = createSupabaseServiceClient()
+  const now = new Date().toISOString()
+  const { data: current, error: selectError } = await supabase
+    .from('subscriptions')
+    .select('user_id, notes')
+    .in('user_id', uniqueIds)
+  if (selectError) throw new Error(`Subscriptions select error: ${selectError.message}`)
+
+  const currentByUser = new Map((current ?? []).map((item) => [item.user_id, item.notes as string | null]))
+  const { error } = await supabase
+    .from('subscriptions')
+    .upsert(
+      uniqueIds.map((teacherId) => ({
+        user_id: teacherId,
+        status: 'blocked',
+        provider: 'manual',
+        notes: appendNote(currentByUser.get(teacherId) ?? null, note),
+        updated_at: now,
+      })),
+      { onConflict: 'user_id' },
+    )
+  if (error) throw new Error(`Subscriptions block error: ${error.message}`)
+
+  await supabase.from('admin_action_logs').insert({
+    actor_id: null,
+    action: 'teacher_access_blocked_manual',
+    target_table: 'subscriptions',
+    target_id: null,
+    metadata: { teacherIds: uniqueIds, note },
+  })
+}
+
+async function listOverdueSubscriptions(supabase: ReturnType<typeof createSupabaseServiceClient>) {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('id, user_id, status, plan, current_period_end, notes')
+  if (error) throw new Error(`Subscriptions overdue error: ${error.message}`)
+  return ((data ?? []) as SubscriptionRow[]).filter(isPaymentOverdue)
+}
+
+function isPaymentOverdue(subscription: SubscriptionRow) {
+  if (subscription.status === 'blocked' || subscription.status === 'canceled') return false
+  if (subscription.status === 'overdue') return true
+  if (!['monthly', 'annual'].includes(subscription.plan)) return false
+  if (!subscription.current_period_end) return false
+  return new Date(subscription.current_period_end).getTime() < Date.now()
+}
+
+function appendNote(current: string | null, note: string) {
+  return [current, `[${new Date().toISOString()}] ${note}`].filter(Boolean).join('\n').slice(0, 2000)
 }

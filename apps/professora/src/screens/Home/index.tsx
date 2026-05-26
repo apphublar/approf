@@ -23,7 +23,7 @@ import { toTitleCaseName } from '@/utils/text'
 import type { BoardNote } from '@/types'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
-import { getCachedTeacherAccountSnapshot, preloadTeacherAccountSnapshot } from '@/services/supabase/account'
+import { getCachedTeacherAccountSnapshot, getTeacherAccountSnapshot, preloadTeacherAccountSnapshot } from '@/services/supabase/account'
 
 const QUICK_ACCESS = [
   { label: 'Anotações', desc: 'Registre o dia a dia da turma', icon: NotebookPen, bg: '#D8F3DC', tab: 'annotations' as const, sub: null },
@@ -41,6 +41,7 @@ export default function HomeScreen() {
   const [modalNote, setModalNote] = useState<BoardNote | null | 'new'>('new')
   const [modalOpen, setModalOpen] = useState(false)
   const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null)
+  const [paymentNotice, setPaymentNotice] = useState<{ title: string; message: string } | null>(null)
   const touchStartX = useRef(0)
 
   const firstName = getDisplayFirstName(userName)
@@ -85,7 +86,20 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (activeTab !== 'home') return
-    void preloadTeacherAccountSnapshot()
+    let active = true
+    getTeacherAccountSnapshot()
+      .then((snapshot) => {
+        if (!active) return
+        const notice = snapshot.notices.find((item) => item.type === 'payment_overdue_notice')
+        setPaymentNotice(notice ? { title: notice.title, message: notice.message } : null)
+      })
+      .catch(() => {
+        if (active) setPaymentNotice(null)
+        void preloadTeacherAccountSnapshot()
+      })
+    return () => {
+      active = false
+    }
   }, [activeTab])
 
   function handleQuickAccess(tab: typeof QUICK_ACCESS[number]['tab'], sub: typeof QUICK_ACCESS[number]['sub']) {
@@ -268,9 +282,20 @@ export default function HomeScreen() {
       {/* Scrollable content */}
       <div className="scroll-area">
         <div className="px-[18px]">
+          {paymentNotice && (
+            <button
+              type="button"
+              onClick={openTeacherAccount}
+              className="w-full rounded-app p-4 mt-[14px] mb-[11px] border border-[#F2D58B] bg-[#FFF8D8] text-left shadow-card active:scale-[.98] transition-transform"
+            >
+              <p className="text-[12px] font-bold text-[#856404]">{paymentNotice.title}</p>
+              <p className="mt-1 text-[12px] leading-snug text-[#856404]">{paymentNotice.message}</p>
+            </button>
+          )}
+
           <button
             onClick={() => openSubscreen('interventions')}
-            className="subtle-attention w-full rounded-app p-4 mt-[14px] mb-[11px] border-none text-left text-white shadow-card active:scale-[.98] transition-transform"
+            className={`subtle-attention w-full rounded-app p-4 ${paymentNotice ? 'mb-[11px]' : 'mt-[14px] mb-[11px]'} border-none text-left text-white shadow-card active:scale-[.98] transition-transform`}
             style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}
           >
             <div className="flex items-center gap-3">

@@ -330,6 +330,44 @@ a {
   align-items: start;
 }
 
+.subscriptions-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.subscriptions-bulk-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.subscriptions-bulk-panel h2 {
+  font-size: 18px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.subscriptions-bulk-panel p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.subscriptions-bulk-actions,
+.subs-action-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.danger-action {
+  border-color: #f3c4c4;
+  color: #b42318;
+  background: #fff5f5;
+}
+
 .materials-grid {
   grid-template-columns: 1.5fr 1fr 0.5fr 0.7fr 0.6fr 0.7fr;
 }
@@ -392,7 +430,8 @@ a {
 }
 
 .badge-active,
-.badge-free {
+.badge-free,
+.badge-paid-ok {
   background: var(--green-100);
   color: var(--green-700);
 }
@@ -871,6 +910,15 @@ a {
   .metrics-grid,
   .content-grid {
     grid-template-columns: 1fr;
+  }
+
+  .subscriptions-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .subscriptions-bulk-panel {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .table-row,

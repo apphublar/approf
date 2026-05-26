@@ -78,7 +78,7 @@ export default async function TeachersPage() {
                   {teacher.phone && <small>{teacher.phone}</small>}
                 </span>
                 <span>
-                  <StatusBadge status={subscription?.status ?? 'blocked'} />
+                  <StatusBadge status={subscription?.status ?? 'active'} />
                   <small>{formatPlan(subscription?.plan)}</small>
                   {subscription?.current_period_end && <small>Valido ate {formatDate(subscription.current_period_end)}</small>}
                   {subscription?.external_reference && (
@@ -111,6 +111,7 @@ function formatPlan(plan?: string | null) {
   if (!plan) return 'Sem plano'
   const labels: Record<string, string> = {
     free: 'Gratuito',
+    trial_7_days: 'Teste 7 dias',
     trial_15_days: 'Teste 15 dias',
     monthly: 'Mensal',
     annual: 'Anual',

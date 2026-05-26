@@ -54,6 +54,13 @@ export interface TeacherAccountSnapshot {
     trialExpiresAt: string | null
   } | null
   verifications: TeacherVerificationRequest[]
+  notices: Array<{
+    id: string
+    type: string
+    createdAt: string
+    title: string
+    message: string
+  }>
 }
 
 const SUBSCRIPTION_EVENT = 'approf-subscription-state-change'
@@ -104,6 +111,15 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
       trial_expires_at: string | null
     } | null
     verifications: TeacherVerificationRequest[]
+    notices?: Array<{
+      id: string
+      type: string
+      created_at: string
+      payload?: {
+        title?: string
+        message?: string
+      }
+    }>
   }>('/api/account', { method: 'GET' })
 
   if (!response.profile?.id) throw new Error('Sessão não encontrada.')
@@ -128,6 +144,13 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
     verifications: (response.verifications ?? []).map((item) => ({
       ...item,
       documents: Array.isArray(item.documents) ? item.documents : [],
+    })),
+    notices: (response.notices ?? []).map((item) => ({
+      id: item.id,
+      type: item.type,
+      createdAt: item.created_at,
+      title: item.payload?.title || 'Aviso importante',
+      message: item.payload?.message || 'Há uma atualização importante na sua conta.',
     })),
   }
   teacherAccountCache = { value: snapshot, fetchedAt: Date.now() }
@@ -296,7 +319,7 @@ export async function logoutTeacher() {
 
 export function isTeacherAccessBlocked(status: TeacherSubscriptionStatus | null) {
   if (!status) return false
-  return status === 'overdue' || status === 'blocked' || status === 'canceled'
+  return status === 'blocked'
 }
 
 export function onSubscriptionStateChange(listener: () => void) {
