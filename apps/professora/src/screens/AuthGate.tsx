@@ -134,7 +134,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <AuthScreen
         key={passwordRecovery ? 'reset' : 'signin'}
-        initialMode={passwordRecovery ? 'reset' : 'signin'}
+        initialMode={passwordRecovery ? 'reset' : getInitialAuthMode()}
         onPasswordResetComplete={() => setPasswordRecovery(false)}
       />
     )
@@ -514,6 +514,12 @@ function hasPasswordRecoveryUrl() {
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
   const searchParams = new URLSearchParams(window.location.search)
   return hashParams.get('type') === 'recovery' || searchParams.get('type') === 'recovery'
+}
+
+function getInitialAuthMode(): AuthMode {
+  if (typeof window === 'undefined') return 'signin'
+  const searchParams = new URLSearchParams(window.location.search)
+  return searchParams.get('mode') === 'signup' ? 'signup' : 'signin'
 }
 
 function getAuthTitle(mode: AuthMode) {

@@ -3,18 +3,22 @@
 import { useState } from 'react'
 import { Check, CreditCard, Calendar, X, Gift } from 'lucide-react'
 
-const WHATSAPP_URL =
-  'https://wa.me/5511948268902?text=Ola%2C%20quero%20comecar%20meu%20teste%20gratis%20do%20Approf.'
+const PROFESSORA_APP_URL = process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? 'https://app.approf.com.br'
+const APP_SIGNUP_URL = `${PROFESSORA_APP_URL.replace(/\/$/, '')}?mode=signup`
 
 const allFeatures = [
-  'Anotações ilimitadas',
-  'Turmas e perfil de alunos',
-  'Calendario pedagogico',
+  'Anotações pedagógicas ilimitadas',
+  'Turmas, alunos e lista de chamada',
+  'Perfil e linha do tempo da criança',
+  'Calendário pedagógico',
+  'Relatórios, portfólios e pareceres com IA',
+  'Planejamentos e projetos com IA',
+  'Intervenções pedagógicas individualizadas',
+  'Geração de imagens pedagógicas',
+  'Chat com IA para dúvidas e ideias',
+  'Materiais de apoio e compartilhamento',
+  'Documentos salvos para editar e reutilizar',
   'Comunidade de professoras',
-  'Biblioteca de material de apoio',
-  'Documentos pessoais seguros',
-  'Relatórios com IA incluidos',
-  'Conquistas e gamificacao',
 ]
 
 function CheckIcon() {
@@ -62,7 +66,7 @@ export default function PricingSection() {
               {isAnnual ? (
                 <><Gift size={13} strokeWidth={2} /> 2 meses gratis</>
               ) : (
-                '15 dias gratis'
+                '7 dias gratis'
               )}
             </div>
 
@@ -89,7 +93,7 @@ export default function PricingSection() {
             <p className="pricing-tagline">
               {isAnnual
                 ? 'Você paga 10 meses e usa o ano todo.'
-                : 'Tudo incluso. Sem planos diferentes.'}
+                : 'Tudo incluso para registrar, planejar e acompanhar sua rotina pedagógica.'}
             </p>
 
             <div className="pricing-divider" />
@@ -103,8 +107,8 @@ export default function PricingSection() {
               ))}
             </ul>
 
-            <a href={WHATSAPP_URL} className="pricing-cta-btn" target="_blank" rel="noopener noreferrer">
-              Comecar pelo WhatsApp
+            <a href={APP_SIGNUP_URL} className="pricing-cta-btn">
+              Testar grátis por 7 dias
             </a>
           </div>
         </div>

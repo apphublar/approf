@@ -2,9 +2,9 @@ import {
   PenLine,
   Users,
   Sparkles,
-  BookOpen,
   MessageCircle,
-  Trophy,
+  ClipboardCheck,
+  Image,
   ArrowDown,
   LayoutGrid,
 } from 'lucide-react'
@@ -12,8 +12,8 @@ import Navbar from './components/Navbar'
 import PricingSection from './components/PricingSection'
 import { ApprofApple, ApprofLogoText } from './components/Logo'
 
-const WHATSAPP_URL =
-  'https://wa.me/5511948268902?text=Ola%2C%20quero%20comecar%20meu%20teste%20gratis%20do%20Approf.'
+const PROFESSORA_APP_URL = process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? 'https://app.approf.com.br'
+const APP_SIGNUP_URL = `${PROFESSORA_APP_URL.replace(/\/$/, '')}?mode=signup`
 
 /* ---- Seta longa e sutil entre os passos ---- */
 function StepArrow() {
@@ -57,27 +57,27 @@ const features = [
   {
     icon: <Users size={22} strokeWidth={1.8} />,
     title: 'Cada aluno no seu lugar',
-    desc: 'Crie suas turmas, adicione seus alunos e vejá o histórico completo de cada um em um só lugar.',
+    desc: 'Crie turmas, adicione alunos, acompanhe a lista de chamada e veja o histórico completo de cada criança.',
   },
   {
     icon: <Sparkles size={22} strokeWidth={1.8} />,
-    title: 'Relatórios prontos em segundos',
-    desc: 'Suas anotações viram relatório pedagógico com um toque. A IA cuida da escrita, você cuida da turma.',
+    title: 'Documentos pedagógicos com IA',
+    desc: 'Gere relatórios, pareceres, portfólios, planejamentos e projetos a partir dos registros da rotina.',
   },
   {
-    icon: <BookOpen size={22} strokeWidth={1.8} />,
-    title: 'Material pronto para usar hoje',
-    desc: 'Planos de aula, listas de chamada e modelos editáveis. Baixe, ajuste e use na sua sala.',
+    icon: <ClipboardCheck size={22} strokeWidth={1.8} />,
+    title: 'Intervenções individualizadas',
+    desc: 'Transforme observações em propostas de intervenção pedagógica para acompanhar melhor cada criança.',
   },
   {
     icon: <MessageCircle size={22} strokeWidth={1.8} />,
-    title: 'Uma comunidade só sua',
-    desc: 'Troque ideias com outras professoras da Educação Infantil. Sem julgamento, sem jargão técnico.',
+    title: 'Chat com IA para dúvidas e ideias',
+    desc: 'Converse com a IA para tirar dúvidas, pensar estratégias, adaptar atividades e organizar ideias.',
   },
   {
-    icon: <Trophy size={22} strokeWidth={1.8} />,
-    title: 'O app que reconhece seu trabalho',
-    desc: 'Cada registro conta. O Approf celebra cada pequena conquista da sua jornada como professora.',
+    icon: <Image size={22} strokeWidth={1.8} />,
+    title: 'Imagem e material de apoio',
+    desc: 'Crie imagens pedagógicas, acesse materiais de apoio e compartilhe recursos com outras professoras.',
   },
 ]
 
@@ -123,8 +123,8 @@ export default function Home() {
 
           {/* CTAs */}
           <div className="hero__actions">
-            <a href={WHATSAPP_URL} className="btn-primary" target="_blank" rel="noopener noreferrer">
-              Comecar pelo WhatsApp
+            <a href={APP_SIGNUP_URL} className="btn-primary">
+              Testar grátis por 7 dias
             </a>
             <a href="#como-funciona" className="btn-secondary">
               Ver como funciona
@@ -266,8 +266,8 @@ export default function Home() {
             <h2 className="cta-final__headline">
               Você merece um app feito pra você.
             </h2>
-            <a href={WHATSAPP_URL} className="btn-primary" target="_blank" rel="noopener noreferrer">
-              Comecar pelo WhatsApp
+            <a href={APP_SIGNUP_URL} className="btn-primary">
+              Testar grátis por 7 dias
             </a>
             <p className="cta-final__caption">
               Sem cartão de crédito · Cancela quando quiser
@@ -319,16 +319,6 @@ export default function Home() {
         </div>
       </footer>
 
-      <a
-        href={WHATSAPP_URL}
-        className="whatsapp-float"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Falar com o Approf pelo WhatsApp"
-      >
-        <MessageCircle size={22} strokeWidth={2} />
-        WhatsApp
-      </a>
     </>
   )
 }
