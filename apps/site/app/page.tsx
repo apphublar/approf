@@ -285,7 +285,10 @@ export default function Home() {
           <div className="container">
             <div className="for-who__content">
               <p className="for-who__eyebrow">Para quem é</p>
-              <h2>Feito para professoras da Educação Infantil</h2>
+              <h2>
+                Feito para professoras da
+                <span>Educação Infantil</span>
+              </h2>
               <p>
                 O Approf apoia quem acompanha crianças de 0 a 5 anos e precisa
                 transformar a rotina da sala em registros, documentos,

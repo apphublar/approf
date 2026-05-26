@@ -646,11 +646,12 @@ h1, h2, h3, h4 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 48px;
+  gap: 72px;
 }
 
 .for-who__content {
-  max-width: 660px;
+  max-width: 720px;
+  flex: 1;
 }
 
 .for-who__eyebrow {
@@ -663,9 +664,15 @@ h1, h2, h3, h4 {
 }
 
 .for-who__content h2 {
-  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-size: clamp(2rem, 3.2vw, 2.65rem);
   color: var(--gd);
   margin-bottom: 14px;
+  max-width: 760px;
+  line-height: 1.18;
+}
+
+.for-who__content h2 span {
+  display: block;
 }
 
 .for-who__content p:not(.for-who__eyebrow) {
@@ -677,7 +684,7 @@ h1, h2, h3, h4 {
 .for-who__list {
   display: grid;
   gap: 10px;
-  min-width: 260px;
+  min-width: 290px;
 }
 
 .for-who__list span {
@@ -1047,10 +1054,12 @@ h1, h2, h3, h4 {
   .for-who .container {
     align-items: flex-start;
     flex-direction: column;
+    gap: 28px;
   }
 
   .for-who__list {
     width: 100%;
+    min-width: 0;
   }
 }
 
