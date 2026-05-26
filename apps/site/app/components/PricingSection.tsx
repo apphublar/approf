@@ -40,7 +40,7 @@ export default function PricingSection() {
           <p>Sem fidelidade. Cancele quando quiser.</p>
         </div>
 
-        <div className="pricing-toggle" role="group" aria-label="Periodo de cobranca">
+        <div className="pricing-toggle" role="group" aria-label="Período de cobrança">
           <button
             className={`pricing-toggle-btn${!isAnnual ? ' pricing-toggle-btn--active' : ''}`}
             onClick={() => setIsAnnual(false)}
@@ -55,7 +55,7 @@ export default function PricingSection() {
           >
             Anual
             <span className="pricing-toggle-badge">
-              <Gift size={13} strokeWidth={2} /> 2 meses gratis
+              <Gift size={13} strokeWidth={2} /> 2 meses grátis
             </span>
           </button>
         </div>
@@ -64,9 +64,9 @@ export default function PricingSection() {
           <div className="pricing-card">
             <div className="pricing-badge">
               {isAnnual ? (
-                <><Gift size={13} strokeWidth={2} /> 2 meses gratis</>
+                <><Gift size={13} strokeWidth={2} /> 2 meses grátis</>
               ) : (
-                '7 dias gratis'
+                '7 dias grátis'
               )}
             </div>
 
@@ -81,7 +81,7 @@ export default function PricingSection() {
               <span className="pricing-currency">
                 {isAnnual ? ',75' : ',90'}
               </span>
-              <span className="pricing-period">/mes</span>
+              <span className="pricing-period">/mês</span>
             </div>
 
             {isAnnual && (
@@ -116,11 +116,11 @@ export default function PricingSection() {
         <div className="pricing-payment-info">
           <div className="pricing-payment-item">
             <CreditCard size={14} strokeWidth={1.8} />
-            <span>Cartao de credito e Pix aceitos</span>
+            <span>Cartão de crédito e Pix aceitos</span>
           </div>
           <div className="pricing-payment-item">
             <Calendar size={14} strokeWidth={1.8} />
-            <span>Cobranca mensal ou anual, sem fidelidade</span>
+            <span>Cobrança mensal ou anual, sem fidelidade</span>
           </div>
           <div className="pricing-payment-item">
             <X size={14} strokeWidth={2} />
@@ -129,7 +129,7 @@ export default function PricingSection() {
         </div>
 
         <p className="pricing-security">
-          Pagamento processado com segurança. Seus dados estao protegidos.
+          Pagamento processado com segurança. Seus dados estão protegidos.
         </p>
       </div>
     </section>

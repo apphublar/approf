@@ -6,6 +6,10 @@ import {
   ClipboardCheck,
   Image,
   ArrowDown,
+  CalendarDays,
+  FileText,
+  ListChecks,
+  BookOpenCheck,
 } from 'lucide-react'
 import Navbar from './components/Navbar'
 import PricingSection from './components/PricingSection'
@@ -80,6 +84,24 @@ const features = [
   },
 ]
 
+const highlights = [
+  {
+    icon: <ListChecks size={20} strokeWidth={1.9} />,
+    title: 'Rotina organizada',
+    desc: 'Turmas, alunos, chamada, calendário e registros em uma única visão.',
+  },
+  {
+    icon: <FileText size={20} strokeWidth={1.9} />,
+    title: 'Documentação pronta',
+    desc: 'Relatórios, portfólios, pareceres, planejamentos e projetos com apoio da IA.',
+  },
+  {
+    icon: <BookOpenCheck size={20} strokeWidth={1.9} />,
+    title: 'Apoio pedagógico',
+    desc: 'Intervenções, materiais compartilhados, imagens pedagógicas e chat para ideias.',
+  },
+]
+
 /* ============================================================
    PAGE
    ============================================================ */
@@ -111,13 +133,13 @@ export default function Home() {
 
           {/* Headline */}
           <h1 className="hero__headline">
-            Organize sua rotina, simplifique sua vida
+            O app completo para a rotina da professora
           </h1>
 
           {/* Subtítulo */}
           <p className="hero__sub">
-            Anotações organizadas que se transformam em relatórios completos
-            com um clique. Sem esforço, sem perda de tempo.
+            Organize turmas, acompanhe crianças, registre observações e gere
+            documentos pedagógicos com IA, tudo em um só lugar.
           </p>
 
           {/* CTAs */}
@@ -132,7 +154,7 @@ export default function Home() {
           </div>
 
           <p className="hero__caption">
-            Para professoras da Educação Infantil · 0 a 5 anos
+            Educação Infantil · 0 a 5 anos · direto no celular
           </p>
         </section>
 
@@ -142,10 +164,24 @@ export default function Home() {
         <section className="problem">
           <div className="container">
             <p className="problem__text">
-              Relatório atrasado, anotação perdida, material que você nem
-              lembra onde salvou. Acontece com toda professora.{' '}
-              <strong>O Approf foi feito para acabar com isso.</strong>
+              Relatório atrasado, chamada em outro lugar, anotação perdida,
+              intervenção sem acompanhamento e material espalhado.{' '}
+              <strong>O Approf reúne a rotina pedagógica em um fluxo simples.</strong>
             </p>
+          </div>
+        </section>
+
+        <section className="highlights" aria-label="Principais benefícios">
+          <div className="container highlights__grid">
+            {highlights.map((item) => (
+              <div className="highlight-card" key={item.title}>
+                <div className="highlight-card__icon">{item.icon}</div>
+                <div>
+                  <h2>{item.title}</h2>
+                  <p>{item.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -225,8 +261,8 @@ export default function Home() {
             <div className="section-header">
               <h2>Feito para o seu dia a dia</h2>
               <p>
-                Sem formulários complicados. Sem aprendizado longo.
-                Você anota, o Approf organiza.
+                As principais ferramentas da rotina pedagógica ficam juntas,
+                conectadas aos registros da turma.
               </p>
             </div>
 
@@ -247,9 +283,20 @@ export default function Home() {
             ============================== */}
         <section className="for-who">
           <div className="container">
-            <p className="for-who__text">
-              Feito para professoras da Educação Infantil.
-            </p>
+            <div className="for-who__content">
+              <p className="for-who__eyebrow">Para quem é</p>
+              <h2>Feito para professoras da Educação Infantil</h2>
+              <p>
+                O Approf apoia quem acompanha crianças de 0 a 5 anos e precisa
+                transformar a rotina da sala em registros, documentos,
+                planejamentos e intervenções com mais clareza.
+              </p>
+            </div>
+            <div className="for-who__list" aria-label="Recursos principais">
+              <span><CalendarDays size={16} /> Rotina e calendário</span>
+              <span><Users size={16} /> Turmas e alunos</span>
+              <span><Sparkles size={16} /> IA pedagógica</span>
+            </div>
           </div>
         </section>
 

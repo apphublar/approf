@@ -29,7 +29,7 @@ export default function Navbar() {
             Como funciona
           </a>
           <a href="#precos" className="navbar__link">
-            Precos
+            Preços
           </a>
         </div>
 
