@@ -15,9 +15,6 @@ import Navbar from './components/Navbar'
 import PricingSection from './components/PricingSection'
 import { ApprofApple, ApprofLogoText } from './components/Logo'
 
-const PROFESSORA_APP_URL = process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? 'https://app.approf.com.br'
-const APP_SIGNUP_URL = `${PROFESSORA_APP_URL.replace(/\/$/, '')}?mode=signup`
-
 /* ---- Seta longa e sutil entre os passos ---- */
 function StepArrow() {
   return (
@@ -144,7 +141,7 @@ export default function Home() {
 
           {/* CTAs */}
           <div className="hero__actions">
-            <a href={APP_SIGNUP_URL} className="btn-primary">
+            <a href="#precos" className="btn-primary">
               Testar grátis por 7 dias
             </a>
             <a href="#como-funciona" className="btn-secondary">
@@ -316,7 +313,7 @@ export default function Home() {
             <h2 className="cta-final__headline">
               Você merece um app feito pra você.
             </h2>
-            <a href={APP_SIGNUP_URL} className="btn-primary">
+            <a href="#precos" className="btn-primary">
               Testar grátis por 7 dias
             </a>
             <p className="cta-final__caption">
