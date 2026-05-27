@@ -186,6 +186,7 @@ export interface ChildSearchPreview {
 }
 
 export type ReportStatus = 'draft' | 'generating' | 'ready' | 'failed' | 'archived'
+export type CoordinatorReviewStatus = 'not_required' | 'pending' | 'changes_requested' | 'approved'
 
 export interface GeneratedDocument {
   id: string
@@ -212,6 +213,10 @@ export interface GeneratedDocument {
     height?: number
   } | null
   is_final_version: boolean
+  coordinator_review_status?: CoordinatorReviewStatus | null
+  coordinator_review_notes?: string | null
+  coordinator_reviewed_by?: string | null
+  coordinator_reviewed_at?: string | null
   created_at: string
   updated_at: string
 }

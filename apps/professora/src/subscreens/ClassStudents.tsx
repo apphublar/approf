@@ -1,10 +1,11 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { BarChart3, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCheck, Pencil, Search, Users } from 'lucide-react'
+import { BarChart3, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCheck, Pencil, Search, Share2, Users } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { saveSupabaseAttendanceRecord } from '@/services/supabase/attendance'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { listReports } from '@/services/reports'
+import { shareClassWithCoordinator } from '@/services/coordinator-review'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
 import type { AttendanceRecord, Student } from '@/types'
@@ -25,6 +26,12 @@ export default function ClassStudentsSubscreen() {
   const [savingAttendance, setSavingAttendance] = useState(false)
   const [attendanceError, setAttendanceError] = useState('')
   const [generatedByStudentId, setGeneratedByStudentId] = useState<Record<string, number>>({})
+  const [coordinatorName, setCoordinatorName] = useState('')
+  const [coordinatorEmail, setCoordinatorEmail] = useState('')
+  const [coordinatorShareUrl, setCoordinatorShareUrl] = useState('')
+  const [coordinatorMessage, setCoordinatorMessage] = useState('')
+  const [coordinatorError, setCoordinatorError] = useState('')
+  const [sharingCoordinator, setSharingCoordinator] = useState(false)
 
   const cls = classes.find((c) => c.id === activeClassId) ?? classes[0]
   const classAttendanceRecords = useMemo(
@@ -131,6 +138,27 @@ export default function ClassStudentsSubscreen() {
     }
   }
 
+  async function shareWithCoordinator() {
+    if (!cls?.id) return
+    setSharingCoordinator(true)
+    setCoordinatorError('')
+    setCoordinatorMessage('')
+    setCoordinatorShareUrl('')
+    try {
+      const result = await shareClassWithCoordinator({
+        classId: cls.id,
+        coordinatorName,
+        coordinatorEmail,
+      })
+      setCoordinatorShareUrl(result.shareUrl)
+      setCoordinatorMessage('Código de validação enviado para o e-mail da coordenadora.')
+    } catch (error) {
+      setCoordinatorError(error instanceof Error ? error.message : 'Não foi possível compartilhar a turma.')
+    } finally {
+      setSharingCoordinator(false)
+    }
+  }
+
   const absentCount = Math.max(sortedStudents.length - presentStudentIds.length, 0)
 
   return (
@@ -186,6 +214,42 @@ export default function ClassStudentsSubscreen() {
 
         {activeTool === 'students' && (
           <>
+            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-10 h-10 rounded-[12px] bg-gbg border border-gp flex items-center justify-center text-gm">
+                  <Share2 size={18} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[14px] font-bold text-ink">Compartilhar turma com a coordenadora</p>
+                  <p className="text-[12px] text-muted leading-[1.5]">Ela valida o acesso por e-mail e revisa os relatórios de desenvolvimento das crianças.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <input
+                  value={coordinatorName}
+                  onChange={(event) => setCoordinatorName(event.target.value)}
+                  placeholder="Nome da coordenadora"
+                  className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none"
+                />
+                <input
+                  value={coordinatorEmail}
+                  onChange={(event) => setCoordinatorEmail(event.target.value)}
+                  placeholder="E-mail da coordenadora"
+                  className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 text-[13px] outline-none"
+                />
+              </div>
+              <button
+                onClick={shareWithCoordinator}
+                disabled={sharingCoordinator || !coordinatorName.trim() || !coordinatorEmail.trim()}
+                className="w-full mt-3 py-3 rounded-app-sm bg-gm text-white text-[13px] font-bold disabled:opacity-50"
+              >
+                {sharingCoordinator ? 'Enviando...' : 'Validar acesso da coordenadora'}
+              </button>
+              {coordinatorMessage && <p className="text-[12px] text-gm mt-2 leading-[1.5]">{coordinatorMessage}</p>}
+              {coordinatorShareUrl && <p className="text-[11px] text-muted mt-1 break-all">Link: {coordinatorShareUrl}</p>}
+              {coordinatorError && <p className="text-[12px] text-[#C1440E] mt-2 leading-[1.5]">{coordinatorError}</p>}
+            </div>
+
             <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
               <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
                 <Search size={16} className="text-muted flex-shrink-0" />

@@ -1133,6 +1133,7 @@ async function persistGeneratedReport(input: GeneratePedagogicalTextInput, body:
       report_type: input.generationType,
       prompt_version: input.promptVersion,
       body,
+      coordinator_review_status: input.generationType === 'development_report' ? 'pending' : 'not_required',
     })
     .select('id')
     .single()

@@ -6,9 +6,11 @@ import { getAppDataMode } from '@/services/app-data'
 import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
 import { deleteSupabaseTimelineEvent } from '@/services/supabase/timeline'
 import { listReports } from '@/services/reports'
+import { listReportReviewEvents, type ReportReviewEvent } from '@/services/coordinator-review'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
 import AnnotationCard from '@/components/ui/AnnotationCard'
+import type { GeneratedDocument } from '@/types'
 
 const EVENT_STYLE: Record<TimelineEventType, { label: string; bg: string; fg: string }> = {
   evolucao: { label: 'Evolução', bg: '#D8F3DC', fg: '#2D6A4F' },
@@ -28,6 +30,8 @@ export default function StudentProfileSubscreen() {
   const { classes, activeStudentId, activeClassId, annotations, attendanceRecords, removeAnnotation, removeTimelineEvent } = useAppStore()
   const [showAllAnnotations, setShowAllAnnotations] = useState(false)
   const [generatedCount, setGeneratedCount] = useState(0)
+  const [developmentReports, setDevelopmentReports] = useState<GeneratedDocument[]>([])
+  const [reviewEvents, setReviewEvents] = useState<ReportReviewEvent[]>([])
 
   useEffect(() => {
     setShowAllAnnotations(false)
@@ -70,10 +74,28 @@ export default function StudentProfileSubscreen() {
     let active = true
     listReports({ studentId: student.id, limit: 200, compact: true })
       .then((reports) => {
-        if (active) setGeneratedCount(reports.length)
+        if (!active) return
+        setGeneratedCount(reports.length)
+        setDevelopmentReports(reports.filter((report) => report.report_type === 'development_report'))
       })
       .catch(() => {
-        if (active) setGeneratedCount(0)
+        if (!active) return
+        setGeneratedCount(0)
+        setDevelopmentReports([])
+      })
+    return () => {
+      active = false
+    }
+  }, [student.id])
+
+  useEffect(() => {
+    let active = true
+    listReportReviewEvents({ studentId: student.id })
+      .then((events) => {
+        if (active) setReviewEvents(events)
+      })
+      .catch(() => {
+        if (active) setReviewEvents([])
       })
     return () => {
       active = false
@@ -217,12 +239,60 @@ export default function StudentProfileSubscreen() {
         </button>
 
         <button
-          onClick={() => openSubscreen('report')}
+          onClick={() => openSubscreen('report', {
+            reportKind: 'Relatório de desenvolvimento',
+            classId: cls.id,
+            studentId: student.id,
+          })}
           className="w-full py-[14px] rounded-app bg-gd text-white font-bold text-[14px] border-none flex items-center justify-center gap-2 mb-5 cursor-pointer"
         >
           <Sparkles size={16} strokeWidth={2} />
-          Gerar relatório
+          Gerar relatório de desenvolvimento
         </button>
+
+        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Aprovação da coordenadora</p>
+            <span className="text-[11px] text-muted">{developmentReports.length} relatório(s)</span>
+          </div>
+          {developmentReports.length === 0 ? (
+            <p className="text-[12px] text-muted leading-[1.6]">
+              Nenhum relatório de desenvolvimento foi gerado para esta criança.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {developmentReports.slice(0, 5).map((report) => (
+                <button
+                  key={report.id}
+                  onClick={() => openSubscreen('document-detail', { reportId: report.id })}
+                  className="w-full rounded-app-sm border border-border bg-cream px-3 py-3 text-left"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-bold text-ink">Relatório de {formatShortDate(report.created_at)}</span>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${getReviewStatusClass(report.coordinator_review_status)}`}>
+                      {formatReviewStatus(report.coordinator_review_status)}
+                    </span>
+                  </div>
+                  {report.coordinator_review_notes && (
+                    <p className="text-[11px] text-muted mt-2 leading-[1.4]">{report.coordinator_review_notes}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          {reviewEvents.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-border">
+              <p className="text-[11px] font-bold text-muted mb-2">Histórico da coordenadora</p>
+              {reviewEvents.slice(0, 4).map((event) => (
+                <div key={event.id} className="mb-3">
+                  <p className="text-[12px] font-bold text-ink">{formatReviewAction(event.action)}</p>
+                  <p className="text-[11px] text-muted">{event.actor_name || 'Coordenadora'} · {formatShortDate(event.created_at)}</p>
+                  {event.notes && <p className="text-[11px] text-muted mt-1 leading-[1.4]">{event.notes}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
           <div className="flex items-center justify-between mb-3">
@@ -379,6 +449,31 @@ export default function StudentProfileSubscreen() {
 function formatBirthDate(value: string) {
   const [year, month, day] = value.split('-')
   return `${day}/${month}/${year}`
+}
+
+function formatShortDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'data não informada'
+  return date.toLocaleDateString('pt-BR')
+}
+
+function formatReviewStatus(status?: string | null) {
+  if (status === 'approved') return 'Aprovado'
+  if (status === 'changes_requested') return 'Corrigir'
+  return 'Aguardando aprovação'
+}
+
+function getReviewStatusClass(status?: string | null) {
+  if (status === 'approved') return 'bg-gbg text-gd border border-gp'
+  if (status === 'changes_requested') return 'bg-[#FFF1F1] text-[#C1440E] border border-[#F3C0B1]'
+  return 'bg-[#FFF3CD] text-[#856404] border border-[#EAD58A]'
+}
+
+function formatReviewAction(action: string) {
+  if (action === 'approve') return 'Relatório aprovado'
+  if (action === 'request_changes') return 'Correção solicitada'
+  if (action === 'comment') return 'Observação registrada'
+  return action
 }
 
 function formatStudentAge(years?: number, months?: number) {

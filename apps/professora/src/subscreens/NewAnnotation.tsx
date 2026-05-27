@@ -8,7 +8,7 @@ import { isSupabaseConfigured } from '@/services/supabase/config'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import type { Annotation, AnnotationCategory, AnnotationPersistence } from '@/types'
 
-type WorkKind = '' | 'report' | 'planning' | 'memory' | 'personal'
+type WorkKind = '' | 'report' | 'planning' | 'personal'
 type Scope = 'child' | 'class' | 'optional-class' | 'teacher'
 type AnnotationViewMode = 'annotation' | 'chat'
 
@@ -33,31 +33,16 @@ interface ChatConversation {
 }
 
 const REPORT_MODELS: ModelOption[] = [
-  { id: 'desenvolvimento', label: 'Relatório de desenvolvimento', desc: 'Evolução individual da criança, sem comparações.', scope: 'child' },
-  { id: 'atipico', label: 'Relatório atípico', desc: 'Observações pedagógicas, sem diagnóstico clínico.', scope: 'child' },
-  { id: 'diario', label: 'Diário de bordo', desc: 'Rotina coletiva, atividades do dia e vivências da turma.', scope: 'class' },
-  { id: 'portfolio', label: 'Portfólio pedagógico', desc: 'Evidências, produções, fotos e jornada individual.', scope: 'child' },
-  { id: 'especialista', label: 'Relatório para especialista', desc: 'Neuropediatra, fono, TO, psicólogo ou psicopedagogo.', scope: 'child' },
-  { id: 'encaminhamento', label: 'Encaminhamento pedagógico', desc: 'Registro para orientar família ou especialista.', scope: 'child' },
-  { id: 'reunião-pais', label: 'Registro de reunião de pais', desc: 'Pontos tratados com a família.', scope: 'child' },
+  { id: 'turma', label: 'Registro da turma', desc: 'Alimenta o diário de bordo e registros coletivos.', scope: 'class' },
+  { id: 'crianca', label: 'Registro de uma criança', desc: 'Alimenta o relatório de desenvolvimento e o portfólio.', scope: 'child' },
 ]
 
 const PLANNING_MODELS: ModelOption[] = [
-  { id: 'semanal', label: 'Planejamento semanal', desc: 'Rotina e propostas da semana.', scope: 'class' },
-  { id: 'diario', label: 'Plano de aula diário', desc: 'Atividade, objetivo, materiais e desenvolvimento.', scope: 'class' },
-  { id: 'projeto', label: 'Projeto pedagógico específico', desc: 'Projeto por tema, interesse da turma ou necessidade observada.', scope: 'class' },
-]
-
-const MEMORY_MODELS: ModelOption[] = [
-  { id: 'evolucao', label: 'Evolução da criança', desc: 'Marco, progresso, fala, autonomia ou interação.', scope: 'child' },
-  { id: 'observacao', label: 'Observação importante', desc: 'Algo que precisa acompanhar a rotina pedagógica.', scope: 'child' },
-  { id: 'ideia', label: 'Ideia solta para depois', desc: 'Pensamento rápido para usar em relatório ou planejamento.', scope: 'optional-class' },
+  { id: 'planejamento', label: 'Planejamento', desc: 'Alimenta planejamento diário/semanal, projeto pedagógico e reunião de pais.', scope: 'optional-class' },
 ]
 
 const PERSONAL_MODELS: ModelOption[] = [
   { id: 'pessoal', label: 'Anotação pessoal', desc: 'Registro privado da professora, sem vínculo com criança ou turma.', scope: 'teacher' },
-  { id: 'lembrete', label: 'Lembrete de rotina', desc: 'Algo para lembrar depois sobre organização, materiais ou combinados.', scope: 'teacher' },
-  { id: 'ideia-pessoal', label: 'Ideia para desenvolver', desc: 'Uma ideia livre para amadurecer antes de virar planejamento.', scope: 'teacher' },
 ]
 
 const MAX_AUDIO_SECONDS = 30
@@ -140,6 +125,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const availableStudents = useMemo(() => selectedClass?.students ?? [], [selectedClass])
   const needsClass = isDirectStudentNote || selectedModel?.scope === 'class' || selectedModel?.scope === 'child'
   const needsStudent = isDirectStudentNote || selectedModel?.scope === 'child'
+  const showsClass = needsClass || selectedModel?.scope === 'optional-class'
   const canSave = isDirectStudentNote
     ? text.trim().length >= 5 && Boolean(classId) && Boolean(studentId)
     : (
@@ -212,8 +198,8 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     if (prefillData.studentId) setStudentId(prefillData.studentId)
     if (prefillData.text) setText(prefillData.text)
     if (prefillData.directStudentNote) {
-      setWorkKind('memory')
-      setModelId('observacao')
+      setWorkKind('report')
+      setModelId('crianca')
     }
   }, [isEditing, prefillData])
 
@@ -290,12 +276,24 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
   function chooseWorkKind(value: WorkKind) {
     setWorkKind(value)
-    setModelId('')
     setError('')
 
     const fallbackClass = activeClass ?? classes[0]
-    setClassId(value === 'personal' ? '' : fallbackClass?.id ?? '')
-    setStudentId(value === 'personal' ? '' : activeStudent?.id ?? fallbackClass?.students[0]?.id ?? '')
+    if (value === 'personal') {
+      setModelId('pessoal')
+      setClassId('')
+      setStudentId('')
+      return
+    }
+    if (value === 'planning') {
+      setModelId('planejamento')
+      setClassId(fallbackClass?.id ?? '')
+      setStudentId('')
+      return
+    }
+    setModelId('')
+    setClassId(fallbackClass?.id ?? '')
+    setStudentId(activeStudent?.id ?? fallbackClass?.students[0]?.id ?? '')
   }
 
   function chooseModel(value: string) {
@@ -441,7 +439,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
     setSaving(true)
     setError('')
-    const effectiveModel = selectedModel ?? MEMORY_MODELS[1]
+    const effectiveModel = selectedModel ?? REPORT_MODELS[1]
     const resolved = isDirectStudentNote
       ? {
           category: 'evolucao' as AnnotationCategory,
@@ -698,7 +696,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 } disabled:opacity-50`}
               >
                 {recording ? <Square size={14} /> : <Mic size={14} />}
-                {recording ? 'Parar' : 'Gravar audio'}
+                {recording ? 'Parar' : 'Gravar áudio'}
               </button>
               <button
                 type="button"
@@ -724,44 +722,44 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
         {!isDirectStudentNote && (
           <>
-            <StepTitle number="1" title="O que esta anotação vai ajudar a fazer?" />
+            <StepTitle number="1" title="Para que esta anotação vai servir?" />
             <div className="grid grid-cols-1 gap-2 mb-4">
-              <ChoiceButton selected={workKind === 'report'} title="Relatório ou documento" desc="Desenvolvimento, portfólio, diário de bordo, especialista, reunião." onClick={() => chooseWorkKind('report')} />
-              <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Semanal, diário ou projeto pedagógico." onClick={() => chooseWorkKind('planning')} />
-              <ChoiceButton selected={workKind === 'memory'} title="Memoria pedagógica" desc="Registro rapido de evolucao, observacao importante ou ideia solta." onClick={() => chooseWorkKind('memory')} />
-              <ChoiceButton selected={workKind === 'personal'} title="Anotação pessoal" desc="Ideias e lembretes privados da professora, sem criança vinculada." onClick={() => chooseWorkKind('personal')} />
+              <ChoiceButton selected={workKind === 'personal'} title="Anotação pessoal" desc="Registro privado, ideia ou lembrete da professora." onClick={() => chooseWorkKind('personal')} />
+              <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Pode ajudar no planejamento diário/semanal, projeto pedagógico ou reunião de pais." onClick={() => chooseWorkKind('planning')} />
+              <ChoiceButton selected={workKind === 'report'} title="Relatórios e portfólio" desc="Use para diário de bordo da turma, relatório de desenvolvimento ou portfólio da criança." onClick={() => chooseWorkKind('report')} />
             </div>
 
-            {workKind && (
+            {workKind === 'report' && (
               <>
-                <StepTitle number="2" title="Escolhá o tipo correto" />
-                <select
-                  className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
-                  value={modelId}
-                  onChange={(event) => chooseModel(event.target.value)}
-                >
-                  <option value="">Selecionar tipo</option>
+                <StepTitle number="2" title="Esse registro é sobre quem?" />
+                <div className="grid grid-cols-1 gap-2 mb-4">
                   {modelOptions.map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
+                    <ChoiceButton
+                      key={option.id}
+                      selected={modelId === option.id}
+                      title={option.label}
+                      desc={option.desc}
+                      onClick={() => chooseModel(option.id)}
+                    />
                   ))}
-                </select>
-                {selectedModel && (
-                  <p className="text-[11px] text-muted leading-[1.5] mb-4">{selectedModel.desc}</p>
-                )}
+                </div>
               </>
             )}
           </>
         )}
 
-        {!isDirectStudentNote && (selectedModel || isDirectStudentNote) && needsClass && (
+        {!isDirectStudentNote && (selectedModel || isDirectStudentNote) && showsClass && (
           <>
-            <StepTitle number={isDirectStudentNote ? '1' : '3'} title={needsStudent || isDirectStudentNote ? 'Escolhá a criança' : 'Escolhá a turma'} />
+            <StepTitle
+              number={isDirectStudentNote ? '1' : workKind === 'report' ? '3' : '2'}
+              title={needsStudent || isDirectStudentNote ? 'Escolha a criança' : selectedModel?.scope === 'optional-class' ? 'Turma vinculada' : 'Escolha a turma'}
+            />
             <select
               className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
               value={classId}
               onChange={(event) => updateClass(event.target.value)}
             >
-              <option value="">Escolher turma</option>
+              <option value="">{selectedModel?.scope === 'optional-class' ? 'Sem turma vinculada' : 'Escolher turma'}</option>
               {classes.map((cls) => (
                 <option key={cls.id} value={cls.id}>{cls.name}</option>
               ))}
@@ -783,7 +781,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
         {selectedModel && !isDirectStudentNote && (
           <>
-            <StepTitle number={needsClass ? '4' : '3'} title="Detalhes opcionais" />
+            <StepTitle number={showsClass ? (workKind === 'report' ? '4' : '3') : '2'} title="Detalhes opcionais" />
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {tags.map((tag) => (
@@ -1003,13 +1001,12 @@ function hexToRgb(hex: string) {
 function getModelOptions(workKind: WorkKind) {
   if (workKind === 'report') return REPORT_MODELS
   if (workKind === 'planning') return PLANNING_MODELS
-  if (workKind === 'memory') return MEMORY_MODELS
   if (workKind === 'personal') return PERSONAL_MODELS
   return []
 }
 
 function isWorkKind(value: unknown): value is WorkKind {
-  return value === 'report' || value === 'planning' || value === 'memory' || value === 'personal' || value === ''
+  return value === 'report' || value === 'planning' || value === 'personal' || value === ''
 }
 
 function StepTitle({ number, title }: { number: string; title: string }) {
@@ -1043,39 +1040,39 @@ function resolveAnnotation(workKind: WorkKind, model: ModelOption): {
   persistence: AnnotationPersistence[]
 } {
   if (workKind === 'planning') {
-    return { category: model.id === 'projeto' ? 'projeto' : 'plano', label: model.label, persistence: ['planejamento-futuro'] }
-  }
-
-  if (workKind === 'memory') {
-    return { category: 'evolucao', label: model.label, persistence: ['observacao-continua', 'observacao-importante'] }
+    return { category: 'plano', label: model.label, persistence: ['planejamento-futuro'] }
   }
 
   if (workKind === 'personal') {
     return { category: 'formacao', label: model.label, persistence: ['observacao-importante'] }
   }
 
-  if (model.id === 'portfolio') {
-    return { category: 'portfolio', label: model.label, persistence: ['relatorio-atual', 'evolucao-positiva'] }
+  if (model.id === 'turma') {
+    return { category: 'evolucao', label: 'Diário de bordo', persistence: ['relatorio-atual', 'observacao-continua'] }
   }
 
-  if (model.id === 'atipico' || model.id === 'especialista' || model.id === 'encaminhamento') {
-    return { category: 'atipico', label: model.label, persistence: ['relatorio-atual', 'observacao-importante'] }
-  }
-
-  return { category: 'evolucao', label: model.label, persistence: ['relatorio-atual', 'observacao-continua'] }
+  return { category: 'portfolio', label: 'Relatório e portfólio', persistence: ['relatorio-atual', 'evolucao-positiva'] }
 }
 
 function inferAnnotationEditorConfig(annotation: Annotation) {
   const modelMatch = findModelByLabel(annotation.label)
   const workKind = modelMatch?.workKind ?? inferWorkKindFromAnnotation(annotation)
+  const fallbackModelId = inferModelIdFromAnnotation(annotation, workKind)
 
   return {
     workKind,
-    modelId: modelMatch?.model.id ?? '',
+    modelId: modelMatch?.model.id ?? fallbackModelId,
     classId: annotation.classId ?? '',
     studentId: annotation.studentId ?? '',
     tags: (annotation.tags ?? []).filter((tag) => tag !== annotation.label),
   }
+}
+
+function inferModelIdFromAnnotation(annotation: Annotation, workKind: WorkKind) {
+  if (workKind === 'personal') return 'pessoal'
+  if (workKind === 'planning') return 'planejamento'
+  if (workKind === 'report') return annotation.studentId ? 'crianca' : 'turma'
+  return ''
 }
 
 function findModelByLabel(label: string) {
@@ -1083,7 +1080,6 @@ function findModelByLabel(label: string) {
   const groups: Array<{ workKind: WorkKind; models: ModelOption[] }> = [
     { workKind: 'report', models: REPORT_MODELS },
     { workKind: 'planning', models: PLANNING_MODELS },
-    { workKind: 'memory', models: MEMORY_MODELS },
     { workKind: 'personal', models: PERSONAL_MODELS },
   ]
 
@@ -1099,7 +1095,7 @@ function inferWorkKindFromAnnotation(annotation: Annotation): WorkKind {
   if (annotation.scope === 'personal') return 'personal'
   if (annotation.category === 'plano' || annotation.category === 'projeto') return 'planning'
   if (annotation.category === 'portfolio' || annotation.category === 'atipico') return 'report'
-  return 'memory'
+  return annotation.studentId ? 'report' : 'planning'
 }
 
 function normalizeText(value: string) {
@@ -1109,5 +1105,3 @@ function normalizeText(value: string) {
     .toLowerCase()
     .trim()
 }
-
-

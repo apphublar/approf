@@ -50,8 +50,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   )
   const defaultClassId = classes[0]?.id ?? ''
   const fallbackStudentId = activeStudentId ?? allStudents[0]?.id ?? ''
-  const [selectedStudentId, setSelectedStudentId] = useState(fallbackStudentId)
-  const [selectedClassId, setSelectedClassId] = useState(defaultClassId)
+  const initialStudentId = typeof data === 'object' && data && 'studentId' in data && typeof (data as { studentId?: unknown }).studentId === 'string'
+    ? String((data as { studentId: string }).studentId)
+    : fallbackStudentId
+  const initialClassId = typeof data === 'object' && data && 'classId' in data && typeof (data as { classId?: unknown }).classId === 'string'
+    ? String((data as { classId: string }).classId)
+    : defaultClassId
+  const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId)
+  const [selectedClassId, setSelectedClassId] = useState(initialClassId)
   const [historyScope, setHistoryScope] = useState<'model' | 'student'>('model')
   const [diaryDate, setDiaryDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [diaryTheme, setDiaryTheme] = useState('')
@@ -65,6 +71,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const assistantMode = typeof data === 'object' && data && 'assistantMode' in data
     ? String((data as { assistantMode?: string }).assistantMode)
     : ''
+  const isPortfólio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
+  const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
+  const isClassDiary = reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo'
+  const isParentsMeeting = reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais'
+  const isPlanning = isPlanningKind(reportKind) && !isParentsMeeting
 
   const [mode, setMode] = useState<ReportMode>('annotations')
   const [selectedAnnotationIds, setSelectedAnnotationIds] = useState<string[]>([])
@@ -107,10 +118,12 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const draftKeyRef = useRef('')
   const loadedDraftRef = useRef(false)
 
-  const studentAnnotations = useMemo(
-    () => annotations.filter((annotation) => matchesStudent(annotation, selectedStudentId, selectedStudent?.name)),
-    [annotations, selectedStudentId, selectedStudent?.name],
-  )
+  const studentAnnotations = useMemo(() => {
+    if (isClassDiary || isParentsMeeting || isPlanning) {
+      return annotations.filter((annotation) => matchesClass(annotation, selectedClass?.id) && !annotation.studentId)
+    }
+    return annotations.filter((annotation) => matchesStudent(annotation, selectedStudentId, selectedStudent?.name))
+  }, [annotations, isClassDiary, isParentsMeeting, isPlanning, selectedClass?.id, selectedStudentId, selectedStudent?.name])
   const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
   const milestoneAnnotations = useMemo(() => {
     const filtered = studentAnnotations.filter((annotation) => {
@@ -121,11 +134,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   }, [studentAnnotations])
   const selectedMilestones = milestoneAnnotations.filter((annotation) => selectedMilestoneIds.includes(annotation.id))
   const firstName = selectedStudent?.name.split(' ')[0] ?? 'A criança'
-  const isPortfólio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
-  const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
-  const isClassDiary = reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo'
-  const isParentsMeeting = reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais'
-  const isPlanning = isPlanningKind(reportKind) && !isParentsMeeting
   const supportsLivingReport = isDevelopmentReport
   const needsBnccFields = isPlanning
   const needsAgeGroup = isPlanning
@@ -1457,6 +1465,11 @@ function matchesStudent(annotation: Annotation, studentId: string, studentName?:
   if (annotation.studentId && annotation.studentId === studentId) return true
   if (studentName && annotation.studentName === studentName) return true
   return false
+}
+
+function matchesClass(annotation: Annotation, classId?: string) {
+  if (!classId) return false
+  return annotation.classId === classId
 }
 
 function getReportGenerationType(reportKind: string, portfolioOutput: PortfólioOutput): AiGenerationType {

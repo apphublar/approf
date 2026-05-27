@@ -5,11 +5,11 @@ export type ReportStatus = 'draft' | 'generating' | 'ready' | 'failed' | 'archiv
 
 const REPORT_STATUSES = new Set<ReportStatus>(['draft', 'generating', 'ready', 'failed', 'archived'])
 const REPORT_SELECT_WITH_ARTIFACTS =
-  'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, created_at, updated_at'
+  'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, ai_artifacts, is_final_version, coordinator_review_status, coordinator_review_notes, coordinator_reviewed_by, coordinator_reviewed_at, created_at, updated_at'
 const REPORT_SELECT_BASE =
-  'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, is_final_version, created_at, updated_at'
+  'id, owner_id, student_id, class_id, status, report_type, prompt_version, body, is_final_version, coordinator_review_status, coordinator_review_notes, coordinator_reviewed_by, coordinator_reviewed_at, created_at, updated_at'
 const REPORT_SELECT_COMPACT =
-  'id, owner_id, student_id, class_id, status, report_type, prompt_version, is_final_version, created_at, updated_at'
+  'id, owner_id, student_id, class_id, status, report_type, prompt_version, is_final_version, coordinator_review_status, coordinator_review_notes, coordinator_reviewed_by, coordinator_reviewed_at, created_at, updated_at'
 
 export interface ReportListFilters {
   status?: ReportStatus
@@ -115,6 +115,9 @@ export async function updateOwnerReport(input: {
   body?: string
   status?: ReportStatus
   isFinalVersion?: boolean
+  coordinatorReviewStatus?: string
+  coordinatorReviewNotes?: string | null
+  coordinatorReviewedBy?: string | null
 }) {
   const supabase = createSupabaseServiceClient()
   const current = await getOwnerReportById(input.ownerId, input.reportId)
@@ -123,6 +126,12 @@ export async function updateOwnerReport(input: {
   const patch: Record<string, unknown> = {}
   if (typeof input.body === 'string') patch.body = input.body
   if (input.status) patch.status = input.status
+  if (input.coordinatorReviewStatus) patch.coordinator_review_status = input.coordinatorReviewStatus
+  if (input.coordinatorReviewNotes !== undefined) patch.coordinator_review_notes = input.coordinatorReviewNotes
+  if (input.coordinatorReviewedBy !== undefined) {
+    patch.coordinator_reviewed_by = input.coordinatorReviewedBy
+    patch.coordinator_reviewed_at = new Date().toISOString()
+  }
 
   if (!Object.keys(patch).length) {
     if (typeof input.isFinalVersion === 'boolean') {
@@ -179,6 +188,7 @@ export async function createOwnerReport(input: {
       report_type: input.reportType,
       prompt_version: input.promptVersion ?? null,
       body: input.body,
+      coordinator_review_status: input.reportType === 'development_report' ? 'pending' : 'not_required',
     })
     .select(REPORT_SELECT_WITH_ARTIFACTS)
     .single()
@@ -194,6 +204,7 @@ export async function createOwnerReport(input: {
         report_type: input.reportType,
         prompt_version: input.promptVersion ?? null,
         body: input.body,
+        coordinator_review_status: input.reportType === 'development_report' ? 'pending' : 'not_required',
       })
       .select(REPORT_SELECT_BASE)
       .single()
