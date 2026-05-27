@@ -47,7 +47,7 @@ export default async function LegalPage({ params }: PageProps) {
             <p className="legal-eyebrow">Approf</p>
             <h1>{page.title}</h1>
             <p>{page.subtitle}</p>
-            <span>Ultima atualizacao: {page.updatedAt}</span>
+            <span>Última atualização: {page.updatedAt}</span>
           </div>
         </section>
 
@@ -92,10 +92,10 @@ export default async function LegalPage({ params }: PageProps) {
               Cancelamento
             </Link>
             <Link href="/uso-aceitavel" className="footer__link">
-              Uso aceitavel
+              Uso aceitável
             </Link>
             <Link href="/protecao-criancas" className="footer__link">
-              Protecao de criancas
+              Proteção de crianças
             </Link>
           </nav>
           <p className="footer__copy">© 2026 Approf. Todos os direitos reservados.</p>

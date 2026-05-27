@@ -13,226 +13,226 @@ export type LegalPageContent = {
 }
 
 const company =
-  'Grupo CAPACARD, CNPJ 40.568.145/0001-08, Avenida Paulista, 1636, Conj 4 Pavmto 15, Bela Vista, Sao Paulo/SP, CEP 01310-200.'
+  'Grupo CAPACARD, CNPJ 40.568.145/0001-08, Avenida Paulista, 1636, Conj 4 Pavmto 15, Bela Vista, São Paulo/SP, CEP 01310-200.'
 
 export const legalPages: LegalPageContent[] = [
   {
     slug: 'termos',
     title: 'Termos de Uso',
-    subtitle: 'Contrato entre o Approf e a professora usuaria.',
+    subtitle: 'Contrato entre o Approf e a professora usuária.',
     updatedAt: 'Maio de 2026',
     sections: [
       {
-        title: '1. Aceitacao dos termos',
+        title: '1. Aceitação dos Termos',
         body: [
-          `Ao se cadastrar e utilizar a plataforma Approf, voce declara ter lido, compreendido e concordado com estes Termos de Uso. Caso nao concorde com qualquer disposicao, nao utilize a plataforma.`,
-          `Estes Termos constituem um contrato juridicamente vinculante entre voce e o ${company}`,
+          'Ao se cadastrar e utilizar a plataforma Approf, você declara ter lido, compreendido e concordado integralmente com estes Termos de Uso. Caso não concorde com qualquer disposição aqui prevista, não utilize a plataforma.',
+          `Estes Termos constituem um contrato juridicamente vinculante entre você e o ${company}`,
         ],
       },
       {
-        title: '2. Descricao do servico',
+        title: '2. Descrição do Serviço',
         body: [
-          'O Approf e uma plataforma digital desenvolvida para professoras da Educacao Infantil, com recursos para organizar a rotina pedagogica, registrar observacoes, acompanhar alunos e gerar documentos com apoio de inteligencia artificial.',
-          'Os documentos gerados pela IA sao instrumentos de apoio a pratica pedagogica. A responsabilidade pedagogica, etica e legal pelo conteudo final utilizado e sempre da professora usuaria.',
+          'O Approf é uma plataforma digital desenvolvida para professoras da Educação Infantil, com recursos para organizar a rotina pedagógica, registrar observações, acompanhar alunos e gerar documentos com apoio de inteligência artificial.',
+          'Os documentos gerados pela IA são instrumentos de apoio à prática pedagógica. A responsabilidade pedagógica, ética e legal pelo conteúdo final utilizado é sempre da professora usuária.',
         ],
         items: [
-          'Registro e organizacao de anotacoes pedagogicas diarias.',
-          'Gestao de turmas, alunos, chamada, calendario e perfis individuais.',
-          'Geracao assistida por IA de relatorios, pareceres, portfolios, planejamentos, projetos e encaminhamentos.',
-          'Geracao de imagens pedagogicas ilustrativas, sem envio de fotos de criancas para IA.',
-          'Intervencoes pedagogicas, materiais de apoio e comunidade de professoras.',
+          'Registro e organização de anotações pedagógicas diárias.',
+          'Gestão de turmas, alunos, chamada, calendário e perfis individuais.',
+          'Geração assistida por IA de relatórios, pareceres, portfólios, planejamentos, projetos e encaminhamentos.',
+          'Geração de imagens pedagógicas ilustrativas, sem envio de fotos de crianças para IA.',
+          'Intervenções pedagógicas, materiais de apoio e comunidade de professoras.',
         ],
       },
       {
-        title: '3. Elegibilidade e cadastro',
+        title: '3. Elegibilidade e Cadastro',
         body: [
-          'Para utilizar o Approf, voce deve ser maior de 18 anos, atuar como professora ou educadora da Educacao Infantil, fornecer informacoes verdadeiras e manter suas credenciais em sigilo.',
-          'O Grupo CAPACARD pode recusar, revisar ou cancelar cadastros em caso de informacoes falsas, uso indevido ou risco a seguranca da plataforma.',
+          'Para utilizar o Approf, você deve ser maior de 18 anos, atuar como professora ou educadora da Educação Infantil, fornecer informações verdadeiras e manter suas credenciais em sigilo.',
+          'O Grupo CAPACARD pode recusar, revisar ou cancelar cadastros em caso de informações falsas, uso indevido ou risco à segurança da plataforma.',
         ],
       },
       {
-        title: '4. Planos, teste gratuito e pagamentos',
+        title: '4. Planos, Teste Gratuito e Pagamentos',
         body: [
-          'O Approf oferece 7 dias de teste gratuito, sem necessidade de cartao de credito. Ao final do periodo, o acesso podera depender da contratacao de um plano pago ou liberacao administrativa.',
-          'Os planos podem ser mensais ou anuais. Os valores vigentes ficam disponiveis na pagina de precos do site e podem ser atualizados com aviso previo quando aplicavel.',
-          'Pagamentos podem ser processados por plataforma terceirizada segura. O Grupo CAPACARD nao armazena dados completos de cartao de credito em seus servidores.',
+          'O Approf oferece 7 dias de teste gratuito, sem necessidade de cartão de crédito. Ao final do período, o acesso poderá depender da contratação de um plano pago ou liberação administrativa.',
+          'Os planos podem ser mensais ou anuais. Os valores vigentes ficam disponíveis na página de preços do site e podem ser atualizados com aviso prévio quando aplicável.',
+          'Pagamentos podem ser processados por plataforma terceirizada segura. O Grupo CAPACARD não armazena dados completos de cartão de crédito em seus servidores.',
         ],
       },
       {
-        title: '5. Cancelamento e reembolso',
+        title: '5. Cancelamento e Reembolso',
         body: [
-          'A assinatura pode ser cancelada a qualquer momento pelos canais disponibilizados pelo Approf. Apos o cancelamento, o acesso permanece ativo ate o final do periodo ja pago.',
-          'Pedidos de reembolso podem ser analisados quando solicitados em ate 7 dias corridos apos a primeira cobranca, conforme o Codigo de Defesa do Consumidor.',
+          'A assinatura pode ser cancelada a qualquer momento pelos canais disponibilizados pelo Approf. Após o cancelamento, o acesso permanece ativo até o final do período já pago.',
+          'Pedidos de reembolso podem ser analisados quando solicitados em até 7 dias corridos após a primeira cobrança, conforme o Código de Defesa do Consumidor.',
         ],
       },
       {
-        title: '6. Uso aceitavel da plataforma',
+        title: '6. Uso Aceitável da Plataforma',
         items: [
-          'Nao compartilhar, vender, alugar ou ceder sua conta a terceiros.',
-          'Nao registrar informacoes falsas sobre criancas, familias ou escola.',
-          'Nao publicar ou compartilhar imagens que identifiquem criancas.',
-          'Nao usar a plataforma para assedio, discriminacao, violencia, spam ou fins contrarios a legislacao brasileira.',
-          'Nao tentar acessar dados, sistemas ou areas para as quais voce nao tenha autorizacao.',
+          'Não compartilhar, vender, alugar ou ceder sua conta a terceiros.',
+          'Não registrar informações falsas sobre crianças, famílias ou escola.',
+          'Não publicar ou compartilhar imagens que identifiquem crianças.',
+          'Não usar a plataforma para assédio, discriminação, violência, spam ou fins contrários à legislação brasileira.',
+          'Não tentar acessar dados, sistemas ou áreas para as quais você não tenha autorização.',
         ],
       },
       {
-        title: '7. Dados de criancas',
+        title: '7. Dados de Crianças',
         body: [
-          'O Approf nao coleta dados de criancas diretamente. As informacoes de alunos sao inseridas exclusivamente pela professora, que deve ter autorizacao institucional e/ou dos responsaveis quando aplicavel.',
-          'Essas informacoes devem ser usadas apenas para finalidade pedagogica, com sigilo profissional e proporcionalidade.',
+          'O Approf não coleta dados de crianças diretamente. As informações de alunos são inseridas exclusivamente pela professora, que deve ter autorização institucional e/ou dos responsáveis quando aplicável.',
+          'Essas informações devem ser usadas apenas para finalidade pedagógica, com sigilo profissional e proporcionalidade.',
         ],
       },
       {
-        title: '8. Propriedade intelectual',
+        title: '8. Propriedade Intelectual',
         body: [
-          'Codigo-fonte, design, logotipos, textos, funcionalidades e documentacao da plataforma pertencem ao Grupo CAPACARD.',
-          'Documentos gerados pela IA com base em anotacoes e dados inseridos pela professora pertencem a professora usuaria, que pode utiliza-los para fins pedagogicos.',
+          'Código-fonte, design, logotipos, textos, funcionalidades e documentação da plataforma pertencem ao Grupo CAPACARD.',
+          'Documentos gerados pela IA com base em anotações e dados inseridos pela professora pertencem à professora usuária, que pode utilizá-los para fins pedagógicos.',
         ],
       },
       {
-        title: '9. Disponibilidade e manutencao',
+        title: '9. Disponibilidade e Manutenção',
         body: [
-          'O Grupo CAPACARD emprega esforcos para manter a plataforma disponivel, mas nao garante funcionamento ininterrupto. Podem ocorrer indisponibilidades por manutencao, atualizacoes ou fatores tecnicos externos.',
+          'O Grupo CAPACARD emprega esforços para manter a plataforma disponível, mas não garante funcionamento ininterrupto. Podem ocorrer indisponibilidades por manutenção, atualizações ou fatores técnicos externos.',
         ],
       },
       {
-        title: '10. Limitacao de responsabilidade',
+        title: '10. Limitação de Responsabilidade',
         body: [
-          'O Approf nao substitui o julgamento profissional da professora. A plataforma nao se responsabiliza por decisoes pedagogicas, administrativas ou clinicas tomadas exclusivamente com base em documentos gerados pela IA.',
+          'O Approf não substitui o julgamento profissional da professora. A plataforma não se responsabiliza por decisões pedagógicas, administrativas ou clínicas tomadas exclusivamente com base em documentos gerados pela IA.',
         ],
       },
       {
-        title: '11. Modificacoes',
+        title: '11. Modificações',
         body: [
-          'Estes Termos podem ser atualizados. Alteracoes significativas serao comunicadas por e-mail ou aviso na plataforma com antecedencia razoavel.',
+          'Estes Termos podem ser atualizados. Alterações significativas serão comunicadas por e-mail ou aviso na plataforma com antecedência razoável.',
         ],
       },
       {
-        title: '12. Contato e foro',
+        title: '12. Contato e Foro',
         body: [
-          'Para duvidas, entre em contato pelo e-mail contato@approf.com.br. Estes Termos sao regidos pelas leis brasileiras, com foro da Comarca de Sao Paulo/SP.',
+          'Para dúvidas, entre em contato pelo e-mail contato@approf.com.br. Estes Termos são regidos pelas leis brasileiras, com foro da Comarca de São Paulo/SP.',
         ],
       },
     ],
   },
   {
     slug: 'privacidade',
-    title: 'Politica de Privacidade',
-    subtitle: 'Como tratamos dados da professora e informacoes pedagogicas.',
+    title: 'Política de Privacidade',
+    subtitle: 'Como tratamos dados da professora e informações pedagógicas.',
     updatedAt: 'Maio de 2026',
     sections: [
       {
         title: '1. Controlador',
         body: [
-          `O controlador dos dados pessoais coletados pela plataforma Approf e o ${company}`,
-          'Para assuntos de privacidade e protecao de dados, entre em contato pelo e-mail contato@approf.com.br.',
+          `O controlador dos dados pessoais coletados pela plataforma Approf é o ${company}`,
+          'Para assuntos de privacidade e proteção de dados, entre em contato pelo e-mail contato@approf.com.br.',
         ],
       },
       {
-        title: '2. Dados que coletamos',
+        title: '2. Dados que Coletamos',
         items: [
-          'Dados da professora: nome, CPF, e-mail, telefone, senha protegida, foto de perfil e informacoes de verificacao quando enviadas.',
-          'Dados pedagogicos: anotacoes, perfis de alunos, turmas, diagnosticos relevantes, fotos de producoes pedagogicas e documentos gerados.',
-          'Dados tecnicos: IP, dispositivo, navegador, paginas acessadas, logs de seguranca e erros tecnicos.',
+          'Dados da professora: nome, CPF, e-mail, telefone, senha protegida, foto de perfil e informações de verificação quando enviadas.',
+          'Dados pedagógicos: anotações, perfis de alunos, turmas, diagnósticos relevantes, fotos de produções pedagógicas e documentos gerados.',
+          'Dados técnicos: IP, dispositivo, navegador, páginas acessadas, logs de segurança e erros técnicos.',
         ],
       },
       {
-        title: '3. Como utilizamos os dados',
+        title: '3. Como Utilizamos os Dados',
         items: [
-          'Autenticacao, seguranca da conta e comunicacoes importantes.',
-          'Organizacao da rotina pedagogica, turmas, alunos, chamada, calendario e documentos.',
-          'Geracao de textos pedagogicos por IA mediante solicitacao da professora.',
-          'Geracao de imagens pedagogicas ilustrativas sem envio de fotos identificaveis de criancas para IA.',
+          'Autenticação, segurança da conta e comunicações importantes.',
+          'Organização da rotina pedagógica, turmas, alunos, chamada, calendário e documentos.',
+          'Geração de textos pedagógicos por IA mediante solicitação da professora.',
+          'Geração de imagens pedagógicas ilustrativas sem envio de fotos identificáveis de crianças para IA.',
           'Melhoria do produto com dados anonimizados e agregados, quando permitido.',
         ],
       },
       {
-        title: '4. Compartilhamento com terceiros',
+        title: '4. Compartilhamento com Terceiros',
         body: [
-          'Nao vendemos nem alugamos dados pessoais. Compartilhamos dados apenas com fornecedores necessarios para prestacao do servico, como infraestrutura, autenticacao, pagamentos, envio de e-mails e APIs de IA.',
-          'Os fornecedores devem atuar sob medidas contratuais e tecnicas adequadas de protecao de dados.',
+          'Não vendemos nem alugamos dados pessoais. Compartilhamos dados apenas com fornecedores necessários para prestação do serviço, como infraestrutura, autenticação, pagamentos, envio de e-mails e APIs de IA.',
+          'Os fornecedores devem atuar sob medidas contratuais e técnicas adequadas de proteção de dados.',
         ],
       },
       {
-        title: '5. Protecao especial de criancas',
+        title: '5. Proteção Especial de Crianças',
         body: [
-          'Nenhuma imagem que identifique criancas e compartilhada publicamente ou utilizada para treinamento de modelos de IA pelo Approf.',
-          'Dados de alunos ficam vinculados a conta da professora responsavel e protegidos por controle de acesso, armazenamento privado e Row Level Security.',
+          'Nenhuma imagem que identifique crianças é compartilhada publicamente ou utilizada para treinamento de modelos de IA pelo Approf.',
+          'Dados de alunos ficam vinculados à conta da professora responsável e protegidos por controle de acesso, armazenamento privado e Row Level Security.',
         ],
       },
       {
-        title: '6. Seguranca',
+        title: '6. Segurança',
         items: [
-          'Criptografia em transito por HTTPS/TLS.',
-          'Protecao de senhas por hash seguro.',
+          'Criptografia em trânsito por HTTPS/TLS.',
+          'Proteção de senhas por hash seguro.',
           'Row Level Security para isolamento entre contas.',
           'Backups, auditoria e monitoramento de acessos e falhas.',
         ],
       },
       {
-        title: '7. Retencao',
+        title: '7. Retenção',
         body: [
-          'Mantemos dados pelo periodo necessario para prestacao do servico e cumprimento de obrigacoes legais. Dados pedagogicos podem ficar disponiveis por ate 90 dias apos encerramento da conta para exportacao, antes da exclusao definitiva.',
+          'Mantemos dados pelo período necessário para prestação do serviço e cumprimento de obrigações legais. Dados pedagógicos podem ficar disponíveis por até 90 dias após o encerramento da conta para exportação, antes da exclusão definitiva.',
         ],
       },
       {
-        title: '8. Direitos da titular',
+        title: '8. Direitos da Titular',
         body: [
-          'Nos termos da LGPD, voce pode solicitar confirmacao, acesso, correcao, portabilidade, anonimimizacao, bloqueio, eliminacao, informacoes sobre compartilhamento, revogacao de consentimento e oposicao quando aplicavel.',
-          'Solicitacoes devem ser enviadas para contato@approf.com.br.',
+          'Nos termos da LGPD, você pode solicitar confirmação, acesso, correção, portabilidade, anonimização, bloqueio, eliminação, informações sobre compartilhamento, revogação de consentimento e oposição quando aplicável.',
+          'Solicitações devem ser enviadas para contato@approf.com.br.',
         ],
       },
       {
-        title: '9. Cookies e transferencia internacional',
+        title: '9. Cookies e Transferência Internacional',
         body: [
-          'Usamos cookies necessarios para funcionamento da plataforma e, quando aplicavel, cookies de analytics ou pagamento. Alguns fornecedores podem processar dados fora do Brasil com mecanismos adequados de protecao.',
+          'Usamos cookies necessários para funcionamento da plataforma e, quando aplicável, cookies de analytics ou pagamento. Alguns fornecedores podem processar dados fora do Brasil com mecanismos adequados de proteção.',
         ],
       },
       {
-        title: '10. Atualizacoes',
+        title: '10. Atualizações',
         body: [
-          'Esta Politica pode ser atualizada periodicamente. A versao mais recente permanecera disponivel nesta pagina.',
+          'Esta Política pode ser atualizada periodicamente. A versão mais recente permanecerá disponível nesta página.',
         ],
       },
     ],
   },
   {
     slug: 'cookies',
-    title: 'Politica de Cookies',
+    title: 'Política de Cookies',
     subtitle: 'Como utilizamos cookies e tecnologias similares.',
     updatedAt: 'Maio de 2026',
     sections: [
       {
-        title: '1. O que sao cookies',
+        title: '1. O que são Cookies',
         body: [
-          'Cookies sao pequenos arquivos armazenados no dispositivo para reconhecer sessoes, manter login, guardar preferencias e melhorar a seguranca e a experiencia de uso.',
+          'Cookies são pequenos arquivos armazenados no dispositivo para reconhecer sessões, manter login, guardar preferências e melhorar a segurança e a experiência de uso.',
         ],
       },
       {
-        title: '2. Cookies estritamente necessarios',
+        title: '2. Cookies Estritamente Necessários',
         body: [
-          'Esses cookies sao indispensaveis para autenticacao, seguranca e funcionamento basico da plataforma. Sem eles, servicos essenciais podem nao funcionar.',
+          'Esses cookies são indispensáveis para autenticação, segurança e funcionamento básico da plataforma. Sem eles, serviços essenciais podem não funcionar.',
         ],
         items: [
-          'Tokens de autenticacao e renovacao de sessao.',
-          'Preferencias essenciais de navegacao e estado da tela.',
+          'Tokens de autenticação e renovação de sessão.',
+          'Preferências essenciais de navegação e estado da tela.',
         ],
       },
       {
-        title: '3. Cookies de desempenho e pagamento',
+        title: '3. Cookies de Desempenho e Pagamento',
         body: [
-          'Cookies de analytics podem ser usados para entender o uso da plataforma e identificar melhorias, quando houver consentimento. Provedores de pagamento podem usar cookies proprios para seguranca e prevencao a fraude durante a contratacao.',
+          'Cookies de analytics podem ser usados para entender o uso da plataforma e identificar melhorias, quando houver consentimento. Provedores de pagamento podem usar cookies próprios para segurança e prevenção a fraude durante a contratação.',
         ],
       },
       {
-        title: '4. Como gerenciar',
+        title: '4. Como Gerenciar',
         body: [
-          'Voce pode gerenciar cookies nas configuracoes do navegador. A desativacao de cookies necessarios pode afetar o acesso a plataforma.',
+          'Você pode gerenciar cookies nas configurações do navegador. A desativação de cookies necessários pode afetar o acesso à plataforma.',
         ],
       },
       {
         title: '5. Contato',
-        body: ['Para duvidas sobre cookies, escreva para contato@approf.com.br.'],
+        body: ['Para dúvidas sobre cookies, escreva para contato@approf.com.br.'],
       },
     ],
   },
@@ -243,190 +243,190 @@ export const legalPages: LegalPageContent[] = [
     updatedAt: 'Maio de 2026',
     sections: [
       {
-        title: '1. Teste gratuito',
+        title: '1. Teste Gratuito',
         body: [
-          'O Approf oferece 7 dias de teste gratuito, sem necessidade de cartao de credito. Durante esse periodo, a professora pode conhecer os recursos principais da plataforma sem cobranca.',
-          'Ao final do teste, o acesso podera depender de assinatura ativa ou liberacao administrativa.',
+          'O Approf oferece 7 dias de teste gratuito, sem necessidade de cartão de crédito. Durante esse período, a professora pode conhecer os recursos principais da plataforma sem cobrança.',
+          'Ao final do teste, o acesso poderá depender de assinatura ativa ou liberação administrativa.',
         ],
       },
       {
-        title: '2. Como cancelar',
+        title: '2. Como Cancelar',
         body: [
-          'A assinatura pode ser cancelada a qualquer momento pelos canais disponibilizados pelo Approf. Quando a opcao estiver disponivel no app, o cancelamento podera ser realizado diretamente em plano e pagamento.',
-          'Tambem e possivel solicitar orientacao pelo e-mail contato@approf.com.br.',
+          'A assinatura pode ser cancelada a qualquer momento pelos canais disponibilizados pelo Approf. Quando a opção estiver disponível no app, o cancelamento poderá ser realizado diretamente em plano e pagamento.',
+          'Também é possível solicitar orientação pelo e-mail contato@approf.com.br.',
         ],
       },
       {
-        title: '3. Depois do cancelamento',
+        title: '3. Depois do Cancelamento',
         items: [
-          'O acesso permanece ativo ate o final do periodo ja pago.',
-          'Nao ha novas cobrancas apos a efetivacao do cancelamento.',
-          'Dados e documentos podem ficar disponiveis por ate 90 dias para exportacao, antes da exclusao definitiva.',
+          'O acesso permanece ativo até o final do período já pago.',
+          'Não há novas cobranças após a efetivação do cancelamento.',
+          'Dados e documentos podem ficar disponíveis por até 90 dias para exportação, antes da exclusão definitiva.',
         ],
       },
       {
         title: '4. Reembolso',
         body: [
-          'Nos termos do art. 49 do Codigo de Defesa do Consumidor, a professora pode solicitar reembolso em ate 7 dias corridos apos a primeira contratacao paga.',
-          'Reembolsos por falha tecnica relevante podem ser analisados caso a caso. Reembolsos aprovados serao processados pelo mesmo metodo de pagamento quando possivel.',
+          'Nos termos do art. 49 do Código de Defesa do Consumidor, a professora pode solicitar reembolso em até 7 dias corridos após a primeira contratação paga.',
+          'Reembolsos por falha técnica relevante podem ser analisados caso a caso. Reembolsos aprovados serão processados pelo mesmo método de pagamento quando possível.',
         ],
       },
       {
-        title: '5. Casos sem reembolso',
+        title: '5. Casos sem Direito a Reembolso',
         items: [
-          'Cancelamentos solicitados apos 7 dias da contratacao paga.',
-          'Cancelamento por nao utilizacao da plataforma.',
-          'Cancelamento por violacao dos Termos de Uso ou da Politica de Uso Aceitavel.',
-          'Periodo ja utilizado de plano anual apos o prazo legal de arrependimento.',
+          'Cancelamentos solicitados após 7 dias da contratação paga.',
+          'Cancelamento por não utilização da plataforma.',
+          'Cancelamento por violação dos Termos de Uso ou da Política de Uso Aceitável.',
+          'Período já utilizado de plano anual após o prazo legal de arrependimento.',
         ],
       },
       {
         title: '6. Contato',
         body: [
-          'Para duvidas sobre cancelamento ou reembolso, escreva para contato@approf.com.br.',
+          'Para dúvidas sobre cancelamento ou reembolso, escreva para contato@approf.com.br.',
         ],
       },
     ],
   },
   {
     slug: 'uso-aceitavel',
-    title: 'Politica de Uso Aceitavel',
-    subtitle: 'O que pode e o que nao pode na plataforma Approf.',
+    title: 'Política de Uso Aceitável',
+    subtitle: 'O que pode e o que não pode na plataforma Approf.',
     updatedAt: 'Maio de 2026',
     sections: [
       {
         title: '1. Objetivo',
         body: [
-          'Esta Politica complementa os Termos de Uso e define regras para manter o Approf seguro, etico e pedagogicamente responsavel.',
+          'Esta Política complementa os Termos de Uso e define regras para manter o Approf seguro, ético e pedagogicamente responsável.',
         ],
       },
       {
-        title: '2. Usos permitidos',
+        title: '2. Usos Permitidos',
         items: [
-          'Registrar anotacoes pedagogicas sobre alunos, turmas e atividades.',
-          'Gerar documentos pedagogicos para uso profissional.',
-          'Gerenciar turmas e perfis de alunos sob sua responsabilidade pedagogica.',
-          'Participar da comunidade com respeito e finalidade pedagogica.',
-          'Utilizar materiais de apoio e documentos gerados em sua pratica profissional.',
+          'Registrar anotações pedagógicas sobre alunos, turmas e atividades.',
+          'Gerar documentos pedagógicos para uso profissional.',
+          'Gerenciar turmas e perfis de alunos sob sua responsabilidade pedagógica.',
+          'Participar da comunidade com respeito e finalidade pedagógica.',
+          'Utilizar materiais de apoio e documentos gerados em sua prática profissional.',
         ],
       },
       {
-        title: '3. Protecao de criancas',
+        title: '3. Proteção de Crianças',
         body: [
-          'E proibido compartilhar, publicar ou tornar publica qualquer imagem que permita identificar criancas. O descumprimento dessa regra pode resultar em suspensao imediata ou cancelamento definitivo da conta.',
+          'É proibido compartilhar, publicar ou tornar pública qualquer imagem que permita identificar crianças. O descumprimento dessa regra pode resultar em suspensão imediata ou cancelamento definitivo da conta.',
         ],
         items: [
-          'Nao publicar imagens identificaveis de criancas no feed ou em areas compartilhadas.',
-          'Nao registrar conteudo que exponha criancas a violencia, assedio ou situacao vexatoria.',
-          'Nao ceder acesso a terceiros para visualizacao de dados de alunos.',
-          'Nao registrar dados de criancas que nao estejam sob sua responsabilidade pedagogica direta.',
+          'Não publicar imagens identificáveis de crianças no feed ou em áreas compartilhadas.',
+          'Não registrar conteúdo que exponha crianças a violência, assédio ou situação vexatória.',
+          'Não ceder acesso a terceiros para visualização de dados de alunos.',
+          'Não registrar dados de crianças que não estejam sob sua responsabilidade pedagógica direta.',
         ],
       },
       {
         title: '4. Comunidade',
         items: [
-          'Nao praticar assedio, bullying, discriminacao, spam ou publicidade indevida.',
-          'Nao publicar conteudo falso, enganoso, ofensivo ou politico-partidario.',
-          'Nao plagiar conteudo de outras professoras sem atribuicao.',
+          'Não praticar assédio, bullying, discriminação, spam ou publicidade indevida.',
+          'Não publicar conteúdo falso, enganoso, ofensivo ou político-partidário.',
+          'Não plagiar conteúdo de outras professoras sem atribuição.',
         ],
       },
       {
-        title: '5. Inteligencia artificial',
+        title: '5. Inteligência Artificial',
         body: [
-          'A professora deve revisar documentos gerados por IA antes de utiliza-los oficialmente. As anotacoes inseridas devem ser verdadeiras e baseadas em observacoes reais.',
+          'A professora deve revisar documentos gerados por IA antes de utilizá-los oficialmente. As anotações inseridas devem ser verdadeiras e baseadas em observações reais.',
         ],
       },
       {
         title: '6. Confidencialidade',
         body: [
-          'Dados pessoais, dados de saude, informacoes familiares e documentos pedagogicos de alunos devem ser mantidos em sigilo profissional.',
+          'Dados pessoais, dados de saúde, informações familiares e documentos pedagógicos de alunos devem ser mantidos em sigilo profissional.',
         ],
       },
       {
-        title: '7. Consequencias',
+        title: '7. Consequências',
         items: [
-          'Advertencia formal.',
-          'Suspensao temporaria da conta.',
+          'Advertência formal.',
+          'Suspensão temporária da conta.',
           'Cancelamento permanente sem direito a reembolso em casos graves.',
-          'Comunicacao as autoridades quando houver violacao legal.',
+          'Comunicação às autoridades quando houver violação legal.',
         ],
       },
       {
-        title: '8. Denuncias',
+        title: '8. Denúncias',
         body: [
-          'Violacoes podem ser denunciadas pelos recursos da plataforma ou pelo e-mail contato@approf.com.br.',
+          'Violações podem ser denunciadas pelos recursos da plataforma ou pelo e-mail contato@approf.com.br.',
         ],
       },
     ],
   },
   {
     slug: 'protecao-criancas',
-    title: 'Aviso de Protecao de Dados de Criancas',
-    subtitle: 'Como o Approf protege informacoes relacionadas a criancas.',
+    title: 'Aviso de Proteção de Dados de Crianças',
+    subtitle: 'Como o Approf protege informações relacionadas a crianças.',
     updatedAt: 'Maio de 2026',
     sections: [
       {
-        title: 'Nosso compromisso',
+        title: 'Nosso Compromisso',
         body: [
-          'O Approf foi criado para professoras da Educacao Infantil. Como a rotina pedagogica envolve informacoes de criancas de 0 a 5 anos, tratamos esse tema com prioridade maxima.',
+          'O Approf foi criado para professoras da Educação Infantil. Como a rotina pedagógica envolve informações de crianças de 0 a 5 anos, tratamos esse tema com prioridade máxima.',
         ],
       },
       {
-        title: '1. O Approf nao coleta dados de criancas diretamente',
+        title: '1. O Approf Não Coleta Dados de Crianças Diretamente',
         body: [
-          'A plataforma nao tem cadastro feito por criancas, nao solicita informacoes diretamente delas e nao interage com criancas. Os dados sao inseridos exclusivamente pela professora no exercicio de sua responsabilidade pedagogica.',
+          'A plataforma não tem cadastro feito por crianças, não solicita informações diretamente delas e não interage com crianças. Os dados são inseridos exclusivamente pela professora no exercício de sua responsabilidade pedagógica.',
         ],
       },
       {
-        title: '2. Informacoes inseridas pela professora',
+        title: '2. Informações Inseridas pela Professora',
         items: [
           'Nome, data de nascimento e turma do aluno.',
-          'Diagnosticos relevantes para o planejamento pedagogico.',
-          'Anotacoes sobre desenvolvimento, comportamento e rotina.',
-          'Fotos de producoes pedagogicas, quando necessarias.',
+          'Diagnósticos relevantes para o planejamento pedagógico.',
+          'Anotações sobre desenvolvimento, comportamento e rotina.',
+          'Fotos de produções pedagógicas, quando necessárias.',
         ],
       },
       {
-        title: '3. Como protegemos os dados',
+        title: '3. Como Protegemos os Dados',
         items: [
-          'Acesso restrito a professora responsavel.',
+          'Acesso restrito à professora responsável.',
           'Armazenamento privado de fotos e documentos.',
           'Controle de acesso por Row Level Security.',
-          'URLs temporarias quando for necessario exibir arquivos privados.',
-          'Proibicao de compartilhamento publico de imagens identificaveis de criancas.',
+          'URLs temporárias quando for necessário exibir arquivos privados.',
+          'Proibição de compartilhamento público de imagens identificáveis de crianças.',
         ],
       },
       {
-        title: '4. IA e imagens',
+        title: '4. IA e Imagens',
         body: [
-          'As imagens geradas por IA no Approf sao ilustrativas e pedagogicas. Nenhuma foto real de crianca deve ser enviada para geracao de imagem por IA.',
+          'As imagens geradas por IA no Approf são ilustrativas e pedagógicas. Nenhuma foto real de criança deve ser enviada para geração de imagem por IA.',
         ],
       },
       {
-        title: '5. Dados sensiveis',
+        title: '5. Dados Sensíveis',
         body: [
-          'Diagnosticos e informacoes de saude sao tratados como dados sensiveis e usados apenas para apoiar a documentacao pedagogica da professora.',
+          'Diagnósticos e informações de saúde são tratados como dados sensíveis e usados apenas para apoiar a documentação pedagógica da professora.',
         ],
       },
       {
-        title: '6. Retencao e exclusao',
+        title: '6. Retenção e Exclusão',
         body: [
-          'Ao encerrar a conta, dados de alunos podem ser mantidos por ate 90 dias para exportacao e depois excluidos de forma definitiva, respeitadas obrigacoes legais aplicaveis.',
+          'Ao encerrar a conta, dados de alunos podem ser mantidos por até 90 dias para exportação e depois excluídos de forma definitiva, respeitadas obrigações legais aplicáveis.',
         ],
       },
       {
-        title: '7. Responsabilidade da professora',
+        title: '7. Responsabilidade da Professora',
         items: [
-          'Utilizar dados de alunos apenas para fins pedagogicos.',
+          'Utilizar dados de alunos apenas para fins pedagógicos.',
           'Manter sigilo profissional.',
-          'Ter autorizacao institucional e/ou dos responsaveis quando aplicavel.',
-          'Nao compartilhar externamente dados identificaveis obtidos pela plataforma.',
+          'Ter autorização institucional e/ou dos responsáveis quando aplicável.',
+          'Não compartilhar externamente dados identificáveis obtidos pela plataforma.',
         ],
       },
       {
         title: '8. Contato',
         body: [
-          'Pais, maes ou responsaveis com duvidas podem entrar em contato pelo e-mail contato@approf.com.br.',
+          'Pais, mães ou responsáveis com dúvidas podem entrar em contato pelo e-mail contato@approf.com.br.',
         ],
       },
     ],
