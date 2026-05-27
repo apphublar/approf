@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Check, Loader2 } from 'lucide-react'
-import { requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
+import { getAuthErrorMessage, requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
 import { loadTeacherWorkspace } from '@/services/supabase/classes'
 import { getSupabaseClient } from '@/services/supabase/client'
 import {
@@ -267,7 +267,7 @@ function AuthScreen({
         setMode('signin')
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível autenticar agora.')
+      setMessage(getAuthErrorMessage(error))
     } finally {
       setSubmitting(false)
     }
