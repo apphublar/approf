@@ -9,7 +9,9 @@ export async function signInWithEmail(email: string, password: string) {
   return data
 }
 
-export async function signUpTeacher(input: { fullName: string; email: string; password: string }) {
+export type SignupPlan = 'monthly' | 'annual'
+
+export async function signUpTeacher(input: { fullName: string; email: string; password: string; plan?: SignupPlan }) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')
 
@@ -20,6 +22,7 @@ export async function signUpTeacher(input: { fullName: string; email: string; pa
       emailRedirectTo: window.location.origin,
       data: {
         full_name: input.fullName,
+        selected_plan: input.plan ?? getSelectedSignupPlanFromUrl(),
       },
     },
   })
@@ -141,4 +144,10 @@ export function getAuthErrorMessage(error: unknown) {
 
 function toAuthError(error: unknown) {
   return new Error(getAuthErrorMessage(error))
+}
+
+export function getSelectedSignupPlanFromUrl(): SignupPlan {
+  if (typeof window === 'undefined') return 'monthly'
+  const plan = new URLSearchParams(window.location.search).get('plan')?.toLowerCase()
+  return plan === 'annual' || plan === 'anual' ? 'annual' : 'monthly'
 }

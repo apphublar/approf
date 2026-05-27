@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Check, Loader2 } from 'lucide-react'
-import { getAuthErrorMessage, requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
+import { getAuthErrorMessage, getSelectedSignupPlanFromUrl, requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
 import { loadTeacherWorkspace } from '@/services/supabase/classes'
 import { getSupabaseClient } from '@/services/supabase/client'
 import {
@@ -249,6 +249,7 @@ function AuthScreen({
           fullName: fullName.trim(),
           email: email.trim(),
           password,
+          plan: getSelectedSignupPlanFromUrl(),
         })
         if (!data.session) {
           setMessage('Cadastro criado. Confira seu e-mail para confirmar a conta.')

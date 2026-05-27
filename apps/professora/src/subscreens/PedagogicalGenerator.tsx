@@ -383,7 +383,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
                     label="Tema"
                     value={theme}
                     onChange={setTheme}
-                    placeholder="Ex: Animais da fazenda, Cores e misturas, Minhá família..."
+                    placeholder="Ex: Animais da fazenda, Cores e misturas, Minha família..."
                   />
 
                   <Checklist

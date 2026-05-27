@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, ChevronLeft, Eye, EyeOff, LogOut, ShieldAlert, ShieldCheck, Wallet } from 'lucide-react'
+import { BadgeCheck, ChevronLeft, Eye, EyeOff, LogOut, ShieldCheck, Wallet } from 'lucide-react'
 import { useNavStore } from '@/store'
 import {
   cancelTeacherSubscription,
@@ -76,8 +76,12 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     () => (snapshot?.verifications ?? []).some((item) => item.status === 'approved'),
     [snapshot],
   )
-  const verificationPending = useMemo(
-    () => (snapshot?.verifications ?? []).some((item) => item.status === 'pending'),
+  const accountReviewPending = useMemo(
+    () => (snapshot?.verifications ?? []).some((item) => item.status === 'pending' && item.documents.length === 0),
+    [snapshot],
+  )
+  const submittedVerificationRequests = useMemo(
+    () => (snapshot?.verifications ?? []).filter((item) => item.documents.length > 0),
     [snapshot],
   )
   async function saveProfile() {
@@ -129,7 +133,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      setMessage('Senhá atualizada com sucesso.')
+      setMessage('Senha atualizada com sucesso.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível atualizar a senha.')
     } finally {
@@ -158,7 +162,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   async function submitVerification() {
     if (!snapshot) return
     if (!pendingFiles.length) {
-      setError('Anexe ao menos um documento para enviar a verificação.')
+      setError('Anexe ao menos um documento para enviar a validação.')
       return
     }
     if (snapshot.schools.length === 0) {
@@ -178,9 +182,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       setPendingFiles([])
       setVerificationNotes('')
       await refreshAccount()
-      setMessage('Solicitação de verificação enviada com sucesso.')
+      setMessage('Documentos enviados para validação com sucesso.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível enviar a verificação.')
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar a validação.')
     } finally {
       setSubmittingVerification(false)
     }
@@ -201,7 +205,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             <ChevronLeft size={18} />
           </button>
         )}
-        <span className="font-serif text-[18px] text-gd flex-1">Minhá conta</span>
+        <span className="font-serif text-[18px] text-gd flex-1">Minha conta</span>
       </div>
 
       <div className="scroll-area px-[18px] py-4">
@@ -218,26 +222,23 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                   <p className="text-[14px] font-bold text-ink truncate">{snapshot.fullName}</p>
                   <p className="text-[11px] text-muted mt-1">Professora</p>
                 </div>
-                <div className="inline-flex items-center gap-1.5 flex-shrink-0">
-                    {isProfileVerified ? (
-                      <>
-                        <BadgeCheck size={14} className="text-gm" />
-                        <span className="text-[11px] text-gm font-bold">Perfil verificado</span>
-                      </>
-                    ) : verificationPending ? (
-                      <>
-                        <ShieldAlert size={14} className="text-[#856404]" />
-                        <span className="text-[11px] text-[#856404] font-bold">Verificação em análise</span>
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck size={14} className="text-muted" />
-                        <span className="text-[11px] text-muted font-bold">Perfil não verificado</span>
-                      </>
-                    )}
+                {isProfileVerified && (
+                  <div className="inline-flex items-center gap-1.5 flex-shrink-0">
+                    <BadgeCheck size={14} className="text-gm" />
+                    <span className="text-[11px] text-gm font-bold">Perfil validado</span>
                   </div>
+                )}
               </div>
             </div>
+
+            {accountReviewPending && (
+              <div className="bg-[#FFF8E7] border border-[#F2D58B] rounded-app p-4 mb-4">
+                <p className="text-[13px] font-bold text-[#856404]">Cadastro em revisão pela equipe</p>
+                <p className="text-[12px] text-[#856404] mt-1 leading-[1.5]">
+                  Seu acesso continua liberado enquanto a equipe confere os dados do cadastro. Se for necessário algum documento, avisaremos por aqui.
+                </p>
+              </div>
+            )}
 
             {blocked && (
               <div className="bg-[#FFF3CD] border border-[#F2D58B] rounded-app p-4 mb-4">
@@ -262,8 +263,8 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             </div>
 
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Senhá e segurança</p>
-              <label className="text-[11px] text-muted">Senhá atual</label>
+              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Senha e segurança</p>
+              <label className="text-[11px] text-muted">Senha atual</label>
               <div className="relative mt-1 mb-3">
                 <input
                   type={showCurrentPassword ? 'text' : 'password'}
@@ -310,9 +311,30 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Assinatura</p>
               </div>
               <p className="text-[13px] font-bold text-ink">Status: {formatSubscriptionStatus(snapshot.subscription?.status)}</p>
-              <p className="text-[12px] text-muted mt-1">Plano: {formatSubscriptionPlan(snapshot.subscription?.plan, snapshot.subscription?.status)}</p>
-              <p className="text-[12px] text-muted mt-1">Provedor: {formatProvider(snapshot.subscription?.provider)}</p>
-              <p className="text-[12px] text-muted mt-1">Próximo vencimento: {formatDate(snapshot.subscription?.currentPeriodEnd)}</p>
+              <p className="text-[12px] text-muted mt-1">Plano escolhido: {formatSubscriptionPlan(snapshot.subscription?.plan)}</p>
+              {snapshot.subscription?.status === 'trial' ? (
+                <>
+                  <p className="text-[12px] text-muted mt-1">
+                    Teste gratuito até: {formatDate(snapshot.subscription.trialExpiresAt ?? snapshot.subscription.currentPeriodEnd)}
+                  </p>
+                  <p className="text-[12px] text-muted mt-1">Cobrança após o teste: {formatSubscriptionPrice(snapshot.subscription.plan)}</p>
+                </>
+              ) : (
+                <p className="text-[12px] text-muted mt-1">
+                  {formatSubscriptionDateLabel(snapshot.subscription?.status)}: {formatDate(snapshot.subscription?.currentPeriodEnd)}
+                </p>
+              )}
+              <p className="text-[12px] text-muted mt-1">Forma de liberação: {formatProvider(snapshot.subscription?.provider)}</p>
+              {getPaymentUrl(snapshot.subscription?.externalReference) && (
+                <a
+                  href={getPaymentUrl(snapshot.subscription?.externalReference) ?? '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold flex items-center justify-center"
+                >
+                  Abrir link de pagamento
+                </a>
+              )}
               <button onClick={requestCancellation} disabled={saving || blocked} className="w-full mt-3 py-2 rounded-app-sm border border-[#C1440E] text-[#C1440E] text-[12px] font-bold disabled:opacity-50">
                 {blocked ? 'Assinatura já restrita' : 'Cancelar assinatura'}
               </button>
@@ -321,10 +343,10 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck size={15} className="text-gm" />
-                <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Verificação de perfil</p>
+                <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Validação profissional</p>
               </div>
               <p className="text-[12px] text-muted leading-[1.5]">
-                Anexe documentos que comprovem vínculo com sua escola. Se atuar em mais de uma escola, envie comprovantes para todas.
+                Esta etapa serve apenas para validar o vínculo profissional da professora com a escola. A revisão é feita pela equipe da Approf.
               </p>
               <textarea
                 value={verificationNotes}
@@ -360,18 +382,18 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 </div>
               )}
               <button onClick={submitVerification} disabled={submittingVerification} className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50">
-                {submittingVerification ? 'Enviando verificação...' : 'Enviar para verificação'}
+                {submittingVerification ? 'Enviando documentos...' : 'Enviar documentos para validação'}
               </button>
-              {snapshot.verifications.length > 0 && (
+              {submittedVerificationRequests.length > 0 && (
                 <div className="mt-4">
-                  <p className="text-[11px] font-bold text-muted mb-2">Solicitações enviadas</p>
-                  {snapshot.verifications.slice(0, 4).map((item) => (
+                  <p className="text-[11px] font-bold text-muted mb-2">Documentos enviados para validação</p>
+                  {submittedVerificationRequests.slice(0, 4).map((item) => (
                     <div key={item.id} className="rounded-app-sm border border-border p-3 mb-2">
                       <p className="text-[12px] font-bold text-ink">
-                        Status: {item.status === 'pending' ? 'pendente' : item.status === 'approved' ? 'aprovada' : 'rejeitada'}
+                        Status: {formatVerificationStatus(item.status)}
                       </p>
                       <p className="text-[11px] text-muted mt-1">
-                        {item.documents.length} documento(s) · {formatDate(item.created_at)}
+                        {item.documents.length} documento(s) enviado(s) em {formatDate(item.created_at)}
                       </p>
                     </div>
                   ))}
@@ -426,18 +448,25 @@ function formatDate(value?: string | null) {
 function formatSubscriptionStatus(status?: string | null) {
   switch (status) {
     case 'trial':
-      return 'teste'
+      return 'Teste gratuito ativo'
     case 'active':
-      return 'ativa'
+      return 'Assinatura ativa'
     case 'overdue':
-      return 'em atraso'
+      return 'Pagamento em atraso'
     case 'blocked':
-      return 'bloqueada'
+      return 'Acesso bloqueado'
     case 'canceled':
-      return 'cancelada'
+      return 'Assinatura cancelada'
     default:
-      return 'não definida'
+      return 'Assinatura não configurada'
   }
+}
+
+function formatSubscriptionDateLabel(status?: string | null) {
+  if (status === 'overdue') return 'Pagamento pendente desde'
+  if (status === 'canceled') return 'Acesso disponível até'
+  if (status === 'blocked') return 'Bloqueado desde'
+  return 'Próximo vencimento'
 }
 
 function formatProvider(provider?: string) {
@@ -448,12 +477,27 @@ function formatProvider(provider?: string) {
   return provider
 }
 
-function formatSubscriptionPlan(plan?: string | null, status?: string | null) {
-  if (status === 'trial') return 'Plano teste'
+function formatSubscriptionPlan(plan?: string | null) {
   if (!plan) return 'Não identificado'
   const normalized = plan.trim().toLowerCase()
-  if (['monthly', 'mensal', 'month', 'mês'].includes(normalized)) return 'Mensal'
+  if (['monthly', 'mensal', 'month', 'mês', 'trial', 'teste', 'trial_7_days', 'trial_15_days'].includes(normalized)) return 'Mensal'
   if (['annual', 'anual', 'yearly', 'ano'].includes(normalized)) return 'Anual'
-  if (['trial', 'teste'].includes(normalized)) return 'Plano teste'
   return plan
+}
+
+function formatSubscriptionPrice(plan?: string | null) {
+  const normalized = plan?.trim().toLowerCase()
+  if (normalized && ['annual', 'anual', 'yearly', 'ano'].includes(normalized)) return 'R$ 369,00 por ano'
+  return 'R$ 36,90 por mês'
+}
+
+function getPaymentUrl(value?: string | null) {
+  if (!value) return null
+  return /^https?:\/\//i.test(value) ? value : null
+}
+
+function formatVerificationStatus(status: 'pending' | 'approved' | 'rejected') {
+  if (status === 'approved') return 'Validação aprovada'
+  if (status === 'rejected') return 'Validação recusada'
+  return 'Aguardando revisão da equipe'
 }

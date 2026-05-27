@@ -27,7 +27,7 @@ export async function getTeacherAccountData(ownerId: string) {
       .order('created_at', { ascending: true }),
     supabase
       .from('subscriptions')
-      .select('id,status,plan,provider,current_period_end,trial_expires_at,updated_at,notes')
+      .select('id,status,plan,provider,current_period_end,trial_expires_at,external_reference,updated_at,notes')
       .eq('user_id', ownerId)
       .maybeSingle(),
     supabase

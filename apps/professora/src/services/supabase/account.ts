@@ -52,6 +52,7 @@ export interface TeacherAccountSnapshot {
     provider?: string
     currentPeriodEnd: string | null
     trialExpiresAt: string | null
+    externalReference: string | null
   } | null
   verifications: TeacherVerificationRequest[]
   notices: Array<{
@@ -109,6 +110,7 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
       provider?: string
       current_period_end: string | null
       trial_expires_at: string | null
+      external_reference: string | null
     } | null
     verifications: TeacherVerificationRequest[]
     notices?: Array<{
@@ -139,6 +141,7 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
           provider: response.subscription.provider,
           currentPeriodEnd: response.subscription.current_period_end ?? null,
           trialExpiresAt: response.subscription.trial_expires_at ?? null,
+          externalReference: response.subscription.external_reference ?? null,
         }
       : null,
     verifications: (response.verifications ?? []).map((item) => ({
@@ -210,7 +213,7 @@ export async function updateTeacherPassword(input: {
     email: input.email,
     password: input.currentPassword,
   })
-  if (signInError) throw new Error('Senhá atual incorreta.')
+  if (signInError) throw new Error('Senha atual incorreta.')
 
   const { error } = await supabase.auth.updateUser({ password: input.newPassword })
   if (error) throw error

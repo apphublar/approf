@@ -57,7 +57,7 @@ export default function TransferStudentSubscreen() {
             onClick={() => setMode('class')}
             className={`rounded-app-sm border px-3 py-3 text-xs font-bold ${mode === 'class' ? 'bg-gm text-white border-gm' : 'bg-white text-muted border-border'}`}
           >
-            Minhá turma
+            Minha turma
           </button>
         </div>
 

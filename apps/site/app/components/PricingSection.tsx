@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Check, CreditCard, Calendar, X, Gift } from 'lucide-react'
 
 const PROFESSORA_APP_URL = process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? 'https://app.approf.com.br'
-const APP_SIGNUP_URL = `${PROFESSORA_APP_URL.replace(/\/$/, '')}?mode=signup`
+const PROFESSORA_APP_BASE_URL = PROFESSORA_APP_URL.replace(/\/$/, '')
 
 const allFeatures = [
   'Anotações pedagógicas ilimitadas',
@@ -31,6 +31,8 @@ function CheckIcon() {
 
 export default function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false)
+  const selectedPlan = isAnnual ? 'annual' : 'monthly'
+  const signupUrl = `${PROFESSORA_APP_BASE_URL}?mode=signup&plan=${selectedPlan}`
 
   return (
     <section id="precos" className="pricing">
@@ -107,7 +109,7 @@ export default function PricingSection() {
               ))}
             </ul>
 
-            <a href={APP_SIGNUP_URL} className="pricing-cta-btn">
+            <a href={signupUrl} className="pricing-cta-btn">
               Testar grátis por 7 dias
             </a>
           </div>
