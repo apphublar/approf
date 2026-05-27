@@ -344,8 +344,23 @@ export default function Home() {
           <div className="footer__divider" />
 
           <nav className="footer__links" aria-label="Links do rodapé">
+            <a href="/termos" className="footer__link">
+              Termos
+            </a>
             <a href="/privacidade" className="footer__link">
               Privacidade
+            </a>
+            <a href="/cookies" className="footer__link">
+              Cookies
+            </a>
+            <a href="/cancelamento-reembolso" className="footer__link">
+              Cancelamento
+            </a>
+            <a href="/uso-aceitavel" className="footer__link">
+              Uso aceitável
+            </a>
+            <a href="/protecao-criancas" className="footer__link">
+              Proteção de crianças
             </a>
             <a
               href="mailto:contato@approf.com.br"

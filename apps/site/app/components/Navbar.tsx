@@ -25,10 +25,10 @@ export default function Navbar() {
         </Link>
 
         <div className="navbar__nav">
-          <a href="#como-funciona" className="navbar__link">
+          <a href="/#como-funciona" className="navbar__link">
             Como funciona
           </a>
-          <a href="#precos" className="navbar__link">
+          <a href="/#precos" className="navbar__link">
             Preços
           </a>
         </div>

@@ -1020,6 +1020,8 @@ h1, h2, h3, h4 {
 .footer__links {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 28px;
 }
 
@@ -1036,6 +1038,119 @@ h1, h2, h3, h4 {
 .footer__copy {
   font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.28);
+}
+
+/* ==============================================
+   LEGAL PAGES
+   ============================================== */
+
+.legal-page {
+  background: var(--cream);
+  min-height: 100vh;
+}
+
+.legal-hero {
+  background-color: var(--gd);
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 31px,
+    rgba(255, 255, 255, 0.035) 31px,
+    rgba(255, 255, 255, 0.035) 32px
+  );
+  padding: 128px 0 72px;
+  color: white;
+}
+
+.legal-hero .container {
+  max-width: 880px;
+}
+
+.legal-back {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 28px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  transition: color 0.15s;
+}
+
+.legal-back:hover {
+  color: white;
+}
+
+.legal-eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.legal-hero h1 {
+  color: white;
+  font-size: clamp(2.25rem, 5vw, 4rem);
+  line-height: 1.08;
+  margin-bottom: 18px;
+  max-width: 760px;
+}
+
+.legal-hero p:not(.legal-eyebrow) {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 1.1875rem;
+  line-height: 1.7;
+  max-width: 680px;
+  margin-bottom: 20px;
+}
+
+.legal-hero span {
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.875rem;
+}
+
+.legal-content {
+  padding: 64px 0 84px;
+}
+
+.legal-content__inner {
+  max-width: 880px;
+}
+
+.legal-section {
+  padding: 28px 0;
+  border-bottom: 1px solid rgba(212, 235, 200, 0.9);
+}
+
+.legal-section:first-child {
+  padding-top: 0;
+}
+
+.legal-section h2 {
+  color: var(--gd);
+  font-size: clamp(1.25rem, 2.5vw, 1.625rem);
+  margin-bottom: 14px;
+}
+
+.legal-section p {
+  color: var(--soft);
+  font-size: 1rem;
+  line-height: 1.8;
+  margin-bottom: 12px;
+}
+
+.legal-section ul {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0 20px;
+  color: var(--soft);
+}
+
+.legal-section li {
+  padding-left: 4px;
+  line-height: 1.7;
 }
 
 /* ==============================================
