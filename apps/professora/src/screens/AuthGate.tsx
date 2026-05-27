@@ -261,7 +261,7 @@ function AuthScreen({
         await signOut()
         onPasswordResetComplete?.()
         window.history.replaceState(null, '', window.location.pathname)
-        setMessage('Senhá atualizada. Agora entre com sua nova senha.')
+        setMessage('Senha atualizada. Agora entre com sua nova senha.')
         setPassword('')
         setConfirmPassword('')
         setMode('signin')
@@ -312,8 +312,9 @@ function AuthScreen({
   }
 
   return (
-    <div className="absolute inset-0 chalk-bg flex flex-col overflow-hidden">
-      <div className="px-5 pt-14 pb-4">
+    <div className="auth-screen absolute inset-0 chalk-bg overflow-y-auto">
+      <div className="auth-screen__content">
+        <div className="auth-screen__header">
         <p className="font-chalk text-white/60 text-xl mb-1">Approf</p>
         <h1 className="font-chalk text-white text-4xl font-bold leading-tight">
           {getAuthTitle(mode)}
@@ -321,10 +322,10 @@ function AuthScreen({
         <p className="text-white/60 text-sm mt-3 leading-relaxed">
           Acesso seguro para professoras da educação infantil.
         </p>
-      </div>
+        </div>
 
-      <div className="px-5 pb-8 overflow-y-auto">
-        <div className="bg-white rounded-app p-5 shadow-xl">
+        <div className="auth-screen__form">
+          <div className="bg-white rounded-app p-5 shadow-xl">
           {(mode === 'signin' || mode === 'signup') && (
             <div className="grid grid-cols-2 gap-2 mb-4">
               <button
@@ -374,7 +375,7 @@ function AuthScreen({
               <input
                 className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white text-sm text-ink outline-none focus:border-gl"
                 type="password"
-                placeholder="Minimo 6 caracteres"
+                placeholder="Mínimo 6 caracteres"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -440,6 +441,7 @@ function AuthScreen({
             )}
           </div>
         </div>
+      </div>
       </div>
 
       {shouldShowInstallPopup && (

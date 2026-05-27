@@ -163,6 +163,46 @@ input, textarea, select, button {
 .auth-loading-dots span:nth-child(2) { animation-delay: 0.15s; }
 .auth-loading-dots span:nth-child(3) { animation-delay: 0.3s; }
 
+.auth-screen {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.auth-screen__content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: 0 auto;
+  min-height: 100%;
+  max-width: 430px;
+  padding: max(48px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+  width: 100%;
+}
+
+.auth-screen__header,
+.auth-screen__form {
+  margin: 0 auto;
+  max-width: 390px;
+  min-width: 0;
+  width: 100%;
+}
+
+.auth-screen__header {
+  padding-bottom: 18px;
+}
+
+@media (max-width: 360px) {
+  .auth-screen__content {
+    justify-content: flex-start;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .auth-screen__header {
+    padding-bottom: 14px;
+  }
+}
+
 @keyframes subtleAttentionPulse {
   0%, 100% {
     transform: translateY(0) scale(1);
