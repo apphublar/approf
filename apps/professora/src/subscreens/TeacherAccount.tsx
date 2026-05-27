@@ -76,10 +76,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     () => (snapshot?.verifications ?? []).some((item) => item.status === 'approved'),
     [snapshot],
   )
-  const accountReviewPending = useMemo(
-    () => (snapshot?.verifications ?? []).some((item) => item.status === 'pending' && item.documents.length === 0),
-    [snapshot],
-  )
   const submittedVerificationRequests = useMemo(
     () => (snapshot?.verifications ?? []).filter((item) => item.documents.length > 0),
     [snapshot],
@@ -231,15 +227,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               </div>
             </div>
 
-            {accountReviewPending && (
-              <div className="bg-[#FFF8E7] border border-[#F2D58B] rounded-app p-4 mb-4">
-                <p className="text-[13px] font-bold text-[#856404]">Cadastro em revisão pela equipe</p>
-                <p className="text-[12px] text-[#856404] mt-1 leading-[1.5]">
-                  Seu acesso continua liberado enquanto a equipe confere os dados do cadastro. Se for necessário algum documento, avisaremos por aqui.
-                </p>
-              </div>
-            )}
-
             {blocked && (
               <div className="bg-[#FFF3CD] border border-[#F2D58B] rounded-app p-4 mb-4">
                 <p className="text-[13px] font-bold text-[#856404]">Acesso restrito pelo admin</p>
@@ -324,7 +311,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                   {formatSubscriptionDateLabel(snapshot.subscription?.status)}: {formatDate(snapshot.subscription?.currentPeriodEnd)}
                 </p>
               )}
-              <p className="text-[12px] text-muted mt-1">Forma de liberação: {formatProvider(snapshot.subscription?.provider)}</p>
               {getPaymentUrl(snapshot.subscription?.externalReference) && (
                 <a
                   href={getPaymentUrl(snapshot.subscription?.externalReference) ?? '#'}
@@ -467,14 +453,6 @@ function formatSubscriptionDateLabel(status?: string | null) {
   if (status === 'canceled') return 'Acesso disponível até'
   if (status === 'blocked') return 'Bloqueado desde'
   return 'Próximo vencimento'
-}
-
-function formatProvider(provider?: string) {
-  if (!provider) return 'manual'
-  if (provider === 'mercado_pago') return 'Mercado Pago'
-  if (provider === 'stripe') return 'Stripe'
-  if (provider === 'manual') return 'Manual'
-  return provider
 }
 
 function formatSubscriptionPlan(plan?: string | null) {
