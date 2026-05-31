@@ -55,6 +55,10 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
         offset: reset ? 0 : page * PAGE_SIZE,
         studentId: filters.studentId,
         classId: filters.classId,
+        reportType: filters.reportType,
+        reportTypes: filters.kind === 'images'
+          ? ['generated_image', 'portfolio_image']
+          : filters.reportTypes,
         compact: true,
       })
       const filtered = items.filter((item) => item.report_type !== 'manual_anamnesis')
@@ -656,7 +660,7 @@ function isImageReport(doc: GeneratedDocument) {
 function filterByKind(doc: GeneratedDocument, kind: 'documents' | 'images' | 'all') {
   if (kind === 'all') return true
   if (kind === 'images') {
-    return doc.report_type === 'generated_image' || doc.ai_artifacts?.kind === 'generated_image'
+    return isImageReport(doc)
   }
   return !isImageReport(doc)
 }

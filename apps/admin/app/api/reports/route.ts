@@ -19,6 +19,11 @@ export async function GET(request: Request) {
 
     const status = parseReportStatus(searchParams.get('status'))
     const reportType = searchParams.get('reportType')?.trim() || undefined
+    const reportTypes = searchParams.get('reportTypes')
+      ?.split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+    const resolvedReportTypes = reportTypes?.length ? reportTypes : undefined
     const studentId = searchParams.get('studentId')?.trim() || undefined
     const classId = searchParams.get('classId')?.trim() || undefined
     const limitRaw = Number(searchParams.get('limit'))
@@ -30,6 +35,7 @@ export async function GET(request: Request) {
     const reports = await listOwnerReports(ownerId, {
       status,
       reportType,
+      reportTypes: resolvedReportTypes,
       studentId,
       classId,
       limit,

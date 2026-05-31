@@ -1,4 +1,4 @@
-import { createSupabaseServiceClient } from './supabase-server'
+﻿import { createSupabaseServiceClient } from './supabase-server'
 import { PublicAiGenerationError } from './ai-generation'
 import type { AiGenerationType } from './ai-usage'
 
@@ -197,7 +197,7 @@ async function requestOpenAiImage(input: {
 }) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new PublicAiGenerationError('Servico de imagem indisponível no momento. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Servico de imagem indisponÃ­vel no momento. Tente novamente em instantes.')
   }
 
   const models = [input.model, ...(input.fallbackModels ?? [])]
@@ -234,7 +234,7 @@ async function requestOpenAiImage(input: {
     } catch (error) {
       clearTimeout(timeout)
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new PublicAiGenerationError('A criação da imagem demorou mais do que o esperado. Tente novamente.')
+        throw new PublicAiGenerationError('A criaÃ§Ã£o da imagem demorou mais do que o esperado. Tente novamente.')
       }
       throw error
     } finally {
@@ -278,7 +278,7 @@ async function requestOpenAiImage(input: {
   }
 
   console.error('[ai-image] falha em todos os modelos', lastErrorMessage)
-  throw new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
+  throw new PublicAiGenerationError('NÃ£o foi possÃ­vel criar a imagem agora. Tente novamente em instantes.')
 }
 
 function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: string) {
@@ -302,24 +302,28 @@ function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: strin
     : 'Sem anexos visuais autorizados.'
 
   const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
-  return `Ilustracao de relatorio de desenvolvimento (${formatLabel}, ${size}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
+  return `Ilustração visual de portfólio pedagógico (${formatLabel}, ${size}) para Educação Infantil.
 
-Texto visivel em portugues:
-- Título: RELATORIO DE DESENVOLVIMENTO
-- Subtítulo: EDUCACAO INFANTIL
-- Criança: ${studentName}
-- Turma: ${className}
-- Blocos curtos: Adaptacao e convivencia, Linguagem, Movimento e autonomia, Interesses, Familia, Consideracoes finais
+Objetivo: criar uma imagem acolhedora, profissional e delicada para acompanhar o portfólio de ${studentName}, turma ${className}.
 
-Regras: usar apenas evidências fornecidas pela professora; não inventar fatos sobre a criança; não separar por campos de experiência BNCC; sem diagnóstico, sem comparação entre crianças, sem nota/ranking, sem marcas d'agua ou QR code, sem outras crianças identificáveis. Pouco texto, letras legiveis.
+Regra crítica de texto: NÃO escreva nenhuma palavra, letra, número, título, legenda, placa, etiqueta, assinatura, marca d'água, QR code ou texto visível dentro da imagem. A aplicação vai inserir os textos corretos em português brasileiro fora da imagem. A imagem deve ser apenas visual/ilustrativa, sem tipografia.
 
-Conteúdo pedagogico real autorizado:
+Direção visual:
+- composição limpa e organizada, em tons suaves;
+- elementos de educação infantil, produções, materiais pedagógicos, desenhos, papéis, brinquedos e registros de aprendizagem;
+- clima afetivo, seguro e escolar;
+- sem outras crianças identificáveis;
+- sem rostos realistas quando não houver foto autorizada;
+- sem diagnóstico, comparação entre crianças, nota, ranking ou símbolos médicos.
+
+Regras pedagógicas: usar apenas evidências fornecidas pela professora; não inventar fatos sobre a criança; não separar por campos de experiência BNCC.
+
+Conteúdo pedagógico real autorizado:
 ${observations}
 
-Extra: ${extraContext || 'Destacar conquistas e proximos passos da rotina.'}
+Extra: ${extraContext || 'Destacar conquistas e próximos passos da rotina.'}
 Anexos: ${attachmentList}`
 }
-
 function resolvePortfolioImageSize(summary: Record<string, unknown>) {
   const fromSummary = asString(summary.portfolioImageFormat)?.trim().toLowerCase()
   if (fromSummary === 'landscape') return '1536x1024'
@@ -358,8 +362,8 @@ function resolveStandaloneImageSize(summary: Record<string, unknown>) {
 
 function resolveStandaloneImageQuality(summary: Record<string, unknown>) {
   const requested = asString(summary.imageQuality)?.trim().toLowerCase()
-  if (requested === 'standard' || requested === 'padrao' || requested === 'padrão') return 'medium'
-  if (requested === 'medium' || requested === 'media' || requested === 'média') return 'medium'
+  if (requested === 'standard' || requested === 'padrao' || requested === 'padrÃ£o') return 'medium'
+  if (requested === 'medium' || requested === 'media' || requested === 'mÃ©dia') return 'medium'
   if (requested === 'high' || requested === 'alta') return 'high'
   return process.env.OPENAI_STANDALONE_IMAGE_QUALITY?.trim() || DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY
 }
@@ -370,15 +374,15 @@ function buildStandaloneImagePrompt(summary: Record<string, unknown>, size: stri
     throw new PublicAiGenerationError('Descreva a imagem para continuar.')
   }
 
-  return `Crie uma imagem de alta qualidade com base na descrição abaixo.
+  return `Crie uma imagem de alta qualidade com base na descriÃ§Ã£o abaixo.
 
 Requisitos:
-- Use português brasileiro quando houver texto visível.
-- Respeite fielmente estilo, cores, cenário, orientação e formato pedidos.
+- Use portuguÃªs brasileiro quando houver texto visÃ­vel.
+- Respeite fielmente estilo, cores, cenÃ¡rio, orientaÃ§Ã£o e formato pedidos.
 - Tamanho final: ${size}.
-- Evite elementos ofensivos, diagnósticos médicos, marcas externas ou conteúdo impróprio para ambiente escolar.
+- Evite elementos ofensivos, diagnÃ³sticos mÃ©dicos, marcas externas ou conteÃºdo imprÃ³prio para ambiente escolar.
 
-Descrição da professora:
+DescriÃ§Ã£o da professora:
 ${description}`
 }
 
@@ -411,7 +415,7 @@ Modelo: ${input.model}
 Tamanho: ${input.size}
 Qualidade: ${input.quality}
 
-Descrição usada:
+DescriÃ§Ã£o usada:
 
 ${input.prompt}`
 }
@@ -450,7 +454,7 @@ async function persistGeneratedReport(
     .single()
 
   if (error || !data?.id) {
-    throw new PublicAiGenerationError('Não foi possível salvar a imagem gerada. Tente novamente.')
+    throw new PublicAiGenerationError('NÃ£o foi possÃ­vel salvar a imagem gerada. Tente novamente.')
   }
 
   return data.id
@@ -476,7 +480,7 @@ async function persistUsage(
     cost_cents: costCents,
   })
 
-  if (error) throw toError(error, 'Não foi possível registrar consumo da imagem.')
+  if (error) throw toError(error, 'NÃ£o foi possÃ­vel registrar consumo da imagem.')
 }
 
 function resolveOpenAiImageCostCents(profile: 'portfolio' | 'standalone') {
@@ -562,14 +566,14 @@ function shouldTryNextImageModel(
 
 function toPublicImageErrorMessage(status: number, message?: string) {
   const normalized = (message ?? '').toLowerCase()
-  if (status === 429) return 'O serviço de imagem está muito usado no momento. Tente novamente em alguns minutos.'
+  if (status === 429) return 'O serviÃ§o de imagem estÃ¡ muito usado no momento. Tente novamente em alguns minutos.'
   if (normalized.includes('content_policy') || normalized.includes('safety') || normalized.includes('moderation')) {
-    return 'Não foi possível criar a imagem com essa descrição. Ajuste o texto e tente novamente.'
+    return 'NÃ£o foi possÃ­vel criar a imagem com essa descriÃ§Ã£o. Ajuste o texto e tente novamente.'
   }
   if (normalized.includes('billing') || normalized.includes('quota')) {
-    return 'O serviço de imagem está sem saldo/configuração no momento.'
+    return 'O serviÃ§o de imagem estÃ¡ sem saldo/configuraÃ§Ã£o no momento.'
   }
-  return 'Não foi possível criar a imagem agora. Tente novamente em instantes.'
+  return 'NÃ£o foi possÃ­vel criar a imagem agora. Tente novamente em instantes.'
 }
 
 function toError(error: unknown, fallback: string) {

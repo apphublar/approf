@@ -2,6 +2,7 @@
 import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
+import { pickFileFromDevice } from '@/services/file-picker'
 import { listReports, updateReport } from '@/services/reports'
 import { uploadChildPortfolioMedia } from '@/services/supabase/child-media'
 import { isSupabaseConfigured } from '@/services/supabase/config'
@@ -25,6 +26,7 @@ const BNCC_FIELD_OPTIONS = [
   'Escuta, fala, pensamento e imaginacao',
   'Espacos, tempos, quantidades, relacoes e transformacoes',
 ]
+const PORTFOLIO_ATTACHMENT_ACCEPT = 'image/*,.pdf,.doc,.docx,.txt'
 
 interface ReportSubscreenProps {
   data?: unknown
@@ -429,7 +431,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setSelectedAnnotationIds([])
   }
 
-  async function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | File[] | null) {
     if (!files?.length) return
 
     const selectedFiles = Array.from(files)
@@ -471,6 +473,19 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       return [...current, ...selected.filter((item) => !existing.has(item.id))]
     })
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function choosePortfolioAttachment() {
+    setUsageError('')
+    try {
+      const file = await pickFileFromDevice({
+        accept: PORTFOLIO_ATTACHMENT_ACCEPT,
+        debugKey: 'portfolio-attachment',
+      })
+      if (file) await handleFiles([file])
+    } catch (error) {
+      setUsageError(error instanceof Error ? error.message : 'Não foi possível abrir a seleção de foto.')
+    }
   }
 
   function removeAttachment(id: string) {
@@ -1327,12 +1342,13 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,.pdf,.doc,.docx,.txt"
+                accept={PORTFOLIO_ATTACHMENT_ACCEPT}
                 className="hidden"
                 onChange={(event) => void handleFiles(event.target.files)}
               />
               <button
-                onClick={() => fileInputRef.current?.click()}
+                type="button"
+                onClick={() => void choosePortfolioAttachment()}
                 disabled={uploadingAttachments}
                 className="w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white"
               >
@@ -1410,7 +1426,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
             <button
               onClick={() => openSubscreen('generated-documents', {
-                reportType: currentReportType,
+                reportType: currentReportType === 'portfolio_image' ? undefined : currentReportType,
+                kind: currentReportType === 'portfolio_image' ? 'images' : undefined,
                 studentId: isClassDiary ? undefined : selectedStudent?.id,
                 classId: isClassDiary ? selectedClass?.id : undefined,
                 focusReportId: reportId,

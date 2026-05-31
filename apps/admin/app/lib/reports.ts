@@ -14,6 +14,7 @@ const REPORT_SELECT_COMPACT =
 export interface ReportListFilters {
   status?: ReportStatus
   reportType?: string
+  reportTypes?: string[]
   studentId?: string
   classId?: string
   limit?: number
@@ -227,6 +228,7 @@ function applyListFilters(
 
   if (filters.status) scopedQuery = scopedQuery.eq('status', filters.status)
   if (filters.reportType) scopedQuery = scopedQuery.eq('report_type', filters.reportType)
+  if (filters.reportTypes?.length) scopedQuery = scopedQuery.in('report_type', filters.reportTypes)
   if (filters.studentId) scopedQuery = scopedQuery.eq('student_id', filters.studentId)
   if (filters.classId) scopedQuery = scopedQuery.eq('class_id', filters.classId)
   const boundedLimit = filters.limit && Number.isFinite(filters.limit)

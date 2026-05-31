@@ -1,8 +1,10 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, FileUp } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
+import { pickFileFromDevice } from '@/services/file-picker'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { createSupabaseTimelineEvent } from '@/services/supabase/timeline'
+import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import type { TimelineEvent, TimelineEventType } from '@/types'
 
 const EVENT_TYPES: { id: TimelineEventType; label: string; desc: string }[] = [
@@ -24,6 +26,7 @@ const ACCEPTED_ATTACHMENT_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
 ]
+const ATTACHMENT_ACCEPT = 'image/*,.pdf,.doc,.docx,.txt'
 
 export default function NewTimelineEventSubscreen({
   data,
@@ -49,7 +52,10 @@ export default function NewTimelineEventSubscreen({
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const draftKey = useMemo(
+    () => student?.id ? `approf:draft:new-timeline-event:${student.id}` : '',
+    [student?.id],
+  )
 
   useEffect(() => {
     return () => {
@@ -57,12 +63,39 @@ export default function NewTimelineEventSubscreen({
     }
   }, [attachmentPreviewUrl])
 
+  useEffect(() => {
+    if (!draftKey) return
+    const draft = loadDraft<{
+      type: TimelineEventType
+      title: string
+      text: string
+      attachmentName: string | null
+    }>(draftKey)
+    if (!draft) return
+    setType(draft.type || 'marco')
+    setTitle(draft.title || '')
+    setText(draft.text || '')
+    setAttachmentName(draft.attachmentName || null)
+  }, [draftKey])
+
+  useEffect(() => {
+    if (!draftKey) return
+    const timeout = window.setTimeout(() => {
+      saveDraft(draftKey, {
+        type,
+        title,
+        text,
+        attachmentName,
+      })
+    }, 250)
+    return () => window.clearTimeout(timeout)
+  }, [attachmentName, draftKey, text, title, type])
+
   if (!cls || !student) return null
 
   const canSave = title.trim().length >= 2 && text.trim().length >= 5
 
-  function selectFile(files: FileList | null) {
-    const file = files?.[0]
+  function selectFile(file: File | null) {
     if (!file) return
     setError('')
     if (file.size > MAX_ATTACHMENT_SIZE_MB * 1024 * 1024) {
@@ -78,6 +111,19 @@ export default function NewTimelineEventSubscreen({
     setAttachmentFile(file)
     setAttachmentName(file.name)
     setAttachmentPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : null)
+  }
+
+  async function chooseAttachment() {
+    setError('')
+    try {
+      const file = await pickFileFromDevice({
+        accept: ATTACHMENT_ACCEPT,
+        debugKey: 'timeline-attachment',
+      })
+      selectFile(file)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível abrir a seleção de arquivo.')
+    }
   }
 
   async function saveEvent() {
@@ -108,6 +154,7 @@ export default function NewTimelineEventSubscreen({
           }
 
       addTimelineEvent(cls.id, student.id, event)
+      if (draftKey) clearDraft(draftKey)
       closeSubscreen()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar o marco.')
@@ -182,19 +229,9 @@ export default function NewTimelineEventSubscreen({
               )}
             </div>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,.pdf,.doc,.docx,.txt"
-            className="hidden"
-            onChange={(event) => {
-              selectFile(event.target.files)
-              event.currentTarget.value = ''
-            }}
-          />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => void chooseAttachment()}
             className="w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white"
           >
             + Anexar arquivo

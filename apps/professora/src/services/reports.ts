@@ -4,6 +4,7 @@ import { getSupabaseClient } from './supabase/client'
 interface ListReportsFilters {
   status?: ReportStatus
   reportType?: string
+  reportTypes?: string[]
   studentId?: string
   classId?: string
   limit?: number
@@ -81,6 +82,7 @@ function buildQuery(filters: ListReportsFilters) {
   const params = new URLSearchParams()
   if (filters.status) params.set('status', filters.status)
   if (filters.reportType) params.set('reportType', filters.reportType)
+  if (filters.reportTypes?.length) params.set('reportTypes', filters.reportTypes.join(','))
   if (filters.studentId) params.set('studentId', filters.studentId)
   if (filters.classId) params.set('classId', filters.classId)
   if (typeof filters.limit === 'number') params.set('limit', String(filters.limit))
