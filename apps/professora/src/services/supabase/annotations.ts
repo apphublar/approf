@@ -29,6 +29,7 @@ export interface AnnotationInput {
   tags: string[]
   persistence: AnnotationPersistence[]
   attachmentName?: string | null
+  attachmentFile?: File | null
 }
 
 export interface AnnotationUpdateInput extends AnnotationInput {
@@ -62,8 +63,10 @@ export async function loadSupabaseAnnotations(ownerId: string, classes: ClassDat
     targetsByAnnotationId.set(target.annotation_id, current)
   })
 
-  return (annotationsResult.data ?? []).map((annotation) =>
-    mapAnnotation(annotation, targetsByAnnotationId.get(annotation.id) ?? [], studentById),
+  return Promise.all(
+    (annotationsResult.data ?? []).map((annotation) =>
+      mapAnnotation(annotation, targetsByAnnotationId.get(annotation.id) ?? [], studentById),
+    ),
   )
 }
 
@@ -120,8 +123,28 @@ export async function createSupabaseAnnotation(input: AnnotationInput) {
     }
   }
 
+  let savedAnnotation = data
+  if (input.attachmentFile) {
+    try {
+      const attachmentPath = await uploadAnnotationAttachment(ownerId, data.id, input.attachmentFile, input.studentId)
+      const { data: updatedAnnotation, error: updateError } = await supabase
+        .from('annotations')
+        .update({ attachment_path: attachmentPath })
+        .eq('id', data.id)
+        .eq('owner_id', ownerId)
+        .select('id, category, body, tags, persistence, attachment_path, occurred_at')
+        .single()
+
+      if (updateError) throw updateError
+      if (updatedAnnotation) savedAnnotation = updatedAnnotation
+    } catch (attachmentError) {
+      await supabase.from('annotations').delete().eq('id', data.id).eq('owner_id', ownerId)
+      throw toError(attachmentError, 'NÃ£o foi possÃ­vel enviar o anexo privado da anotaÃ§Ã£o.')
+    }
+  }
+
   const studentById = new Map<string, string>()
-  return mapAnnotation(data, targets, studentById, input)
+  return mapAnnotation(savedAnnotation, targets, studentById, input)
 }
 
 export async function updateSupabaseAnnotation(input: AnnotationUpdateInput) {
@@ -134,6 +157,9 @@ export async function updateSupabaseAnnotation(input: AnnotationUpdateInput) {
   if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const tags = [input.label, ...input.tags.filter((tag) => tag !== input.label)]
+  const attachmentPath = input.attachmentFile
+    ? await uploadAnnotationAttachment(ownerId, input.annotationId, input.attachmentFile, input.studentId)
+    : undefined
   const { data, error } = await supabase
     .from('annotations')
     .update({
@@ -141,7 +167,7 @@ export async function updateSupabaseAnnotation(input: AnnotationUpdateInput) {
       body: input.text,
       tags,
       persistence: input.persistence,
-      attachment_path: null,
+      ...(attachmentPath ? { attachment_path: attachmentPath } : {}),
     })
     .eq('id', input.annotationId)
     .eq('owner_id', ownerId)
@@ -193,12 +219,12 @@ function buildTargets(annotationId: string, ownerId: string, input: AnnotationIn
   return targets
 }
 
-function mapAnnotation(
+async function mapAnnotation(
   annotation: AnnotationRow,
   targets: AnnotationTargetRow[],
   studentById: Map<string, string>,
   fallback?: AnnotationInput,
-): Annotation {
+): Promise<Annotation> {
   const studentTarget = targets.find((target) => target.target_type === 'student' && target.target_id)
   const classTarget = targets.find((target) => target.target_type === 'class' && target.target_id)
   const teacherTarget = targets.find((target) => target.target_type === 'teacher')
@@ -222,6 +248,8 @@ function mapAnnotation(
     tags,
     persistence: annotation.persistence ?? [],
     attachmentName: annotation.attachment_path ? getFileName(annotation.attachment_path) : null,
+    attachmentUrl: annotation.attachment_path ? await getSignedAnnotationAttachmentUrl(annotation.attachment_path) : null,
+    attachmentKind: annotation.attachment_path && isImagePath(annotation.attachment_path) ? 'image' : annotation.attachment_path ? 'file' : undefined,
     scope: teacherTarget ? 'personal' : undefined,
   }
 }
@@ -261,6 +289,49 @@ function formatAnnotationDate(value: string) {
 
 function getFileName(path: string) {
   return path.split('/').pop() ?? 'Arquivo privado'
+}
+
+async function uploadAnnotationAttachment(ownerId: string, annotationId: string, file: File, studentId?: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase nÃ£o estÃ¡ configurado.')
+
+  const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  const safeName = sanitizeFileName(file.name, extension)
+  const ownerFolder = studentId ? `${ownerId}/${studentId}` : `${ownerId}/annotations`
+  const path = `${ownerFolder}/annotations/${annotationId}-${Date.now()}-${safeName}`
+  const { error } = await supabase.storage.from('child-photos').upload(path, file, {
+    cacheControl: '3600',
+    upsert: true,
+    contentType: file.type || 'application/octet-stream',
+  })
+
+  if (error) throw toError(error, 'NÃ£o foi possÃ­vel enviar o anexo privado da anotaÃ§Ã£o.')
+  return path
+}
+
+async function getSignedAnnotationAttachmentUrl(path: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) return null
+
+  const { data, error } = await supabase.storage.from('child-photos').createSignedUrl(path, 60 * 60)
+  if (error) return null
+  return data.signedUrl
+}
+
+function isImagePath(path: string) {
+  return /\.(apng|avif|gif|jpe?g|png|webp)$/i.test(path)
+}
+
+function sanitizeFileName(fileName: string, fallbackExtension: string) {
+  const sanitized = fileName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+
+  if (!sanitized) return `arquivo.${fallbackExtension}`
+  return sanitized.includes('.') ? sanitized : `${sanitized}.${fallbackExtension}`
 }
 
 function toError(error: unknown, fallbackMessage: string) {

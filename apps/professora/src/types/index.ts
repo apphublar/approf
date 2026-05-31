@@ -86,6 +86,8 @@ export interface Annotation {
   tags?: string[]
   persistence?: AnnotationPersistence[]
   attachmentName?: string | null
+  attachmentUrl?: string | null
+  attachmentKind?: 'image' | 'file'
   scope?: 'personal'
 }
 

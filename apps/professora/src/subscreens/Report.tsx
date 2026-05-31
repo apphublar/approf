@@ -3,6 +3,8 @@ import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
 import { listReports, updateReport } from '@/services/reports'
+import { uploadChildPortfolioMedia } from '@/services/supabase/child-media'
+import { isSupabaseConfigured } from '@/services/supabase/config'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import { loadDocumentStyleSettings } from '@/utils/document-style'
@@ -34,6 +36,8 @@ interface ReportAttachment {
   size: number
   type: string
   isImage: boolean
+  storagePath?: string
+  dataUrl?: string
 }
 
 type ReportMode = 'annotations' | 'blank'
@@ -83,6 +87,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [blankContext, setBlankContext] = useState('')
   const [extraContext, setExtraContext] = useState('')
   const [attachments, setAttachments] = useState<ReportAttachment[]>([])
+  const [uploadingAttachments, setUploadingAttachments] = useState(false)
   const [portfolioOutput, setPortfólioOutput] = useState<PortfólioOutput>('text')
   const [portfolioImageFormat, setPortfolioImageFormat] = useState<PortfolioImageFormat>('portrait')
   const [generating, setGenerating] = useState(false)
@@ -424,21 +429,48 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setSelectedAnnotationIds([])
   }
 
-  function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     if (!files?.length) return
 
-    const selected = Array.from(files).map((file) => ({
+    const selectedFiles = Array.from(files)
+    const selected = await Promise.all(selectedFiles.map(async (file) => ({
       id: `${file.name}-${file.size}-${file.lastModified}`,
       name: file.name,
       size: file.size,
       type: file.type || 'application/octet-stream',
       isImage: file.type.startsWith('image/'),
-    }))
+      dataUrl: file.type.startsWith('image/') ? await fileToDataUrl(file) : undefined,
+    })))
+
+    if (isSupabaseConfigured() && selectedStudent?.id) {
+      setUploadingAttachments(true)
+      setUsageError('')
+      try {
+        const uploaded = await uploadChildPortfolioMedia(selectedStudent.id, selectedFiles)
+        const uploadedWithImages = uploaded.map((item, index) => ({
+          ...item,
+          dataUrl: selected[index]?.dataUrl,
+        }))
+        setAttachments((current) => {
+          const existing = new Set(current.map((item) => item.storagePath ?? item.id))
+          return [...current, ...uploadedWithImages.filter((item) => !existing.has(item.storagePath))]
+        })
+        setDraftMessage('Anexo enviado para o portfólio privado.')
+        return
+      } catch (error) {
+        setUsageError(error instanceof Error ? error.message : 'NÃ£o foi possÃ­vel enviar o anexo do portfÃ³lio.')
+        return
+      } finally {
+        setUploadingAttachments(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    }
 
     setAttachments((current) => {
       const existing = new Set(current.map((item) => item.id))
       return [...current, ...selected.filter((item) => !existing.has(item.id))]
     })
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function removeAttachment(id: string) {
@@ -526,6 +558,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
           name: item.name,
           type: item.type,
           size: item.size,
+          hasImageInPortfolio: item.isImage && Boolean(item.dataUrl),
         })),
         documentStyle: styleSettings,
       }
@@ -563,7 +596,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
           ? `Imagem de portfólio gerada com sucesso.\n\nDescrição usada:\n\n${result.prompt}`
           : mockReport
       const nextImageUrl = 'imageDataUrl' in result && result.imageDataUrl ? result.imageDataUrl : ''
-      let nextBody = generatedBody
+      let nextBody = generationType === 'portfolio_text'
+        ? appendPortfolioImagesToBody(generatedBody, attachments, selectedStudent?.name ?? 'Criança')
+        : generatedBody
       let nextReportId = result.reportId ?? ''
 
       if (
@@ -1294,13 +1329,14 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 multiple
                 accept="image/*,.pdf,.doc,.docx,.txt"
                 className="hidden"
-                onChange={(event) => handleFiles(event.target.files)}
+                onChange={(event) => void handleFiles(event.target.files)}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAttachments}
                 className="w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white"
               >
-                + Anexar foto
+                {uploadingAttachments ? 'Enviando...' : '+ Anexar foto'}
               </button>
             </div>
             )}
@@ -1361,6 +1397,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   className="w-full min-h-[520px] resize-y bg-white rounded-app-sm border border-border px-5 py-5 text-[14px] text-ink outline-none leading-[1.8] font-serif shadow-inner"
                   value={editableContent}
                   onChange={(event) => setEditableContent(event.target.value)}
+                />
+              ) : isHtmlContent(editableContent || savedContent) ? (
+                <div
+                  className="document-editor text-[12px] text-ink leading-[1.7]"
+                  dangerouslySetInnerHTML={{ __html: editableContent || savedContent }}
                 />
               ) : (
                 <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink leading-[1.7]">{editableContent || savedContent || mockReport}</pre>
@@ -1716,6 +1757,48 @@ function formatAttachments(attachments: ReportAttachment[]) {
   return `\n\nANEXOS CONSIDERADOS\n\n${attachments.map((item) => `- ${item.name} (${formatFileSize(item.size)})`).join('\n')}`
 }
 
+function appendPortfolioImagesToBody(body: string, attachments: ReportAttachment[], studentName: string) {
+  const images = attachments.filter((item) => item.isImage && item.dataUrl)
+  if (!images.length) return body
+
+  const imageHtml = images
+    .map((image, index) => `
+      <figure class="portfolio-child-image">
+        <img src="${image.dataUrl}" alt="${escapeHtml(`Registro de portfólio de ${studentName}`)}" />
+        <figcaption>${escapeHtml(index === 0 ? `Registro visual de ${studentName}` : image.name)}</figcaption>
+      </figure>
+    `)
+    .join('')
+
+  return `
+    <section class="portfolio-document">
+      <div class="portfolio-images">${imageHtml}</div>
+      <div class="portfolio-text">${textToHtml(body)}</div>
+    </section>
+  `.trim()
+}
+
+function textToHtml(value: string) {
+  return value
+    .trim()
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+    .join('')
+}
+
+function isHtmlContent(value: string) {
+  return /<[a-z][\s\S]*>/i.test(value.trim())
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(new Error('Não foi possível preparar a imagem para o portfólio.'))
+    reader.readAsDataURL(file)
+  })
+}
+
 function isSpecialistReport(reportKind: string) {
   return [
     'Relatório para neuropediatra',
@@ -1845,10 +1928,12 @@ function exportAbntDocument(content: string, title: string) {
   const filename = normalize(title)
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'documento'
-  const paragraphs = content
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
-    .join('')
+  const paragraphs = isHtmlContent(content)
+    ? content
+    : content
+      .split(/\n{2,}/)
+      .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+      .join('')
   const html = `<!doctype html>
 <html>
 <head>
@@ -1858,6 +1943,10 @@ function exportAbntDocument(content: string, title: string) {
     body { color: #000; font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.5; text-align: justify; }
     h1 { font-size: 14pt; text-align: center; text-transform: uppercase; margin: 0 0 24pt; }
     p { margin: 0 0 12pt; }
+    .portfolio-images { margin: 0 0 18pt; text-align: center; }
+    .portfolio-child-image { margin: 0 auto 14pt; page-break-inside: avoid; text-align: center; }
+    .portfolio-child-image img { max-width: 11cm; max-height: 9cm; object-fit: contain; border: 1px solid #ddd; }
+    .portfolio-child-image figcaption { font-size: 10pt; color: #555; margin-top: 4pt; }
   </style>
 </head>
 <body>

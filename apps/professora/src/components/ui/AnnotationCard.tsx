@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { ImageIcon, Paperclip, Pencil, Trash2 } from 'lucide-react'
 import type { Annotation } from '@/types'
 
 const BADGE_STYLES: Record<string, string> = {
@@ -43,6 +43,32 @@ export default function AnnotationCard({
         <span className="inline-block text-[10px] font-bold px-2 py-[3px] rounded-full bg-gbg text-gm mt-2">
           Transcrição de áudio
         </span>
+      )}
+      {annotation.attachmentUrl && annotation.attachmentKind === 'image' && (
+        <a href={annotation.attachmentUrl} target="_blank" rel="noreferrer" className="block mt-3">
+          <img
+            src={annotation.attachmentUrl}
+            alt={annotation.attachmentName ?? 'Anexo privado'}
+            className="w-full max-h-48 object-cover rounded-app-sm border border-border"
+          />
+        </a>
+      )}
+      {annotation.attachmentUrl && annotation.attachmentKind === 'file' && (
+        <a
+          href={annotation.attachmentUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 flex items-center gap-2 rounded-app-sm border border-border bg-cream px-3 py-2 text-[12px] font-bold text-gm"
+        >
+          <Paperclip size={14} />
+          <span className="flex-1 truncate">{annotation.attachmentName ?? 'Anexo privado'}</span>
+        </a>
+      )}
+      {annotation.attachmentName && !annotation.attachmentUrl && (
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-muted">
+          <ImageIcon size={13} />
+          Anexo privado: {annotation.attachmentName}
+        </p>
       )}
       <p className="text-[11px] text-muted mt-[5px]">{annotation.date}</p>
       {hasActions && (

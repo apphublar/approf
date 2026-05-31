@@ -41,7 +41,7 @@ export interface BuildPromptInput {
   diaryRawText?: string
   bnccFields?: string[]
   useAnnotations?: boolean
-  attachments?: Array<{ name?: string; type?: string; size?: number }>
+  attachments?: Array<{ name?: string; type?: string; size?: number; hasImageInPortfolio?: boolean }>
   interventionMode?: 'suggestions' | 'feedback_analysis'
   observation?: string
   studentAge?: string
@@ -78,6 +78,7 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
   const system = [
     `Você executa a ETAPA 1 (rascunho pedagógico) do pipeline textual do Approf (${pv}).`,
     'Produza um RASCUNHO em português brasileiro para Educação Infantil (0 a 5 anos), alinhado a BNCC.',
+    'Use ortografia, acentuação, concordância e pontuação corretas do português do Brasil. Não use português de Portugal.',
     'Priorize texto util para o dia a dia escolar: claro, objetivo, profissional e natural.',
     'Evite tom academico excessivo, introducoes longas, repeticoes e paragrafos extensos.',
     'Mantenha estrutura organizada com secoes curtas e foco pratico.',
@@ -87,7 +88,7 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
     'Nunca realize diagnóstico medico, clinico ou psicologico.',
     'Não invente fatos: use apenas o contexto fornecido.',
     `Evite em todos os documentos estas expressoes: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
-    'Transforme as informações da professora: preserve detalhes relevantes, organize melhor, corrijá a escrita e humanize sem apagar o que foi informado.',
+    'Transforme as informações da professora: preserve detalhes relevantes, organize melhor, corrija a escrita e humanize sem apagar o que foi informado.',
     ...documentGuidelines.system,
     'A saida desta etapa e um rascunho que sera revisado nas etapas seguintes; não precisa estar perfeita, mas deve ser completa e estruturada.',
   ].join('\n')
@@ -114,6 +115,7 @@ export function buildStage2BnccReviewPrompt(input: BuildPromptInput, draftFromSt
   const system = [
     `Você executa a ETAPA 2 (revisão BNCC e segurança pedagógica) do pipeline textual do Approf (${pv}).`,
     'Você recebe um RASCUNHO da etapa anterior. Revise e reescreva o texto completo.',
+    'Faça revisão gramatical completa em português brasileiro: acentuação, concordância, regência, pontuação, grafia e fluidez.',
     'Revise a BNCC apenas quando o tipo de documento pedir; não force códigos, teoria ou citações longas.',
     'Mantenha formato profissional, leitura leve e objetiva, sem linguagem academica exagerada.',
     'Remova ou neutralize qualquer comparação entre crianças, diagnóstico ou conclusão clínica, e linguagem julgadora.',
@@ -155,6 +157,7 @@ export function buildStage3FinalRefinementPrompt(input: BuildPromptInput, textFr
   const system = [
     `Você executa a ETAPA 3 (refinamento final e humanização) do pipeline textual do Approf (${pv}).`,
     'Você recebe um texto já revisado pedagógicamente. Melhore fluidez, clareza e tom humano e acolhedor.',
+    'Entregue texto final impecável em português brasileiro, sem erros de ortografia, acentuação, concordância ou pontuação.',
     'Personalize levemente quando fizer sentido (sem inventar dados) para leitura pela professora e famílias.',
     'Mantenha todas as regras: Educação Infantil 0-5 anos, BNCC, sem diagnóstico clinico, sem comparação entre crianças, sem linguagem julgadora.',
     `Se aparecer alguma destas expressoes, substitua por linguagem natural: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
@@ -325,8 +328,10 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
       'Este documento é portfólio textual: narrativa pedagógica com evidências, memória de percurso e tom afetivo-profissional.',
       'Valorize produções, falas, brincadeiras, descobertas e avanços sem transformar em relatório clínico.',
       'BNCC pode aparecer de forma discreta, conectada às experiências observadas.',
+      'Escreva em português brasileiro revisado, com frases naturais, sem erros de acentuação, concordância ou grafia.',
+      'Não descreva o conteúdo visual das fotos anexadas; use-as apenas como registros que serão inseridos visualmente no documento pela aplicação.',
     )
-    user.push('Tamanho final: narrativa média, com evidências e linguagem sensível, sem exagero acadêmico.')
+    user.push('Tamanho final: narrativa média, com evidências e linguagem sensível, sem exagero acadêmico, em português brasileiro correto.')
   }
 
   return { system, user }
@@ -345,7 +350,7 @@ function formatAnnotations(annotations?: Array<{ date?: string; label?: string; 
     .join('\n')
 }
 
-function formatAttachments(attachments?: Array<{ name?: string; type?: string; size?: number }>) {
+function formatAttachments(attachments?: Array<{ name?: string; type?: string; size?: number; hasImageInPortfolio?: boolean }>) {
   if (!attachments?.length) return ''
   return attachments
     .slice(0, 20)
@@ -353,7 +358,8 @@ function formatAttachments(attachments?: Array<{ name?: string; type?: string; s
       const name = attachment.name ?? 'arquivo'
       const type = attachment.type ?? 'application/octet-stream'
       const size = typeof attachment.size === 'number' ? `${attachment.size} bytes` : 'tamanho desconhecido'
-      return `- ${name} (${type}, ${size})`
+      const visualNote = attachment.hasImageInPortfolio ? ', imagem será exibida no portfólio pela aplicação' : ''
+      return `- ${name} (${type}, ${size}${visualNote})`
     })
     .join('\n')
 }

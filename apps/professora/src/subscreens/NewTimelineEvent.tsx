@@ -119,7 +119,7 @@ export default function NewTimelineEventSubscreen({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
-        <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
+        <button type="button" onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1">
@@ -133,6 +133,7 @@ export default function NewTimelineEventSubscreen({
         <div className="grid grid-cols-2 gap-2 mb-4">
           {EVENT_TYPES.map((item) => (
             <button
+              type="button"
               key={item.id}
               onClick={() => setType(item.id)}
               className={`rounded-app-sm border px-3 py-3 text-left ${
@@ -186,9 +187,13 @@ export default function NewTimelineEventSubscreen({
             type="file"
             accept="image/*,.pdf,.doc,.docx,.txt"
             className="hidden"
-            onChange={(event) => selectFile(event.target.files)}
+            onChange={(event) => {
+              selectFile(event.target.files)
+              event.currentTarget.value = ''
+            }}
           />
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             className="w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white"
           >
@@ -200,6 +205,7 @@ export default function NewTimelineEventSubscreen({
 
       <div className="p-[18px] bg-white border-t border-border flex-shrink-0">
         <button
+          type="button"
           onClick={saveEvent}
           disabled={!canSave || saving}
           className="w-full bg-gm text-white rounded-app-sm py-[13px] text-[14px] font-bold disabled:opacity-40"
@@ -210,4 +216,3 @@ export default function NewTimelineEventSubscreen({
     </div>
   )
 }
-

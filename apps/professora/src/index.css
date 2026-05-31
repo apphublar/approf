@@ -285,6 +285,32 @@ input, textarea, select, button {
   margin-bottom: 6px;
 }
 
+.document-editor .portfolio-images {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.document-editor .portfolio-child-image {
+  margin: 0;
+  text-align: center;
+}
+
+.document-editor .portfolio-child-image img {
+  background: #FDFAF6;
+  border: 1px solid #E8E0D2;
+  border-radius: 8px;
+  max-height: 320px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.document-editor .portfolio-child-image figcaption {
+  color: #7B6F63;
+  font-size: 11px;
+  margin-top: 5px;
+}
+
 /* Toast */
 @keyframes toastIn {
   from { opacity: 0; transform: translateX(-50%) translateY(8px); }

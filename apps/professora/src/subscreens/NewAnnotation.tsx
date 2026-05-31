@@ -46,6 +46,14 @@ const PERSONAL_MODELS: ModelOption[] = [
 ]
 
 const MAX_AUDIO_SECONDS = 30
+const MAX_ATTACHMENT_SIZE_MB = 10
+const ACCEPTED_ATTACHMENT_TYPES = [
+  'image/',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+]
 
 export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
@@ -66,6 +74,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [studentId, setStudentId] = useState(activeStudent?.id ?? '')
   const [tags, setTags] = useState<string[]>([])
   const [attachmentName, setAttachmentName] = useState('')
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
@@ -321,6 +330,17 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   function selectFile(files: FileList | null) {
     const file = files?.[0]
     if (!file) return
+    setError('')
+    if (file.size > MAX_ATTACHMENT_SIZE_MB * 1024 * 1024) {
+      setError(`O arquivo precisa ter até ${MAX_ATTACHMENT_SIZE_MB} MB.`)
+      return
+    }
+    if (!ACCEPTED_ATTACHMENT_TYPES.some((type) => file.type.startsWith(type) || file.type === type)) {
+      setError('Use imagem, PDF, Word ou TXT.')
+      return
+    }
+
+    setAttachmentFile(file)
     setAttachmentName(file.name)
   }
 
@@ -460,6 +480,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       tags,
       persistence: resolved.persistence,
       attachmentName: attachmentName || null,
+      attachmentFile,
     }
     const localAnnotation = {
       id: `ann-${Date.now()}`,
