@@ -1,8 +1,7 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
-import { pickFileFromDevice } from '@/services/file-picker'
 import { listReports, updateReport } from '@/services/reports'
 import { uploadChildPortfolioMedia } from '@/services/supabase/child-media'
 import { isSupabaseConfigured } from '@/services/supabase/config'
@@ -475,17 +474,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  async function choosePortfolioAttachment() {
+  function handlePortfolioInputChange(event: ChangeEvent<HTMLInputElement>) {
     setUsageError('')
-    try {
-      const file = await pickFileFromDevice({
-        accept: PORTFOLIO_ATTACHMENT_ACCEPT,
-        debugKey: 'portfolio-attachment',
-      })
-      if (file) await handleFiles([file])
-    } catch (error) {
-      setUsageError(error instanceof Error ? error.message : 'Não foi possível abrir a seleção de foto.')
-    }
+    void handleFiles(event.currentTarget.files)
   }
 
   function removeAttachment(id: string) {
@@ -1338,22 +1329,22 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   )}
                 </div>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept={PORTFOLIO_ATTACHMENT_ACCEPT}
-                className="hidden"
-                onChange={(event) => void handleFiles(event.target.files)}
-              />
-              <button
-                type="button"
-                onClick={() => void choosePortfolioAttachment()}
-                disabled={uploadingAttachments}
-                className="w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white"
+              <label
+                className={`relative block w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white text-center overflow-hidden ${
+                  uploadingAttachments ? 'opacity-60 pointer-events-none' : ''
+                }`}
               >
-                {uploadingAttachments ? 'Enviando...' : '+ Anexar foto'}
-              </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={PORTFOLIO_ATTACHMENT_ACCEPT}
+                  disabled={uploadingAttachments}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={handlePortfolioInputChange}
+                />
+                <span aria-hidden="true">{uploadingAttachments ? 'Enviando...' : '+ Anexar foto'}</span>
+              </label>
             </div>
             )}
 

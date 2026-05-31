@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { ChevronLeft, FileUp } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
-import { pickFileFromDevice } from '@/services/file-picker'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { createSupabaseTimelineEvent } from '@/services/supabase/timeline'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
@@ -113,17 +112,10 @@ export default function NewTimelineEventSubscreen({
     setAttachmentPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : null)
   }
 
-  async function chooseAttachment() {
+  function handleAttachmentInputChange(event: ChangeEvent<HTMLInputElement>) {
     setError('')
-    try {
-      const file = await pickFileFromDevice({
-        accept: ATTACHMENT_ACCEPT,
-        debugKey: 'timeline-attachment',
-      })
-      selectFile(file)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível abrir a seleção de arquivo.')
-    }
+    selectFile(event.currentTarget.files?.[0] ?? null)
+    event.currentTarget.value = ''
   }
 
   async function saveEvent() {
@@ -229,13 +221,15 @@ export default function NewTimelineEventSubscreen({
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => void chooseAttachment()}
-            className="w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white"
-          >
-            + Anexar arquivo
-          </button>
+          <label className="relative block w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white text-center overflow-hidden">
+            <input
+              type="file"
+              accept={ATTACHMENT_ACCEPT}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              onChange={handleAttachmentInputChange}
+            />
+            <span aria-hidden="true">+ Anexar arquivo</span>
+          </label>
         </div>
         {error && <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{error}</p>}
       </div>
