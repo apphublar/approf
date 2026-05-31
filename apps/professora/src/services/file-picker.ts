@@ -26,8 +26,8 @@ export function pickFileFromDevice(options: PickFileOptions): Promise<File | nul
 
     let settled = false
     const cleanup = () => {
-      window.removeEventListener('focus', handleFocus)
-      window.clearTimeout(focusTimeout)
+      window.clearTimeout(waitingTimeout)
+      window.clearTimeout(safetyTimeout)
       input.remove()
     }
     const finish = (file: File | null) => {
@@ -44,15 +44,12 @@ export function pickFileFromDevice(options: PickFileOptions): Promise<File | nul
       cleanup()
       reject(error)
     }
-    const handleFocus = () => {
-      window.clearTimeout(focusTimeout)
-      window.setTimeout(() => {
-        if (!settled && !input.files?.length) finish(null)
-      }, 1200)
-    }
-    const focusTimeout = window.setTimeout(() => {
+    const waitingTimeout = window.setTimeout(() => {
       if (!settled && !input.files?.length) writePickerDebug(options.debugKey, 'waiting')
     }, 5000)
+    const safetyTimeout = window.setTimeout(() => {
+      if (!settled) finish(null)
+    }, 60_000)
 
     input.addEventListener('change', () => {
       finish(input.files?.[0] ?? null)
@@ -63,7 +60,6 @@ export function pickFileFromDevice(options: PickFileOptions): Promise<File | nul
     input.addEventListener('error', (event) => {
       fail(event)
     })
-    window.addEventListener('focus', handleFocus)
 
     document.body.appendChild(input)
     writePickerDebug(options.debugKey, 'opening')

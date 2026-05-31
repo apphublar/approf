@@ -1,4 +1,4 @@
-const SW_VERSION = 'approf-pwa-v7'
+const SW_VERSION = 'approf-pwa-v8'
 const SHELL_CACHE = `${SW_VERSION}:shell`
 const STATIC_CACHE = `${SW_VERSION}:static`
 const THUMB_CACHE = `${SW_VERSION}:thumb`
@@ -43,6 +43,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
+    if (!isSameOrigin) return
     event.respondWith(networkFirstNavigate(request))
     return
   }
@@ -69,12 +70,16 @@ self.addEventListener('fetch', (event) => {
 })
 
 async function networkFirstNavigate(request) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 3000)
   try {
-    const response = await fetch(request)
+    const response = await fetch(request, { signal: controller.signal })
+    clearTimeout(timeout)
     const cache = await caches.open(SHELL_CACHE)
     cache.put('/index.html', response.clone())
     return response
   } catch {
+    clearTimeout(timeout)
     const cached = await caches.match('/index.html')
     return cached || caches.match('/offline.html')
   }
