@@ -568,8 +568,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       }
 
       const generationType = getReportGenerationType(reportKind, portfolioOutput)
-      const primaryPhotoDataUrl = generationType === 'portfolio_image'
+      const rawPhotoDataUrl = generationType === 'portfolio_image'
         ? (attachments.find((item) => item.isImage && item.dataUrl)?.dataUrl ?? null)
+        : null
+      const primaryPhotoDataUrl = rawPhotoDataUrl
+        ? await resizeImageForPortfolio(rawPhotoDataUrl)
         : null
       const result = generationType === 'portfolio_image'
         ? await generateAiPortfolioImage({
@@ -2047,4 +2050,32 @@ function getGenerationRequirementHint(input: {
   if (!input.hasRequiredBnccInput) return 'Complete os campos pedagógicos obrigatórios antes de gerar.'
   if (!input.hasRequiredObjective) return 'Informe o objetivo pedagógico com um pouco mais de detalhe.'
   return ''
+}
+
+function resizeImageForPortfolio(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => {
+      const MAX_DIM = 1024
+      let { width, height } = img
+      if (width > MAX_DIM || height > MAX_DIM) {
+        if (width >= height) {
+          height = Math.round((height / width) * MAX_DIM)
+          width = MAX_DIM
+        } else {
+          width = Math.round((width / height) * MAX_DIM)
+          height = MAX_DIM
+        }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve(dataUrl); return }
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', 0.85))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
 }

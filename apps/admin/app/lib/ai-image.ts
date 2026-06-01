@@ -79,7 +79,7 @@ export async function generatePortfolioImage(
         size,
         quality,
         user: input.ownerId,
-        timeoutMs: 150000,
+        timeoutMs: 270000,
       })
     : await requestOpenAiImage({
         model,
@@ -88,7 +88,7 @@ export async function generatePortfolioImage(
         size,
         quality,
         user: input.ownerId,
-        timeoutMs: 150000,
+        timeoutMs: 270000,
       })
 
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'portfolio')
@@ -308,17 +308,21 @@ async function requestOpenAiImageEdit(input: {
     throw new PublicAiGenerationError('Serviço de imagem indisponível no momento. Tente novamente em instantes.')
   }
 
-  const [, base64] = input.inputImageDataUrl.split(',')
-  if (!base64) {
+  const separatorIdx = input.inputImageDataUrl.indexOf(',')
+  if (separatorIdx < 0) {
     throw new PublicAiGenerationError('Foto inválida. Tente novamente com outra imagem.')
   }
+  const header = input.inputImageDataUrl.slice(0, separatorIdx)
+  const base64 = input.inputImageDataUrl.slice(separatorIdx + 1)
+  const mimeType = header.match(/data:([^;]+)/)?.[1] ?? 'image/jpeg'
+  const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
 
   const imageBytes = Buffer.from(base64, 'base64')
-  const imageBlob = new Blob([imageBytes], { type: 'image/png' })
+  const imageBlob = new Blob([imageBytes], { type: mimeType })
 
   const form = new FormData()
   form.append('model', input.model)
-  form.append('image[]', imageBlob, 'photo.png')
+  form.append('image[]', imageBlob, `photo.${ext}`)
   form.append('prompt', input.prompt)
   form.append('n', '1')
   form.append('size', input.size)
@@ -418,36 +422,52 @@ function buildPortfolioImageEditPrompt(summary: Record<string, unknown>, size: s
   const studentName = asString(summary.studentName) ?? 'criança'
   const className = asString(summary.className) ?? 'turma'
   const selectedAnnotations = asObjectArray(summary.selectedAnnotations)
+  const selectedMilestones = asObjectArray(summary.selectedMilestones)
   const extraContext = asString(summary.extraContext)?.trim()
   const blankContext = asString(summary.blankContext)
 
-  const observations = selectedAnnotations.length
-    ? selectedAnnotations.map((item) => {
+  const allAnnotations = [...selectedAnnotations, ...selectedMilestones]
+  const observations = allAnnotations.length
+    ? allAnnotations.map((item) => {
         const label = asString(item.label) ?? 'registro'
         const text = asString(item.text) ?? ''
         return `- ${label}: ${text}`
       }).join('\n')
-    : blankContext || 'Destacar conquistas e próximos passos da rotina.'
+    : blankContext || 'Destacar principais conquistas e evolução da criança na rotina escolar.'
 
   const teacherInstruction = extraContext
-    ? `\nINSTRUÇÃO OBRIGATÓRIA DA PROFESSORA (seguir à risca):\n${extraContext}`
+    ? `\nINSTRUÇÃO OBRIGATÓRIA DA PROFESSORA — seguir à risca, inclusive pedidos de posição da foto ou remoção de informações:\n${extraContext}`
     : ''
 
-  const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
-  return `Crie um portfólio pedagógico visual (${formatLabel}, ${size}) para Educação Infantil usando a foto fornecida da criança como elemento central e principal.
+  const isLandscape = size === '1536x1024'
+  const isSquare = size === '1024x1024'
 
-IMPORTANTE: A foto é da criança real. Mantenha-a visível e em destaque. NÃO substitua por ilustração. Adicione apenas elementos decorativos ao redor da foto.
+  const layoutDesc = isLandscape
+    ? `LAYOUT (paisagem):
+- Lado ESQUERDO (~40% da largura): foto real da criança, altura total, com moldura suave em tons pastel
+- Ao LADO DIREITO da foto: cabeçalho com PORTFÓLIO PEDAGÓGICO, nome "${studentName}", turma "${className}", linha para Professora, linha para Período 2026
+- Abaixo do cabeçalho: blocos de texto com o conteúdo pedagógico`
+    : isSquare
+    ? `LAYOUT (quadrado):
+- Terço SUPERIOR: foto real da criança centralizada com moldura suave pastel, ao lado: PORTFÓLIO PEDAGÓGICO, nome "${studentName}", turma "${className}"
+- Dois terços INFERIORES: blocos com conteúdo pedagógico em fundo branco ou creme`
+    : `LAYOUT (retrato — padrão):
+- Terço SUPERIOR: foto real da criança à ESQUERDA (portrait dentro de uma moldura suave), ao lado direito: PORTFÓLIO PEDAGÓGICO em destaque, nome "${studentName}", turma "${className}", linha para Professora, Período 2026
+- Dois terços INFERIORES: fundo branco ou creme, dividido em blocos arredondados com título em verde ou azul pastel e texto sobre o desenvolvimento`
 
-Elementos a adicionar em torno da foto:
-- Moldura decorativa em tons pastel, estilo acolhedor de Educação Infantil
-- Título no topo: PORTFÓLIO PEDAGÓGICO — ${studentName}
-- Turma: ${className}
-- Pequenos blocos de texto nos cantos ou na parte inferior com resumo dos marcos
+  return `Crie um portfólio pedagógico visual completo para Educação Infantil usando a foto da criança fornecida como imagem real e preservada.
 
-Conteúdo pedagógico real autorizado:
-${observations}
+${layoutDesc}
+
+REGRAS ABSOLUTAS:
+- A foto da criança é REAL — não redesenhe, não ilustre, não substitua. Use-a exatamente como está.
+- Fundo e decoração em tons pastel suaves (verde, azul, rosa, amarelo claro) — estilo acolhedor escolar.
+- Texto em português brasileiro correto com acentos, letras legíveis.
+- Sem marcas d'água, sem QR code, sem outras crianças identificáveis.
+- Não inventar informações sobre a criança além do que está no conteúdo abaixo.
 ${teacherInstruction}
-Regras: letras legíveis em português brasileiro; sem marcas d'água ou QR code; sem outras crianças identificáveis.`
+CONTEÚDO PEDAGÓGICO (preencha os blocos com estes dados):
+${observations}`
 }
 function resolvePortfolioImageSize(summary: Record<string, unknown>) {
   const fromSummary = asString(summary.portfolioImageFormat)?.trim().toLowerCase()
