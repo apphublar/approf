@@ -316,64 +316,81 @@ async function requestOpenAiImageEdit(input: {
   const base64 = input.inputImageDataUrl.slice(separatorIdx + 1)
   const mimeType = header.match(/data:([^;]+)/)?.[1] ?? 'image/jpeg'
   const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
-
   const imageBytes = Buffer.from(base64, 'base64')
-  const imageBlob = new Blob([imageBytes], { type: mimeType })
 
-  const form = new FormData()
-  form.append('model', input.model)
-  form.append('image[]', imageBlob, `photo.${ext}`)
-  form.append('prompt', input.prompt)
-  form.append('n', '1')
-  form.append('size', input.size)
-  form.append('quality', input.quality)
-  form.append('output_format', 'png')
-  form.append('user', input.user)
+  const MAX_ATTEMPTS = 2
+  let lastError: PublicAiGenerationError | null = null
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 180000)
-  let response: Response
-  try {
-    response = await fetch('https://api.openai.com/v1/images/edits', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-      signal: controller.signal,
-    })
-  } catch (error) {
-    clearTimeout(timeout)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new PublicAiGenerationError('A criação da imagem demorou mais do que o esperado. Tente novamente.')
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 3000))
     }
-    throw error
-  } finally {
-    clearTimeout(timeout)
+
+    const imageBlob = new Blob([imageBytes], { type: mimeType })
+    const form = new FormData()
+    form.append('model', input.model)
+    form.append('image[]', imageBlob, `photo.${ext}`)
+    form.append('prompt', input.prompt)
+    form.append('n', '1')
+    form.append('size', input.size)
+    form.append('quality', input.quality)
+    form.append('output_format', 'png')
+    form.append('user', input.user)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 270000)
+    let response: Response
+    try {
+      response = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      clearTimeout(timeout)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new PublicAiGenerationError('A criação da imagem demorou mais do que o esperado. Tente novamente.')
+      }
+      lastError = error instanceof PublicAiGenerationError
+        ? error
+        : new PublicAiGenerationError('Erro de conexão com o serviço de imagem.')
+      continue
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    const payload = (await response.json().catch(() => null)) as {
+      data?: Array<{ b64_json?: string; url?: string }>
+      usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number }
+      error?: { message?: string; code?: string }
+    } | null
+
+    if (!response.ok) {
+      console.error('[ai-image] OpenAI edit HTTP', response.status, attempt + 1, input.model, payload?.error)
+      const isRetryable = response.status >= 500 || response.status === 429
+      lastError = new PublicAiGenerationError(toPublicImageErrorMessage(response.status, payload?.error?.message))
+      if (isRetryable && attempt < MAX_ATTEMPTS - 1) continue
+      throw lastError
+    }
+
+    const b64Json = payload?.data?.[0]?.b64_json
+    const imageUrl = payload?.data?.[0]?.url
+    const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
+    if (!image) {
+      lastError = new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
+      continue
+    }
+
+    return {
+      image,
+      model: input.model,
+      inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
+      outputTokens: payload?.usage?.output_tokens ?? 0,
+    }
   }
 
-  const payload = (await response.json().catch(() => null)) as {
-    data?: Array<{ b64_json?: string; url?: string }>
-    usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number }
-    error?: { message?: string; code?: string }
-  } | null
-
-  if (!response.ok) {
-    console.error('[ai-image] OpenAI edit HTTP', response.status, input.model, payload?.error)
-    throw new PublicAiGenerationError(toPublicImageErrorMessage(response.status, payload?.error?.message))
-  }
-
-  const b64Json = payload?.data?.[0]?.b64_json
-  const imageUrl = payload?.data?.[0]?.url
-  const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
-  if (!image) {
-    throw new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
-  }
-
-  return {
-    image,
-    model: input.model,
-    inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
-    outputTokens: payload?.usage?.output_tokens ?? 0,
-  }
+  throw lastError ?? new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
 }
 
 function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: string) {

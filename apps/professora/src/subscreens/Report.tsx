@@ -121,6 +121,22 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const draftKeyRef = useRef('')
   const loadedDraftRef = useRef(false)
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
+
+  async function acquireWakeLock() {
+    try {
+      const nav = navigator as Navigator & { wakeLock?: { request(t: 'screen'): Promise<{ release(): Promise<void> }> } }
+      if (!nav.wakeLock) return
+      wakeLockRef.current = await nav.wakeLock.request('screen')
+    } catch {
+      // Wake Lock não disponível neste dispositivo — continua sem
+    }
+  }
+
+  function releaseWakeLock() {
+    wakeLockRef.current?.release().catch(() => {})
+    wakeLockRef.current = null
+  }
 
   const studentAnnotations = useMemo(() => {
     if (isClassDiary || isParentsMeeting || isPlanning) {
@@ -378,6 +394,27 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setMode('blank')
   }, [assistantMode])
 
+  // On mount: check if a previous generation was interrupted (page reloaded)
+  useEffect(() => {
+    const ts = localStorage.getItem('approf:generating')
+    if (!ts) return
+    const elapsed = Date.now() - parseInt(ts, 10)
+    localStorage.removeItem('approf:generating')
+    if (elapsed > 25000) {
+      setUsageError('A geração anterior foi interrompida (tela bloqueada ou app fechado). Configure os campos e tente novamente.')
+    }
+  }, [])
+
+  // Re-acquire Wake Lock when the tab/screen becomes visible again during generation
+  useEffect(() => {
+    function onVisibility() {
+      if (document.visibilityState !== 'visible') return
+      if (generating) void acquireWakeLock()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [generating])
+
   const mockReport = createReportPreview({
     reportKind,
     studentName: isClassDiary || isParentsMeeting ? '-' : (selectedStudent?.name ?? '-'),
@@ -516,6 +553,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setReportId('')
     setEditingDocument(false)
 
+    void acquireWakeLock()
+    localStorage.setItem('approf:generating', String(Date.now()))
+
     try {
       const styleSettings = loadDocumentStyleSettings()
       const requestSummary = {
@@ -592,6 +632,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
           })
 
       if (!result.allowed) {
+        releaseWakeLock()
+        localStorage.removeItem('approf:generating')
         setUsageError(result.message || 'Esta geração precisa de pacote extra.')
         setGenerating(false)
         return
@@ -629,6 +671,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       setGeneratedImageUrl(nextImageUrl)
       setReportId(nextReportId)
       window.setTimeout(() => {
+        releaseWakeLock()
+        localStorage.removeItem('approf:generating')
         celebrateAiGeneration()
         setGenerating(false)
         setGenerated(true)
@@ -638,6 +682,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       }
       resetReportFormAfterGeneration()
     } catch (error) {
+      releaseWakeLock()
+      localStorage.removeItem('approf:generating')
       setGenerating(false)
       setUsageError(error instanceof Error ? error.message : 'Não foi possível gerar agora.')
     }
