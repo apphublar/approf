@@ -181,6 +181,7 @@ export default function NewStudentSubscreen() {
             <input
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               type="file"
+              accept="image/*"
               onChange={(event) => {
                 handlePhotoChange(event.currentTarget.files?.[0])
                 event.currentTarget.value = ''

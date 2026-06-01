@@ -1336,6 +1336,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   ref={fileInputRef}
                   type="file"
                   multiple
+                  accept="image/*"
                   disabled={uploadingAttachments}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   onChange={handlePortfolioInputChange}

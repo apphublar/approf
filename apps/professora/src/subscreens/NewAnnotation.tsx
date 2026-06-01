@@ -802,6 +802,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
             <label className="relative w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 overflow-hidden">
               <input
                 type="file"
+                accept="image/*,.pdf,.doc,.docx,.txt"
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 onChange={(event) => {
                   selectFile(event.currentTarget.files)

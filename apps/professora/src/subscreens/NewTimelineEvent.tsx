@@ -206,6 +206,7 @@ export default function NewTimelineEventSubscreen({
           <label className="relative block w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white text-center overflow-hidden">
             <input
               type="file"
+              accept="image/*,.pdf,.doc,.docx,.txt"
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               onChange={handleAttachmentInputChange}
             />
