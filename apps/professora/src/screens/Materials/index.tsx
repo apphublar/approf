@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import {
   ExternalLink,
   FileText,
@@ -24,12 +24,18 @@ import {
   registerMaterialView,
   reportMaterial,
   setMaterialFavorite,
-  type MaterialAnalysisResult,
   type MaterialUploadStatus,
   type SupportMaterial,
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
 import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
+
+type QueuedFile = {
+  file: File
+  previewUrl: string | null
+  status: 'pending' | 'sending' | 'done' | 'error'
+  statusMsg: string
+}
 
 type TabId = 'all' | 'mine' | 'favorites' | 'blocked'
 type SortBy = 'newest' | 'downloads' | 'rating' | 'oldest' | 'name'
@@ -37,7 +43,6 @@ type KindFilter = 'all' | 'documents' | 'images'
 type StatusFilter = 'all' | MaterialUploadStatus
 type MaterialKind = 'document' | 'image'
 
-const ACCEPTED_MATERIALS = ['.pdf', '.docx', '.xlsx', '.pptx', '.jpg', '.jpeg', '.png', '.webp', 'image/jpeg', 'image/png', 'image/webp'].join(',')
 const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
 const DEFAULT_AGE_RANGE = '0 a 5 anos'
@@ -67,14 +72,11 @@ export default function MaterialsScreen() {
   const [desc, setDesc] = useState('')
   const [ageRange, setAgeRange] = useState(DEFAULT_AGE_RANGE)
   const [pedagogicalObjective, setPedagogicalObjective] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [queue, setQueue] = useState<QueuedFile[]>([])
   const [submitting, setSubmitting] = useState(false)
-  const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'analyzing'>('idle')
   const [uploadMsg, setUploadMsg] = useState('')
-  const [analysis, setAnalysis] = useState<MaterialAnalysisResult | null>(null)
-  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
 
-  const canSubmit = Boolean(title.trim() && desc.trim() && file && !submitting)
+  const canSubmit = Boolean(title.trim() && desc.trim() && queue.length > 0 && !submitting)
 
   const filtered = useMemo(() => {
     let list = [...materials]
@@ -137,16 +139,6 @@ export default function MaterialsScreen() {
     void init()
   }, [])
 
-  useEffect(() => {
-    if (!file || getKindFromFile(file) !== 'image') {
-      setFilePreviewUrl(null)
-      return
-    }
-    const url = URL.createObjectURL(file)
-    setFilePreviewUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file])
-
   async function init() {
     const supabase = getSupabaseClient()
     if (supabase) {
@@ -172,65 +164,86 @@ export default function MaterialsScreen() {
     setDesc('')
     setAgeRange(DEFAULT_AGE_RANGE)
     setPedagogicalObjective('')
-    setFile(null)
+    setQueue((current) => {
+      current.forEach((entry) => { if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl) })
+      return []
+    })
     setUploadMsg('')
-    setAnalysis(null)
     setShowUpload(true)
   }
 
-  function pickFile(f?: File | null) {
-    if (f && !isAllowedMaterialFile(f)) {
-      setFile(null)
-      setUploadMsg('Arquivo não permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
-      return
+  function addFiles(fileList: FileList | null) {
+    if (!fileList) return
+    const newEntries: QueuedFile[] = []
+    for (const f of Array.from(fileList)) {
+      if (!isAllowedMaterialFile(f)) {
+        setUploadMsg('Arquivo não permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
+        continue
+      }
+      if (f.size > MAX_BYTES) {
+        setUploadMsg(`"${f.name}" excede ${MAX_MB} MB e não pode ser adicionado.`)
+        continue
+      }
+      newEntries.push({
+        file: f,
+        previewUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
+        status: 'pending',
+        statusMsg: '',
+      })
     }
-    if (f && f.size > MAX_BYTES) {
-      setFile(null)
-      setUploadMsg(`O arquivo precisa ter até ${MAX_MB} MB.`)
-      return
+    if (newEntries.length > 0) {
+      setQueue((current) => [...current, ...newEntries])
+      setUploadMsg('')
     }
-    setFile(f ?? null)
-    setUploadMsg('')
   }
 
-  function onNativeMaterialChange(event: ChangeEvent<HTMLInputElement>) {
-    const input = event.currentTarget
-    const selectedFile = input.files?.[0] ?? null
-    if (selectedFile) pickFile(selectedFile)
-    window.setTimeout(() => {
-      input.value = ''
-    }, 0)
+  function removeFromQueue(index: number) {
+    setQueue((current) => {
+      const entry = current[index]
+      if (entry?.previewUrl) URL.revokeObjectURL(entry.previewUrl)
+      return current.filter((_, i) => i !== index)
+    })
   }
 
   async function submitMaterial() {
-    if (!file || !canSubmit) return
+    if (!canSubmit) return
     setSubmitting(true)
-    setUploadPhase('uploading')
     setUploadMsg('')
-    setAnalysis(null)
-    try {
-      window.setTimeout(() => setUploadPhase((p) => (p === 'uploading' ? 'analyzing' : p)), 800)
-      const result = await analyzeAndUploadMaterial({
-        title: title.trim(),
-        description: desc.trim(),
-        ageRange,
-        pedagogicalObjective: pedagogicalObjective.trim() || desc.trim(),
-        file,
-      })
-      setAnalysis(result)
-      setUploadMsg(getStatusMessage(result.status))
+    const snapshot = queue.slice()
+    let anyError = false
+
+    for (let i = 0; i < snapshot.length; i++) {
+      if (snapshot[i].status !== 'pending') continue
+      setQueue((current) => current.map((entry, idx) =>
+        idx === i ? { ...entry, status: 'sending', statusMsg: 'Enviando...' } : entry,
+      ))
+      try {
+        const result = await analyzeAndUploadMaterial({
+          title: title.trim(),
+          description: desc.trim(),
+          ageRange,
+          pedagogicalObjective: pedagogicalObjective.trim() || desc.trim(),
+          file: snapshot[i].file,
+        })
+        setQueue((current) => current.map((entry, idx) =>
+          idx === i ? { ...entry, status: 'done', statusMsg: getStatusMessage(result.status) } : entry,
+        ))
+      } catch (e) {
+        anyError = true
+        setQueue((current) => current.map((entry, idx) =>
+          idx === i ? { ...entry, status: 'error', statusMsg: e instanceof Error ? e.message : 'Não foi possível enviar.' } : entry,
+        ))
+      }
+    }
+
+    setSubmitting(false)
+    if (!anyError) {
       setTitle('')
       setDesc('')
       setAgeRange(DEFAULT_AGE_RANGE)
       setPedagogicalObjective('')
-      setFile(null)
-      await refresh()
-    } catch (e) {
-      setUploadMsg(e instanceof Error ? e.message : 'Não foi possível enviar o material.')
-    } finally {
-      setSubmitting(false)
-      setUploadPhase('idle')
     }
+    await refresh()
   }
 
   async function handleDelete(id: string) {
@@ -487,73 +500,75 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${submitting ? 'opacity-50 pointer-events-none' : ''}`}>
-                <UploadCloud size={26} className="mx-auto text-gm" />
-                <p className="mt-2 text-[13px] font-bold text-gd">
-                  {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
+              <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-4 ${submitting ? 'opacity-50 pointer-events-none' : ''}`}>
+                <p className="text-[13px] font-bold text-gd text-center mb-1">Adicionar arquivos</p>
+                <p className="text-[11px] leading-[1.5] text-muted text-center mb-3">
+                  Imagens (JPG, PNG, WEBP) ou documentos (PDF, DOCX, XLSX, PPTX) até {MAX_MB} MB cada
                 </p>
-                <p className="mb-3 mt-1 text-[11px] leading-[1.5] text-muted">
-                  PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
-                </p>
-                <label className="relative flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white overflow-hidden">
-                  <UploadCloud size={15} />
-                  <span aria-hidden="true">Escolher arquivo</span>
-                  <input
-                    type="file"
-                    accept={ACCEPTED_MATERIALS}
-                    disabled={submitting}
-                    onChange={onNativeMaterialChange}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  />
-                </label>
-              </div>
-              {file && (
-                <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
-                  <MaterialIcon kind={getKindFromFile(file)} />
-                  {filePreviewUrl && (
-                    <img
-                      src={filePreviewUrl}
-                      alt=""
-                      className="h-14 w-14 flex-shrink-0 rounded-app-sm border border-border object-cover bg-white"
+                <div className="flex gap-2">
+                  <label className="relative flex-1 flex items-center justify-center gap-1.5 rounded-app-sm border border-gp bg-white px-3 py-2.5 text-[12px] font-bold text-gm overflow-hidden cursor-pointer">
+                    <ImageIcon size={14} />
+                    <span aria-hidden="true">Imagem</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={submitting}
+                      onChange={(event) => { addFiles(event.currentTarget.files); event.currentTarget.value = '' }}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                     />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-bold text-ink truncate">{file.name}</p>
-                    <p className="text-[11px] text-muted">{formatFileSize(file.size)}</p>
-                    <p className="text-[10px] text-muted truncate">{file.type || 'MIME não informado'}</p>
-                  </div>
-                  <button type="button" onClick={() => pickFile(null)} className="text-[11px] font-bold text-[#C1440E]">
-                    Remover
-                  </button>
+                  </label>
+                  <label className="relative flex-1 flex items-center justify-center gap-1.5 rounded-app-sm bg-gd px-3 py-2.5 text-[12px] font-bold text-white overflow-hidden cursor-pointer">
+                    <FileText size={14} />
+                    <span aria-hidden="true">Documento</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,.xlsx,.pptx"
+                      multiple
+                      disabled={submitting}
+                      onChange={(event) => { addFiles(event.currentTarget.files); event.currentTarget.value = '' }}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {queue.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {queue.map((entry, index) => (
+                    <div key={index} className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
+                      {entry.previewUrl ? (
+                        <img src={entry.previewUrl} alt="" className="h-12 w-12 flex-shrink-0 rounded-app-sm border border-border object-cover bg-white" />
+                      ) : (
+                        <MaterialIcon kind="document" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-bold text-ink truncate">{entry.file.name}</p>
+                        <p className="text-[10px] text-muted">{formatFileSize(entry.file.size)}</p>
+                        {entry.statusMsg && (
+                          <p className={`text-[10px] mt-0.5 leading-[1.4] ${entry.status === 'error' ? 'text-[#C1440E]' : entry.status === 'done' ? 'text-gm' : 'text-muted'}`}>
+                            {entry.statusMsg}
+                          </p>
+                        )}
+                      </div>
+                      {entry.status === 'sending' ? (
+                        <Loader2 size={15} className="animate-spin text-gm flex-shrink-0" />
+                      ) : entry.status === 'pending' ? (
+                        <button
+                          type="button"
+                          onClick={() => removeFromQueue(index)}
+                          className="text-[11px] font-bold text-[#C1440E] flex-shrink-0"
+                        >
+                          Remover
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               )}
 
               {uploadMsg && (
-                <div
-                  className={`rounded-app-sm border px-3 py-3 text-[12px] leading-[1.5] ${
-                    analysis?.status === 'blocked'
-                      ? 'border-red-200 bg-red-50 text-red-700'
-                      : 'border-gp bg-gbg text-gd'
-                  }`}
-                >
-                  {uploadMsg}
-                </div>
-              )}
-
-              {analysis && (
-                <div className="rounded-app-sm border border-border p-3">
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <p className="text-[12px] font-bold text-ink">Resultado da análise</p>
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${getStatusClass(analysis.status)}`}>
-                      {formatStatus(analysis.status)}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-muted">Confiança: {Math.round(analysis.review.confianca * 100)}%</p>
-                  <p className="mt-1 text-[11px] text-muted">Categoria: {analysis.review.categoria_detectada}</p>
-                  {analysis.review.motivo && (
-                    <p className="mt-2 text-[12px] leading-[1.5] text-soft">{analysis.review.motivo}</p>
-                  )}
-                </div>
+                <p className="text-[12px] text-[#C1440E] leading-[1.5]">{uploadMsg}</p>
               )}
 
               <button
@@ -564,9 +579,9 @@ export default function MaterialsScreen() {
               >
                 {submitting ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
                 {submitting
-                  ? uploadPhase === 'uploading'
-                    ? 'Enviando arquivo...'
-                    : 'Analisando arquivo...'
+                  ? 'Enviando...'
+                  : queue.length > 1
+                  ? `Enviar ${queue.length} materiais`
                   : 'Enviar material'}
               </button>
 
@@ -1097,12 +1112,6 @@ function DeleteButton({ onDelete }: { onDelete: () => Promise<void> }) {
       Excluir
     </button>
   )
-}
-
-function getKindFromFile(file: File): MaterialKind {
-  if (file.type.startsWith('image/')) return 'image'
-  if (['.jpg', '.jpeg', '.png', '.webp'].some((ext) => file.name.toLowerCase().endsWith(ext))) return 'image'
-  return 'document'
 }
 
 function getKindFromMaterial(material: SupportMaterial): MaterialKind {
