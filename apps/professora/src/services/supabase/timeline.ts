@@ -149,7 +149,7 @@ function getFileName(path: string) {
 }
 
 function isImagePath(path: string) {
-  return /\.(apng|avif|gif|jpe?g|png|webp)$/i.test(path)
+  return /\.(apng|avif|gif|heic|heif|jpe?g|png|webp)$/i.test(path)
 }
 
 function sanitizeFileName(fileName: string, fallbackExtension: string) {

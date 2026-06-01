@@ -16,7 +16,6 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const [mobileUploadBlocked] = useState(() => isMobileUploadContext())
 
   useEffect(() => {
     void refreshDocuments()
@@ -132,23 +131,19 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </p>
           </div>
 
-          {mobileUploadBlocked ? (
-            <UploadDesktopOnlyNotice />
-          ) : (
-            <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white p-3">
-              <label className="flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white">
-                {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-                {uploading ? 'Anexando...' : 'Escolher arquivo'}
-                <input
-                  type="file"
-                  accept={ACCEPTED_TYPES}
-                  disabled={uploading}
-                  onChange={(event) => void onNativeDocumentChange(event)}
-                  className="hidden"
-                />
-              </label>
-            </div>
-          )}
+          <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white p-3">
+            <label className={`relative flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white overflow-hidden ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+              {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
+              <span aria-hidden="true">{uploading ? 'Anexando...' : 'Escolher arquivo'}</span>
+              <input
+                type="file"
+                accept={ACCEPTED_TYPES}
+                disabled={uploading}
+                onChange={(event) => void onNativeDocumentChange(event)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
+          </div>
 
           {(uploadError || loadError) && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>
@@ -287,24 +282,4 @@ function normalizeText(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
-}
-
-function UploadDesktopOnlyNotice() {
-  return (
-    <div className="mb-4 rounded-app-sm border border-gp bg-gbg px-4 py-4">
-      <p className="text-[13px] font-bold text-gd">Envio disponível pelo computador</p>
-      <p className="mt-1 text-[12px] leading-[1.55] text-muted">
-        Para proteger seus arquivos pessoais, o envio de documentos deve ser feito pelo computador. Pelo celular, você pode visualizar e baixar seus arquivos normalmente.
-      </p>
-    </div>
-  )
-}
-
-function isMobileUploadContext() {
-  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false
-  const ua = navigator.userAgent.toLowerCase()
-  const mobileUa = /android|iphone|ipad|ipod|mobile/.test(ua)
-  const standalone = window.matchMedia('(display-mode: standalone)').matches
-    || (navigator as Navigator & { standalone?: boolean }).standalone === true
-  return mobileUa || standalone
 }

@@ -25,8 +25,6 @@ const BNCC_FIELD_OPTIONS = [
   'Escuta, fala, pensamento e imaginacao',
   'Espacos, tempos, quantidades, relacoes e transformacoes',
 ]
-const PORTFOLIO_ATTACHMENT_ACCEPT = 'image/*,.pdf,.doc,.docx,.txt'
-
 interface ReportSubscreenProps {
   data?: unknown
 }
@@ -439,8 +437,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       name: file.name,
       size: file.size,
       type: file.type || 'application/octet-stream',
-      isImage: file.type.startsWith('image/'),
-      dataUrl: file.type.startsWith('image/') ? await fileToDataUrl(file) : undefined,
+      isImage: isImageFile(file),
+      dataUrl: isImageFile(file) ? await fileToDataUrl(file) : undefined,
     })))
 
     if (isSupabaseConfigured() && selectedStudent?.id) {
@@ -1338,7 +1336,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept={PORTFOLIO_ATTACHMENT_ACCEPT}
                   disabled={uploadingAttachments}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   onChange={handlePortfolioInputChange}
@@ -1907,6 +1904,10 @@ function formatFileSize(size: number) {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function isImageFile(file: File) {
+  return file.type.startsWith('image/') || /\.(apng|avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)
 }
 
 function mergeLivingReport(existingBody: string, updateBlock: string) {

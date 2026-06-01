@@ -73,7 +73,6 @@ export default function MaterialsScreen() {
   const [uploadMsg, setUploadMsg] = useState('')
   const [analysis, setAnalysis] = useState<MaterialAnalysisResult | null>(null)
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
-  const [mobileUploadBlocked] = useState(() => isMobileUploadContext())
 
   const canSubmit = Boolean(title.trim() && desc.trim() && file && !submitting)
 
@@ -488,30 +487,26 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              {mobileUploadBlocked ? (
-                <UploadDesktopOnlyNotice />
-              ) : (
-                <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${submitting ? 'opacity-50' : ''}`}>
-                  <UploadCloud size={26} className="mx-auto text-gm" />
-                  <p className="mt-2 text-[13px] font-bold text-gd">
-                    {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
-                  </p>
-                  <p className="mb-3 mt-1 text-[11px] leading-[1.5] text-muted">
-                    PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
-                  </p>
-                  <label className="flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white">
-                    <UploadCloud size={15} />
-                    Escolher arquivo
-                    <input
-                      type="file"
-                      accept={ACCEPTED_MATERIALS}
-                      disabled={submitting}
-                      onChange={onNativeMaterialChange}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              )}
+              <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-5 text-center ${submitting ? 'opacity-50 pointer-events-none' : ''}`}>
+                <UploadCloud size={26} className="mx-auto text-gm" />
+                <p className="mt-2 text-[13px] font-bold text-gd">
+                  {file ? 'Trocar arquivo' : 'Selecionar arquivo'}
+                </p>
+                <p className="mb-3 mt-1 text-[11px] leading-[1.5] text-muted">
+                  PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP até {MAX_MB} MB
+                </p>
+                <label className="relative flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white overflow-hidden">
+                  <UploadCloud size={15} />
+                  <span aria-hidden="true">Escolher arquivo</span>
+                  <input
+                    type="file"
+                    accept={ACCEPTED_MATERIALS}
+                    disabled={submitting}
+                    onChange={onNativeMaterialChange}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
+                </label>
+              </div>
               {file && (
                 <div className="rounded-app-sm border border-border bg-cream p-3 flex items-center gap-3">
                   <MaterialIcon kind={getKindFromFile(file)} />
@@ -1173,24 +1168,4 @@ function normalizeText(value: string) {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .trim()
-}
-
-function UploadDesktopOnlyNotice() {
-  return (
-    <div className="rounded-app-sm border border-gp bg-gbg px-4 py-4">
-      <p className="text-[13px] font-bold text-gd">Envio disponível pelo computador</p>
-      <p className="mt-1 text-[12px] leading-[1.55] text-muted">
-        Para proteger os materiais compartilhados e garantir uma análise mais completa antes da publicação, o envio deve ser feito pelo computador. Pelo celular, você pode consultar, baixar e editar os materiais normalmente.
-      </p>
-    </div>
-  )
-}
-
-function isMobileUploadContext() {
-  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false
-  const ua = navigator.userAgent.toLowerCase()
-  const mobileUa = /android|iphone|ipad|ipod|mobile/.test(ua)
-  const standalone = window.matchMedia('(display-mode: standalone)').matches
-    || (navigator as Navigator & { standalone?: boolean }).standalone === true
-  return mobileUa || standalone
 }

@@ -52,12 +52,16 @@ export async function uploadChildPortfolioMedia(studentId: string, files: File[]
       name: file.name,
       size: file.size,
       type: file.type || 'application/octet-stream',
-      isImage: file.type.startsWith('image/'),
+      isImage: isImageFile(file),
       storagePath: path,
     })
   }
 
   return uploaded
+}
+
+function isImageFile(file: File) {
+  return file.type.startsWith('image/') || /\.(apng|avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)
 }
 
 function sanitizeFileName(fileName: string, fallbackExtension: string) {

@@ -340,14 +340,17 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 placeholder="Observações para a equipe (opcional)."
                 className="w-full mt-3 min-h-[88px] rounded-app-sm border border-border px-3 py-2 text-[12px]"
               />
-              <label className="w-full mt-3 inline-flex justify-center py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer">
-                Anexar documentos
+              <label className="relative w-full mt-3 inline-flex justify-center py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer overflow-hidden">
+                <span aria-hidden="true">Anexar documentos</span>
                 <input
                   type="file"
-                  className="hidden"
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   multiple
                   accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
-                  onChange={(event) => queueVerificationFiles(event.target.files)}
+                  onChange={(event) => {
+                    queueVerificationFiles(event.currentTarget.files)
+                    event.currentTarget.value = ''
+                  }}
                 />
               </label>
               {pendingFiles.length > 0 && (

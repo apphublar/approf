@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+﻿import { useMemo, useState, type ChangeEvent } from 'react'
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronLeft, ChevronRight, FileText, Search, Settings2, Sparkles, Upload, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import {
@@ -37,7 +37,6 @@ export default function AiPedagogicaSubscreen() {
   const [query, setQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const visibleSections = useMemo(() => {
     const normalizedQuery = normalizeText(query)
@@ -312,14 +311,11 @@ export default function AiPedagogicaSubscreen() {
               </label>
 
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-5">Papel timbrado</p>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full mt-2 rounded-app-sm border border-gp bg-gbg px-3 py-3 text-[12px] font-bold text-gd flex items-center justify-center gap-2"
-              >
+              <label className="relative w-full mt-2 rounded-app-sm border border-gp bg-gbg px-3 py-3 text-[12px] font-bold text-gd flex items-center justify-center gap-2 overflow-hidden">
                 <Upload size={14} />
-                {styleSettings.schoolLogoDataUrl ? 'Trocar logo da escola' : 'Enviar logo da escola'}
-              </button>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                <span aria-hidden="true">{styleSettings.schoolLogoDataUrl ? 'Trocar logo da escola' : 'Enviar logo da escola'}</span>
+                <input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+              </label>
 
               {styleSettings.schoolLogoDataUrl && (
                 <div className="mt-3 rounded-app-sm border border-border bg-cream p-3">

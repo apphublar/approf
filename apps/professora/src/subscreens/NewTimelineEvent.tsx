@@ -17,16 +17,6 @@ const EVENT_TYPES: { id: TimelineEventType; label: string; desc: string }[] = [
   { id: 'marco', label: 'Marco especial', desc: 'Momento importante da jornada.' },
 ]
 
-const MAX_ATTACHMENT_SIZE_MB = 10
-const ACCEPTED_ATTACHMENT_TYPES = [
-  'image/',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain',
-]
-const ATTACHMENT_ACCEPT = 'image/*,.pdf,.doc,.docx,.txt'
-
 export default function NewTimelineEventSubscreen({
   data,
 }: {
@@ -97,19 +87,11 @@ export default function NewTimelineEventSubscreen({
   function selectFile(file: File | null) {
     if (!file) return
     setError('')
-    if (file.size > MAX_ATTACHMENT_SIZE_MB * 1024 * 1024) {
-      setError(`O arquivo precisa ter até ${MAX_ATTACHMENT_SIZE_MB} MB.`)
-      return
-    }
-    if (!ACCEPTED_ATTACHMENT_TYPES.some((type) => file.type.startsWith(type) || file.type === type)) {
-      setError('Use imagem, PDF, Word ou TXT.')
-      return
-    }
 
     if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl)
     setAttachmentFile(file)
     setAttachmentName(file.name)
-    setAttachmentPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : null)
+    setAttachmentPreviewUrl(isImageFile(file) ? URL.createObjectURL(file) : null)
   }
 
   function handleAttachmentInputChange(event: ChangeEvent<HTMLInputElement>) {
@@ -224,7 +206,6 @@ export default function NewTimelineEventSubscreen({
           <label className="relative block w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white text-center overflow-hidden">
             <input
               type="file"
-              accept={ATTACHMENT_ACCEPT}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               onChange={handleAttachmentInputChange}
             />
@@ -246,4 +227,8 @@ export default function NewTimelineEventSubscreen({
       </div>
     </div>
   )
+}
+
+function isImageFile(file: File) {
+  return file.type.startsWith('image/') || /\.(apng|avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)
 }

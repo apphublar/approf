@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { ChevronLeft, ImagePlus } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
@@ -56,7 +56,6 @@ export default function NewStudentSubscreen() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [draftMessage, setDraftMessage] = useState('')
-  const photoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const draft = loadDraft<{
@@ -110,9 +109,6 @@ export default function NewStudentSubscreen() {
 
   const canSave = name.trim().length >= 2
 
-  function choosePhoto() {
-    photoInputRef.current?.click()
-  }
 
   function handlePhotoChange(file?: File) {
     if (!file) return
@@ -181,17 +177,15 @@ export default function NewStudentSubscreen() {
 
       <div className="flex-1 overflow-y-auto px-[18px] py-[16px] pb-[26px]">
         <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
-          <input
-            ref={photoInputRef}
-            className="hidden"
-            type="file"
-            accept="image/*"
-            onChange={(event) => handlePhotoChange(event.target.files?.[0])}
-          />
-          <button
-            onClick={choosePhoto}
-            className="w-full border-[1.5px] border-dashed border-border rounded-app-sm py-5 flex flex-col items-center gap-3 text-muted"
-          >
+          <label className="relative w-full border-[1.5px] border-dashed border-border rounded-app-sm py-5 flex flex-col items-center gap-3 text-muted overflow-hidden">
+            <input
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              type="file"
+              onChange={(event) => {
+                handlePhotoChange(event.currentTarget.files?.[0])
+                event.currentTarget.value = ''
+              }}
+            />
             {photoPreviewUrl ? (
               <span className="w-24 h-24 rounded-full overflow-hidden border-2 border-gp bg-cream block">
                 <img
@@ -205,7 +199,7 @@ export default function NewStudentSubscreen() {
               <ImagePlus size={22} />
             )}
             <span className="text-xs font-bold">{photoName ?? 'Adicionar foto opcional'}</span>
-          </button>
+          </label>
           {photoPreviewUrl && (
             <div className="mt-4 space-y-3">
               <PhotoPositionSlider label="Zoom" min={100} max={240} value={photoZoom} onChange={setPhotoZoom} />

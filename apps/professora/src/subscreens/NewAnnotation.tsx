@@ -46,19 +46,9 @@ const PERSONAL_MODELS: ModelOption[] = [
 ]
 
 const MAX_AUDIO_SECONDS = 30
-const MAX_ATTACHMENT_SIZE_MB = 10
-const ACCEPTED_ATTACHMENT_TYPES = [
-  'image/',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain',
-]
-
 export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
   const { addAnnotation, updateAnnotation, annotations, classes, activeClassId, activeStudentId, userId } = useAppStore()
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -331,14 +321,6 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     const file = files?.[0]
     if (!file) return
     setError('')
-    if (file.size > MAX_ATTACHMENT_SIZE_MB * 1024 * 1024) {
-      setError(`O arquivo precisa ter até ${MAX_ATTACHMENT_SIZE_MB} MB.`)
-      return
-    }
-    if (!ACCEPTED_ATTACHMENT_TYPES.some((type) => file.type.startsWith(type) || file.type === type)) {
-      setError('Use imagem, PDF, Word ou TXT.')
-      return
-    }
 
     setAttachmentFile(file)
     setAttachmentName(file.name)
@@ -817,20 +799,18 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
               </div>
             )}
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,.pdf,.doc,.docx,.txt"
-              className="hidden"
-              onChange={(event) => selectFile(event.target.files)}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2"
-            >
+            <label className="relative w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 overflow-hidden">
+              <input
+                type="file"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                onChange={(event) => {
+                  selectFile(event.currentTarget.files)
+                  event.currentTarget.value = ''
+                }}
+              />
               <Paperclip size={15} />
-              Anexar imagem ou arquivo
-            </button>
+              <span aria-hidden="true">Anexar imagem ou arquivo</span>
+            </label>
             {attachmentName && <p className="text-[11px] text-muted mt-2 leading-[1.5]">Anexo preparado: {attachmentName}</p>}
           </>
         )}
