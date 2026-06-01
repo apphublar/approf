@@ -138,7 +138,7 @@ async function getSignedTimelineAttachmentUrl(path: string) {
   const supabase = getSupabaseClient()
   if (!supabase) return null
 
-  const { data, error } = await supabase.storage.from('child-photos').createSignedUrl(path, 60 * 60)
+  const { data, error } = await supabase.storage.from('child-photos').createSignedUrl(path, 60 * 60 * 24 * 7)
   if (error) return null
   return data.signedUrl
 }

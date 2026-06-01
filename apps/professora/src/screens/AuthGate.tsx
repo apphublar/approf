@@ -63,6 +63,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
+    let hiddenAt: number | null = null
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now()
+      } else if (document.visibilityState === 'visible' && hiddenAt !== null) {
+        if (Date.now() - hiddenAt > 30 * 60 * 1000) {
+          setHydratedUserId(null)
+        }
+        hiddenAt = null
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
+  useEffect(() => {
     const userId = session?.user?.id
     if (!userId) return
     if (hydratedUserId === userId) return
