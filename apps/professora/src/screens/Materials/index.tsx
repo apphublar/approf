@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   ExternalLink,
   FileText,
@@ -28,6 +28,7 @@ import {
   type SupportMaterial,
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
+import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 
 type QueuedFile = {
@@ -46,6 +47,17 @@ type MaterialKind = 'document' | 'image'
 const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
 const DEFAULT_AGE_RANGE = '0 a 5 anos'
+const UPLOAD_DRAFT_KEY = 'approf:draft:material-upload'
+const DOC_ACCEPT = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.pdf', '.docx', '.xlsx', '.pptx',
+].join(',')
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -75,8 +87,30 @@ export default function MaterialsScreen() {
   const [queue, setQueue] = useState<QueuedFile[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [uploadMsg, setUploadMsg] = useState('')
+  const draftRestoredRef = useRef(false)
 
   const canSubmit = Boolean(title.trim() && desc.trim() && queue.length > 0 && !submitting)
+
+  useEffect(() => {
+    if (draftRestoredRef.current) return
+    draftRestoredRef.current = true
+    const draft = loadDraft<{ title: string; desc: string; ageRange: string; pedagogicalObjective: string; showUpload: boolean }>(UPLOAD_DRAFT_KEY)
+    if (draft?.showUpload) {
+      setTitle(draft.title || '')
+      setDesc(draft.desc || '')
+      setAgeRange(draft.ageRange || DEFAULT_AGE_RANGE)
+      setPedagogicalObjective(draft.pedagogicalObjective || '')
+      setShowUpload(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!showUpload || submitting) return
+    const timeout = window.setTimeout(() => {
+      saveDraft(UPLOAD_DRAFT_KEY, { title, desc, ageRange, pedagogicalObjective, showUpload: true })
+    }, 300)
+    return () => window.clearTimeout(timeout)
+  }, [showUpload, submitting, title, desc, ageRange, pedagogicalObjective])
 
   const filtered = useMemo(() => {
     let list = [...materials]
@@ -238,6 +272,7 @@ export default function MaterialsScreen() {
 
     setSubmitting(false)
     if (!anyError) {
+      clearDraft(UPLOAD_DRAFT_KEY)
       setTitle('')
       setDesc('')
       setAgeRange(DEFAULT_AGE_RANGE)
@@ -452,7 +487,7 @@ export default function MaterialsScreen() {
           <div className="flex items-center gap-3 px-[18px] pt-12 pb-3 border-b border-border flex-shrink-0 bg-white">
             <button
               type="button"
-              onClick={() => setShowUpload(false)}
+              onClick={() => { clearDraft(UPLOAD_DRAFT_KEY); setShowUpload(false) }}
               className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted"
             >
               <X size={18} />
@@ -503,7 +538,7 @@ export default function MaterialsScreen() {
               <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-4 ${submitting ? 'opacity-50 pointer-events-none' : ''}`}>
                 <p className="text-[13px] font-bold text-gd text-center mb-1">Adicionar arquivos</p>
                 <p className="text-[11px] leading-[1.5] text-muted text-center mb-3">
-                  Imagens (JPG, PNG, WEBP) ou documentos (PDF, DOCX, XLSX, PPTX) até {MAX_MB} MB cada
+                  Imagens (JPG, PNG, WEBP) — múltiplas de uma vez. Documentos (PDF, DOCX, XLSX, PPTX) — um por vez. Até {MAX_MB} MB cada.
                 </p>
                 <div className="flex gap-2">
                   <label className="relative flex-1 flex items-center justify-center gap-1.5 rounded-app-sm border border-gp bg-white px-3 py-2.5 text-[12px] font-bold text-gm overflow-hidden cursor-pointer">
@@ -523,8 +558,7 @@ export default function MaterialsScreen() {
                     <span aria-hidden="true">Documento</span>
                     <input
                       type="file"
-                      accept=".pdf,.docx,.xlsx,.pptx"
-                      multiple
+                      accept={DOC_ACCEPT}
                       disabled={submitting}
                       onChange={(event) => { addFiles(event.currentTarget.files); event.currentTarget.value = '' }}
                       className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
