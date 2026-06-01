@@ -206,11 +206,11 @@ export default function NewTimelineEventSubscreen({
           <label className="relative block w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white text-center overflow-hidden">
             <input
               type="file"
-              accept="image/*,.pdf,.doc,.docx,.txt"
+              accept="image/*"
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               onChange={handleAttachmentInputChange}
             />
-            <span aria-hidden="true">+ Anexar arquivo</span>
+            <span aria-hidden="true">+ Anexar foto</span>
           </label>
         </div>
         {error && <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{error}</p>}
