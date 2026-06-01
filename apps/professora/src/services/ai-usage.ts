@@ -54,6 +54,7 @@ export interface AiTextGenerationResult extends AiUsageReservationResult {
 
 export interface AiImageGenerationInput extends AiUsageReservationInput {
   requestSummary?: Record<string, unknown>
+  primaryPhotoDataUrl?: string | null
 }
 
 export interface AiImageGenerationResult extends AiUsageReservationResult {

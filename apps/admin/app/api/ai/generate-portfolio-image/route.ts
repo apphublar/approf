@@ -34,6 +34,9 @@ export async function POST(request: Request) {
     const promptVersion = typeof body.promptVersion === 'string' && body.promptVersion.trim()
       ? body.promptVersion.trim()
       : 'portfolio-image-v1'
+    const primaryPhotoDataUrl = typeof body.primaryPhotoDataUrl === 'string' && body.primaryPhotoDataUrl.startsWith('data:image/')
+      ? body.primaryPhotoDataUrl
+      : null
 
     const reservation = await reserveAiUsage({
       ownerId,
@@ -60,6 +63,7 @@ export async function POST(request: Request) {
       promptVersion,
       requestSummary: isObjectRecord(body.requestSummary) ? body.requestSummary : {},
       logId: reservedLogId,
+      inputImageDataUrl: primaryPhotoDataUrl,
     })
     generatedReportId = generated.reportId
 

@@ -568,6 +568,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       }
 
       const generationType = getReportGenerationType(reportKind, portfolioOutput)
+      const primaryPhotoDataUrl = generationType === 'portfolio_image'
+        ? (attachments.find((item) => item.isImage && item.dataUrl)?.dataUrl ?? null)
+        : null
       const result = generationType === 'portfolio_image'
         ? await generateAiPortfolioImage({
             generationType,
@@ -575,6 +578,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             studentId: isClassDiary || isParentsMeeting ? null : (selectedStudent?.id ?? null),
             promptVersion: 'portfolio-image-v1',
             requestSummary,
+            primaryPhotoDataUrl,
           })
         : await generateAiTextDocument({
             generationType,
@@ -1280,12 +1284,17 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             {!isParentsMeeting && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                {isPortfólio ? 'Campo de observação' : 'Orientação adicional'}
+                {isPortfólio ? 'Instruções para a IA (obrigatório seguir)' : 'Orientação adicional'}
               </label>
+              {isPortfólio && (
+                <p className="text-[11px] text-muted leading-[1.5] mt-1 mb-2">
+                  A IA seguirá exatamente o que você escrever aqui: destacar conquistas, remover informações, ajustar o layout, corrigir a imagem — qualquer instrução será respeitada.
+                </p>
+              )}
               <textarea
                 className="w-full min-h-[118px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
                 placeholder={isPortfólio
-                  ? 'Algo que você queira acrescentar sobre o desenvolvimento desta criança ou sobre as fotos anexadas.'
+                  ? 'Ex.: "Destaque a evolução na socialização. Não mencionar a semana de adaptação difícil. Usar cores suaves. A foto anexada é da criança fazendo pintura."'
                   : 'Ex.: destacar a adaptação nas últimas semanas, evitar linguagem muito técnica e incluir encaminhamentos para a família...'}
                 value={extraContext}
                 onChange={(event) => setExtraContext(event.target.value)}

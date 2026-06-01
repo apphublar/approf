@@ -10,6 +10,7 @@ interface GeneratePortfolioImageInput {
   promptVersion: string
   requestSummary?: Record<string, unknown>
   logId: string
+  inputImageDataUrl?: string | null
 }
 
 interface GeneratePortfolioImageResult {
@@ -66,17 +67,29 @@ export async function generatePortfolioImage(
   const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_IMAGE_MODEL
   const size = resolvePortfolioImageSize(summary)
   const quality = resolvePortfolioImageQuality()
-  const prompt = buildPortfolioImagePrompt(summary, size)
+  const prompt = input.inputImageDataUrl
+    ? buildPortfolioImageEditPrompt(summary, size)
+    : buildPortfolioImagePrompt(summary, size)
 
-  const generated = await requestOpenAiImage({
-    model,
-    fallbackModels: resolvePortfolioImageFallbackModels(model),
-    prompt,
-    size,
-    quality,
-    user: input.ownerId,
-    timeoutMs: 150000,
-  })
+  const generated = input.inputImageDataUrl
+    ? await requestOpenAiImageEdit({
+        model,
+        inputImageDataUrl: input.inputImageDataUrl,
+        prompt,
+        size,
+        quality,
+        user: input.ownerId,
+        timeoutMs: 150000,
+      })
+    : await requestOpenAiImage({
+        model,
+        fallbackModels: resolvePortfolioImageFallbackModels(model),
+        prompt,
+        size,
+        quality,
+        user: input.ownerId,
+        timeoutMs: 150000,
+      })
 
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'portfolio')
   const body = buildPersistedImageBody({
@@ -278,14 +291,92 @@ async function requestOpenAiImage(input: {
   }
 
   console.error('[ai-image] falha em todos os modelos', lastErrorMessage)
-  throw new PublicAiGenerationError('NÃ£o foi possÃ­vel criar a imagem agora. Tente novamente em instantes.')
+  throw new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
+}
+
+async function requestOpenAiImageEdit(input: {
+  model: string
+  inputImageDataUrl: string
+  prompt: string
+  size: string
+  quality: string
+  user: string
+  timeoutMs?: number
+}) {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new PublicAiGenerationError('Serviço de imagem indisponível no momento. Tente novamente em instantes.')
+  }
+
+  const [, base64] = input.inputImageDataUrl.split(',')
+  if (!base64) {
+    throw new PublicAiGenerationError('Foto inválida. Tente novamente com outra imagem.')
+  }
+
+  const imageBytes = Buffer.from(base64, 'base64')
+  const imageBlob = new Blob([imageBytes], { type: 'image/png' })
+
+  const form = new FormData()
+  form.append('model', input.model)
+  form.append('image[]', imageBlob, 'photo.png')
+  form.append('prompt', input.prompt)
+  form.append('n', '1')
+  form.append('size', input.size)
+  form.append('quality', input.quality)
+  form.append('output_format', 'png')
+  form.append('user', input.user)
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 180000)
+  let response: Response
+  try {
+    response = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: controller.signal,
+    })
+  } catch (error) {
+    clearTimeout(timeout)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new PublicAiGenerationError('A criação da imagem demorou mais do que o esperado. Tente novamente.')
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  const payload = (await response.json().catch(() => null)) as {
+    data?: Array<{ b64_json?: string; url?: string }>
+    usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number }
+    error?: { message?: string; code?: string }
+  } | null
+
+  if (!response.ok) {
+    console.error('[ai-image] OpenAI edit HTTP', response.status, input.model, payload?.error)
+    throw new PublicAiGenerationError(toPublicImageErrorMessage(response.status, payload?.error?.message))
+  }
+
+  const b64Json = payload?.data?.[0]?.b64_json
+  const imageUrl = payload?.data?.[0]?.url
+  const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
+  if (!image) {
+    throw new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
+  }
+
+  return {
+    image,
+    model: input.model,
+    inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
+    outputTokens: payload?.usage?.output_tokens ?? 0,
+  }
 }
 
 function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: string) {
   const studentName = asString(summary.studentName) ?? 'criança'
   const className = asString(summary.className) ?? 'turma'
   const selectedAnnotations = asObjectArray(summary.selectedAnnotations)
-  const extraContext = asString(summary.extraContext)
+  const extraContext = asString(summary.extraContext)?.trim()
   const blankContext = asString(summary.blankContext)
   const attachments = asObjectArray(summary.attachments)
 
@@ -299,25 +390,64 @@ function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: strin
 
   const attachmentList = attachments.length
     ? attachments.map((item) => `- ${asString(item.name) ?? 'arquivo anexado'}`).join('\n')
-    : 'Sem anexos visuais autorizados.'
+    : 'Sem anexos visuais.'
+
+  const teacherInstruction = extraContext
+    ? `\nINSTRUÇÃO OBRIGATÓRIA DA PROFESSORA (seguir à risca):\n${extraContext}`
+    : ''
 
   const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
-  return `Ilustracao de relatorio de desenvolvimento (${formatLabel}, ${size}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
+  return `Ilustração de portfólio pedagógico (${formatLabel}, ${size}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
 
-Texto visivel em portugues:
-- Título: RELATORIO DE DESENVOLVIMENTO
-- Subtítulo: EDUCACAO INFANTIL
+Texto visível em português brasileiro:
+- Título: PORTFÓLIO PEDAGÓGICO
+- Subtítulo: EDUCAÇÃO INFANTIL
 - Criança: ${studentName}
 - Turma: ${className}
-- Blocos curtos: Adaptacao e convivencia, Linguagem, Movimento e autonomia, Interesses, Familia, Consideracoes finais
+- Blocos curtos: Adaptação e convivência, Linguagem, Movimento e autonomia, Interesses, Família, Considerações finais
 
-Regras: usar apenas evidências fornecidas pela professora; não inventar fatos sobre a criança; não separar por campos de experiência BNCC; sem diagnóstico, sem comparação entre crianças, sem nota/ranking, sem marcas d'agua ou QR code, sem outras crianças identificáveis. Pouco texto, letras legiveis.
+Regras: usar apenas evidências fornecidas pela professora; não inventar fatos sobre a criança; sem diagnóstico, sem comparação entre crianças, sem nota ou ranking, sem marcas d'água ou QR code, sem outras crianças identificáveis. Pouco texto, letras legíveis.
 
-Conteúdo pedagogico real autorizado:
+Conteúdo pedagógico real autorizado:
 ${observations}
-
-Extra: ${extraContext || 'Destacar conquistas e proximos passos da rotina.'}
+${teacherInstruction}
 Anexos: ${attachmentList}`
+}
+
+function buildPortfolioImageEditPrompt(summary: Record<string, unknown>, size: string) {
+  const studentName = asString(summary.studentName) ?? 'criança'
+  const className = asString(summary.className) ?? 'turma'
+  const selectedAnnotations = asObjectArray(summary.selectedAnnotations)
+  const extraContext = asString(summary.extraContext)?.trim()
+  const blankContext = asString(summary.blankContext)
+
+  const observations = selectedAnnotations.length
+    ? selectedAnnotations.map((item) => {
+        const label = asString(item.label) ?? 'registro'
+        const text = asString(item.text) ?? ''
+        return `- ${label}: ${text}`
+      }).join('\n')
+    : blankContext || 'Destacar conquistas e próximos passos da rotina.'
+
+  const teacherInstruction = extraContext
+    ? `\nINSTRUÇÃO OBRIGATÓRIA DA PROFESSORA (seguir à risca):\n${extraContext}`
+    : ''
+
+  const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
+  return `Crie um portfólio pedagógico visual (${formatLabel}, ${size}) para Educação Infantil usando a foto fornecida da criança como elemento central e principal.
+
+IMPORTANTE: A foto é da criança real. Mantenha-a visível e em destaque. NÃO substitua por ilustração. Adicione apenas elementos decorativos ao redor da foto.
+
+Elementos a adicionar em torno da foto:
+- Moldura decorativa em tons pastel, estilo acolhedor de Educação Infantil
+- Título no topo: PORTFÓLIO PEDAGÓGICO — ${studentName}
+- Turma: ${className}
+- Pequenos blocos de texto nos cantos ou na parte inferior com resumo dos marcos
+
+Conteúdo pedagógico real autorizado:
+${observations}
+${teacherInstruction}
+Regras: letras legíveis em português brasileiro; sem marcas d'água ou QR code; sem outras crianças identificáveis.`
 }
 function resolvePortfolioImageSize(summary: Record<string, unknown>) {
   const fromSummary = asString(summary.portfolioImageFormat)?.trim().toLowerCase()
