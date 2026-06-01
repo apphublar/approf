@@ -302,26 +302,21 @@ function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: strin
     : 'Sem anexos visuais autorizados.'
 
   const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
-  return `Ilustração visual de portfólio pedagógico (${formatLabel}, ${size}) para Educação Infantil.
+  return `Ilustracao de relatorio de desenvolvimento (${formatLabel}, ${size}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
 
-Objetivo: criar uma imagem acolhedora, profissional e delicada para acompanhar o portfólio de ${studentName}, turma ${className}.
+Texto visivel em portugues:
+- Título: RELATORIO DE DESENVOLVIMENTO
+- Subtítulo: EDUCACAO INFANTIL
+- Criança: ${studentName}
+- Turma: ${className}
+- Blocos curtos: Adaptacao e convivencia, Linguagem, Movimento e autonomia, Interesses, Familia, Consideracoes finais
 
-Regra crítica de texto: NÃO escreva nenhuma palavra, letra, número, título, legenda, placa, etiqueta, assinatura, marca d'água, QR code ou texto visível dentro da imagem. A aplicação vai inserir os textos corretos em português brasileiro fora da imagem. A imagem deve ser apenas visual/ilustrativa, sem tipografia.
+Regras: usar apenas evidências fornecidas pela professora; não inventar fatos sobre a criança; não separar por campos de experiência BNCC; sem diagnóstico, sem comparação entre crianças, sem nota/ranking, sem marcas d'agua ou QR code, sem outras crianças identificáveis. Pouco texto, letras legiveis.
 
-Direção visual:
-- composição limpa e organizada, em tons suaves;
-- elementos de educação infantil, produções, materiais pedagógicos, desenhos, papéis, brinquedos e registros de aprendizagem;
-- clima afetivo, seguro e escolar;
-- sem outras crianças identificáveis;
-- sem rostos realistas quando não houver foto autorizada;
-- sem diagnóstico, comparação entre crianças, nota, ranking ou símbolos médicos.
-
-Regras pedagógicas: usar apenas evidências fornecidas pela professora; não inventar fatos sobre a criança; não separar por campos de experiência BNCC.
-
-Conteúdo pedagógico real autorizado:
+Conteúdo pedagogico real autorizado:
 ${observations}
 
-Extra: ${extraContext || 'Destacar conquistas e próximos passos da rotina.'}
+Extra: ${extraContext || 'Destacar conquistas e proximos passos da rotina.'}
 Anexos: ${attachmentList}`
 }
 function resolvePortfolioImageSize(summary: Record<string, unknown>) {
