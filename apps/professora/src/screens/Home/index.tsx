@@ -51,6 +51,10 @@ export default function HomeScreen() {
     () => buildStudentsWithoutRecentNotes(annotations, classes).slice(0, 3),
     [annotations, classes],
   )
+  const studentsReadyForReport = useMemo(
+    () => buildStudentsReadyForReport(annotations, classes),
+    [annotations, classes],
+  )
   const giztokensRemaining = aiUsage?.wallet.giztokensRemaining ?? 8000
   const docsGenerated = aiUsage?.generatedDocumentsThisMonth ?? aiUsage?.generatedThisMonth ?? 0
   const imagesGenerated = aiUsage?.generatedImagesThisMonth ?? 0
@@ -327,6 +331,7 @@ export default function HomeScreen() {
             </div>
           </button>
 
+          {studentsReadyForReport.length > 0 && (
           <div className="bg-white rounded-app p-4 mb-[14px] border border-border shadow-card">
             <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
               Sugestões pedagógicas
@@ -339,11 +344,18 @@ export default function HomeScreen() {
                 <Sparkles size={17} color="#856404" />
               </div>
               <div className="flex-1">
-                <p className="text-[12px] font-bold text-ink">3 relatórios pendentes</p>
-                <p className="text-[11px] text-muted leading-snug">Lucas, Sofia e Valentina já têm anotações suficientes.</p>
+                <p className="text-[12px] font-bold text-ink">
+                  {studentsReadyForReport.length === 1
+                    ? '1 relatório pendente'
+                    : `${studentsReadyForReport.length} relatórios pendentes`}
+                </p>
+                <p className="text-[11px] text-muted leading-snug">
+                  {formatFirstNames(studentsReadyForReport)} já {studentsReadyForReport.length === 1 ? 'tem' : 'têm'} anotações suficientes para gerar relatório.
+                </p>
               </div>
             </button>
           </div>
+          )}
 
           <button
             onClick={() => openSubscreen('calendar')}
@@ -856,5 +868,40 @@ function findStudentName(studentId: string, classes: ReturnType<typeof useAppSto
     if (found) return found.name
   }
   return null
+}
+
+const MIN_ANNOTATIONS_FOR_REPORT = 3
+
+function buildStudentsReadyForReport(
+  annotations: ReturnType<typeof useAppStore.getState>['annotations'],
+  classes: ReturnType<typeof useAppStore.getState>['classes'],
+) {
+  const countByStudent = new Map<string, number>()
+  for (const annotation of annotations) {
+    if (!annotation.studentId) continue
+    countByStudent.set(annotation.studentId, (countByStudent.get(annotation.studentId) ?? 0) + 1)
+  }
+
+  return classes.flatMap((classItem) =>
+    classItem.students
+      .filter((student) => (countByStudent.get(student.id) ?? 0) >= MIN_ANNOTATIONS_FOR_REPORT)
+      .map((student) => ({
+        studentId: student.id,
+        studentName: student.name,
+        className: classItem.name,
+        classId: classItem.id,
+        annotationCount: countByStudent.get(student.id) ?? 0,
+      })),
+  )
+}
+
+function formatFirstNames(students: Array<{ studentName: string }>, max = 3) {
+  const names = students.slice(0, max).map((s) => s.studentName.split(' ')[0])
+  const remaining = students.length - max
+  let base = ''
+  if (names.length === 1) base = names[0]
+  else if (names.length === 2) base = `${names[0]} e ${names[1]}`
+  else base = `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
+  return remaining > 0 ? `${base} e mais ${remaining}` : base
 }
 

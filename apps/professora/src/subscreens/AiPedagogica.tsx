@@ -33,7 +33,25 @@ type SectionTitle = (typeof AI_SECTIONS)[number]['title']
 
 export default function AiPedagogicaSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { userName, schoolName } = useAppStore()
+  const { userName, schoolName, annotations, classes } = useAppStore()
+
+  const studentsReadyForReport = useMemo(() => {
+    const countByStudent = new Map<string, number>()
+    for (const annotation of annotations) {
+      if (!annotation.studentId) continue
+      countByStudent.set(annotation.studentId, (countByStudent.get(annotation.studentId) ?? 0) + 1)
+    }
+    return classes.flatMap((classItem) =>
+      classItem.students
+        .filter((student) => (countByStudent.get(student.id) ?? 0) >= 3)
+        .map((student) => ({
+          studentId: student.id,
+          studentName: student.name,
+          className: classItem.name,
+          annotationCount: countByStudent.get(student.id) ?? 0,
+        })),
+    )
+  }, [annotations, classes])
   const [query, setQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
@@ -198,10 +216,16 @@ export default function AiPedagogicaSubscreen() {
             <div className="rounded-app p-4 border border-gp mb-8" style={{ background: '#F0FAF4' }}>
               <div className="flex items-center gap-2 text-gm font-bold text-[13px] mb-1">
                 <Sparkles size={15} />
-                Relatórios pendentes
+                {studentsReadyForReport.length > 0
+                  ? studentsReadyForReport.length === 1
+                    ? '1 relatório pendente'
+                    : `${studentsReadyForReport.length} relatórios pendentes`
+                  : 'Relatórios pedagógicos'}
               </div>
               <p className="text-[12px] text-soft leading-[1.6]">
-                Lucas, Sofia e Valentina já têm anotações suficientes para gerar uma primeira versão de relatório.
+                {studentsReadyForReport.length > 0
+                  ? `${formatReadyNames(studentsReadyForReport)} já ${studentsReadyForReport.length === 1 ? 'tem' : 'têm'} anotações suficientes para gerar uma primeira versão de relatório.`
+                  : 'Continue adicionando anotações. Quando uma criança tiver registros suficientes, ela aparecerá aqui como sugestão de relatório.'}
               </p>
             </div>
         </>
@@ -395,6 +419,16 @@ export default function AiPedagogicaSubscreen() {
       )}
     </div>
   )
+}
+
+function formatReadyNames(students: Array<{ studentName: string }>, max = 3) {
+  const names = students.slice(0, max).map((s) => s.studentName.split(' ')[0])
+  const remaining = students.length - max
+  let base = ''
+  if (names.length === 1) base = names[0]
+  else if (names.length === 2) base = `${names[0]} e ${names[1]}`
+  else base = `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
+  return remaining > 0 ? `${base} e mais ${remaining}` : base
 }
 
 function normalizeText(value: string) {
