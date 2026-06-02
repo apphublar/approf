@@ -108,11 +108,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const [includeDayAnnotations, setIncludeDayAnnotations] = useState(true)
   const [meetingDate, setMeetingDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [meetingDuration, setMeetingDuration] = useState('1h30')
-  const [meetingOpening, setMeetingOpening] = useState('')
   const [meetingAgenda, setMeetingAgenda] = useState('')
-  const [meetingGeneralInfo, setMeetingGeneralInfo] = useState('')
-  const [meetingAgreements, setMeetingAgreements] = useState('')
-  const [meetingClosing, setMeetingClosing] = useState('')
   const [livingReport, setLivingReport] = useState(false)
   const [latestReportId, setLatestReportId] = useState('')
   const [latestReportBody, setLatestReportBody] = useState('')
@@ -175,7 +171,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const hasRequiredPeriod = !needsEvaluationPeriod || evaluationPeriod.trim().length >= 5
   const hasRequiredDevelopmentFields = !isDevelopmentReport || finalConsiderations.trim().length >= 10
   const hasRequiredMeetingFields = !isParentsMeeting
-    || Boolean(meetingDate && meetingDuration && meetingOpening.trim().length >= 10 && meetingAgenda.trim().length >= 10 && meetingGeneralInfo.trim().length >= 10 && meetingAgreements.trim().length >= 10 && meetingClosing.trim().length >= 10)
+    || Boolean(meetingDate && meetingDuration && meetingAgenda.trim().length >= 10)
   const canGenerate = hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod && hasRequiredDevelopmentFields && hasRequiredMeetingFields
   const generationRequirementHint = getGenerationRequirementHint({
     isClassDiary,
@@ -249,11 +245,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       includeDayAnnotations: boolean
       meetingDate: string
       meetingDuration: string
-      meetingOpening: string
       meetingAgenda: string
-      meetingGeneralInfo: string
-      meetingAgreements: string
-      meetingClosing: string
       livingReport: boolean
     }>(key)
     if (draft) {
@@ -279,11 +271,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       setIncludeDayAnnotations(draft.includeDayAnnotations !== false)
       setMeetingDate(draft.meetingDate || new Date().toISOString().slice(0, 10))
       setMeetingDuration(draft.meetingDuration || '1h30')
-      setMeetingOpening(draft.meetingOpening || '')
       setMeetingAgenda(draft.meetingAgenda || '')
-      setMeetingGeneralInfo(draft.meetingGeneralInfo || '')
-      setMeetingAgreements(draft.meetingAgreements || '')
-      setMeetingClosing(draft.meetingClosing || '')
       setLivingReport(Boolean(draft.livingReport))
       setDraftMessage('Rascunho recuperado')
     }
@@ -317,11 +305,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         includeDayAnnotations,
         meetingDate,
         meetingDuration,
-        meetingOpening,
         meetingAgenda,
-        meetingGeneralInfo,
-        meetingAgreements,
-        meetingClosing,
         livingReport,
       })
     }, 350)
@@ -343,12 +327,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     ignoredNotes,
     livingReport,
     meetingAgenda,
-    meetingAgreements,
-    meetingClosing,
     meetingDate,
     meetingDuration,
-    meetingGeneralInfo,
-    meetingOpening,
     mode,
     objective,
     portfolioImageFormat,
@@ -436,11 +416,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     includeDayAnnotations,
     meetingDate,
     meetingDuration,
-    meetingOpening,
     meetingAgenda,
-    meetingGeneralInfo,
-    meetingAgreements,
-    meetingClosing,
   })
 
   function handleBack() {
@@ -533,11 +509,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     setFinalConsiderations('')
     setSelectedMilestoneIds([])
     setIncludeDayAnnotations(true)
-    setMeetingOpening('')
     setMeetingAgenda('')
-    setMeetingGeneralInfo('')
-    setMeetingAgreements('')
-    setMeetingClosing('')
     setLivingReport(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -582,11 +554,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         diaryRawText: isClassDiary ? diaryRawText : null,
         meetingDate: isParentsMeeting ? meetingDate : null,
         meetingDuration: isParentsMeeting ? meetingDuration : null,
-        meetingOpening: isParentsMeeting ? meetingOpening : null,
         meetingAgenda: isParentsMeeting ? meetingAgenda : null,
-        meetingGeneralInfo: isParentsMeeting ? meetingGeneralInfo : null,
-        meetingAgreements: isParentsMeeting ? meetingAgreements : null,
-        meetingClosing: isParentsMeeting ? meetingClosing : null,
         assistantMode: assistantMode || null,
         livingReport,
         voiceAnnotationsCount: voiceAnnotations.length,
@@ -883,38 +851,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   <option value="2h">2h</option>
                 </select>
                 <MeetingTextArea
-                  label="Abertura (10 min)"
-                  value={meetingOpening}
-                  onChange={setMeetingOpening}
-                  placeholder="Como receber os pais e criar um ambiente acolhedor no início da reunião."
-                />
-                <MeetingTextArea
                   label="Pauta da reunião"
                   value={meetingAgenda}
                   onChange={setMeetingAgenda}
-                  placeholder="Liste os itens da pauta e, se quiser, o tempo sugerido para cada um."
-                />
-                <MeetingTextArea
-                  label="Informações gerais da turma"
-                  value={meetingGeneralInfo}
-                  onChange={setMeetingGeneralInfo}
-                  placeholder="Baseado nas suas anotações: como a turma está coletivamente, conquistas do período e próximos passos. Não cite nomes de crianças."
-                />
-                <MeetingTextArea
-                  label="Combinados gerais"
-                  value={meetingAgreements}
-                  onChange={setMeetingAgreements}
-                  placeholder="Sugestões de rotina e parceria com as famílias."
-                />
-                <div className="rounded-app-sm border border-dashed border-border bg-cream px-3 py-3 mb-4">
-                  <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Espaço para anotações durante a reunião</p>
-                  <p className="text-[12px] text-muted mt-1">O documento gerado terá um campo em branco para a professora usar na hora.</p>
-                </div>
-                <MeetingTextArea
-                  label="Encerramento (5 min)"
-                  value={meetingClosing}
-                  onChange={setMeetingClosing}
-                  placeholder="Como fechar a reunião, agradecer a presença e reforçar a parceria com as famílias."
+                  placeholder="Liste os itens da pauta e, se quiser, o tempo sugerido para cada um. Ex: apresentação do bimestre, conquistas da turma, combinados de rotina, dúvidas das famílias..."
                 />
               </div>
             )}
@@ -1330,26 +1270,31 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isParentsMeeting && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                {isPortfólio ? 'Instruções para a IA (obrigatório seguir)' : 'Orientação adicional'}
+                {isPortfólio ? 'Instruções para a IA (obrigatório seguir)' : 'Orientações finais para a IA (opcional)'}
               </label>
               {isPortfólio && (
                 <p className="text-[11px] text-muted leading-[1.5] mt-1 mb-2">
                   A IA seguirá exatamente o que você escrever aqui: destacar conquistas, remover informações, ajustar o layout, corrigir a imagem — qualquer instrução será respeitada.
                 </p>
               )}
+              {!isPortfólio && (
+                <p className="text-[11px] text-muted leading-[1.5] mt-1 mb-2">
+                  A IA seguirá exatamente o que você escrever aqui. Use para dar instruções específicas, destacar situações, nomear crianças em situações concretas ou indicar o tom desejado.
+                </p>
+              )}
               <textarea
                 className="w-full min-h-[118px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
                 placeholder={isPortfólio
                   ? 'Ex.: "Destaque a evolução na socialização. Não mencionar a semana de adaptação difícil. Usar cores suaves. A foto anexada é da criança fazendo pintura."'
-                  : 'Ex.: destacar a adaptação nas últimas semanas, evitar linguagem muito técnica e incluir encaminhamentos para a família...'}
+                  : isParentsMeeting
+                    ? 'Ex.: reforçar o combinado sobre uniforme, mencionar a festa junina que está chegando, agradecer a participação dos pais na última atividade...'
+                    : 'Ex.: Pedro teve dificuldade com as tesouras em março mas superou em abril. Ana adora cantar e se destaca nas rodas. Não mencionar o episódio de choro da semana 1...'}
                 value={extraContext}
                 onChange={(event) => setExtraContext(event.target.value)}
               />
             </div>
-            )}
 
             {isPortfólio && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
@@ -1612,11 +1557,7 @@ function createReportPreview(input: {
   includeDayAnnotations: boolean
   meetingDate: string
   meetingDuration: string
-  meetingOpening: string
   meetingAgenda: string
-  meetingGeneralInfo: string
-  meetingAgreements: string
-  meetingClosing: string
 }) {
   const annotationBlock = input.selectedAnnotations.length
     ? input.selectedAnnotations.map((annotation) => `- ${annotation.date} | ${annotation.label}: ${annotation.text}`).join('\n')
@@ -1643,25 +1584,16 @@ ${input.extraContext.trim() || 'Nenhuma orientação adicional foi incluída ant
     return `PLANEJAMENTO DE REUNIÁO — ${input.className}
 Data: ${input.meetingDate || '__ / __ / ____'}   Duração estimada: ${input.meetingDuration || '1h30'}
 
-ABERTURA (10 min)
-${input.meetingOpening.trim() || 'Como receber os pais e criar ambiente acolhedor.'}
-
 PAUTA DA REUNIÁO
-${input.meetingAgenda.trim() || '1. [item da pauta] — tempo sugerido'}
+${input.meetingAgenda.trim() || '1. [item da pauta] — tempo sugerido\n2. [item da pauta]\n3. [item da pauta]'}
 
-INFORMAÇÕES GERAIS DA TURMA
-${input.meetingGeneralInfo.trim() || 'Baseado nas suas anotações: como a turma está coletivamente, conquistas do período e próximos passos.'}
-
-COMBINADOS GERAIS
-${input.meetingAgreements.trim() || 'Sugestões de rotina e parceria com as famílias.'}
+OBSERVAÇÕES E ENCAMINHAMENTOS
+${input.extraContext.trim() || 'Anotações e encaminhamentos definidos durante a reunião.'}
 
 ESPAÇO PARA ANOTAÇÕES DURANTE A REUNIÁO
 ________________________________________
 ________________________________________
 ________________________________________
-
-ENCERRAMENTO (5 min)
-${input.meetingClosing.trim() || 'Como fechar a reunião.'}
 
 Documento gerado a partir das informações autorizadas pela professora.`
   }
@@ -2079,7 +2011,7 @@ function getGenerationRequirementHint(input: {
     return 'Escreva um relato breve do dia da turma para criar um diário mais fiel.'
   }
   if (input.isParentsMeeting && !input.hasRequiredMeetingFields) {
-    return 'Preencha abertura, pauta, informações gerais, combinados e encerramento da reunião.'
+    return 'Preencha a pauta da reunião com pelo menos 10 caracteres.'
   }
   if (input.mode === 'blank' && input.blankContextLength < 20 && !input.isParentsMeeting) {
     return input.isSpecialistReferral

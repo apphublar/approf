@@ -30,11 +30,7 @@ export interface BuildPromptInput {
   includeDayAnnotations?: boolean
   meetingDate?: string
   meetingDuration?: string
-  meetingOpening?: string
   meetingAgenda?: string
-  meetingGeneralInfo?: string
-  meetingAgreements?: string
-  meetingClosing?: string
   theme?: string
   diaryDate?: string
   diaryTheme?: string
@@ -88,6 +84,8 @@ export function buildStage1DraftPrompt(input: BuildPromptInput): PedagogicalProm
     'Nunca realize diagnóstico medico, clinico ou psicologico.',
     'Não invente fatos: use apenas o contexto fornecido.',
     `Evite em todos os documentos estas expressoes: ${FORBIDDEN_PEDAGOGICAL_WORDS.join(', ')}.`,
+    'FIDELIDADE OBRIGATÓRIA: preserve exatamente os detalhes fornecidos pela professora — nomes de crianças, situações específicas, datas, conquistas e fatos relatados. Nunca generalize uma situação específica (ex: se a professora escreveu "Pedro caiu no parque", não escreva "uma criança apresentou dificuldade"). Nunca omita informação específica para transformá-la em afirmação genérica.',
+    'INSTRUÇÕES DA PROFESSORA TÊM PRIORIDADE ABSOLUTA: o campo "INSTRUÇÕES FINAIS DA PROFESSORA" deve ser seguido à risca, sem exceção. Se a professora pediu para destacar algo, destacar. Se pediu para omitir, omitir. Se deu um tom ou formato, usar.',
     'Transforme as informações da professora: preserve detalhes relevantes, organize melhor, corrija a escrita e humanize sem apagar o que foi informado.',
     ...documentGuidelines.system,
     'A saida desta etapa e um rascunho que sera revisado nas etapas seguintes; não precisa estar perfeita, mas deve ser completa e estruturada.',
@@ -220,11 +218,7 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     `PUXAR ANOTACOES DO DIARIO: ${input.includeDayAnnotations === false ? 'não' : 'sim'}`,
     `DATA DA REUNIAO: ${input.meetingDate?.trim() || 'Não informado'}`,
     `DURACAO DA REUNIAO: ${input.meetingDuration?.trim() || 'Não informado'}`,
-    `ABERTURA DA REUNIAO: ${input.meetingOpening?.trim() || 'Não informado'}`,
     `PAUTA DA REUNIAO: ${input.meetingAgenda?.trim() || 'Não informado'}`,
-    `INFORMACOES GERAIS DA TURMA: ${input.meetingGeneralInfo?.trim() || 'Não informado'}`,
-    `COMBINADOS GERAIS: ${input.meetingAgreements?.trim() || 'Não informado'}`,
-    `ENCERRAMENTO DA REUNIAO: ${input.meetingClosing?.trim() || 'Não informado'}`,
     `USAR ANOTACOES: ${input.useAnnotations === false ? 'não' : 'sim'}`,
     '',
     'ANOTACOES SELECIONADAS:',
@@ -242,8 +236,8 @@ function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
     'ANOTAÇÁO BRUTA DA PROFESSORA (quando for Diário de Bordo):',
     input.diaryRawText?.trim() || '- Não informado.',
     '',
-    'ORIENTAÇÁO EXTRA DA PROFESSORA:',
-    input.extraContext?.trim() || '- Não informado.',
+    'INSTRUÇÕES FINAIS DA PROFESSORA (prioridade máxima — seguir à risca, sem exceção):',
+    input.extraContext?.trim() || '- Nenhuma instrução adicional.',
     '',
     'ANEXOS AUTORIZADOS COMO REFERÊNCIA (apenas nomes/metadados; não analise o conteúdo binário):',
     attachments || '- Nenhum anexo enviado.',
@@ -291,9 +285,10 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
     system.push(
       'Este documento é um planejamento semanal prático, escaneável e aplicável na rotina.',
       'Use BNCC de forma objetiva nos campos/intencionalidades, sem texto teórico longo.',
-      'Organize por dias ou blocos da semana, com objetivos, propostas, materiais e observação.',
+      'Organize por dias da semana (segunda, terça, quarta, quinta, sexta).',
+      'OBRIGATÓRIO: cada dia da semana deve ter sua PRÓPRIA intencionalidade específica — nunca use um único objetivo geral para a semana inteira. Cada dia = intencionalidade distinta, proposta própria e materiais específicos.',
     )
-    user.push('Tamanho final: planejamento de leitura rápida, com listas úteis e sem parágrafos extensos.')
+    user.push('Tamanho final: planejamento de leitura rápida, com listas úteis e sem parágrafos extensos. Cada dia da semana deve ter sua própria intencionalidade, proposta e materiais — não use objetivo único semanal.')
   } else if (type === 'daily_lesson_plan') {
     system.push(
       'Este documento é um plano de aula diário, direto e operacional.',
@@ -319,10 +314,11 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
   } else if (type === 'parents_meeting_record') {
     system.push(
       'Este documento é um planejamento de reunião de pais: acolhedor, objetivo e prático para conduzir a reunião.',
-      'Não use BNCC nem linguagem acadêmica. Organize abertura, pauta, informações gerais da turma, combinados e encerramento.',
+      'Não use BNCC nem linguagem acadêmica. Foque na PAUTA DA REUNIÃO como eixo central do documento.',
       'Não cite nomes de crianças. Fale da turma como grupo e preserve dados sensíveis.',
+      'Estruture o documento em: Pauta da reunião (principal) e Observações/encaminhamentos. Não crie seções longas de abertura, informações gerais da turma, combinados ou encerramento — integre esses elementos como itens da pauta quando necessário.',
     )
-    user.push('Tamanho final: curto, com roteiro de reunião, tempos estimados e espaço para anotações.')
+    user.push('Tamanho final: curto, focado na pauta e nas observações, com espaço para anotações durante a reunião.')
   } else if (type === 'portfolio_text') {
     system.push(
       'Este documento é portfólio textual: narrativa pedagógica com evidências, memória de percurso e tom afetivo-profissional.',
@@ -405,9 +401,18 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
     ]
   }
 
+  if (input.generationType === 'weekly_planning') {
+    return [
+      'Para cada dia da semana (segunda a sexta): intencionalidade específica do dia',
+      'Para cada dia da semana: proposta/atividade do dia',
+      'Para cada dia da semana: materiais necessários',
+      'PROIBIDO: objetivo único geral para a semana inteira — cada dia tem sua própria intencionalidade',
+      'Observações gerais ao final (opcional)',
+    ]
+  }
+
   if (
     input.generationType === 'planning'
-    || input.generationType === 'weekly_planning'
     || input.generationType === 'daily_lesson_plan'
   ) {
     return [
@@ -455,12 +460,9 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
 
   if (input.generationType === 'parents_meeting_record') {
     return [
-      'Abertura acolhedora',
-      'Pauta da reunião com tempos estimados',
-      'Informações gerais da turma sem citar nomes de crianças',
-      'Combinados gerais com as famílias',
-      'Espaço para anotações',
-      'Encerramento',
+      'Pauta da reunião (eixo central, com itens numerados e tempos estimados)',
+      'Observações e encaminhamentos',
+      'Espaço em branco para anotações durante a reunião',
     ]
   }
 
