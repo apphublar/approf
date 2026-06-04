@@ -5,6 +5,7 @@ import { mapSupabaseStudent } from './students'
 import { loadSupabaseTimelineEvents } from './timeline'
 import { loadSupabaseAnnotations } from './annotations'
 import { loadSupabaseAttendanceRecords } from './attendance'
+import { loadBoardNotes } from './board-notes'
 
 export interface ClassInput {
   name: string
@@ -31,7 +32,7 @@ export async function loadTeacherWorkspace() {
 
   if (profileError) throw profileError
 
-  const [schoolsResult, classesResult, studentsResult, timelineEvents, attendanceRecords] = await Promise.all([
+  const [schoolsResult, classesResult, studentsResult, timelineEvents, attendanceRecords, boardNotes] = await Promise.all([
     supabase.from('schools').select('id, name').eq('owner_id', user.id),
     supabase
       .from('classes')
@@ -42,6 +43,7 @@ export async function loadTeacherWorkspace() {
     loadStudentsWithPhotoPositionFallback(user.id),
     loadSupabaseTimelineEvents(user.id),
     loadSupabaseAttendanceRecords(user.id),
+    loadBoardNotes(user.id),
   ])
 
   if (schoolsResult.error) throw schoolsResult.error
@@ -81,7 +83,7 @@ export async function loadTeacherWorkspace() {
     iconBg: '#D8F3DC',
     students: studentsByClassId.get(item.id) ?? [],
   }))
-  const annotations = await loadSupabaseAnnotations(user.id, classes)
+  const { annotations, hasMore: annotationsHasMore } = await loadSupabaseAnnotations(user.id, classes)
   const noteCountByStudentId = buildNoteCountByStudentId(classes, annotations)
   const classesWithCounts = classes.map((classData) => ({
     ...classData,
@@ -97,7 +99,9 @@ export async function loadTeacherWorkspace() {
     schoolName: schoolsResult.data?.[0]?.name ?? 'Escola nao informada',
     classes: classesWithCounts,
     annotations,
+    annotationsHasMore,
     attendanceRecords,
+    boardNotes,
     onboardingCompleted: Number(profile.estimated_student_count ?? 0) > 0 || classes.length > 0,
   }
 }

@@ -6,7 +6,27 @@ export interface CoordinatorShareResult {
     id: string
     coordinator_name: string
     coordinator_email: string
-    access_status: 'pending' | 'verified' | 'revoked'
+    access_status: 'pending' | 'verified' | 'revoked' | 'review_finalized'
+  }
+}
+
+export interface CoordinatorShareInfo {
+  id: string
+  coordinator_name: string
+  coordinator_email: string
+  share_token: string
+  access_status: 'pending' | 'verified' | 'revoked' | 'review_finalized'
+  verified_at: string | null
+  last_access_at: string | null
+  updated_at: string
+}
+
+export interface CoordinatorShareStatus {
+  shares: CoordinatorShareInfo[]
+  reportSummary: {
+    total: number
+    approved: number
+    changesRequested: number
   }
 }
 
@@ -22,6 +42,12 @@ export interface ReportReviewEvent {
   previous_status: string | null
   next_status: string | null
   created_at: string
+}
+
+export async function getCoordinatorShareStatus(classId: string): Promise<CoordinatorShareStatus> {
+  return callCoordinatorApi<CoordinatorShareStatus>(`/api/coordinator/share?classId=${encodeURIComponent(classId)}`, {
+    method: 'GET',
+  })
 }
 
 export async function shareClassWithCoordinator(input: {

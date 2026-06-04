@@ -5,7 +5,7 @@ import { useNavStore, useAppStore } from '@/store'
 import { saveSupabaseAttendanceRecord } from '@/services/supabase/attendance'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { listReports } from '@/services/reports'
-import { shareClassWithCoordinator } from '@/services/coordinator-review'
+import { getCoordinatorShareStatus, shareClassWithCoordinator, type CoordinatorShareStatus } from '@/services/coordinator-review'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
 import type { AttendanceRecord, Student } from '@/types'
@@ -32,8 +32,16 @@ export default function ClassStudentsSubscreen() {
   const [coordinatorMessage, setCoordinatorMessage] = useState('')
   const [coordinatorError, setCoordinatorError] = useState('')
   const [sharingCoordinator, setSharingCoordinator] = useState(false)
+  const [shareStatus, setShareStatus] = useState<CoordinatorShareStatus | null>(null)
 
   const cls = classes.find((c) => c.id === activeClassId) ?? classes[0]
+
+  useEffect(() => {
+    if (!cls?.id || !isSupabaseAuthEnabled()) return
+    getCoordinatorShareStatus(cls.id)
+      .then(setShareStatus)
+      .catch(() => { /* silent — optional status */ })
+  }, [cls?.id])
   const classAttendanceRecords = useMemo(
     () => attendanceRecords.filter((record) => record.classId === cls?.id),
     [attendanceRecords, cls?.id],
@@ -224,6 +232,29 @@ export default function ClassStudentsSubscreen() {
                   <p className="text-[12px] text-muted leading-[1.5]">Ela valida o acesso por e-mail e revisa os relatórios de desenvolvimento das crianças.</p>
                 </div>
               </div>
+
+              {shareStatus && shareStatus.shares.length > 0 && (() => {
+                const latestShare = shareStatus.shares[0]
+                const isFinalized = latestShare.access_status === 'review_finalized'
+                const isVerified = latestShare.access_status === 'verified' || isFinalized
+                const { approved, changesRequested, total } = shareStatus.reportSummary
+                return (
+                  <div className={`rounded-app-sm border p-3 mb-3 ${isFinalized ? 'bg-[#EAF7EE] border-[#B6DECA]' : isVerified ? 'bg-[#FFF8E8] border-[#EAD58A]' : 'bg-cream border-border'}`}>
+                    <p className="text-[11px] font-bold text-ink mb-1">
+                      {isFinalized ? '✅ Revisão finalizada pela coordenadora' : isVerified ? '👀 Coordenadora com acesso ativo' : '⏳ Aguardando acesso da coordenadora'}
+                    </p>
+                    <p className="text-[11px] text-muted leading-[1.5]">
+                      {latestShare.coordinator_name} · {latestShare.coordinator_email}
+                    </p>
+                    {isFinalized && total > 0 && (
+                      <p className="text-[11px] text-muted mt-1">
+                        {approved} aprovado(s) · {changesRequested} com correção solicitada · {total - approved - changesRequested} pendente(s)
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
+
               <div className="grid grid-cols-1 gap-2">
                 <input
                   value={coordinatorName}
@@ -243,7 +274,7 @@ export default function ClassStudentsSubscreen() {
                 disabled={sharingCoordinator || !coordinatorName.trim() || !coordinatorEmail.trim()}
                 className="w-full mt-3 py-3 rounded-app-sm bg-gm text-white text-[13px] font-bold disabled:opacity-50"
               >
-                {sharingCoordinator ? 'Enviando...' : 'Validar acesso da coordenadora'}
+                {sharingCoordinator ? 'Enviando...' : 'Enviar acesso para a coordenadora'}
               </button>
               {coordinatorMessage && <p className="text-[12px] text-gm mt-2 leading-[1.5]">{coordinatorMessage}</p>}
               {coordinatorShareUrl && <p className="text-[11px] text-muted mt-1 break-all">Link: {coordinatorShareUrl}</p>}

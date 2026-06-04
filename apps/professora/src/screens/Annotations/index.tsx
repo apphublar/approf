@@ -3,12 +3,13 @@ import { Plus, Search } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 import { getAppDataMode } from '@/services/app-data'
-import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
+import { deleteSupabaseAnnotation, loadSupabaseAnnotations } from '@/services/supabase/annotations'
 
 export default function AnnotationsScreen() {
-  const { annotations, removeAnnotation } = useAppStore()
+  const { annotations, annotationsHasMore, removeAnnotation, addAnnotation, setAnnotationsHasMore, classes, userId } = useAppStore()
   const { openSubscreen } = useNavStore()
   const [query, setQuery] = useState('')
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const filtered = useMemo(() => {
     const normalizedQuery = normalizeText(query)
@@ -27,6 +28,20 @@ export default function AnnotationsScreen() {
 
   function openAnnotation(annotation: (typeof annotations)[number]) {
     openSubscreen('new-annotation', { annotationId: annotation.id })
+  }
+
+  async function loadAllAnnotations() {
+    if (loadingMore || getAppDataMode() !== 'supabase') return
+    setLoadingMore(true)
+    try {
+      const { annotations: all, hasMore } = await loadSupabaseAnnotations(userId, classes, { limitDays: null })
+      all.forEach((ann) => addAnnotation(ann))
+      setAnnotationsHasMore(hasMore)
+    } catch {
+      // silent — user can retry
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   async function handleDeleteAnnotation(annotationId: string) {
@@ -82,6 +97,15 @@ export default function AnnotationsScreen() {
               onDelete={() => handleDeleteAnnotation(annotation.id)}
             />
           ))
+        )}
+        {annotationsHasMore && !query && (
+          <button
+            onClick={() => void loadAllAnnotations()}
+            disabled={loadingMore}
+            className="w-full mt-3 mb-6 py-3 rounded-app border border-border bg-white text-[12px] font-bold text-muted disabled:opacity-50"
+          >
+            {loadingMore ? 'Carregando...' : 'Carregar anotações mais antigas'}
+          </button>
         )}
       </div>
 

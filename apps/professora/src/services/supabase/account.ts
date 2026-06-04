@@ -43,6 +43,7 @@ export interface TeacherAccountSnapshot {
   email: string
   phone: string | null
   avatarUrl: string | null
+  schoolLogoUrl: string | null
   notificationPreferences: NotificationPreferences
   schools: Array<{ id: string; name: string; city: string | null; state: string | null }>
   subscription: {
@@ -131,6 +132,7 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
     email: response.profile.email ?? '',
     phone: response.profile.phone ?? null,
     avatarUrl: response.profile.avatar_url ?? null,
+    schoolLogoUrl: (response.profile as Record<string, unknown>).school_logo_url as string | null ?? null,
     notificationPreferences: sanitizeNotificationPreferences(response.profile.notification_preferences),
     schools: response.schools ?? [],
     subscription: response.subscription
@@ -177,6 +179,7 @@ export async function updateTeacherProfile(input: {
   phone?: string | null
   email?: string
   avatarUrl?: string | null
+  schoolLogoUrl?: string | null
   notificationPreferences?: NotificationPreferences
 }) {
   await callAccountApi('/api/account', {
@@ -187,6 +190,7 @@ export async function updateTeacherProfile(input: {
       phone: input.phone,
       email: input.email,
       avatarUrl: input.avatarUrl,
+      schoolLogoUrl: input.schoolLogoUrl,
       notificationPreferences: input.notificationPreferences,
     }),
   })
@@ -217,6 +221,28 @@ export async function updateTeacherPassword(input: {
 
   const { error } = await supabase.auth.updateUser({ password: input.newPassword })
   if (error) throw error
+}
+
+export async function uploadSchoolLogo(file: File) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não configurado.')
+
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError) throw authError
+  const userId = authData.user?.id
+  if (!userId) throw new Error('Sessão não encontrada.')
+
+  const extension = file.name.split('.').pop()?.toLowerCase() || 'png'
+  const path = `${userId}/school-logo.${extension}`
+  const { error } = await supabase.storage.from('avatars').upload(path, file, {
+    cacheControl: '3600',
+    upsert: true,
+    contentType: file.type || 'image/png',
+  })
+  if (error) throw toError(error, 'Não foi possível enviar o logo da escola.')
+
+  const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path)
+  return publicData.publicUrl
 }
 
 export async function uploadTeacherAvatar(file: File) {

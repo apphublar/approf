@@ -76,7 +76,8 @@ function sanitizeSettings(value: Partial<DocumentStyleSettings>): DocumentStyleS
     paragraphIndentCm: Math.max(0, Math.min(2.5, Number(paragraphIndentCm.toFixed(2)))),
     textAlign,
     boldTitles: value.boldTitles !== false,
-    schoolLogoDataUrl: typeof value.schoolLogoDataUrl === 'string' && value.schoolLogoDataUrl.startsWith('data:image/')
+    schoolLogoDataUrl: typeof value.schoolLogoDataUrl === 'string' &&
+      (value.schoolLogoDataUrl.startsWith('data:image/') || value.schoolLogoDataUrl.startsWith('https://'))
       ? value.schoolLogoDataUrl
       : null,
     letterheadStyle: value.letterheadStyle === 'centered' || value.letterheadStyle === 'watermark'

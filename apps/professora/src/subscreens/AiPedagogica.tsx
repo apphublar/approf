@@ -8,6 +8,8 @@ import {
   saveDocumentStyleSettings,
   type DocumentStyleSettings,
 } from '@/utils/document-style'
+import { isSupabaseAuthEnabled } from '@/services/supabase/config'
+import { uploadSchoolLogo, updateTeacherProfile } from '@/services/supabase/account'
 
 const AI_SECTIONS = [
   {
@@ -105,6 +107,12 @@ export default function AiPedagogicaSubscreen() {
     const dataUrl = await fileToDataUrl(file)
     updateSettings({ schoolLogoDataUrl: dataUrl })
     event.target.value = ''
+
+    if (isSupabaseAuthEnabled()) {
+      uploadSchoolLogo(file)
+        .then((url) => updateTeacherProfile({ schoolLogoUrl: url }))
+        .catch(() => { /* silent — logo saved locally */ })
+    }
   }
 
   return (

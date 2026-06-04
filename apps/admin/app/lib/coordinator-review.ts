@@ -219,6 +219,55 @@ export async function updateCoordinatorReport(input: {
   return updated
 }
 
+export async function finalizeCoordinatorReview(token: string, accessToken: string) {
+  const supabase = createSupabaseServiceClient()
+  const share = await requireVerifiedShare(token, accessToken)
+
+  const [reportsResult] = await Promise.all([
+    supabase
+      .from('reports')
+      .select('id,student_id,coordinator_review_status')
+      .eq('owner_id', share.owner_id)
+      .eq('class_id', share.class_id)
+      .eq('report_type', 'development_report')
+      .neq('status', 'archived'),
+  ])
+
+  const reports = reportsResult.data ?? []
+  const approved = reports.filter((r) => r.coordinator_review_status === 'approved').length
+  const changesRequested = reports.filter((r) => r.coordinator_review_status === 'changes_requested').length
+
+  const timestamp = new Date().toISOString()
+  await supabase
+    .from('coordinator_class_shares')
+    .update({ access_status: 'review_finalized', last_access_at: timestamp, updated_at: timestamp })
+    .eq('id', share.id)
+
+  await supabase.from('report_review_events').insert({
+    report_id: null,
+    owner_id: share.owner_id,
+    class_id: share.class_id,
+    student_id: null,
+    actor_type: 'coordinator',
+    actor_name: share.coordinator_name,
+    actor_email: share.coordinator_email,
+    action: 'finalize',
+    notes: `Revisão finalizada: ${approved} aprovado(s), ${changesRequested} com correção solicitada.`,
+    previous_status: null,
+    next_status: 'review_finalized',
+  })
+
+  await supabase.from('admin_action_logs').insert({
+    actor_id: share.owner_id,
+    action: 'coordinator_review_finalized',
+    target_table: 'coordinator_class_shares',
+    target_id: share.id,
+    metadata: { classId: share.class_id, coordinatorEmail: share.coordinator_email, approved, changesRequested },
+  })
+
+  return { approved, changesRequested, total: reports.length }
+}
+
 async function requireVerifiedShare(token: string, accessToken: string) {
   const share = await getCoordinatorShareByToken(token)
   if (!share) throw new Error('Link de acesso não encontrado.')

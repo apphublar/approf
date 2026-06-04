@@ -75,6 +75,7 @@ interface AppStore {
   teacherCode: string
   userId: string
   annotations: Annotation[]
+  annotationsHasMore: boolean
   attendanceRecords: AttendanceRecord[]
   classes: ClassData[]
   boardNotes: BoardNote[]
@@ -92,8 +93,11 @@ interface AppStore {
     schoolName: string
     classes: ClassData[]
     annotations?: Annotation[]
+    annotationsHasMore?: boolean
     attendanceRecords?: AttendanceRecord[]
+    boardNotes?: BoardNote[]
   }) => void
+  setAnnotationsHasMore: (hasMore: boolean) => void
   setUserName: (name: string) => void
   setSchoolName: (name: string) => void
   addAnnotation: (ann: Annotation) => void
@@ -130,6 +134,7 @@ export const useAppStore = create<AppStore>()(
       schoolName: initialAppData.schoolName,
       teacherCode: 'PROF-ANA-2026',
       annotations: initialAppData.annotations,
+      annotationsHasMore: false,
       attendanceRecords: [],
       classes: initialAppData.classes,
       boardNotes: initialAppData.boardNotes,
@@ -169,16 +174,19 @@ export const useAppStore = create<AppStore>()(
         return state.communityAccess.global || state.communityAccess.allowedUserIds.includes(state.userId)
       },
       hydrateWorkspace: (data) =>
-        set({
+        set((state) => ({
           userId: data.userId,
           userName: data.userName,
           schoolName: data.schoolName,
           classes: data.classes,
           annotations: data.annotations ?? [],
+          annotationsHasMore: data.annotationsHasMore ?? false,
           attendanceRecords: data.attendanceRecords ?? [],
+          boardNotes: data.boardNotes ?? state.boardNotes,
           activeClassId: data.classes[0]?.id ?? null,
           activeStudentId: null,
-        }),
+        })),
+      setAnnotationsHasMore: (hasMore) => set({ annotationsHasMore: hasMore }),
       setUserName: (name: string) => set({ userName: name }),
       setSchoolName: (name: string) => set({ schoolName: name }),
       addAnnotation: (ann: Annotation) =>

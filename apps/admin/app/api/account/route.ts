@@ -35,6 +35,7 @@ export async function PATCH(request: Request) {
       phone: typeof body.phone === 'string' || body.phone === null ? (body.phone as string | null) : undefined,
       email: typeof body.email === 'string' ? body.email : undefined,
       avatarUrl: typeof body.avatarUrl === 'string' || body.avatarUrl === null ? (body.avatarUrl as string | null) : undefined,
+      schoolLogoUrl: typeof body.schoolLogoUrl === 'string' || body.schoolLogoUrl === null ? (body.schoolLogoUrl as string | null) : undefined,
       notificationPreferences:
         body.notificationPreferences && typeof body.notificationPreferences === 'object' && !Array.isArray(body.notificationPreferences)
           ? (body.notificationPreferences as Record<string, unknown>)

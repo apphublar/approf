@@ -17,7 +17,7 @@ export async function getTeacherAccountData(ownerId: string) {
   const [profileResult, schoolsResult, subscriptionResult, verificationsResult, noticesResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id,full_name,email,phone,avatar_url,notification_preferences')
+      .select('id,full_name,email,phone,avatar_url,notification_preferences,school_logo_url')
       .eq('id', ownerId)
       .maybeSingle(),
     supabase
@@ -70,6 +70,7 @@ export async function updateTeacherProfile(ownerId: string, input: {
   phone?: string | null
   email?: string
   avatarUrl?: string | null
+  schoolLogoUrl?: string | null
   notificationPreferences?: Record<string, unknown>
 }) {
   const supabase = createSupabaseServiceClient()
@@ -78,6 +79,7 @@ export async function updateTeacherProfile(ownerId: string, input: {
     ...(input.phone !== undefined ? { phone: input.phone?.trim() || null } : {}),
     ...(typeof input.email === 'string' ? { email: input.email.trim() } : {}),
     ...(input.avatarUrl !== undefined ? { avatar_url: input.avatarUrl } : {}),
+    ...(input.schoolLogoUrl !== undefined ? { school_logo_url: input.schoolLogoUrl } : {}),
     ...(input.notificationPreferences ? { notification_preferences: input.notificationPreferences } : {}),
     updated_at: new Date().toISOString(),
   }

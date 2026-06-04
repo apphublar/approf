@@ -24,6 +24,8 @@ import type { BoardNote } from '@/types'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
 import { getCachedTeacherAccountSnapshot, getTeacherAccountSnapshot, preloadTeacherAccountSnapshot } from '@/services/supabase/account'
+import { syncBoardNotes } from '@/services/supabase/board-notes'
+import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 
 const QUICK_ACCESS = [
   { label: 'Anotações', desc: 'Registre o dia a dia da turma', icon: NotebookPen, bg: '#D8F3DC', tab: 'annotations' as const, sub: null },
@@ -35,7 +37,7 @@ const QUICK_ACCESS = [
 ] as const
 
 export default function HomeScreen() {
-  const { userName, annotations, boardNotes, classes } = useAppStore()
+  const { userName, userId, annotations, boardNotes, classes } = useAppStore()
   const { setTab, openSubscreen, activeTab, subscreens } = useNavStore()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [modalNote, setModalNote] = useState<BoardNote | null | 'new'>('new')
@@ -139,9 +141,11 @@ export default function HomeScreen() {
   function deleteCurrentNote() {
     if (!currentViewedNote) return
     setNoteMenuOpen(false)
-    // Go back to previous slide before deleting to avoid empty frame
     setCurrentSlide((s) => Math.max(0, s - 1))
     useAppStore.getState().deleteBoardNote(currentViewedNote.id)
+    if (isSupabaseAuthEnabled()) {
+      syncBoardNotes(userId, useAppStore.getState().boardNotes).catch(() => {})
+    }
   }
 
   function onTouchStart(e: React.TouchEvent) {
@@ -584,7 +588,7 @@ function BoardNoteModal({
   initialNote: BoardNote | null
   onClose: () => void
 }) {
-  const { addBoardNote, deleteBoardNote } = useAppStore()
+  const { addBoardNote, deleteBoardNote, userId } = useAppStore()
 
   const [title, setTitle]   = useState(initialNote?.title   ?? '')
   const [body, setBody]     = useState(initialNote?.body    ?? '')
@@ -622,6 +626,9 @@ function BoardNoteModal({
       chalk,
       expiresAt: expires || null,
     })
+    if (isSupabaseAuthEnabled()) {
+      syncBoardNotes(userId, useAppStore.getState().boardNotes).catch(() => {})
+    }
     onClose()
   }
 

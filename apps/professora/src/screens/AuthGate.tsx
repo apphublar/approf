@@ -9,6 +9,7 @@ import {
   isTeacherAccessBlocked,
   onSubscriptionStateChange,
 } from '@/services/supabase/account'
+import { loadDocumentStyleSettings, saveDocumentStyleSettings } from '@/utils/document-style'
 import TeacherAccountSubscreen from '@/subscreens/TeacherAccount'
 import { useAppStore, useOnboardingStore } from '@/store'
 
@@ -109,6 +110,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         const snapshot = await getTeacherAccountSnapshot()
         if (!active) return
         setSubscriptionBlocked(isTeacherAccessBlocked(snapshot.subscription?.status ?? null))
+        if (snapshot.schoolLogoUrl && !loadDocumentStyleSettings().schoolLogoDataUrl) {
+          saveDocumentStyleSettings({ schoolLogoDataUrl: snapshot.schoolLogoUrl })
+        }
       } catch {
         if (!active) return
         setSubscriptionBlocked(false)

@@ -36,16 +36,31 @@ export interface AnnotationUpdateInput extends AnnotationInput {
   annotationId: string
 }
 
-export async function loadSupabaseAnnotations(ownerId: string, classes: ClassData[]) {
+const DEFAULT_LOAD_DAYS = 90
+const MAX_ROWS_PER_LOAD = 500
+
+export async function loadSupabaseAnnotations(ownerId: string, classes: ClassData[], options?: { limitDays?: number | null }) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')
 
+  const limitDays = options?.limitDays === null ? null : (options?.limitDays ?? DEFAULT_LOAD_DAYS)
+  const since = limitDays !== null
+    ? new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString()
+    : null
+
+  let annotationsQuery = supabase
+    .from('annotations')
+    .select('id, category, body, tags, persistence, attachment_path, occurred_at')
+    .eq('owner_id', ownerId)
+    .order('occurred_at', { ascending: false })
+    .limit(MAX_ROWS_PER_LOAD)
+
+  if (since) {
+    annotationsQuery = annotationsQuery.gte('occurred_at', since)
+  }
+
   const [annotationsResult, targetsResult] = await Promise.all([
-    supabase
-      .from('annotations')
-      .select('id, category, body, tags, persistence, attachment_path, occurred_at')
-      .eq('owner_id', ownerId)
-      .order('occurred_at', { ascending: false }),
+    annotationsQuery,
     supabase
       .from('annotation_targets')
       .select('annotation_id, target_type, target_id')
@@ -63,11 +78,16 @@ export async function loadSupabaseAnnotations(ownerId: string, classes: ClassDat
     targetsByAnnotationId.set(target.annotation_id, current)
   })
 
-  return Promise.all(
-    (annotationsResult.data ?? []).map((annotation) =>
+  const rows = annotationsResult.data ?? []
+  const hasMore = since !== null && rows.length === MAX_ROWS_PER_LOAD
+
+  const mapped = await Promise.all(
+    rows.map((annotation) =>
       mapAnnotation(annotation, targetsByAnnotationId.get(annotation.id) ?? [], studentById),
     ),
   )
+
+  return { annotations: mapped, hasMore }
 }
 
 export async function deleteSupabaseAnnotation(annotationId: string) {
