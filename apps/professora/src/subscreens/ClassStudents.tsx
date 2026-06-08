@@ -28,7 +28,6 @@ export default function ClassStudentsSubscreen() {
   const [generatedByStudentId, setGeneratedByStudentId] = useState<Record<string, number>>({})
   const [coordinatorName, setCoordinatorName] = useState('')
   const [coordinatorEmail, setCoordinatorEmail] = useState('')
-  const [coordinatorShareUrl, setCoordinatorShareUrl] = useState('')
   const [coordinatorMessage, setCoordinatorMessage] = useState('')
   const [coordinatorError, setCoordinatorError] = useState('')
   const [sharingCoordinator, setSharingCoordinator] = useState(false)
@@ -92,7 +91,9 @@ export default function ClassStudentsSubscreen() {
   const reportRows = buildAttendanceReport(sortedStudents, classAttendanceRecords)
   const selectedCalendarRecord = attendanceByDate.get(selectedCalendarDate)
   const latestCoordinatorShare = shareStatus?.shares[0]
-  const visibleCoordinatorShareUrl = coordinatorShareUrl || latestCoordinatorShare?.share_url || ''
+  const effectiveCoordinatorName = coordinatorName.trim() || latestCoordinatorShare?.coordinator_name || ''
+  const effectiveCoordinatorEmail = coordinatorEmail.trim() || latestCoordinatorShare?.coordinator_email || ''
+  const canSendCoordinatorAccess = Boolean(effectiveCoordinatorName && effectiveCoordinatorEmail)
 
   function openStudent(id: string) {
     setActiveClass(cls.id)
@@ -153,14 +154,14 @@ export default function ClassStudentsSubscreen() {
     setSharingCoordinator(true)
     setCoordinatorError('')
     setCoordinatorMessage('')
-    setCoordinatorShareUrl('')
     try {
-      const result = await shareClassWithCoordinator({
+      await shareClassWithCoordinator({
         classId: cls.id,
-        coordinatorName,
-        coordinatorEmail,
+        coordinatorName: effectiveCoordinatorName,
+        coordinatorEmail: effectiveCoordinatorEmail,
       })
-      setCoordinatorShareUrl(result.shareUrl)
+      setCoordinatorName('')
+      setCoordinatorEmail('')
       setCoordinatorMessage('Código de validação enviado para o e-mail da coordenadora. O acesso fica válido por 30 dias.')
       const status = await getCoordinatorShareStatus(cls.id).catch(() => null)
       if (status) setShareStatus(status)
@@ -240,16 +241,28 @@ export default function ClassStudentsSubscreen() {
               {latestCoordinatorShare && (() => {
                 const latestShare = latestCoordinatorShare
                 const isFinalized = latestShare.access_status === 'review_finalized'
-                const isVerified = latestShare.access_status === 'verified' || isFinalized
+                const isVerified = latestShare.access_status === 'verified'
+                const isCodeExpired = !isVerified && !isFinalized && !latestShare.has_valid_access_code
                 const { approved, changesRequested, total } = shareStatus?.reportSummary ?? { approved: 0, changesRequested: 0, total: 0 }
                 return (
-                  <div className={`rounded-app-sm border p-3 mb-3 ${isFinalized ? 'bg-[#EAF7EE] border-[#B6DECA]' : isVerified ? 'bg-[#FFF8E8] border-[#EAD58A]' : 'bg-cream border-border'}`}>
+                  <div className={`rounded-app-sm border p-3 mb-3 ${isFinalized ? 'bg-[#EAF7EE] border-[#B6DECA]' : isVerified ? 'bg-[#FFF8E8] border-[#EAD58A]' : isCodeExpired ? 'bg-[#FFF1F1] border-[#F3C0B1]' : 'bg-cream border-border'}`}>
                     <p className="text-[11px] font-bold text-ink mb-1">
-                      {isFinalized ? '✅ Revisão finalizada pela coordenadora' : isVerified ? '👀 Coordenadora com acesso ativo' : '⏳ Aguardando acesso da coordenadora'}
+                      {isFinalized
+                        ? 'Revisão finalizada pela coordenadora'
+                        : isVerified
+                          ? 'Acesso validado pela coordenadora'
+                          : isCodeExpired
+                            ? 'Código expirado. Reenvie o acesso.'
+                            : 'Convite enviado. Aguardando validação'}
                     </p>
                     <p className="text-[11px] text-muted leading-[1.5]">
                       {latestShare.coordinator_name} · {latestShare.coordinator_email}
                     </p>
+                    {latestShare.access_code_expires_at && !isFinalized && (
+                      <p className="text-[11px] text-muted mt-1">
+                        Código válido até {formatDateTime(latestShare.access_code_expires_at)}.
+                      </p>
+                    )}
                     {isFinalized && total > 0 && (
                       <p className="text-[11px] text-muted mt-1">
                         {approved} aprovado(s) · {changesRequested} com correção solicitada · {total - approved - changesRequested} pendente(s)
@@ -289,13 +302,12 @@ export default function ClassStudentsSubscreen() {
               </div>
               <button
                 onClick={shareWithCoordinator}
-                disabled={sharingCoordinator || !coordinatorName.trim() || !coordinatorEmail.trim()}
+                disabled={sharingCoordinator || !canSendCoordinatorAccess}
                 className="w-full mt-3 py-3 rounded-app-sm bg-gm text-white text-[13px] font-bold disabled:opacity-50"
               >
-                {sharingCoordinator ? 'Enviando...' : 'Enviar acesso para a coordenadora'}
+                {sharingCoordinator ? 'Enviando...' : latestCoordinatorShare ? 'Reenviar acesso para a coordenadora' : 'Enviar acesso para a coordenadora'}
               </button>
               {coordinatorMessage && <p className="text-[12px] text-gm mt-2 leading-[1.5]">{coordinatorMessage}</p>}
-              {visibleCoordinatorShareUrl && <p className="text-[11px] text-muted mt-1 break-all">Link: {visibleCoordinatorShareUrl}</p>}
               {coordinatorError && <p className="text-[12px] text-[#C1440E] mt-2 leading-[1.5]">{coordinatorError}</p>}
             </div>
 
@@ -699,6 +711,16 @@ function formatMonthTitle(date: Date) {
 
 function formatDateTitle(dateKey: string) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(parseDateKey(dateKey))
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
 }
 
 function countStudentRecords(student: Student, annotations: ReturnType<typeof useAppStore.getState>['annotations'], generatedCount: number) {
