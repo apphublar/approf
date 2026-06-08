@@ -46,7 +46,14 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     }
 
     let active = true
-    if (!preloadedReport) setLoading(true)
+    const shouldHydrate = !preloadedReport || !isHydratedDocument(preloadedReport)
+    if (shouldHydrate) setLoading(true)
+    if (!shouldHydrate) {
+      setLoading(false)
+      return () => {
+        active = false
+      }
+    }
     getReportById(reportId)
       .then((item) => {
         if (!active) return
@@ -681,6 +688,12 @@ function toEditorHtml(value: string) {
     .split(/\n{2,}/)
     .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
     .join('')
+}
+
+function isHydratedDocument(document: GeneratedDocument) {
+  const hasBody = typeof document.body === 'string' && document.body.trim().length > 0
+  const hasArtifacts = Boolean(document.ai_artifacts && typeof document.ai_artifacts === 'object')
+  return hasBody || hasArtifacts
 }
 
 function buildExportHtml(

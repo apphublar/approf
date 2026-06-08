@@ -5,7 +5,7 @@ import type { TimelineEvent, TimelineEventType } from '@/types'
 import { getAppDataMode } from '@/services/app-data'
 import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
 import { deleteSupabaseTimelineEvent } from '@/services/supabase/timeline'
-import { listReports } from '@/services/reports'
+import { getCachedReportById, listReports, prefetchReportsByIds } from '@/services/reports'
 import { listReportReviewEvents, type ReportReviewEvent } from '@/services/coordinator-review'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
@@ -138,6 +138,17 @@ export default function StudentProfileSubscreen() {
     }
   }
 
+  function openDevelopmentReport(report: GeneratedDocument) {
+    const cached = getCachedReportById(report.id)
+    if (!cached) {
+      void prefetchReportsByIds([report.id])
+    }
+    openSubscreen('document-detail', {
+      reportId: report.id,
+      preloadedReport: cached,
+    })
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
@@ -267,7 +278,7 @@ export default function StudentProfileSubscreen() {
               {developmentReports.slice(0, 5).map((report) => (
                 <button
                   key={report.id}
-                  onClick={() => openSubscreen('document-detail', { reportId: report.id })}
+                  onClick={() => openDevelopmentReport(report)}
                   className="w-full rounded-app-sm border border-border bg-cream px-3 py-3 text-left"
                 >
                   <div className="flex items-center justify-between gap-2">
