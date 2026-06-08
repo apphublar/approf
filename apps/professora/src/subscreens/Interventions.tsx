@@ -1,7 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
+import { getAppDataMode } from '@/services/app-data'
 import { generateAiTextDocument } from '@/services/ai-usage'
+import { deleteInterventionRecord, saveInterventionRecord } from '@/services/supabase/interventions'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 import type {
@@ -169,8 +171,7 @@ export default function InterventionsSubscreen() {
       chosenIntervention: chosenSuggestion,
       status: 'pendente',
     }
-    upsertIntervention(item)
-    closeSubscreen()
+    void upsertIntervention(item).finally(() => closeSubscreen())
   }
 
   function resumeIntervention(item: InterventionHistoryItem) {
@@ -188,7 +189,7 @@ export default function InterventionsSubscreen() {
   }
 
   function completeWithoutAnalysis(item: InterventionHistoryItem) {
-    updateIntervention({
+    void upsertIntervention({
       ...item,
       status: 'concluida',
       teacherReturn: item.teacherReturn ?? 'Intervenção concluída manualmente pela professora.',
@@ -197,10 +198,17 @@ export default function InterventionsSubscreen() {
     })
   }
 
-  function discardIntervention(item: InterventionHistoryItem) {
+  async function discardIntervention(item: InterventionHistoryItem) {
     const confirmed = window.confirm('Deseja remover esta intervenção do histórico da criança?')
     if (!confirmed) return
-    removeIntervention(item.id)
+    try {
+      if (getAppDataMode() === 'supabase') {
+        await deleteInterventionRecord(item.id)
+      }
+      removeIntervention(item.id)
+    } catch (discardError) {
+      setError(discardError instanceof Error ? discardError.message : 'Não foi possível remover a intervenção.')
+    }
   }
 
   async function handleAnalyzeReturn() {
@@ -250,7 +258,7 @@ export default function InterventionsSubscreen() {
         status,
       }
 
-      upsertIntervention(item)
+      await upsertIntervention(item)
 
       if (returnChoice === 'houve_avanco') {
         addAnnotation({
@@ -284,12 +292,20 @@ export default function InterventionsSubscreen() {
     }
   }
 
-  function upsertIntervention(item: InterventionHistoryItem) {
-    const exists = interventions.some((current) => current.id === item.id)
-    if (exists) {
-      updateIntervention(item)
-    } else {
-      addIntervention(item)
+  async function upsertIntervention(item: InterventionHistoryItem) {
+    try {
+      const saved = getAppDataMode() === 'supabase'
+        ? await saveInterventionRecord(item)
+        : item
+      const exists = interventions.some((current) => current.id === item.id || current.id === saved.id)
+      if (exists) {
+        updateIntervention(saved)
+      } else {
+        addIntervention(saved)
+      }
+    } catch (persistError) {
+      setError(persistError instanceof Error ? persistError.message : 'Não foi possível salvar a intervenção.')
+      throw persistError
     }
   }
 

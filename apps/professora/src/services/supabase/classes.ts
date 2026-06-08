@@ -7,6 +7,7 @@ import { loadSupabaseAnnotations } from './annotations'
 import { loadSupabaseAttendanceRecords } from './attendance'
 import { loadBoardNotes } from './board-notes'
 import { loadCommunityFeatureAccess, loadCommunityPosts } from './community'
+import { loadInterventionRecords } from './interventions'
 
 export interface ClassInput {
   name: string
@@ -27,7 +28,7 @@ export async function loadTeacherWorkspace() {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, full_name, email, estimated_student_count')
+    .select('id, full_name, email, estimated_student_count, teacher_code')
     .eq('id', user.id)
     .single()
 
@@ -83,10 +84,11 @@ export async function loadTeacherWorkspace() {
     iconBg: '#D8F3DC',
     students: studentsByClassId.get(item.id) ?? [],
   }))
-  const [{ annotations, hasMore: annotationsHasMore }, communityAccess, communityPosts] = await Promise.all([
+  const [{ annotations, hasMore: annotationsHasMore }, communityAccess, communityPosts, interventions] = await Promise.all([
     loadSupabaseAnnotations(user.id, classes),
     loadCommunityFeatureAccess(user.id),
     loadCommunityPosts().catch(() => []),
+    loadInterventionRecords(user.id).catch(() => []),
   ])
   const noteCountByStudentId = buildNoteCountByStudentId(classes, annotations)
   const classesWithCounts = classes.map((classData) => ({
@@ -108,6 +110,8 @@ export async function loadTeacherWorkspace() {
     boardNotes,
     communityAccess,
     communityPosts,
+    interventions,
+    teacherCode: profile.teacher_code ?? '',
     onboardingCompleted: Number(profile.estimated_student_count ?? 0) > 0 || classes.length > 0,
   }
 }

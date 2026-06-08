@@ -98,6 +98,8 @@ interface AppStore {
     boardNotes?: BoardNote[]
     communityAccess?: FeatureAccess
     communityPosts?: CommunityPost[]
+    interventions?: InterventionHistoryItem[]
+    teacherCode?: string
   }) => void
   setAnnotationsHasMore: (hasMore: boolean) => void
   setAnnotations: (annotations: Annotation[]) => void
@@ -188,10 +190,10 @@ export const useAppStore = create<AppStore>()(
           boardNotes: data.boardNotes ?? [],
           activeClassId: data.classes[0]?.id ?? null,
           activeStudentId: null,
-          teacherCode: '',
+          teacherCode: data.teacherCode ?? '',
           communityAccess: data.communityAccess ?? { global: false, allowedUserIds: [data.userId] },
           communityPosts: data.communityPosts ?? [],
-          interventions: [],
+          interventions: data.interventions ?? [],
           calendarEvents: [],
           personalDocuments: [],
         }),

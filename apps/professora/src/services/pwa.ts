@@ -1,3 +1,4 @@
+// Mantém o app online-first: remove service workers legados para evitar cache inconsistente.
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return
 

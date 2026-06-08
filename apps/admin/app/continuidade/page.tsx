@@ -1,7 +1,13 @@
 import { MoveRight, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
+import { requireAdminSession } from '../lib/admin-auth'
+import { listContinuityRequestsForAdmin } from '../lib/continuity'
+import { ContinuityRequestsPanel } from './ContinuityRequestsPanel'
 
-export default function ContinuityPage() {
+export default async function ContinuityPage() {
+  await requireAdminSession()
+  const requests = await listContinuityRequestsForAdmin()
+
   return (
     <>
       <PageHeader
@@ -17,17 +23,7 @@ export default function ContinuityPage() {
       />
 
       <section className="content-grid">
-        <article className="panel panel-wide">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Solicitações</p>
-              <h2>Vínculo de criança existente</h2>
-            </div>
-          </div>
-          <p className="text-muted-panel">
-            Nenhuma solicitação pendente. As professoras ainda não iniciaram pedidos de vínculo pelo app — os casos aparecerão aqui quando essa funcionalidade estiver ativa na plataforma.
-          </p>
-        </article>
+        <ContinuityRequestsPanel initialRequests={requests} />
 
         <article className="panel privacy-panel">
           <div className="panel-header">
@@ -40,7 +36,7 @@ export default function ContinuityPage() {
           <ul className="privacy-list">
             <li><ShieldCheck size={16} /> Prévia sem fotos, anexos, relatórios completos ou observações sensíveis.</li>
             <li><ShieldCheck size={16} /> Acesso completo apenas após vínculo aprovado.</li>
-            <li><ShieldCheck size={16} /> Toda busca, aprovação e transferência deve gerar auditoria.</li>
+            <li><ShieldCheck size={16} /> Toda busca, aprovação e transferência gera auditoria.</li>
             <li><ShieldCheck size={16} /> Timeline acompanha a identidade contínua da criança.</li>
           </ul>
         </article>
@@ -49,16 +45,16 @@ export default function ContinuityPage() {
       <article className="panel spaced-panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Transferências</p>
-            <h2>Entre professoras ou turmas</h2>
+            <p className="eyebrow">Operação</p>
+            <h2>Como aprovar</h2>
           </div>
           <span className="status-pill">
             <MoveRight size={16} />
-            Aceite ou aprovação
+            Turma destino obrigatória
           </span>
         </div>
         <p className="text-muted-panel">
-          Nenhuma transferência registrada. As transferências entre professoras ou turmas aparecerão aqui quando solicitadas pelo app.
+          Para aprovar vínculos ou transferências entre professoras, informe o ID da turma de destino da professora solicitante antes de clicar em Aprovar.
         </p>
       </article>
     </>

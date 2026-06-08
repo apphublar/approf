@@ -1,205 +1,134 @@
 ﻿'use client'
 
 import { useState } from 'react'
-import { CheckCircle2, Eye, X, XCircle } from 'lucide-react'
-import { StatusBadge } from '../components/StatusBadge'
+import type { ContinuityRequestRow } from '../lib/continuity'
 
-interface SafeTimelineItem {
-  date: string
-  category: string
-  summary: string
-}
+export function ContinuityRequestsPanel({ initialRequests }: { initialRequests: ContinuityRequestRow[] }) {
+  const [requests, setRequests] = useState(initialRequests)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [targetClassById, setTargetClassById] = useState<Record<string, string>>({})
+  const [error, setError] = useState('')
 
-interface ChildLinkRequest {
-  child: string
-  childCode: string
-  birthDate: string
-  requester: string
-  requesterCode: string
-  previousTeacher: string
-  school: string
-  status: string
-  reason: string
-  preview: string[]
-  safeTimelinePreview: SafeTimelineItem[]
-}
-
-interface DecisionState {
-  type: 'approve' | 'deny'
-  request: ChildLinkRequest
-}
-
-export function ContinuityRequestsPanel({ requests }: { requests: ChildLinkRequest[] }) {
-  const [decision, setDecision] = useState<DecisionState | null>(null)
-  const [decisions, setDecisions] = useState<Record<string, 'approved' | 'denied'>>({})
-
-  function finishDecision(justification: string) {
-    if (!decision || !justification.trim()) return
-
-    setDecisions((current) => ({
-      ...current,
-      [decision.request.childCode]: decision.type === 'approve' ? 'approved' : 'denied',
-    }))
-    setDecision(null)
+  async function reviewRequest(requestId: string, status: 'approved' | 'rejected') {
+    setUpdatingId(requestId)
+    setError('')
+    try {
+      const response = await fetch('/api/continuity/requests/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          status,
+          targetClassId: targetClassById[requestId] || null,
+        }),
+      })
+      const payload = await response.json().catch(() => null) as { error?: string; requests?: ContinuityRequestRow[] } | null
+      if (!response.ok) throw new Error(payload?.error || 'Falha ao revisar solicitação.')
+      setRequests(payload?.requests ?? [])
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : 'Falha ao revisar solicitação.')
+    } finally {
+      setUpdatingId(null)
+    }
   }
 
+  const pending = requests.filter((item) => item.status === 'pending')
+
   return (
-    <>
-      <article className="panel panel-wide">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Solicitações</p>
-            <h2>Vínculo de criança existente</h2>
-          </div>
-          <span className="status-pill">
-            <Eye size={16} />
-            Sem fotos na prévia
-          </span>
+    <article className="panel panel-wide spaced-panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Solicitações</p>
+          <h2>Vínculos e transferências</h2>
         </div>
+        <span className="status-pill">{pending.length} pendentes</span>
+      </div>
 
-        <div className="stack-list">
-          {requests.map((request) => {
-            const resolved = decisions[request.childCode]
-            return (
-              <div className="stack-item continuity-card" key={`${request.child}-${request.requester}`}>
-                <div>
-                  <strong>{request.child}</strong>
-                  <small>{request.childCode} - nascimento {formatDate(request.birthDate)}</small>
-                  <small>{request.school}</small>
-                  <p>{request.reason}</p>
-                  <div className="continuity-tags">
-                    {request.preview.map((item) => (
-                      <span key={item}>{item}</span>
-                    ))}
-                  </div>
-                </div>
-                <div className="continuity-actions">
-                  {resolved ? <StatusBadge status={resolved === 'approved' ? 'active' : 'canceled'} /> : <StatusBadge status={request.status} />}
-                  <small>Solicitante: {request.requester}</small>
-                  <small>{request.requesterCode}</small>
-                  <button
-                    className="quiet-button"
-                    disabled={Boolean(resolved)}
-                    onClick={() => setDecision({ type: 'approve', request })}
-                  >
-                    <CheckCircle2 size={15} />
-                    Aprovar
-                  </button>
-                  <button
-                    className="quiet-button secondary-action"
-                    disabled={Boolean(resolved)}
-                    onClick={() => setDecision({ type: 'deny', request })}
-                  >
-                    <XCircle size={15} />
-                    Negar
-                  </button>
-                </div>
+      {error && <p className="text-muted-panel" style={{ color: '#a33a20' }}>{error}</p>}
+
+      {requests.length === 0 ? (
+        <p className="text-muted-panel">Nenhuma solicitação registrada ainda.</p>
+      ) : (
+        <div className="table-list">
+          {requests.map((request) => (
+            <div className="table-row" key={request.id}>
+              <div>
+                <strong>{request.studentName ?? 'Criança'}</strong>
+                <p className="text-muted-panel">
+                  {labelRequestType(request.requestType)} · {request.requesterName ?? 'Professora solicitante'} · {formatDate(request.createdAt)}
+                </p>
+                {request.reason && <p className="text-muted-panel">{request.reason}</p>}
+                {request.targetTeacherCode && <p className="text-muted-panel">Código destino: {request.targetTeacherCode}</p>}
               </div>
-            )
-          })}
+              <div className="continuity-actions">
+                <span className={`status-pill status-${request.status}`}>{labelStatus(request.status)}</span>
+                {request.status === 'pending' && (
+                  <>
+                    <input
+                      className="input-compact"
+                      placeholder="ID da turma destino (aprovação)"
+                      value={targetClassById[request.id] ?? ''}
+                      onChange={(event) =>
+                        setTargetClassById((current) => ({ ...current, [request.id]: event.target.value }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="button-primary"
+                      disabled={updatingId === request.id}
+                      onClick={() => void reviewRequest(request.id, 'approved')}
+                    >
+                      Aprovar
+                    </button>
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      disabled={updatingId === request.id}
+                      onClick={() => void reviewRequest(request.id, 'rejected')}
+                    >
+                      Rejeitar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-      </article>
-
-      {decision && (
-        <DecisionModal
-          decision={decision}
-          onClose={() => setDecision(null)}
-          onConfirm={finishDecision}
-        />
       )}
-    </>
+    </article>
   )
 }
 
-function DecisionModal({
-  decision,
-  onClose,
-  onConfirm,
-}: {
-  decision: DecisionState
-  onClose: () => void
-  onConfirm: (justification: string) => void
-}) {
-  const [justification, setJustification] = useState('')
-  const isApproval = decision.type === 'approve'
+function labelRequestType(value: ContinuityRequestRow['requestType']) {
+  switch (value) {
+    case 'link':
+      return 'Vínculo'
+    case 'transfer_teacher':
+      return 'Transferência entre professoras'
+    case 'transfer_class':
+      return 'Mudança de turma'
+    default:
+      return value
+  }
+}
 
-  return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="decision-modal">
-        <div className="modal-header">
-          <div>
-            <p className="eyebrow">{isApproval ? 'Aprovar vinculo' : 'Negar vinculo'}</p>
-            <h2>{decision.request.child}</h2>
-          </div>
-          <button className="icon-button" onClick={onClose} aria-label="Fechar">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="decision-summary">
-          <span>
-            <strong>Código da criança</strong>
-            {decision.request.childCode}
-          </span>
-          <span>
-            <strong>Solicitante</strong>
-            {decision.request.requester} - {decision.request.requesterCode}
-          </span>
-          <span>
-            <strong>Professora anterior</strong>
-            {decision.request.previousTeacher}
-          </span>
-        </div>
-
-        <section className="safe-preview-panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Prévia segura da timeline</p>
-              <h3>Marcos resumidos para conferência</h3>
-            </div>
-            <span className="status-pill">Sem anexos</span>
-          </div>
-          <div className="safe-preview-list">
-            {decision.request.safeTimelinePreview.map((item) => (
-              <article key={`${item.date}-${item.category}`}>
-                <span>{item.date}</span>
-                <strong>{item.category}</strong>
-                <p>{item.summary}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <label className="decision-label">
-          Justificativa para auditoria
-          <textarea
-            value={justification}
-            onChange={(event) => setJustification(event.target.value)}
-            placeholder={isApproval ? 'Ex.: dados conferidos com a escola e a prévia confere com a criança.' : 'Ex.: dados insuficientes para confirmar identidade.'}
-          />
-        </label>
-
-        <p className="modal-warning">
-          Esta ação deve gerar log no Supabase com ator, data, decisão e justificativa. Fotos e relatórios completos seguem bloqueados até o vínculo aprovado.
-        </p>
-
-        <div className="modal-actions">
-          <button className="quiet-button secondary-action" onClick={onClose}>Cancelar</button>
-          <button
-            className="quiet-button"
-            disabled={!justification.trim()}
-            onClick={() => onConfirm(justification)}
-          >
-            {isApproval ? 'Confirmar aprovação' : 'Confirmar negativa'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+function labelStatus(value: ContinuityRequestRow['status']) {
+  switch (value) {
+    case 'pending':
+      return 'Pendente'
+    case 'approved':
+      return 'Aprovada'
+    case 'rejected':
+      return 'Rejeitada'
+    case 'canceled':
+      return 'Cancelada'
+    default:
+      return value
+  }
 }
 
 function formatDate(value: string) {
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year}`
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('pt-BR')
 }
-

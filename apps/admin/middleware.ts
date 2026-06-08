@@ -19,6 +19,10 @@ function isPublicPath(pathname: string) {
   if (pathname.startsWith('/api/coordinator/public/')) return true
   if (pathname.startsWith('/api/coordinator/share')) return true
   if (pathname.startsWith('/api/coordinator/review-events')) return true
+  if (pathname.startsWith('/api/continuity/search')) return true
+  if (pathname.startsWith('/api/continuity/requests') && !pathname.startsWith('/api/continuity/requests/admin')) {
+    return true
+  }
 
   return false
 }

@@ -2,8 +2,12 @@
 import { ChevronLeft, Search, ShieldCheck } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import type { ChildSearchPreview } from '@/types'
+import { getAppDataMode } from '@/services/app-data'
 import { listReports } from '@/services/reports'
+import { searchExternalChildPreviews, submitContinuityRequest } from '@/services/continuity'
 import { countPedagogicalRecords } from '@/utils/pedagogical-records'
+
+type PreviewResult = ChildSearchPreview & { ownerId?: string; isExternal?: boolean }
 
 export default function FindChildSubscreen() {
   const { closeSubscreen } = useNavStore()
@@ -11,6 +15,12 @@ export default function FindChildSubscreen() {
   const [childCode, setChildCode] = useState('')
   const [name, setName] = useState('')
   const [birthDate, setBirthDate] = useState('')
+  const [externalPreviews, setExternalPreviews] = useState<PreviewResult[]>([])
+  const [searchingExternal, setSearchingExternal] = useState(false)
+  const [requestedId, setRequestedId] = useState<string | null>(null)
+  const [submittingId, setSubmittingId] = useState<string | null>(null)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
   const [generatedByStudentId, setGeneratedByStudentId] = useState<Record<string, number>>({})
 
   useEffect(() => {
@@ -43,7 +53,44 @@ export default function FindChildSubscreen() {
     }
   }, [classes])
 
-  const localPreviews: ChildSearchPreview[] = useMemo(
+  useEffect(() => {
+    const canSearchExternal = getAppDataMode() === 'supabase'
+      && ((childCode.trim().length >= 6) || (name.trim().length >= 2))
+    if (!canSearchExternal) {
+      setExternalPreviews([])
+      return
+    }
+
+    let active = true
+    const timeout = window.setTimeout(() => {
+      setSearchingExternal(true)
+      setError('')
+      searchExternalChildPreviews({
+        childCode: childCode.trim() || undefined,
+        name: name.trim() || undefined,
+        birthDate: birthDate || undefined,
+      })
+        .then((previews) => {
+          if (!active) return
+          setExternalPreviews(previews)
+        })
+        .catch((searchError) => {
+          if (!active) return
+          setExternalPreviews([])
+          setError(searchError instanceof Error ? searchError.message : 'Não foi possível buscar outras professoras.')
+        })
+        .finally(() => {
+          if (active) setSearchingExternal(false)
+        })
+    }, 450)
+
+    return () => {
+      active = false
+      window.clearTimeout(timeout)
+    }
+  }, [birthDate, childCode, name])
+
+  const localPreviews: PreviewResult[] = useMemo(
     () =>
       classes.flatMap((cls) =>
         cls.students.map((student) => ({
@@ -60,12 +107,13 @@ export default function FindChildSubscreen() {
             generatedByStudentId[student.id] ?? 0,
           ),
           timelineSummary: (student.timeline ?? []).slice(0, 3).map((event) => event.title),
+          isExternal: false,
         })),
       ),
     [annotations, classes, generatedByStudentId, userName],
   )
 
-  const results = localPreviews.filter((child) => {
+  const results = [...localPreviews, ...externalPreviews].filter((child) => {
     const byCode = childCode.trim() && child.childCode.toLowerCase().includes(childCode.trim().toLowerCase())
     const byIdentity =
       name.trim().length >= 2 &&
@@ -74,6 +122,31 @@ export default function FindChildSubscreen() {
 
     return byCode || byIdentity
   })
+
+  async function requestLink(child: PreviewResult) {
+    if (!child.isExternal || submittingId) return
+    setSubmittingId(child.id)
+    setError('')
+    setMessage('')
+    try {
+      if (getAppDataMode() !== 'supabase') {
+        setRequestedId(child.id)
+        setMessage('Solicitação registrada no modo demonstração.')
+        return
+      }
+      await submitContinuityRequest({
+        requestType: 'link',
+        studentId: child.id,
+        reason: 'Solicitação de vínculo pedagógico pela busca de continuidade.',
+      })
+      setRequestedId(child.id)
+      setMessage('Solicitação enviada. O admin ou a professora atual irá revisar o pedido.')
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Não foi possível solicitar o vínculo.')
+    } finally {
+      setSubmittingId(null)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
@@ -123,6 +196,12 @@ export default function FindChildSubscreen() {
           </div>
         </div>
 
+        {searchingExternal && (
+          <p className="text-[12px] text-muted mb-3">Buscando correspondências em outras professoras...</p>
+        )}
+        {message && <p className="text-[12px] text-gm mb-3">{message}</p>}
+        {error && <p className="text-[12px] text-[#C1440E] mb-3">{error}</p>}
+
         <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-[10px]">
           Possíveis correspondências
         </p>
@@ -135,7 +214,7 @@ export default function FindChildSubscreen() {
           </div>
         ) : (
           results.map((child) => (
-            <article key={child.id} className="bg-white rounded-app p-4 border border-border shadow-card mb-3">
+            <article key={`${child.isExternal ? 'external' : 'local'}-${child.id}`} className="bg-white rounded-app p-4 border border-border shadow-card mb-3">
               <div className="flex justify-between gap-3">
                 <div>
                   <h3 className="text-[14px] font-bold text-ink">{child.name}</h3>
@@ -144,17 +223,27 @@ export default function FindChildSubscreen() {
                 <span className="text-[10px] font-bold text-gm bg-gbg rounded-full px-2 py-1 h-fit">{child.childCode}</span>
               </div>
               <p className="text-[12px] text-soft mt-3">{child.school} - {child.recordsCount} registros pedagógicos</p>
+              <p className="text-[11px] text-muted mt-1">Professora: {child.lastTeacher}</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 {child.timelineSummary.map((item) => (
                   <span key={item} className="text-[10px] text-muted bg-cream rounded-full px-2 py-1 border border-border">{item}</span>
                 ))}
               </div>
-              <button
-                disabled
-                className="w-full mt-3 py-[11px] rounded-app-sm bg-gm text-white text-sm font-bold opacity-50"
-              >
-                Solicitar vínculo — em breve
-              </button>
+              {child.isExternal ? (
+                <button
+                  onClick={() => void requestLink(child)}
+                  disabled={requestedId === child.id || submittingId === child.id}
+                  className="w-full mt-3 py-[11px] rounded-app-sm bg-gm text-white text-sm font-bold disabled:opacity-50"
+                >
+                  {requestedId === child.id
+                    ? 'Solicitação registrada'
+                    : submittingId === child.id
+                      ? 'Enviando...'
+                      : 'Solicitar vínculo'}
+                </button>
+              ) : (
+                <p className="text-[11px] text-muted mt-3">Esta criança já está em uma das suas turmas.</p>
+              )}
             </article>
           ))
         )}
@@ -168,4 +257,3 @@ function formatDate(value: string) {
   const [year, month, day] = value.split('-')
   return `${day}/${month}/${year}`
 }
-

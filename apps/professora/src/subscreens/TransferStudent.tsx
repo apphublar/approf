@@ -1,10 +1,13 @@
 ﻿import { useState } from 'react'
 import { ChevronLeft, MoveRight, ShieldCheck } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
+import { getAppDataMode } from '@/services/app-data'
+import { loadTeacherWorkspace } from '@/services/supabase/classes'
+import { submitContinuityRequest } from '@/services/continuity'
 
 export default function TransferStudentSubscreen() {
   const { closeSubscreen } = useNavStore()
-  const { classes, activeClassId, activeStudentId, teacherCode } = useAppStore()
+  const { classes, activeClassId, activeStudentId, teacherCode, hydrateWorkspace } = useAppStore()
   const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
   const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
   const otherClasses = classes.filter((item) => item.id !== cls?.id)
@@ -13,7 +16,48 @@ export default function TransferStudentSubscreen() {
   const [targetTeacherCode, setTargetTeacherCode] = useState('')
   const [targetClassId, setTargetClassId] = useState(otherClasses[0]?.id ?? '')
   const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+
   if (!cls || !student) return null
+
+  async function transfer() {
+    if (submitting) return
+    setSubmitting(true)
+    setError('')
+    setMessage('')
+
+    try {
+      if (getAppDataMode() !== 'supabase') {
+        setMessage('Transferência registrada no modo demonstração.')
+        return
+      }
+
+      const result = await submitContinuityRequest({
+        requestType: mode === 'class' ? 'transfer_class' : 'transfer_teacher',
+        studentId: student.id,
+        targetClassId: mode === 'class' ? targetClassId : null,
+        targetTeacherCode: mode === 'teacher' ? targetTeacherCode.trim().toUpperCase() : null,
+        reason: reason.trim() || null,
+      })
+
+      if (result.immediate) {
+        const workspace = await loadTeacherWorkspace()
+        hydrateWorkspace(workspace)
+        setMessage('Criança movida para a nova turma com sucesso.')
+        return
+      }
+
+      setMessage('Solicitação enviada. A professora de destino ou o admin irá revisar o pedido.')
+    } catch (transferError) {
+      setError(transferError instanceof Error ? transferError.message : 'Não foi possível registrar a transferência.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const canSubmit = mode === 'teacher' ? targetTeacherCode.trim().length >= 6 : Boolean(targetClassId)
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
@@ -28,17 +72,9 @@ export default function TransferStudentSubscreen() {
       </div>
 
       <div className="scroll-area px-[18px] py-[16px]">
-        <div className="rounded-app p-4 border border-border mb-4" style={{ background: '#FFF7E8' }}>
-          <p className="text-[12px] font-bold text-[#8A5A00]">Em breve</p>
-          <p className="text-[12px] text-soft mt-2 leading-[1.6]">
-            A transferência entre professoras e a movimentação oficial entre turmas ainda estão em desenvolvimento.
-            Por enquanto, este fluxo não altera a criança no sistema.
-          </p>
-        </div>
-
-        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4 opacity-60 pointer-events-none">
+        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
           <p className="text-[11px] text-muted">Seu código de professora</p>
-          <p className="text-[18px] font-bold text-gd mt-1">{teacherCode}</p>
+          <p className="text-[18px] font-bold text-gd mt-1">{teacherCode || 'Gerando código...'}</p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -93,20 +129,23 @@ export default function TransferStudentSubscreen() {
           <div className="flex items-start gap-3">
             <ShieldCheck size={18} className="text-gm mt-[2px] flex-shrink-0" />
             <p className="text-[12px] text-soft leading-[1.6]">
-              A timeline acompanha a criança somente após aceite da professora de destino ou aprovação do Super Admin.
+              Mudanças entre suas turmas são imediatas. Transferências para outra professora precisam de aceite ou revisão do admin.
             </p>
           </div>
         </div>
 
+        {message && <p className="text-[12px] text-gm mb-3">{message}</p>}
+        {error && <p className="text-[12px] text-[#C1440E] mb-3">{error}</p>}
+
         <button
-          disabled
-          className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] flex items-center justify-center gap-2 opacity-40"
+          onClick={() => void transfer()}
+          disabled={!canSubmit || submitting}
+          className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40"
         >
           <MoveRight size={18} />
-          Disponível em breve
+          {submitting ? 'Registrando...' : mode === 'class' ? 'Mover para turma' : 'Solicitar transferência'}
         </button>
       </div>
     </div>
   )
 }
-
