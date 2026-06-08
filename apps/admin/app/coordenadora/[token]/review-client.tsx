@@ -331,6 +331,14 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
             {inviteInfo && (
               <div className="cr-invite-info">
                 <div className="cr-invite-row">
+                  <span>Coordenadora</span>
+                  <strong>{inviteInfo.coordinatorName || 'Coordenadora'}</strong>
+                </div>
+                <div className="cr-invite-row">
+                  <span>E-mail da coordenadora</span>
+                  <strong>{inviteInfo.coordinatorEmail || '-'}</strong>
+                </div>
+                <div className="cr-invite-row">
                   <span>Professora</span>
                   <strong>{inviteInfo.teacher?.name || 'Professora'}</strong>
                 </div>
