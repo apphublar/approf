@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type Student = { id: string; full_name: string; birth_date: string | null; tag: string | null }
 type Report = {
@@ -55,6 +55,7 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
   const [submitting, setSubmitting] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
   const [finalized, setFinalized] = useState(false)
+  const reportEditorRef = useRef<HTMLDivElement | null>(null)
   const storageKey = `approf:coordinator:${token}`
 
   useEffect(() => {
@@ -100,7 +101,7 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
   }, [selectedReport, selectedReports])
 
   useEffect(() => {
-    setEditedBody(selectedReport?.body ?? '')
+    setEditedBody(normalizeReportHtml(selectedReport?.body ?? ''))
     setNotes('')
     setActionMessage('')
     setError('')
@@ -179,10 +180,11 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
     setActionMessage('')
     setSubmitting(true)
     try {
+      const currentBody = reportEditorRef.current?.innerHTML ?? editedBody
       const response = await fetch(`/api/coordinator/public/reports/${selectedReport.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'x-coordinator-access': accessToken },
-        body: JSON.stringify({ token, action, notes: notes.trim() || undefined, body: editedBody }),
+        body: JSON.stringify({ token, action, notes: notes.trim() || undefined, body: currentBody }),
       })
       const payload = await response.json()
       if (!response.ok) {
@@ -195,10 +197,23 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
         comment: 'Observação registrada.',
       }
       setActionMessage(messages[action])
+      setEditedBody(currentBody)
       await loadWorkspace()
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function applyReportCommand(command: 'bold' | 'italic' | 'underline' | 'removeFormat') {
+    reportEditorRef.current?.focus()
+    document.execCommand(command)
+    setEditedBody(reportEditorRef.current?.innerHTML ?? editedBody)
+  }
+
+  function applyReportHighlight(color: string) {
+    reportEditorRef.current?.focus()
+    document.execCommand('backColor', false, color)
+    setEditedBody(reportEditorRef.current?.innerHTML ?? editedBody)
   }
 
   async function finalize() {
@@ -274,8 +289,17 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
     .cr-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #6E8C78; margin: 0 0 4px; }
     .cr-card h2 { font-size: 18px; font-weight: 800; margin: 0; }
     .cr-select { width: 100%; border: 1px solid #C8DEC0; border-radius: 8px; padding: 10px 12px; font-size: 13px; background: #F8FBF7; color: #1A2B20; outline: none; margin-bottom: 14px; }
-    .cr-textarea { width: 100%; min-height: 320px; border: 1px solid #C8DEC0; border-radius: 10px; padding: 14px; font-size: 14px; line-height: 1.7; background: #FAFCF9; color: #1A2B20; resize: vertical; outline: none; font-family: inherit; }
-    .cr-textarea:focus { border-color: #3E7A3F; background: #fff; }
+    .cr-editor-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border: 1px solid #C8DEC0; border-bottom: none; border-radius: 10px 10px 0 0; padding: 8px 10px; background: #F8FBF7; }
+    .cr-tool-btn { border: 1px solid #D0E8C8; background: #fff; color: #1A2B20; border-radius: 8px; min-width: 34px; height: 32px; padding: 0 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+    .cr-tool-btn:hover { border-color: #3E7A3F; }
+    .cr-color-btn { width: 28px; height: 28px; border-radius: 999px; border: 2px solid #fff; box-shadow: 0 0 0 1px #C8DEC0; cursor: pointer; }
+    .cr-document-editor { width: 100%; min-height: 360px; border: 1px solid #C8DEC0; border-radius: 0 0 10px 10px; padding: 24px 28px; font-size: 15px; line-height: 1.8; background: #fff; color: #1A2B20; outline: none; font-family: Georgia, 'Times New Roman', serif; }
+    .cr-document-editor:focus { border-color: #3E7A3F; }
+    .cr-document-editor p { margin: 0 0 14px; }
+    .cr-document-editor p:last-child { margin-bottom: 0; }
+    .cr-document-editor b, .cr-document-editor strong { font-weight: 800; color: #0F261D; }
+    .cr-document-editor h1, .cr-document-editor h2, .cr-document-editor h3 { font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; color: #1B4332; margin: 18px 0 10px; line-height: 1.25; }
+    .cr-editor-hint { font-size: 11px; color: #6E8C78; margin: 8px 0 0; line-height: 1.4; }
     .cr-notes-area { width: 100%; min-height: 80px; border: 1px solid #C8DEC0; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.6; background: #FAFCF9; color: #1A2B20; resize: vertical; outline: none; font-family: inherit; margin-top: 12px; }
     .cr-notes-area:focus { border-color: #3E7A3F; background: #fff; }
     .cr-section-label { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #6E8C78; margin: 16px 0 6px; display: block; }
@@ -508,12 +532,38 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
                 {selectedReport && (
                   <>
                     <span className="cr-section-label">Conteúdo do relatório</span>
-                    <textarea
-                      className="cr-textarea"
-                      value={editedBody}
-                      onChange={(e) => setEditedBody(e.target.value)}
-                      placeholder="Conteúdo do relatório..."
+                    <div className="cr-editor-toolbar" aria-label="Ferramentas de marcacao do relatorio">
+                      <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('bold') }}>B</button>
+                      <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('italic') }}>I</button>
+                      <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('underline') }}>U</button>
+                      {[
+                        ['#FFF2A8', 'Amarelo'],
+                        ['#DDF7D8', 'Verde'],
+                        ['#DDEBFF', 'Azul'],
+                        ['#FFE0E6', 'Rosa'],
+                      ].map(([color, label]) => (
+                        <button
+                          key={color}
+                          type="button"
+                          className="cr-color-btn"
+                          style={{ background: color }}
+                          title={`Marcar em ${label}`}
+                          aria-label={`Marcar em ${label}`}
+                          onMouseDown={(event) => { event.preventDefault(); applyReportHighlight(color) }}
+                        />
+                      ))}
+                      <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('removeFormat') }}>Limpar</button>
+                    </div>
+                    <div
+                      key={selectedReport.id}
+                      ref={reportEditorRef}
+                      className="cr-document-editor"
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={(event) => setEditedBody(event.currentTarget.innerHTML)}
+                      dangerouslySetInnerHTML={{ __html: sanitizeReportHtml(editedBody) }}
                     />
+                    <p className="cr-editor-hint">Selecione um trecho do relatorio e use as cores para marcar pontos de correcao ou destaque.</p>
 
                     <span className="cr-section-label">Observação para a professora (opcional)</span>
                     <textarea
@@ -597,6 +647,51 @@ function getOverallStudentStatus(reports: Report[]): string {
   if (statuses.every((s) => s === 'approved')) return 'approved'
   if (statuses.some((s) => s === 'approved')) return 'approved'
   return 'pending'
+}
+
+function normalizeReportHtml(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const decoded = decodeHtmlEntities(trimmed)
+  const hasHtml = /<\/?[a-z][\s\S]*>/i.test(decoded)
+  if (hasHtml) return sanitizeReportHtml(decoded)
+
+  const paragraphs = decoded
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+
+  return paragraphs.join('')
+}
+
+function sanitizeReportHtml(value: string) {
+  return value
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/\s(href|src)="javascript:[^"]*"/gi, '')
+    .replace(/\s(href|src)='javascript:[^']*'/gi, '')
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ')
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 function formatStudentStatus(status: string) {
