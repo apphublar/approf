@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { ExternalLink, Eye, FileText, Flag, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
+import { requireAdminSession } from '../lib/admin-auth'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
@@ -284,6 +285,7 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
 
 async function updateMaterialStatus(formData: FormData) {
   'use server'
+  const admin = await requireAdminSession()
   const materialId = String(formData.get('materialId') ?? '').trim()
   const quickStatus = String(formData.get('quickStatus') ?? '').trim()
   const status = (quickStatus || String(formData.get('status') ?? '').trim()) as MaterialStatus
@@ -313,7 +315,7 @@ async function updateMaterialStatus(formData: FormData) {
   if (error) throw new Error(error.message)
 
   await supabase.from('admin_action_logs').insert({
-    actor_id: null,
+    actor_id: admin.userId,
     action: 'material_admin_status_updated',
     target_table: 'materials',
     target_id: materialId,
@@ -324,6 +326,7 @@ async function updateMaterialStatus(formData: FormData) {
 
 async function reviewReport(formData: FormData) {
   'use server'
+  const admin = await requireAdminSession()
   const reportId = String(formData.get('reportId') ?? '').trim()
   const materialId = String(formData.get('materialId') ?? '').trim()
   const decision = String(formData.get('decision') ?? '').trim()
@@ -332,7 +335,7 @@ async function reviewReport(formData: FormData) {
   const supabase = createSupabaseServiceClient()
   const { error } = await supabase
     .from('material_reports')
-    .update({ status: decision, reviewed_at: new Date().toISOString(), reviewed_by: null })
+    .update({ status: decision, reviewed_at: new Date().toISOString(), reviewed_by: admin.userId })
     .eq('id', reportId)
   if (error) throw new Error(error.message)
 
@@ -345,7 +348,7 @@ async function reviewReport(formData: FormData) {
 
   await supabase.from('materials').update({ reports_count: openReports?.length ?? 0 }).eq('id', materialId)
   await supabase.from('admin_action_logs').insert({
-    actor_id: null,
+    actor_id: admin.userId,
     action: 'material_report_reviewed',
     target_table: 'materials',
     target_id: materialId,
@@ -356,6 +359,7 @@ async function reviewReport(formData: FormData) {
 
 async function refreshMaterialModeration() {
   'use server'
+  await requireAdminSession()
   const supabase = createSupabaseServiceClient()
   const { data: groupedReports, error } = await supabase
     .from('material_reports')

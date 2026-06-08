@@ -58,12 +58,13 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const activeStudent = activeClass?.students.find((item) => item.id === activeStudentId)
 
   const [text, setText] = useState('')
-  const [workKind, setWorkKind] = useState<WorkKind>('')
-  const [modelId, setModelId] = useState('')
+  const [workKind, setWorkKind] = useState<WorkKind>('report')
+  const [modelId, setModelId] = useState('turma')
   const [classId, setClassId] = useState(activeClass?.id ?? '')
   const [studentId, setStudentId] = useState(activeStudent?.id ?? '')
   const [tags, setTags] = useState<string[]>([])
   const [customCategory, setCustomCategory] = useState('')
+  const [newCustomCategory, setNewCustomCategory] = useState('')
   const [attachmentName, setAttachmentName] = useState('')
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
@@ -118,11 +119,11 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   }, [props?.data])
   const isDirectStudentNote = Boolean(prefillData?.directStudentNote) && !isEditing
 
-  const modelOptions = getModelOptions(workKind)
-  const selectedModel = modelOptions.find((item) => item.id === modelId)
+  const selectedModel = findModelById(modelId)
   const selectedClass = classes.find((item) => item.id === classId) ?? activeClass
   const selectedStudent = selectedClass?.students.find((item) => item.id === studentId)
   const availableStudents = useMemo(() => selectedClass?.students ?? [], [selectedClass])
+  const customAnnotationCategories = useMemo(() => buildCustomAnnotationCategories(annotations), [annotations])
   const needsClass = isDirectStudentNote || selectedModel?.scope === 'class' || selectedModel?.scope === 'child'
   const needsStudent = isDirectStudentNote || selectedModel?.scope === 'child'
   const showsClass = needsClass || selectedModel?.scope === 'optional-class'
@@ -183,7 +184,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setClassId(editConfig.classId)
     setStudentId(editConfig.studentId)
     setTags(editConfig.tags)
-    setCustomCategory('')
+    setCustomCategory(editConfig.customCategory)
     setAttachmentName(editAnnotation.attachmentName ?? '')
     setError('')
     setAudioMessage('')
@@ -217,6 +218,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       studentId: string
       tags: string[]
       customCategory: string
+      newCustomCategory: string
       attachmentName: string
       viewMode: AnnotationViewMode
       chatInput: string
@@ -232,6 +234,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setStudentId(draft.studentId || '')
     setTags(draft.tags || [])
     setCustomCategory(draft.customCategory || '')
+    setNewCustomCategory(draft.newCustomCategory || '')
     setAttachmentName(draft.attachmentName || '')
     setViewMode(draft.viewMode || 'annotation')
     setChatInput(draft.chatInput || '')
@@ -255,6 +258,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         studentId,
         tags,
         customCategory,
+        newCustomCategory,
         attachmentName,
         viewMode,
         chatInput,
@@ -274,47 +278,63 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     studentId,
     tags,
     customCategory,
+    newCustomCategory,
     text,
     viewMode,
     workKind,
   ])
 
-  function chooseWorkKind(value: WorkKind) {
-    setWorkKind(value)
-    setError('')
-
+  function choosePlanningTarget() {
     const fallbackClass = activeClass ?? classes[0]
-    if (value === 'personal') {
-      setModelId('pessoal')
-      setClassId('')
-      setStudentId('')
-      return
-    }
-    if (value === 'planning') {
-      setModelId('planejamento')
-      setClassId(fallbackClass?.id ?? '')
-      setStudentId('')
-      return
-    }
-    setModelId('')
+    setWorkKind('planning')
+    setModelId('planejamento')
+    setCustomCategory('')
     setClassId(fallbackClass?.id ?? '')
+    setStudentId('')
+    setError('')
+  }
+
+  function chooseDefaultTarget(target: 'class' | 'child') {
+    const fallbackClass = activeClass ?? classes[0]
+    setWorkKind('report')
+    setCustomCategory('')
+    setError('')
+    setClassId(fallbackClass?.id ?? '')
+    if (target === 'class') {
+      setModelId('turma')
+      setStudentId('')
+      return
+    }
+    setModelId('crianca')
     setStudentId(activeStudent?.id ?? fallbackClass?.students[0]?.id ?? '')
   }
 
-  function chooseModel(value: string) {
-    const nextModel = getModelOptions(workKind).find((item) => item.id === value)
-    setModelId(value)
+  function chooseCustomCategory(category: string) {
+    const normalized = category.trim()
+    if (!normalized) return
+    const normalizedKey = normalizeText(normalized)
+    const isPlanningCategory = normalizedKey.includes('planej') || normalizedKey.includes('projeto')
+    if (isPlanningCategory) {
+      choosePlanningTarget()
+      setCustomCategory(normalized)
+      return
+    }
+    setWorkKind('personal')
+    setModelId('pessoal')
+    setCustomCategory(normalized)
+    setClassId('')
+    setStudentId('')
+    setError('')
+  }
 
-    if (nextModel?.scope === 'class' || nextModel?.scope === 'optional-class') {
-      setStudentId('')
+  function createCustomCategory() {
+    const normalized = newCustomCategory.trim()
+    if (!normalized) {
+      setError('Informe o nome da categoria.')
+      return
     }
-    if (nextModel?.scope === 'teacher') {
-      setClassId('')
-      setStudentId('')
-    }
-    if (nextModel?.scope === 'child' && !studentId) {
-      setStudentId(selectedClass?.students[0]?.id ?? '')
-    }
+    chooseCustomCategory(normalized)
+    setNewCustomCategory('')
   }
 
   function updateClass(id: string) {
@@ -458,7 +478,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           label: 'Anotação direta',
           persistence: ['observacao-continua', 'observacao-importante'] as AnnotationPersistence[],
         }
-      : resolveAnnotation(workKind, effectiveModel)
+      : resolveAnnotation(workKind, effectiveModel, normalizedCustomCategory)
     const targetClassId = effectiveModel.scope === 'teacher' ? undefined : classId || undefined
     const targetStudentId = (isDirectStudentNote || effectiveModel.scope === 'child') ? selectedStudent?.id : undefined
     const targetStudentName = (isDirectStudentNote || effectiveModel.scope === 'child') ? selectedStudent?.name ?? null : null
@@ -484,7 +504,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       date: 'Agora',
       classId: targetClassId,
       studentId: targetStudentId,
-      tags: [isDirectStudentNote ? 'Anotação direta' : effectiveModel.label, ...effectiveTags],
+      tags: [resolved.label, ...effectiveTags.filter((tag) => tag !== resolved.label)],
       persistence: resolved.persistence,
       attachmentName: attachmentName || null,
       scope: !isDirectStudentNote && effectiveModel.scope === 'teacher' ? 'personal' as const : undefined,
@@ -735,36 +755,63 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
         {!isDirectStudentNote && (
           <>
-            <StepTitle number="1" title="Para que esta anotação vai servir?" />
+            <StepTitle number="1" title="Tipo de anotação" />
             <div className="grid grid-cols-1 gap-2 mb-4">
-              <ChoiceButton selected={workKind === 'personal'} title="Anotação pessoal" desc="Registro privado, ideia ou lembrete da professora." onClick={() => chooseWorkKind('personal')} />
-              <ChoiceButton selected={workKind === 'planning'} title="Planejamento" desc="Pode ajudar no planejamento diário/semanal, projeto pedagógico ou reunião de pais." onClick={() => chooseWorkKind('planning')} />
-              <ChoiceButton selected={workKind === 'report'} title="Relatórios e portfólio" desc="Use para diário de bordo da turma, relatório de desenvolvimento ou portfólio da criança." onClick={() => chooseWorkKind('report')} />
+              <ChoiceButton selected={workKind === 'report' && modelId === 'turma'} title="Turma" desc="Anotação geral da turma, sem escolher uma criança específica." onClick={() => chooseDefaultTarget('class')} />
+              <ChoiceButton selected={workKind === 'report' && modelId === 'crianca'} title="Criança" desc="Anotação vinculada a uma criança da turma." onClick={() => chooseDefaultTarget('child')} />
+              <ChoiceButton
+                selected={workKind === 'planning'}
+                title="Planejamento"
+                desc="Alimenta planejamento diário/semanal, projeto pedagógico e reunião de pais."
+                onClick={() => choosePlanningTarget()}
+              />
             </div>
 
-            {workKind === 'report' && (
-              <>
-                <StepTitle number="2" title="Esse registro é sobre quem?" />
-                <div className="grid grid-cols-1 gap-2 mb-4">
-                  {modelOptions.map((option) => (
-                    <ChoiceButton
-                      key={option.id}
-                      selected={modelId === option.id}
-                      title={option.label}
-                      desc={option.desc}
-                      onClick={() => chooseModel(option.id)}
-                    />
+            <div className="rounded-app-sm border border-border bg-white p-3 mb-4">
+              <p className="text-[12px] font-bold text-ink mb-1">Categorias criadas pela professora</p>
+              <p className="text-[11px] text-muted leading-[1.5] mb-3">Use para anotações pessoais, planejamentos, lembretes ou outras categorias próprias.</p>
+              {customAnnotationCategories.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {customAnnotationCategories.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => chooseCustomCategory(category)}
+                      className={`px-3 py-[8px] rounded-full border text-[11px] font-bold ${
+                        workKind === 'personal' && normalizeText(customCategory) === normalizeText(category)
+                          ? 'bg-gbg border-gp text-gd'
+                          : 'bg-cream border-border text-muted'
+                      }`}
+                    >
+                      {category}
+                    </button>
                   ))}
                 </div>
-              </>
-            )}
+              )}
+              <div className="flex gap-2">
+                <input
+                  className="min-w-0 flex-1 px-3 py-3 rounded-app-sm border border-border bg-cream font-sans text-sm text-ink outline-none focus:border-gl"
+                  placeholder="Ex: PESSOAL"
+                  value={newCustomCategory}
+                  onChange={(event) => setNewCustomCategory(event.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={createCustomCategory}
+                  className="px-3 rounded-app-sm bg-gm text-white text-[12px] font-bold flex items-center gap-1"
+                >
+                  <PlusCircle size={14} />
+                  Criar
+                </button>
+              </div>
+            </div>
           </>
         )}
 
         {!isDirectStudentNote && (selectedModel || isDirectStudentNote) && showsClass && (
           <>
             <StepTitle
-              number={isDirectStudentNote ? '1' : workKind === 'report' ? '3' : '2'}
+              number={isDirectStudentNote ? '1' : '2'}
               title={needsStudent || isDirectStudentNote ? 'Escolha a criança' : selectedModel?.scope === 'optional-class' ? 'Turma vinculada' : 'Escolha a turma'}
             />
             <select
@@ -794,7 +841,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
 
         {selectedModel && !isDirectStudentNote && (
           <>
-            <StepTitle number={showsClass ? (workKind === 'report' ? '4' : '3') : '2'} title="Detalhes opcionais" />
+            <StepTitle number={showsClass ? '3' : '2'} title="Detalhes opcionais" />
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {tags.map((tag) => (
@@ -808,16 +855,6 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 ))}
               </div>
             )}
-
-            <label className="block text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">
-              Categoria personalizada
-            </label>
-            <input
-              className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-4"
-              placeholder="Ex: Pessoais, ideias de planejamento, reunião com famílias..."
-              value={customCategory}
-              onChange={(event) => setCustomCategory(event.target.value)}
-            />
 
             <label className="relative w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 overflow-hidden">
               <input
@@ -1020,11 +1057,8 @@ function hexToRgb(hex: string) {
   ]
 }
 
-function getModelOptions(workKind: WorkKind) {
-  if (workKind === 'report') return REPORT_MODELS
-  if (workKind === 'planning') return PLANNING_MODELS
-  if (workKind === 'personal') return PERSONAL_MODELS
-  return []
+function findModelById(modelId: string) {
+  return [...REPORT_MODELS, ...PLANNING_MODELS, ...PERSONAL_MODELS].find((item) => item.id === modelId)
 }
 
 function isWorkKind(value: unknown): value is WorkKind {
@@ -1056,7 +1090,7 @@ function ChoiceButton({ selected, title, desc, onClick }: { selected: boolean; t
   )
 }
 
-function resolveAnnotation(workKind: WorkKind, model: ModelOption): {
+function resolveAnnotation(workKind: WorkKind, model: ModelOption, customCategory?: string): {
   category: AnnotationCategory
   label: string
   persistence: AnnotationPersistence[]
@@ -1066,20 +1100,23 @@ function resolveAnnotation(workKind: WorkKind, model: ModelOption): {
   }
 
   if (workKind === 'personal') {
-    return { category: 'formacao', label: model.label, persistence: ['observacao-importante'] }
+    return { category: 'formacao', label: customCategory?.trim() || model.label, persistence: ['observacao-importante'] }
   }
 
   if (model.id === 'turma') {
-    return { category: 'evolucao', label: 'Diário de bordo', persistence: ['relatorio-atual', 'observacao-continua'] }
+    return { category: 'evolucao', label: 'Anotação da turma', persistence: ['relatorio-atual', 'observacao-continua'] }
   }
 
-  return { category: 'portfolio', label: 'Relatório e portfólio', persistence: ['relatorio-atual', 'evolucao-positiva'] }
+  return { category: 'portfolio', label: 'Anotação da criança', persistence: ['relatorio-atual', 'evolucao-positiva'] }
 }
 
 function inferAnnotationEditorConfig(annotation: Annotation) {
   const modelMatch = findModelByLabel(annotation.label)
   const workKind = modelMatch?.workKind ?? inferWorkKindFromAnnotation(annotation)
   const fallbackModelId = inferModelIdFromAnnotation(annotation, workKind)
+  const customCategory = workKind === 'personal'
+    ? getCustomCategoryFromAnnotation(annotation)
+    : ''
 
   return {
     workKind,
@@ -1087,6 +1124,7 @@ function inferAnnotationEditorConfig(annotation: Annotation) {
     classId: annotation.classId ?? '',
     studentId: annotation.studentId ?? '',
     tags: (annotation.tags ?? []).filter((tag) => tag !== annotation.label),
+    customCategory,
   }
 }
 
@@ -1113,11 +1151,51 @@ function findModelByLabel(label: string) {
   return null
 }
 
+function buildCustomAnnotationCategories(annotations: Annotation[]) {
+  const categories = new Map<string, string>()
+  for (const annotation of annotations) {
+    for (const value of [annotation.label, ...(annotation.tags ?? [])]) {
+      const trimmed = value.trim()
+      if (!trimmed || isReservedAnnotationCategoryLabel(trimmed)) continue
+      const key = normalizeText(trimmed)
+      if (!categories.has(key)) categories.set(key, trimmed)
+    }
+  }
+  return [...categories.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
+
+function getCustomCategoryFromAnnotation(annotation: Annotation) {
+  const values = [annotation.label, ...(annotation.tags ?? [])]
+  return values.find((value) => value.trim() && !isReservedAnnotationCategoryLabel(value))?.trim() ?? ''
+}
+
+function isReservedAnnotationCategoryLabel(value: string) {
+  const normalized = normalizeText(value)
+  return [
+    'anotacao da turma',
+    'anotacao da crianca',
+    'anotacao direta',
+    'registro da turma',
+    'registro de uma crianca',
+    'diario de bordo',
+    'relatorio e portfolio',
+    'planejamento',
+    'anotacao pessoal',
+    'transcricao de audio',
+    'evolucao',
+    'portfolio',
+    'projeto',
+    'formacao',
+    'comunicado',
+    'atipico',
+  ].includes(normalized)
+}
+
 function inferWorkKindFromAnnotation(annotation: Annotation): WorkKind {
   if (annotation.scope === 'personal') return 'personal'
   if (annotation.category === 'plano' || annotation.category === 'projeto') return 'planning'
   if (annotation.category === 'portfolio' || annotation.category === 'atipico') return 'report'
-  return annotation.studentId ? 'report' : 'planning'
+  return 'report'
 }
 
 function normalizeText(value: string) {

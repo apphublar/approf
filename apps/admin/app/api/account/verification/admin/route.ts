@@ -1,18 +1,31 @@
 import { NextResponse } from 'next/server'
+import { getAdminSessionFromCookies } from '@/app/lib/admin-auth'
 import { listTeacherVerificationRequests, updateTeacherVerificationStatus } from '@/app/lib/account'
 
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_ADMIN_URL ?? process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
   'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+  'Access-Control-Allow-Credentials': 'true',
 }
 
 export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
 }
 
+async function requireAdminApiSession() {
+  const session = await getAdminSessionFromCookies()
+  if (!session) {
+    return NextResponse.json({ error: 'Não autorizado.' }, { status: 401, headers: CORS_HEADERS })
+  }
+  return session
+}
+
 export async function GET() {
   try {
+    const auth = await requireAdminApiSession()
+    if (auth instanceof NextResponse) return auth
+
     const requests = await listTeacherVerificationRequests()
     return NextResponse.json({ requests }, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
@@ -26,6 +39,9 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
+    const auth = await requireAdminApiSession()
+    if (auth instanceof NextResponse) return auth
+
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
     const verificationId = typeof body.verificationId === 'string' ? body.verificationId : ''
     const status = typeof body.status === 'string' ? body.status : ''

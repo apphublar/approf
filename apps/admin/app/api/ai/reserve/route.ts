@@ -13,7 +13,7 @@ const GENERATION_TYPES = new Set<AiGenerationType>([
   'class_diary',
   'weekly_planning',
   'daily_lesson_plan',
-  'pedagógical_project',
+  'pedagogical_project',
   'specialist_referral',
   'parents_meeting_record',
   'general_report',

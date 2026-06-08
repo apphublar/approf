@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { requireAdminSession } from '../lib/admin-auth'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
 
 type SubscriptionStatus = 'trial' | 'active' | 'overdue' | 'blocked' | 'canceled'
@@ -31,6 +32,7 @@ const statusOptions: Array<{ value: SubscriptionStatus; label: string }> = [
 ]
 
 export async function liberarAcessoGratuito(formData: FormData) {
+  const admin = await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
   if (!teacherId) return
 
@@ -85,7 +87,7 @@ export async function liberarAcessoGratuito(formData: FormData) {
 
   // 3. Log the action
   await supabase.from('admin_action_logs').insert({
-    actor_id: null,
+    actor_id: admin.userId,
     action: 'teacher_access_granted_free',
     target_table: 'subscriptions',
     target_id: null,
@@ -96,6 +98,7 @@ export async function liberarAcessoGratuito(formData: FormData) {
 }
 
 export async function sendPaymentOverdueNotice(formData: FormData) {
+  await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
   if (!teacherId) return
   await createPaymentNotice([teacherId])
@@ -103,6 +106,7 @@ export async function sendPaymentOverdueNotice(formData: FormData) {
 }
 
 export async function sendAllPaymentOverdueNotices() {
+  await requireAdminSession()
   const supabase = createSupabaseServiceClient()
   const overdue = await listOverdueSubscriptions(supabase)
   await createPaymentNotice(overdue.map((item) => item.user_id))
@@ -110,6 +114,7 @@ export async function sendAllPaymentOverdueNotices() {
 }
 
 export async function blockTeacherAccess(formData: FormData) {
+  await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
   if (!teacherId) return
   await blockSubscriptions([teacherId], 'Bloqueio manual individual pelo admin.')
@@ -117,6 +122,7 @@ export async function blockTeacherAccess(formData: FormData) {
 }
 
 export async function blockAllOverdueAccess() {
+  await requireAdminSession()
   const supabase = createSupabaseServiceClient()
   const overdue = await listOverdueSubscriptions(supabase)
   await blockSubscriptions(overdue.map((item) => item.user_id), 'Bloqueio manual em massa de contas em atraso pelo admin.')
@@ -124,6 +130,7 @@ export async function blockAllOverdueAccess() {
 }
 
 export async function updateTeacherSubscription(formData: FormData) {
+  const admin = await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
   const status = String(formData.get('status') ?? '').trim() as SubscriptionStatus
   const plan = String(formData.get('plan') ?? '').trim()
@@ -160,7 +167,7 @@ export async function updateTeacherSubscription(formData: FormData) {
   if (error) throw new Error(`Subscriptions error: ${error.message}`)
 
   await supabase.from('admin_action_logs').insert({
-    actor_id: null,
+    actor_id: admin.userId,
     action: 'teacher_subscription_updated',
     target_table: 'subscriptions',
     target_id: null,

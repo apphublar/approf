@@ -1885,7 +1885,7 @@ function getReportGenerationType(reportKind: string, portfolioOutput: Portfólio
   if (reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo') return 'class_diary'
   if (reportKind === 'Planejamento semanal') return 'weekly_planning'
   if (reportKind === 'Plano de aula diário') return 'daily_lesson_plan'
-  if (reportKind === 'Projeto pedagógico específico' || reportKind === 'Projeto Pedagógico') return 'pedagógical_project'
+  if (reportKind === 'Projeto pedagógico específico' || reportKind === 'Projeto Pedagógico') return 'pedagogical_project'
   if (reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais') return 'parents_meeting_record'
   if (reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio') {
     return portfolioOutput === 'image' ? 'portfolio_image' : 'portfolio_text'
@@ -1896,7 +1896,7 @@ function getReportGenerationType(reportKind: string, portfolioOutput: Portfólio
   if (normalized.includes('reuniao') && normalized.includes('pais')) return 'parents_meeting_record'
   if (normalized.includes('plano de aula')) return 'daily_lesson_plan'
   if (normalized.includes('planejamento') || normalized.includes('plano')) return 'planning'
-  if (normalized.includes('projeto')) return 'pedagógical_project'
+  if (normalized.includes('projeto')) return 'pedagogical_project'
   if (normalized.includes('especialista') || normalized.includes('encaminhamento')) return 'specialist_referral'
   if (normalized.includes('relatorio') || normalized.includes('parecer')) return 'general_report'
   return 'general_report'

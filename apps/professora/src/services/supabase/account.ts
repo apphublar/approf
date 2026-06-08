@@ -245,28 +245,6 @@ export async function uploadSchoolLogo(file: File) {
   return publicData.publicUrl
 }
 
-export async function uploadTeacherAvatar(file: File) {
-  const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase não configurado.')
-
-  const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError) throw authError
-  const userId = authData.user?.id
-  if (!userId) throw new Error('Sessão não encontrada.')
-
-  const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const path = `${userId}/avatar-${Date.now()}.${extension}`
-  const { error } = await supabase.storage.from('avatars').upload(path, file, {
-    cacheControl: '3600',
-    upsert: true,
-    contentType: file.type || 'image/jpeg',
-  })
-  if (error) throw toError(error, 'Não foi possível enviar o avatar.')
-
-  const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path)
-  return publicData.publicUrl
-}
-
 export async function cancelTeacherSubscription() {
   await callAccountApi('/api/account/subscription', {
     method: 'POST',

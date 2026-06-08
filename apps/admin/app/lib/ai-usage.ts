@@ -9,7 +9,7 @@ export type AiGenerationType =
   | 'planning_daily'
   | 'daily_lesson_plan'
   | 'planning_project'
-  | 'pedagógical_project'
+  | 'pedagogical_project'
   | 'planning_meeting'
   | 'specialist_referral'
   | 'parents_meeting'
@@ -149,7 +149,7 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     outputTokens: 3000,
     imageCount: 0,
   },
-  pedagógical_project: {
+  pedagogical_project: {
     provider: 'openai',
     model: 'gpt-document-pipeline',
     giztokens: toGizTokens(190),
@@ -273,13 +273,12 @@ const GENERATION_TYPE_RPC_FALLBACK: Partial<Record<AiGenerationType, AiGeneratio
   classroom_journal: 'class_diary',
   planning_daily: 'daily_lesson_plan',
   planning_weekly: 'weekly_planning',
-  planning_project: 'pedagógical_project',
+  planning_project: 'pedagogical_project',
   planning_meeting: 'parents_meeting_record',
   parents_meeting: 'parents_meeting_record',
   class_diary: 'general_report',
   weekly_planning: 'planning',
   daily_lesson_plan: 'planning',
-  pedagógical_project: 'planning',
   specialist_referral: 'specialist_report',
   parents_meeting_record: 'general_report',
   audio_transcription: 'other',

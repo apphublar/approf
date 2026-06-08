@@ -11,12 +11,12 @@ export interface ChildMediaUploadResult {
 
 export async function uploadChildPortfolioMedia(studentId: string, files: File[]) {
   const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase nÃ£o estÃ¡ configurado.')
+  if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   const ownerId = userData.user?.id
-  if (!ownerId) throw new Error('SessÃ£o nÃ£o encontrada.')
+  if (!ownerId) throw new Error('Sessão não encontrada.')
 
   const uploaded: ChildMediaUploadResult[] = []
 
@@ -30,7 +30,7 @@ export async function uploadChildPortfolioMedia(studentId: string, files: File[]
       upsert: false,
       contentType: file.type || 'application/octet-stream',
     })
-    if (uploadError) throw toError(uploadError, 'NÃ£o foi possÃ­vel enviar a foto privada do portfÃ³lio.')
+    if (uploadError) throw toError(uploadError, 'Não foi possível enviar a foto privada do portfólio.')
 
     const { data: media, error: mediaError } = await supabase
       .from('child_media_assets')
@@ -45,7 +45,7 @@ export async function uploadChildPortfolioMedia(studentId: string, files: File[]
       .select('id')
       .single()
 
-    if (mediaError) throw toError(mediaError, 'Foto enviada, mas nÃ£o foi possÃ­vel registrar no portfÃ³lio.')
+    if (mediaError) throw toError(mediaError, 'Foto enviada, mas não foi possível registrar no portfólio.')
 
     uploaded.push({
       id: media?.id ?? path,

@@ -8,6 +8,7 @@ import { listReports } from '@/services/reports'
 import { getCoordinatorShareStatus, shareClassWithCoordinator, type CoordinatorShareStatus } from '@/services/coordinator-review'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
+import { countPedagogicalRecords } from '@/utils/pedagogical-records'
 import type { AttendanceRecord, Student } from '@/types'
 type ClassTool = 'students' | 'attendance' | 'calendar' | 'report'
 
@@ -333,7 +334,7 @@ export default function ClassStudentsSubscreen() {
                   rightSlot={
                     <div className="text-right flex-shrink-0">
                       <span className="text-[11px] font-semibold text-gm">
-                        {countStudentRecords(student, annotations, generatedByStudentId[student.id] ?? 0)}
+                        {countPedagogicalRecords(student, annotations, generatedByStudentId[student.id] ?? 0)}
                       </span>
                       <span className="text-[10px] text-muted block">registros</span>
                     </div>
@@ -723,26 +724,3 @@ function formatDateTime(value: string) {
   }).format(new Date(value))
 }
 
-function countStudentRecords(student: Student, annotations: ReturnType<typeof useAppStore.getState>['annotations'], generatedCount: number) {
-  const normalizedStudentName = normalizeText(student.name)
-  const notesCount = annotations.filter((annotation) => {
-    const hasStudentIdMatch = annotation.studentId === student.id
-    if (hasStudentIdMatch) return true
-    if (normalizeText(annotation.studentName ?? '') === normalizedStudentName) return true
-    return false
-  }).length
-
-  const milestonesCount = (student.timeline ?? []).filter(
-    (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
-  ).length
-
-  return notesCount + milestonesCount + generatedCount
-}
-
-function normalizeText(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}

@@ -25,13 +25,16 @@ export default function ClassesScreen() {
       </div>
 
       <div className="scroll-area px-[18px]">
-        <button
-          onClick={() => openSubscreen('find-child')}
-          className="w-full bg-gd text-white rounded-app p-4 mt-[14px] mb-[14px] text-left shadow-card active:scale-[.98] transition-transform"
-        >
-          <p className="text-[14px] font-bold">Buscar criança existente</p>
-          <p className="text-[12px] opacity-80 mt-1">Use código ou nome + nascimento.</p>
-        </button>
+        <div className="w-full bg-white rounded-app p-4 mt-[14px] mb-[14px] border border-border shadow-card">
+          <p className="text-[14px] font-bold text-ink">Buscar criança existente</p>
+          <p className="text-[12px] text-muted mt-1">Pesquisa local nas suas turmas. O vínculo entre professoras chega em breve.</p>
+          <button
+            onClick={() => openSubscreen('find-child')}
+            className="w-full mt-3 py-3 rounded-app-sm bg-gm text-white text-[13px] font-bold"
+          >
+            Buscar nas minhas turmas
+          </button>
+        </div>
 
         <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mt-[14px] mb-[10px]">
           Ano letivo 2026

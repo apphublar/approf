@@ -27,6 +27,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [checkingAccess, setCheckingAccess] = useState(false)
   const [subscriptionBlocked, setSubscriptionBlocked] = useState(false)
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null)
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const hydrateWorkspace = useAppStore((state) => state.hydrateWorkspace)
   const setOnboardingCompleted = useOnboardingStore((state) => state.setCompleted)
 
@@ -85,16 +86,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (hydratedUserId === userId) return
 
     setLoadingWorkspace(true)
+    setWorkspaceError(null)
     loadTeacherWorkspace()
       .then((workspace) => {
         hydrateWorkspace(workspace)
         setOnboardingCompleted(Boolean(workspace.onboardingCompleted))
+        setHydratedUserId(userId)
       })
       .catch((error) => {
         console.error('Não foi possível carregar dados do Supabase.', error)
+        setWorkspaceError(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível carregar seus dados. Verifique a conexão e tente novamente.',
+        )
       })
       .finally(() => {
-        setHydratedUserId(userId)
         setLoadingWorkspace(false)
       })
   }, [hydrateWorkspace, hydratedUserId, session?.user?.id, setOnboardingCompleted])
@@ -162,6 +169,43 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (subscriptionBlocked) {
     return <TeacherAccountSubscreen data={{ forcedMode: true }} />
+  }
+
+  if (workspaceError) {
+    return (
+      <div className="absolute inset-0 chalk-bg flex items-center justify-center px-6">
+        <div className="max-w-sm w-full bg-white rounded-2xl p-6 shadow-sm text-center">
+          <p className="text-[15px] font-semibold text-ink mb-2">Não foi possível carregar seus dados</p>
+          <p className="text-[13px] text-soft mb-5">{workspaceError}</p>
+          <button
+            type="button"
+            className="w-full bg-forest text-white rounded-xl py-3 text-[14px] font-semibold"
+            onClick={() => setHydratedUserId(null)}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!hydratedUserId) {
+    return (
+      <div className="absolute inset-0 chalk-bg flex items-center justify-center px-6">
+        <div className="auth-loading-wrap">
+          <img
+            src="/branding/logo-approf.png"
+            alt="Approf"
+            className="auth-loading-logo"
+          />
+          <div className="auth-loading-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return children

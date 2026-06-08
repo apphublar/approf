@@ -8,6 +8,15 @@ import { adminSections } from '../lib/mock-admin-data'
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
+  if (pathname === '/login') {
+    return <>{children}</>
+  }
+
+  async function logout() {
+    await fetch('/api/admin/auth/logout', { method: 'POST' })
+    window.location.href = '/login'
+  }
+
   return (
     <main className="admin-shell">
       <aside className="sidebar" aria-label="Navegação admin">
@@ -38,9 +47,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <div className="sidebar-note">
-          <ShieldCheck size={16} />
-          <span>Dados sensíveis exigem RLS, auditoria e buckets privados.</span>
+        <div className="sidebar-footer">
+          <div className="sidebar-note">
+            <ShieldCheck size={16} />
+            <span>Dados sensíveis exigem RLS, auditoria e buckets privados.</span>
+          </div>
+          <button type="button" className="logout-button" onClick={() => void logout()}>
+            Sair
+          </button>
         </div>
       </aside>
 

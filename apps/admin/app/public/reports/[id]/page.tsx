@@ -103,7 +103,7 @@ function formatReportType(type: string) {
     class_diary: 'Diário de bordo',
     weekly_planning: 'Planejamento semanal',
     daily_lesson_plan: 'Plano de aula diário',
-    pedagógical_project: 'Projeto pedagógico específico',
+    pedagogical_project: 'Projeto pedagógico específico',
     specialist_referral: 'Relatório para especialista',
     parents_meeting_record: 'Planejamento de reunião de pais',
     planning: 'Planejamento',

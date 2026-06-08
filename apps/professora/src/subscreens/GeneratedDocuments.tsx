@@ -565,7 +565,7 @@ function formatReportType(type: string) {
     class_diary: 'Diário de bordo',
     weekly_planning: 'Planejamento semanal',
     daily_lesson_plan: 'Plano de aula diário',
-    pedagógical_project: 'Projeto pedagógico específico',
+    pedagogical_project: 'Projeto pedagógico específico',
     portfolio_text: 'Portfólio pedagógico',
     portfolio_image: 'Imagem de portfólio',
     generated_image: 'Imagem',
@@ -656,7 +656,7 @@ function hasPlanningFilter(filters: GeneratedDocumentsData) {
     item === 'planning'
     || item === 'weekly_planning'
     || item === 'daily_lesson_plan'
-    || item === 'pedagógical_project',
+    || item === 'pedagogical_project',
   )
 }
 

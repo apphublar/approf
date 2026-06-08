@@ -79,7 +79,7 @@ export async function loadSupabaseAnnotations(ownerId: string, classes: ClassDat
   })
 
   const rows = annotationsResult.data ?? []
-  const hasMore = since !== null && rows.length === MAX_ROWS_PER_LOAD
+  const hasMore = rows.length === MAX_ROWS_PER_LOAD
 
   const mapped = await Promise.all(
     rows.map((annotation) =>

@@ -296,7 +296,7 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
       'Use BNCC apenas como referência pedagógica breve, sem dominar o documento.',
     )
     user.push('Tamanho final: curto a médio, pronto para a professora aplicar no dia.')
-  } else if (type === 'pedagógical_project') {
+  } else if (type === 'pedagogical_project') {
     system.push(
       'Este documento é um projeto pedagógico específico, com estrutura própria e linguagem institucional simples.',
       'Inclua justificativa, objetivos, etapas, propostas, registros, culminância opcional e avaliação processual.',
@@ -374,7 +374,7 @@ function mapGenerationType(generationType: AiGenerationType) {
       return 'Planejamento semanal'
     case 'daily_lesson_plan':
       return 'Plano de aula diário'
-    case 'pedagógical_project':
+    case 'pedagogical_project':
       return 'Projeto pedagógico específico'
     case 'specialist_referral':
       return 'Encaminhamento para especialista'
@@ -444,7 +444,7 @@ function buildRequiredStructureInstructions(input: BuildPromptInput) {
     ]
   }
 
-  if (input.generationType === 'pedagógical_project') {
+  if (input.generationType === 'pedagogical_project') {
     return [
       'Justificativa',
       'Objetivos do projeto',

@@ -9,6 +9,7 @@ import { listReports } from '@/services/reports'
 import { listReportReviewEvents, type ReportReviewEvent } from '@/services/coordinator-review'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
+import { countPedagogicalRecords } from '@/utils/pedagogical-records'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 import type { GeneratedDocument } from '@/types'
 
@@ -55,8 +56,10 @@ export default function StudentProfileSubscreen() {
 
   const timeline: TimelineEvent[] = student.timeline ?? []
   const totalNotes = studentAnns.length
-  const totalMilestones = timeline.length
-  const totalRecords = totalNotes + totalMilestones + generatedCount
+  const totalMilestones = (student.timeline ?? []).filter(
+    (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
+  ).length
+  const totalRecords = countPedagogicalRecords(student, annotations, generatedCount)
   const attendanceSummary = getStudentAttendanceSummary(
     student,
     attendanceRecords.filter((record) => record.classId === cls.id),
@@ -355,10 +358,10 @@ export default function StudentProfileSubscreen() {
 
         <button
           onClick={() => openSubscreen('transfer-student')}
-          className="w-full py-[13px] rounded-app-sm bg-white text-gm font-bold text-[14px] border border-gp flex items-center justify-center gap-2 mb-5 cursor-pointer"
+          className="w-full py-[13px] rounded-app-sm bg-white text-muted font-bold text-[14px] border border-border flex items-center justify-center gap-2 mb-5"
         >
           <MoveRight size={16} strokeWidth={2} />
-          Transferir ou mover criança
+          Transferir criança — em breve
         </button>
 
         <div className="flex items-center justify-between mb-[10px]">

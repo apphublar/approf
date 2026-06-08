@@ -615,7 +615,7 @@ function formatReportType(type: string) {
     case 'class_diary': return 'Diário de bordo'
     case 'weekly_planning': return 'Planejamento semanal'
     case 'daily_lesson_plan': return 'Plano de aula diário'
-    case 'pedagógical_project': return 'Projeto pedagógico específico'
+    case 'pedagogical_project': return 'Projeto pedagógico específico'
     case 'planning': return 'Planejamento'
     case 'portfolio_text': return 'Portfólio pedagógico'
     case 'portfolio_image': return 'Portfólio pedagógico'

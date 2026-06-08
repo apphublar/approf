@@ -6,7 +6,7 @@ import { getAppDataMode } from '@/services/app-data'
 import { deleteSupabaseAnnotation, loadSupabaseAnnotations } from '@/services/supabase/annotations'
 
 export default function AnnotationsScreen() {
-  const { annotations, annotationsHasMore, removeAnnotation, addAnnotation, setAnnotationsHasMore, classes, userId } = useAppStore()
+  const { annotations, annotationsHasMore, removeAnnotation, setAnnotations, setAnnotationsHasMore, classes, userId } = useAppStore()
   const { openSubscreen } = useNavStore()
   const [query, setQuery] = useState('')
   const [loadingMore, setLoadingMore] = useState(false)
@@ -35,7 +35,7 @@ export default function AnnotationsScreen() {
     setLoadingMore(true)
     try {
       const { annotations: all, hasMore } = await loadSupabaseAnnotations(userId, classes, { limitDays: null })
-      all.forEach((ann) => addAnnotation(ann))
+      setAnnotations(all)
       setAnnotationsHasMore(hasMore)
     } catch {
       // silent — user can retry

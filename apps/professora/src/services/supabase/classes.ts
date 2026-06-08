@@ -63,7 +63,6 @@ export async function loadTeacherWorkspace() {
       classId: student.class_id,
       student: {
         ...(await mapSupabaseStudent(student)),
-        annotationCount: timelineByStudentId.get(student.id)?.length ?? 0,
         timeline: timelineByStudentId.get(student.id) ?? [],
       },
     })),

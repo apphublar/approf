@@ -200,7 +200,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     try {
       const styleSettings = loadDocumentStyleSettings()
       const generationType = isProject
-        ? 'pedagógical_project'
+        ? 'pedagogical_project'
         : planningPeriod === 'diario'
           ? 'daily_lesson_plan'
           : 'weekly_planning'

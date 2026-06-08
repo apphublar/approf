@@ -417,7 +417,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             <div className="mb-8 text-center">
               <p className="text-[11px] text-muted">Approf v1.0.0</p>
               <p className="text-[11px] text-muted mt-1">
-                <a href="#" className="underline">Termos de uso</a> · <a href="#" className="underline">Privacidade</a>
+                <a href={`${import.meta.env.VITE_APPROF_SITE_URL ?? 'https://approf.com.br'}/termos`} target="_blank" rel="noopener noreferrer" className="underline">Termos de uso</a> · <a href={`${import.meta.env.VITE_APPROF_SITE_URL ?? 'https://approf.com.br'}/privacidade`} target="_blank" rel="noopener noreferrer" className="underline">Privacidade</a>
               </p>
             </div>
           </>

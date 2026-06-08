@@ -3,28 +3,14 @@ import { ChevronLeft, Search, ShieldCheck } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import type { ChildSearchPreview } from '@/types'
 import { listReports } from '@/services/reports'
-
-const EXTERNAL_PREVIEWS: ChildSearchPreview[] = [
-  {
-    id: 'external-1',
-    childCode: 'CRI-MAN-8R4Q',
-    name: 'Manuela Martins',
-    birthDate: '2021-10-18',
-    school: 'E.M. Joao XXIII',
-    previousClass: 'Maternal II',
-    lastTeacher: 'Prof. Camila',
-    recordsCount: 12,
-    timelineSummary: ['Adaptacao registrada', 'Avancos em autonomia', 'Participacao em musicalizacao'],
-  },
-]
+import { countPedagogicalRecords } from '@/utils/pedagogical-records'
 
 export default function FindChildSubscreen() {
   const { closeSubscreen } = useNavStore()
-  const { classes } = useAppStore()
+  const { classes, annotations, userName } = useAppStore()
   const [childCode, setChildCode] = useState('')
   const [name, setName] = useState('')
   const [birthDate, setBirthDate] = useState('')
-  const [requestedId, setRequestedId] = useState<string | null>(null)
   const [generatedByStudentId, setGeneratedByStudentId] = useState<Record<string, number>>({})
 
   useEffect(() => {
@@ -67,18 +53,19 @@ export default function FindChildSubscreen() {
           birthDate: student.birthDate ?? '',
           school: cls.school,
           previousClass: cls.name,
-          lastTeacher: 'Prof. Ana Lima',
-          recordsCount:
-            student.annotationCount +
-            (student.timeline ?? []).filter((event) => event.type === 'marco').length +
-            (generatedByStudentId[student.id] ?? 0),
+          lastTeacher: userName,
+          recordsCount: countPedagogicalRecords(
+            student,
+            annotations,
+            generatedByStudentId[student.id] ?? 0,
+          ),
           timelineSummary: (student.timeline ?? []).slice(0, 3).map((event) => event.title),
         })),
       ),
-    [classes, generatedByStudentId],
+    [annotations, classes, generatedByStudentId, userName],
   )
 
-  const results = [...localPreviews, ...EXTERNAL_PREVIEWS].filter((child) => {
+  const results = localPreviews.filter((child) => {
     const byCode = childCode.trim() && child.childCode.toLowerCase().includes(childCode.trim().toLowerCase())
     const byIdentity =
       name.trim().length >= 2 &&
@@ -163,10 +150,10 @@ export default function FindChildSubscreen() {
                 ))}
               </div>
               <button
-                onClick={() => setRequestedId(child.id)}
-                className="w-full mt-3 py-[11px] rounded-app-sm bg-gm text-white text-sm font-bold"
+                disabled
+                className="w-full mt-3 py-[11px] rounded-app-sm bg-gm text-white text-sm font-bold opacity-50"
               >
-                {requestedId === child.id ? 'Solicitação registrada' : 'Solicitar vínculo'}
+                Solicitar vínculo — em breve
               </button>
             </article>
           ))

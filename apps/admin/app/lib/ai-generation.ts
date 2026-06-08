@@ -462,7 +462,7 @@ function buildStructureRepairSystemPrompt(generationType: AiGenerationType) {
     ].join('\n')
   }
 
-  if (generationType === 'weekly_planning' || generationType === 'daily_lesson_plan' || generationType === 'planning' || generationType === 'pedagógical_project') {
+  if (generationType === 'weekly_planning' || generationType === 'daily_lesson_plan' || generationType === 'planning' || generationType === 'pedagogical_project') {
     return [
       'Você revisa planejamentos pedagógicos práticos para Educação Infantil.',
       'Organize o texto com títulos claros para cada seção obrigatória, sem texto acadêmico longo.',
@@ -546,7 +546,7 @@ function validateRequiredStructure(generationType: AiGenerationType, reportKind:
     return { ok: missing.length === 0, missing }
   }
 
-  if (generationType === 'pedagógical_project') {
+  if (generationType === 'pedagogical_project') {
     const missing = [
       !hasAnyHeading(text, ['justificativa']) && 'Justificativa',
       !hasAnyHeading(text, ['objetivo']) && 'Objetivos',
@@ -652,7 +652,7 @@ function validateDocumentQuality(generationType: AiGenerationType, text: string)
     issues.push('Remover seção de campos de experiência; relatório deve usar adaptação, linguagem, motor, cognitivo/autonomia, interesses, família e considerações finais.')
   }
 
-  if (generationType === 'pedagógical_project' && words > 1100) {
+  if (generationType === 'pedagogical_project' && words > 1100) {
     issues.push('Reduzir o projeto pedagógico para estrutura objetiva, sem texto acadêmico extenso.')
   }
 
@@ -1003,13 +1003,13 @@ function resolveLegacyGenerationType(
   if (generationType === 'classroom_journal') return 'class_diary'
   if (generationType === 'planning_daily') return 'daily_lesson_plan'
   if (generationType === 'planning_weekly') return 'weekly_planning'
-  if (generationType === 'planning_project') return 'pedagógical_project'
+  if (generationType === 'planning_project') return 'pedagogical_project'
   if (generationType === 'planning_meeting') return 'parents_meeting_record'
   if (generationType === 'parents_meeting') return 'parents_meeting_record'
 
   if (generationType === 'planning') {
     if (normalizedDocKind.includes('plano de aula')) return 'daily_lesson_plan'
-    if (normalizedDocKind.includes('projeto pedagogico')) return 'pedagógical_project'
+    if (normalizedDocKind.includes('projeto pedagogico')) return 'pedagogical_project'
     return 'weekly_planning'
   }
 

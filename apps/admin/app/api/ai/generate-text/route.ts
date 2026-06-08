@@ -27,7 +27,7 @@ const TEXT_GENERATION_TYPES = new Set<AiGenerationType>([
   'planning_daily',
   'daily_lesson_plan',
   'planning_project',
-  'pedagógical_project',
+  'pedagogical_project',
   'planning_meeting',
   'specialist_referral',
   'parents_meeting',

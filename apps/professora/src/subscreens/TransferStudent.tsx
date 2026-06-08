@@ -4,7 +4,7 @@ import { useAppStore, useNavStore } from '@/store'
 
 export default function TransferStudentSubscreen() {
   const { closeSubscreen } = useNavStore()
-  const { classes, activeClassId, activeStudentId, teacherCode, updateStudent } = useAppStore()
+  const { classes, activeClassId, activeStudentId, teacherCode } = useAppStore()
   const cls = classes.find((item) => item.id === activeClassId) ?? classes[0]
   const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
   const otherClasses = classes.filter((item) => item.id !== cls?.id)
@@ -13,20 +13,7 @@ export default function TransferStudentSubscreen() {
   const [targetTeacherCode, setTargetTeacherCode] = useState('')
   const [targetClassId, setTargetClassId] = useState(otherClasses[0]?.id ?? '')
   const [reason, setReason] = useState('')
-  const [done, setDone] = useState(false)
-
   if (!cls || !student) return null
-
-  function transfer() {
-    if (mode === 'class' && targetClassId) {
-      updateStudent(cls.id, student.id, {
-        generalNotes: [student.generalNotes, `Movimentacao solicitada para turma ${targetClassId}. ${reason}`].filter(Boolean).join('\n'),
-      })
-    }
-    setDone(true)
-  }
-
-  const canSubmit = mode === 'teacher' ? targetTeacherCode.trim().length >= 6 : Boolean(targetClassId)
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
@@ -41,7 +28,15 @@ export default function TransferStudentSubscreen() {
       </div>
 
       <div className="scroll-area px-[18px] py-[16px]">
-        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+        <div className="rounded-app p-4 border border-border mb-4" style={{ background: '#FFF7E8' }}>
+          <p className="text-[12px] font-bold text-[#8A5A00]">Em breve</p>
+          <p className="text-[12px] text-soft mt-2 leading-[1.6]">
+            A transferência entre professoras e a movimentação oficial entre turmas ainda estão em desenvolvimento.
+            Por enquanto, este fluxo não altera a criança no sistema.
+          </p>
+        </div>
+
+        <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4 opacity-60 pointer-events-none">
           <p className="text-[11px] text-muted">Seu código de professora</p>
           <p className="text-[18px] font-bold text-gd mt-1">{teacherCode}</p>
         </div>
@@ -104,12 +99,11 @@ export default function TransferStudentSubscreen() {
         </div>
 
         <button
-          onClick={transfer}
-          disabled={!canSubmit}
-          className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40"
+          disabled
+          className="w-full py-4 rounded-app bg-gd text-white font-bold text-[15px] flex items-center justify-center gap-2 opacity-40"
         >
           <MoveRight size={18} />
-          {done ? 'Transferência registrada' : 'Registrar transferência'}
+          Disponível em breve
         </button>
       </div>
     </div>
