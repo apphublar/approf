@@ -119,23 +119,25 @@ export async function POST(request: Request) {
 function resolveCoordinatorPublicOrigin(requestOrigin: string) {
   const customCoordinatorUrl = process.env.NEXT_PUBLIC_COORDINATOR_PUBLIC_URL?.trim().replace(/\/$/, '')
     || process.env.COORDINATOR_PUBLIC_URL?.trim().replace(/\/$/, '')
-  if (customCoordinatorUrl && !isLocalhostOrigin(customCoordinatorUrl)) return customCoordinatorUrl
+  if (customCoordinatorUrl && !isLocalhostOrigin(customCoordinatorUrl) && !isUnavailableCoordinatorOrigin(customCoordinatorUrl)) {
+    return customCoordinatorUrl
+  }
 
-  const productionDomain = 'https://admin.approf.com.br'
+  const productionDomain = 'https://approf-admin.vercel.app'
 
   const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim()
-  if (productionUrl && !isSiteRootOrigin(productionUrl)) {
+  if (productionUrl && !isUnavailableCoordinatorOrigin(productionUrl)) {
     return `https://${productionUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
   }
 
   const configured = process.env.NEXT_PUBLIC_ADMIN_URL?.trim().replace(/\/$/, '')
-  if (configured && !isLocalhostOrigin(configured) && !isSiteRootOrigin(configured)) return configured
+  if (configured && !isLocalhostOrigin(configured) && !isUnavailableCoordinatorOrigin(configured)) return configured
 
   const vercelUrl = process.env.VERCEL_URL?.trim()
   if (vercelUrl) return `https://${vercelUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
 
   const cleanRequestOrigin = requestOrigin.replace(/\/$/, '')
-  if (cleanRequestOrigin && !isLocalhostOrigin(cleanRequestOrigin) && !isSiteRootOrigin(cleanRequestOrigin)) return cleanRequestOrigin
+  if (cleanRequestOrigin && !isLocalhostOrigin(cleanRequestOrigin) && !isUnavailableCoordinatorOrigin(cleanRequestOrigin)) return cleanRequestOrigin
 
   return productionDomain
 }
@@ -149,10 +151,14 @@ function isLocalhostOrigin(value: string) {
   }
 }
 
-function isSiteRootOrigin(value: string) {
+function isUnavailableCoordinatorOrigin(value: string) {
   try {
     const url = new URL(value.startsWith('http') ? value : `https://${value}`)
-    return url.hostname === 'approf.com.br' || url.hostname === 'www.approf.com.br'
+    return [
+      'approf.com.br',
+      'www.approf.com.br',
+      'admin.approf.com.br',
+    ].includes(url.hostname)
   } catch {
     return false
   }
