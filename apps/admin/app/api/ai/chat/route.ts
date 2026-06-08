@@ -12,11 +12,10 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 }
 
-type ChatProvider = 'openai' | 'anthropic'
+type ChatProvider = 'openai'
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-4o-mini'
-const DEFAULT_ANTHROPIC_CHAT_MODEL = 'claude-3-5-haiku-latest'
 
 export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
@@ -55,9 +54,7 @@ export async function POST(request: Request) {
     logId = reservedLogId
     reservedEstimatedCostCents = reservation.estimate?.estimatedCostCents ?? estimate.estimatedCostCents
 
-    const result = provider === 'openai'
-      ? await requestOpenAiChat(messages)
-      : await requestAnthropicChat(messages)
+    const result = await requestOpenAiChat(messages)
 
     await completeAiUsageReservation({
       logId: reservedLogId,
@@ -114,7 +111,7 @@ export async function POST(request: Request) {
 }
 
 function parseProvider(value: unknown): ChatProvider {
-  if (value === 'openai' || value === 'anthropic') return value
+  if (value === 'openai') return value
   return 'openai'
 }
 
@@ -136,13 +133,11 @@ function parseMessages(value: unknown): ChatMessage[] {
 function buildPricingEstimate(provider: ChatProvider, messages: ChatMessage[]) {
   const textLength = messages.reduce((acc, message) => acc + message.content.length, 0)
   const estimatedInputTokens = Math.max(300, Math.round(textLength / 3))
-  const estimatedOutputTokens = provider === 'openai' ? 500 : 650
-  const estimatedCostCents = provider === 'openai'
-    ? estimateOpenAiCostCents(estimatedInputTokens, estimatedOutputTokens)
-    : estimateAnthropicCostCents(resolveAnthropicChatModel(), estimatedInputTokens, estimatedOutputTokens)
+  const estimatedOutputTokens = 500
+  const estimatedCostCents = estimateOpenAiCostCents(estimatedInputTokens, estimatedOutputTokens)
   return {
     provider,
-    model: provider === 'openai' ? resolveOpenAiChatModel() : resolveAnthropicChatModel(),
+    model: resolveOpenAiChatModel(),
     estimatedCostCents,
     giztokens: Math.max(20, estimatedCostCents * 10),
     inputTokens: estimatedInputTokens,
@@ -193,52 +188,6 @@ async function requestOpenAiChat(messages: ChatMessage[]) {
   }
 }
 
-async function requestAnthropicChat(messages: ChatMessage[]) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('Serviço Claude indisponível no momento.')
-  const model = resolveAnthropicChatModel()
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 900,
-      temperature: 0.5,
-      system: 'Você é um assistente útil, claro e cordial para professoras de educação infantil. Responda em português brasileiro. Escreva sempre em texto corrido e limpo, sem formatação Markdown: sem asteriscos, sem hashtags, sem traços de lista, sem backticks, sem negrito nem itálico.',
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    }),
-  })
-  const payload = (await response.json().catch(() => null)) as {
-    content?: Array<{ type?: string; text?: string }>
-    usage?: { input_tokens?: number; output_tokens?: number }
-    error?: { message?: string }
-  } | null
-
-  if (!response.ok) {
-    throw new Error(payload?.error?.message || 'Não foi possível responder com Claude agora.')
-  }
-
-  const raw = payload?.content
-    ?.filter((item) => item.type === 'text' && typeof item.text === 'string')
-    .map((item) => item.text ?? '')
-    .join('\n')
-    .trim()
-  if (!raw) throw new Error('O Claude não retornou resposta suficiente.')
-  const inputTokens = payload?.usage?.input_tokens ?? 0
-  const outputTokens = payload?.usage?.output_tokens ?? 0
-  return {
-    text: stripMarkdown(raw),
-    model,
-    inputTokens,
-    outputTokens,
-    actualCostCents: estimateAnthropicCostCents(model, inputTokens, outputTokens),
-  }
-}
-
 function stripMarkdown(value: string) {
   return value
     .replace(/\r\n/g, '\n')
@@ -263,11 +212,6 @@ function resolveOpenAiChatModel() {
   return fromEnv || DEFAULT_OPENAI_CHAT_MODEL
 }
 
-function resolveAnthropicChatModel() {
-  const fromEnv = process.env.ANTHROPIC_CHAT_MODEL?.trim()
-  return fromEnv || DEFAULT_ANTHROPIC_CHAT_MODEL
-}
-
 function resolveUsdToBrlRate() {
   const fromEnv = Number(process.env.AI_USD_TO_BRL)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
@@ -289,22 +233,6 @@ function resolveOpenAiOutputUsdPerMillion() {
 function estimateOpenAiCostCents(inputTokens: number, outputTokens: number) {
   const usd = (inputTokens / 1_000_000) * resolveOpenAiInputUsdPerMillion()
     + (outputTokens / 1_000_000) * resolveOpenAiOutputUsdPerMillion()
-  const brlApprox = usd * resolveUsdToBrlRate()
-  return Math.max(1, Math.round(brlApprox * 100))
-}
-
-function estimateAnthropicCostCents(model: string, inputTokens: number, outputTokens: number) {
-  const m = model.toLowerCase()
-  let inputCostPerMillion = 3
-  let outputCostPerMillion = 15
-  if (m.includes('haiku')) {
-    inputCostPerMillion = 0.25
-    outputCostPerMillion = 1.25
-  } else if (m.includes('opus')) {
-    inputCostPerMillion = 15
-    outputCostPerMillion = 75
-  }
-  const usd = (inputTokens / 1_000_000) * inputCostPerMillion + (outputTokens / 1_000_000) * outputCostPerMillion
   const brlApprox = usd * resolveUsdToBrlRate()
   return Math.max(1, Math.round(brlApprox * 100))
 }

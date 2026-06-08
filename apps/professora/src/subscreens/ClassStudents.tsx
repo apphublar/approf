@@ -91,6 +91,8 @@ export default function ClassStudentsSubscreen() {
   })
   const reportRows = buildAttendanceReport(sortedStudents, classAttendanceRecords)
   const selectedCalendarRecord = attendanceByDate.get(selectedCalendarDate)
+  const latestCoordinatorShare = shareStatus?.shares[0]
+  const visibleCoordinatorShareUrl = coordinatorShareUrl || latestCoordinatorShare?.share_url || ''
 
   function openStudent(id: string) {
     setActiveClass(cls.id)
@@ -233,11 +235,11 @@ export default function ClassStudentsSubscreen() {
                 </div>
               </div>
 
-              {shareStatus && shareStatus.shares.length > 0 && (() => {
-                const latestShare = shareStatus.shares[0]
+              {latestCoordinatorShare && (() => {
+                const latestShare = latestCoordinatorShare
                 const isFinalized = latestShare.access_status === 'review_finalized'
                 const isVerified = latestShare.access_status === 'verified' || isFinalized
-                const { approved, changesRequested, total } = shareStatus.reportSummary
+                const { approved, changesRequested, total } = shareStatus?.reportSummary ?? { approved: 0, changesRequested: 0, total: 0 }
                 return (
                   <div className={`rounded-app-sm border p-3 mb-3 ${isFinalized ? 'bg-[#EAF7EE] border-[#B6DECA]' : isVerified ? 'bg-[#FFF8E8] border-[#EAD58A]' : 'bg-cream border-border'}`}>
                     <p className="text-[11px] font-bold text-ink mb-1">
@@ -277,7 +279,7 @@ export default function ClassStudentsSubscreen() {
                 {sharingCoordinator ? 'Enviando...' : 'Enviar acesso para a coordenadora'}
               </button>
               {coordinatorMessage && <p className="text-[12px] text-gm mt-2 leading-[1.5]">{coordinatorMessage}</p>}
-              {coordinatorShareUrl && <p className="text-[11px] text-muted mt-1 break-all">Link: {coordinatorShareUrl}</p>}
+              {visibleCoordinatorShareUrl && <p className="text-[11px] text-muted mt-1 break-all">Link: {visibleCoordinatorShareUrl}</p>}
               {coordinatorError && <p className="text-[12px] text-[#C1440E] mt-2 leading-[1.5]">{coordinatorError}</p>}
             </div>
 

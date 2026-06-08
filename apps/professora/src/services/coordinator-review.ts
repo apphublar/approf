@@ -15,6 +15,7 @@ export interface CoordinatorShareInfo {
   coordinator_name: string
   coordinator_email: string
   share_token: string
+  share_url: string
   access_status: 'pending' | 'verified' | 'revoked' | 'review_finalized'
   verified_at: string | null
   last_access_at: string | null

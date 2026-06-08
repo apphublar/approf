@@ -37,7 +37,7 @@ export interface BuildPromptInput {
   diaryRawText?: string
   bnccFields?: string[]
   useAnnotations?: boolean
-  attachments?: Array<{ name?: string; type?: string; size?: number; hasImageInPortfolio?: boolean }>
+  attachments?: Array<{ name?: string; type?: string; size?: number; hasImageInPortfolio?: boolean; extractedText?: string }>
   interventionMode?: 'suggestions' | 'feedback_analysis'
   observation?: string
   studentAge?: string
@@ -346,7 +346,7 @@ function formatAnnotations(annotations?: Array<{ date?: string; label?: string; 
     .join('\n')
 }
 
-function formatAttachments(attachments?: Array<{ name?: string; type?: string; size?: number; hasImageInPortfolio?: boolean }>) {
+function formatAttachments(attachments?: Array<{ name?: string; type?: string; size?: number; hasImageInPortfolio?: boolean; extractedText?: string }>) {
   if (!attachments?.length) return ''
   return attachments
     .slice(0, 20)
@@ -355,7 +355,11 @@ function formatAttachments(attachments?: Array<{ name?: string; type?: string; s
       const type = attachment.type ?? 'application/octet-stream'
       const size = typeof attachment.size === 'number' ? `${attachment.size} bytes` : 'tamanho desconhecido'
       const visualNote = attachment.hasImageInPortfolio ? ', imagem será exibida no portfólio pela aplicação' : ''
-      return `- ${name} (${type}, ${size}${visualNote})`
+      const extractedText = attachment.extractedText?.trim()
+      const textNote = extractedText
+        ? `\n  Trecho textual extraído para seguir como referência:\n  ${extractedText.slice(0, 3000)}`
+        : ''
+      return `- ${name} (${type}, ${size}${visualNote})${textNote}`
     })
     .join('\n')
 }

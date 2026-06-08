@@ -81,14 +81,14 @@ const MONTHLY_GIZTOKENS_DEFAULT = MONTHLY_INCLUDED_COST_CENTS * GIZTOKENS_PER_CO
 const MONTHLY_GIZTOKEN_OVERAGE_LIMIT = (MONTHLY_COST_LIMIT_CENTS - MONTHLY_INCLUDED_COST_CENTS) * GIZTOKENS_PER_COST_CENT
 
 /**
- * Estimativas de reserva para geração textual via pipeline Claude em 3 etapas (rascunho → BNCC/segurança → refinamento).
+ * Estimativas de reserva para geração textual via pipeline OpenAI em 3 etapas (rascunho → BNCC/segurança → refinamento).
  * Tokens e custo são agregados conservadores (etapas 2–3 reenviam o texto anterior no prompt).
  * portfolio_image permanece no modelo de chamada única.
  */
 const PRICING: Record<AiGenerationType, PricingEstimate> = {
   development_report: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(140),
     estimatedCostCents: 140,
     inputTokens: 10500,
@@ -96,8 +96,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   class_diary: {
-    provider: 'anthropic',
-    model: 'claude-text-2stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(95),
     estimatedCostCents: 95,
     inputTokens: 6200,
@@ -105,8 +105,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   classroom_journal: {
-    provider: 'anthropic',
-    model: 'claude-text-2stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(95),
     estimatedCostCents: 95,
     inputTokens: 6200,
@@ -114,8 +114,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   weekly_planning: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(165),
     estimatedCostCents: 165,
     inputTokens: 11800,
@@ -123,8 +123,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   planning_weekly: {
-    provider: 'anthropic',
-    model: 'claude-text-2stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(115),
     estimatedCostCents: 115,
     inputTokens: 8200,
@@ -132,8 +132,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   daily_lesson_plan: {
-    provider: 'anthropic',
-    model: 'claude-text-2stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(120),
     estimatedCostCents: 120,
     inputTokens: 8600,
@@ -141,8 +141,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   planning_daily: {
-    provider: 'anthropic',
-    model: 'claude-text-2stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(95),
     estimatedCostCents: 95,
     inputTokens: 6400,
@@ -150,8 +150,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   pedagógical_project: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(190),
     estimatedCostCents: 190,
     inputTokens: 13200,
@@ -159,8 +159,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   planning_project: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(190),
     estimatedCostCents: 190,
     inputTokens: 13200,
@@ -168,8 +168,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   specialist_referral: {
-    provider: 'anthropic',
-    model: 'claude-text-2stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(135),
     estimatedCostCents: 135,
     inputTokens: 9100,
@@ -177,8 +177,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   parents_meeting_record: {
-    provider: 'anthropic',
-    model: 'claude-text-2stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(105),
     estimatedCostCents: 105,
     inputTokens: 7200,
@@ -186,8 +186,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   planning_meeting: {
-    provider: 'anthropic',
-    model: 'claude-text-2stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(105),
     estimatedCostCents: 105,
     inputTokens: 7200,
@@ -195,8 +195,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   parents_meeting: {
-    provider: 'anthropic',
-    model: 'claude-text-1stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(75),
     estimatedCostCents: 75,
     inputTokens: 3600,
@@ -204,8 +204,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   general_report: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(175),
     estimatedCostCents: 175,
     inputTokens: 12800,
@@ -213,8 +213,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   planning: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(155),
     estimatedCostCents: 155,
     inputTokens: 11200,
@@ -222,8 +222,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   portfolio_text: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(210),
     estimatedCostCents: 210,
     inputTokens: 13800,
@@ -249,8 +249,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   specialist_report: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(245),
     estimatedCostCents: 245,
     inputTokens: 15500,
@@ -258,8 +258,8 @@ const PRICING: Record<AiGenerationType, PricingEstimate> = {
     imageCount: 0,
   },
   other: {
-    provider: 'anthropic',
-    model: 'claude-text-3stage',
+    provider: 'openai',
+    model: 'gpt-document-pipeline',
     giztokens: toGizTokens(145),
     estimatedCostCents: 145,
     inputTokens: 10000,

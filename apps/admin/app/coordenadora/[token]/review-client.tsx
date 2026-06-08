@@ -102,6 +102,7 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
   }, [students, reportsByStudent])
 
   const canFinalize = reviewedCount > 0 && students.length > 0
+  const isReviewFinalized = finalized || workspace?.share?.access_status === 'review_finalized'
 
   async function verify() {
     if (!email.trim() || !code.trim()) {
@@ -338,7 +339,7 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
     )
   }
 
-  if (finalized) {
+  if (isReviewFinalized) {
     return (
       <div className="cr-page">
         <style>{css}</style>

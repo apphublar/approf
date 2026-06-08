@@ -37,11 +37,13 @@ interface ReportAttachment {
   isImage: boolean
   storagePath?: string
   dataUrl?: string
+  extractedText?: string
 }
 
 type ReportMode = 'annotations' | 'blank'
 type PortfólioOutput = 'text' | 'image'
 type PortfolioImageFormat = 'portrait' | 'landscape' | 'square'
+type ChildAnnotationMode = 'all' | 'one'
 
 export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const { closeSubscreen, openSubscreen } = useNavStore()
@@ -74,12 +76,20 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const assistantMode = typeof data === 'object' && data && 'assistantMode' in data
     ? String((data as { assistantMode?: string }).assistantMode)
     : ''
+  const isUnifiedCreator = Boolean(typeof data === 'object' && data && 'unifiedCreator' in data && (data as { unifiedCreator?: unknown }).unifiedCreator)
+    || reportKind === 'Criador pedagógico'
   const isPortfólio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
   const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
   const isClassDiary = reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo'
   const isParentsMeeting = reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais'
   const isPlanning = isPlanningKind(reportKind) && !isParentsMeeting
 
+  const [documentTitle, setDocumentTitle] = useState('')
+  const [useUnifiedAnnotations, setUseUnifiedAnnotations] = useState(false)
+  const [includeUnifiedClassNotes, setIncludeUnifiedClassNotes] = useState(true)
+  const [includeUnifiedChildNotes, setIncludeUnifiedChildNotes] = useState(true)
+  const [childAnnotationMode, setChildAnnotationMode] = useState<ChildAnnotationMode>('all')
+  const [selectedCustomCategories, setSelectedCustomCategories] = useState<string[]>([])
   const [mode, setMode] = useState<ReportMode>('annotations')
   const [selectedAnnotationIds, setSelectedAnnotationIds] = useState<string[]>([])
   const [ignoredNotes, setIgnoredNotes] = useState('')
@@ -140,7 +150,65 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     }
     return annotations.filter((annotation) => matchesStudent(annotation, selectedStudentId, selectedStudent?.name))
   }, [annotations, isClassDiary, isParentsMeeting, isPlanning, selectedClass?.id, selectedStudentId, selectedStudent?.name])
-  const selectedAnnotations = studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
+  const customAnnotationCategories = useMemo(() => {
+    const systemLabels = new Set([
+      'registro da turma',
+      'registro de uma crianca',
+      'registro de uma criança',
+      'planejamento',
+      'anotacao pessoal',
+      'anotação pessoal',
+      'anotacao direta',
+      'anotação direta',
+      'transcricao de audio',
+      'transcrição de áudio',
+    ])
+    const values = new Set<string>()
+    for (const annotation of annotations) {
+      for (const value of [annotation.label, ...(annotation.tags ?? [])]) {
+        const clean = value?.trim()
+        if (!clean) continue
+        if (systemLabels.has(normalize(clean))) continue
+        values.add(clean)
+      }
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [annotations])
+  const unifiedAnnotations = useMemo(() => {
+    if (!useUnifiedAnnotations) return []
+    const selectedClassStudentIds = new Set(selectedClass?.students.map((student) => student.id) ?? [])
+    const selectedClassStudentNames = new Set(selectedClass?.students.map((student) => student.name) ?? [])
+    const selectedCategories = new Set(selectedCustomCategories.map((item) => normalize(item)))
+    const picked = annotations.filter((annotation) => {
+      const isClassNote = includeUnifiedClassNotes && matchesClass(annotation, selectedClass?.id) && !annotation.studentId
+      const isChildNote = includeUnifiedChildNotes && (
+        childAnnotationMode === 'one'
+          ? matchesStudent(annotation, selectedStudentId, selectedStudent?.name)
+          : Boolean(
+              (annotation.studentId && selectedClassStudentIds.has(annotation.studentId))
+              || (annotation.studentName && selectedClassStudentNames.has(annotation.studentName)),
+            )
+      )
+      const isCustomCategory = selectedCategories.size > 0 && [annotation.label, ...(annotation.tags ?? [])]
+        .some((value) => selectedCategories.has(normalize(value)))
+      return isClassNote || isChildNote || isCustomCategory
+    })
+    return dedupeAnnotations(picked)
+  }, [
+    annotations,
+    childAnnotationMode,
+    includeUnifiedChildNotes,
+    includeUnifiedClassNotes,
+    selectedClass?.id,
+    selectedClass?.students,
+    selectedCustomCategories,
+    selectedStudent?.name,
+    selectedStudentId,
+    useUnifiedAnnotations,
+  ])
+  const selectedAnnotations = isUnifiedCreator
+    ? unifiedAnnotations
+    : studentAnnotations.filter((annotation) => selectedAnnotationIds.includes(annotation.id))
   const milestoneAnnotations = useMemo(() => {
     const filtered = studentAnnotations.filter((annotation) => {
       const text = normalize(`${annotation.label} ${annotation.text}`)
@@ -150,14 +218,17 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   }, [studentAnnotations])
   const selectedMilestones = milestoneAnnotations.filter((annotation) => selectedMilestoneIds.includes(annotation.id))
   const firstName = selectedStudent?.name.split(' ')[0] ?? 'A criança'
-  const supportsLivingReport = isDevelopmentReport
-  const needsBnccFields = isPlanning
-  const needsAgeGroup = isPlanning
-  const needsObjective = isPlanning
-  const needsEvaluationPeriod = isDevelopmentReport
-  const currentReportType = getReportGenerationType(reportKind, portfolioOutput)
+  const supportsLivingReport = !isUnifiedCreator && isDevelopmentReport
+  const needsBnccFields = !isUnifiedCreator && isPlanning
+  const needsAgeGroup = !isUnifiedCreator && isPlanning
+  const needsObjective = !isUnifiedCreator && isPlanning
+  const needsEvaluationPeriod = !isUnifiedCreator && isDevelopmentReport
+  const effectiveDocumentTitle = isUnifiedCreator ? documentTitle.trim() : reportKind
+  const currentReportType = getReportGenerationType(effectiveDocumentTitle || reportKind, portfolioOutput)
   const isSpecialistReferral = currentReportType === 'specialist_referral' || currentReportType === 'specialist_report'
-  const hasContentBase = isClassDiary
+  const hasContentBase = isUnifiedCreator
+    ? documentTitle.trim().length >= 3 && extraContext.trim().length >= 10 && (!useUnifiedAnnotations || unifiedAnnotations.length > 0)
+    : isClassDiary
     ? diaryRawText.trim().length >= 20
     : isPortfólio
       ? selectedMilestones.length > 0 || extraContext.trim().length >= 10 || attachments.length > 0
@@ -452,9 +523,10 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       type: file.type || 'application/octet-stream',
       isImage: isImageFile(file),
       dataUrl: isImageFile(file) ? await fileToDataUrl(file) : undefined,
+      extractedText: await extractAttachmentText(file),
     })))
 
-    if (isSupabaseConfigured() && selectedStudent?.id) {
+    if (!isUnifiedCreator && isSupabaseConfigured() && selectedStudent?.id) {
       setUploadingAttachments(true)
       setUsageError('')
       try {
@@ -530,14 +602,28 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
     try {
       const styleSettings = loadDocumentStyleSettings()
+      const requestClassId = isUnifiedCreator
+        ? (selectedClass?.id ?? null)
+        : isClassDiary || isParentsMeeting
+          ? (selectedClass?.id ?? null)
+          : (selectedStudent?.classId ?? null)
+      const requestStudentId = isUnifiedCreator
+        ? (useUnifiedAnnotations && includeUnifiedChildNotes && childAnnotationMode === 'one' ? (selectedStudent?.id ?? null) : null)
+        : isClassDiary || isParentsMeeting
+          ? null
+          : (selectedStudent?.id ?? null)
       const requestSummary = {
-        reportKind,
+        reportKind: effectiveDocumentTitle || 'Documento pedagógico',
+        documentTitle: effectiveDocumentTitle || null,
+        unifiedCreator: isUnifiedCreator,
         portfolioOutput,
         portfolioImageFormat,
         historyScope,
-        mode,
-        studentName: isClassDiary || isParentsMeeting ? null : (selectedStudent?.name ?? null),
-        className: isClassDiary || isParentsMeeting ? (selectedClass?.name ?? null) : (selectedStudent?.className ?? null),
+        mode: isUnifiedCreator
+          ? (useUnifiedAnnotations ? 'annotations' : 'blank')
+          : mode,
+        studentName: requestStudentId ? (selectedStudent?.name ?? null) : null,
+        className: requestClassId ? (selectedClass?.name ?? selectedStudent?.className ?? null) : null,
         ageGroup: ageGroup || null,
         bnccFields,
         objective: objective || null,
@@ -558,24 +644,33 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         assistantMode: assistantMode || null,
         livingReport,
         voiceAnnotationsCount: voiceAnnotations.length,
+        annotationSources: isUnifiedCreator ? {
+          useAnnotations: useUnifiedAnnotations,
+          classNotes: includeUnifiedClassNotes,
+          childNotes: includeUnifiedChildNotes,
+          childMode: childAnnotationMode,
+          customCategories: selectedCustomCategories,
+        } : null,
+        useAnnotations: isUnifiedCreator ? useUnifiedAnnotations : mode === 'annotations',
         selectedAnnotations: selectedAnnotations.map((annotation) => ({
           date: annotation.date,
           label: annotation.label,
           text: annotation.text,
         })),
         ignoredNotes,
-        blankContext,
+        blankContext: isUnifiedCreator ? '' : blankContext,
         extraContext: extraContext.trim(),
         attachments: attachments.map((item) => ({
           name: item.name,
           type: item.type,
           size: item.size,
           hasImageInPortfolio: item.isImage && Boolean(item.dataUrl),
+          extractedText: item.extractedText,
         })),
         documentStyle: styleSettings,
       }
 
-      const generationType = getReportGenerationType(reportKind, portfolioOutput)
+      const generationType = getReportGenerationType(effectiveDocumentTitle || reportKind, portfolioOutput)
       const rawPhotoDataUrl = generationType === 'portfolio_image'
         ? (attachments.find((item) => item.isImage && item.dataUrl)?.dataUrl ?? null)
         : null
@@ -585,17 +680,17 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       const result = generationType === 'portfolio_image'
         ? await generateAiPortfolioImage({
             generationType,
-            classId: isClassDiary || isParentsMeeting ? (selectedClass?.id ?? null) : (selectedStudent?.classId ?? null),
-            studentId: isClassDiary || isParentsMeeting ? null : (selectedStudent?.id ?? null),
+            classId: requestClassId,
+            studentId: requestStudentId,
             promptVersion: 'portfolio-image-v1',
             requestSummary,
             primaryPhotoDataUrl,
           })
         : await generateAiTextDocument({
             generationType,
-            classId: isClassDiary || isParentsMeeting ? (selectedClass?.id ?? null) : (selectedStudent?.classId ?? null),
-            studentId: isClassDiary || isParentsMeeting ? null : (selectedStudent?.id ?? null),
-            promptVersion: 'professora-report-v1',
+            classId: requestClassId,
+            studentId: requestStudentId,
+            promptVersion: isUnifiedCreator ? 'criador-pedagogico-v1' : 'professora-report-v1',
             requestSummary,
           })
 
@@ -701,7 +796,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         <button onClick={handleBack} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">{reportKind}</span>
+        <span className="font-serif text-[18px] text-gd flex-1">{isUnifiedCreator ? 'Criador pedagógico' : reportKind}</span>
       </div>
 
       <div key={generationViewKey} className="scroll-area px-[18px] stage-fade-in">
@@ -709,7 +804,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
           generating ? (
             currentReportType === 'portfolio_image'
               ? <GenerationImageLoadingScreen />
-              : <GenerationDocumentLoadingScreen variant={resolveDocumentLoadingVariant(reportKind)} />
+              : <GenerationDocumentLoadingScreen variant={resolveDocumentLoadingVariant(effectiveDocumentTitle || reportKind)} />
           ) : (
           <div className="py-5">
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
@@ -720,7 +815,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 <div className="flex-1">
                   <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
                   <p className="text-[12px] text-muted leading-snug">
-                    {isClassDiary
+                    {isUnifiedCreator
+                      ? 'Informe o título, escolha as anotações que podem entrar no contexto e descreva o pedido como faria no ChatGPT.'
+                      : isClassDiary
                       ? 'Preencha rapidamente os dados do dia da turma para gerar o diário.'
                       : isParentsMeeting
                       ? 'Selecione a turma e descreva a pauta para planejar a reunião.'
@@ -729,7 +826,34 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 </div>
               </div>
 
-              {isClassDiary || isParentsMeeting ? (
+              {isUnifiedCreator ? (
+                <>
+                  <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                    Título do que você precisa
+                  </label>
+                  <input
+                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none"
+                    placeholder="Ex: Relatório individual do João sobre adaptação"
+                    value={documentTitle}
+                    onChange={(event) => setDocumentTitle(event.target.value)}
+                  />
+
+                  <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
+                    Turma de referência
+                  </label>
+                  <select
+                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
+                    value={selectedClassId}
+                    onChange={(event) => setSelectedClassId(event.target.value)}
+                  >
+                    {classes.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : isClassDiary || isParentsMeeting ? (
                 <>
                   <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
                     Turma
@@ -811,7 +935,137 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               )}
             </div>
 
-            {isDevelopmentReport && (
+            {isUnifiedCreator && (
+              <>
+                <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                  <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
+                    Anotações
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setUseUnifiedAnnotations(false)}
+                      className={`rounded-app-sm border px-3 py-3 text-left ${
+                        !useUnifiedAnnotations ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                      }`}
+                    >
+                      <span className="block text-[13px] font-bold">Não usar</span>
+                      <span className="block text-[11px] mt-1">Criar só pelo pedido</span>
+                    </button>
+                    <button
+                      onClick={() => setUseUnifiedAnnotations(true)}
+                      className={`rounded-app-sm border px-3 py-3 text-left ${
+                        useUnifiedAnnotations ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                      }`}
+                    >
+                      <span className="block text-[13px] font-bold">Usar anotações</span>
+                      <span className="block text-[11px] mt-1">Escolher fontes</span>
+                    </button>
+                  </div>
+
+                  {useUnifiedAnnotations && (
+                    <div className="mt-4 space-y-3">
+                      <SourceToggle
+                        selected={includeUnifiedClassNotes}
+                        title="Anotações da turma"
+                        desc="Usa registros coletivos vinculados à turma selecionada."
+                        onClick={() => setIncludeUnifiedClassNotes((current) => !current)}
+                      />
+                      <SourceToggle
+                        selected={includeUnifiedChildNotes}
+                        title="Anotações das crianças"
+                        desc="Usa registros das crianças da turma ou de uma criança específica."
+                        onClick={() => setIncludeUnifiedChildNotes((current) => !current)}
+                      />
+
+                      {includeUnifiedChildNotes && (
+                        <div className="rounded-app-sm border border-border bg-cream p-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => setChildAnnotationMode('all')}
+                              className={`rounded-app-sm border px-3 py-2 text-[12px] font-bold ${
+                                childAnnotationMode === 'all' ? 'bg-gd text-white border-gd' : 'bg-white text-muted border-border'
+                              }`}
+                            >
+                              Turma toda
+                            </button>
+                            <button
+                              onClick={() => setChildAnnotationMode('one')}
+                              className={`rounded-app-sm border px-3 py-2 text-[12px] font-bold ${
+                                childAnnotationMode === 'one' ? 'bg-gd text-white border-gd' : 'bg-white text-muted border-border'
+                              }`}
+                            >
+                              Uma criança
+                            </button>
+                          </div>
+                          {childAnnotationMode === 'one' && (
+                            <select
+                              className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-3 text-[14px] outline-none"
+                              value={selectedStudentId}
+                              onChange={(event) => setSelectedStudentId(event.target.value)}
+                            >
+                              {allStudents
+                                .filter((student) => student.classId === selectedClassId)
+                                .map((student) => (
+                                  <option key={`${student.classId}-${student.id}`} value={student.id}>
+                                    {student.name}
+                                  </option>
+                                ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
+
+                      {customAnnotationCategories.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
+                            Categorias criadas
+                          </p>
+                          <div className="flex flex-col gap-2">
+                            {customAnnotationCategories.map((category) => {
+                              const selected = selectedCustomCategories.includes(category)
+                              return (
+                                <button
+                                  key={category}
+                                  onClick={() => setSelectedCustomCategories((current) =>
+                                    current.includes(category)
+                                      ? current.filter((item) => item !== category)
+                                      : [...current, category],
+                                  )}
+                                  className={`rounded-app-sm border px-3 py-3 text-left text-[12px] font-bold ${
+                                    selected ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                                  }`}
+                                >
+                                  {selected ? '[x] ' : '[ ] '}
+                                  {category}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-muted leading-[1.5]">
+                        {unifiedAnnotations.length} anotações serão usadas como contexto.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                  <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
+                    O que você quer que o ChatGPT faça?
+                  </label>
+                  <textarea
+                    className="w-full min-h-[180px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
+                    placeholder="Explique o que deseja criar, o tom do texto, informações importantes, o que deve aparecer, o que precisa remover e qualquer padrão que deseja seguir."
+                    value={extraContext}
+                    onChange={(event) => setExtraContext(event.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {!isUnifiedCreator && isDevelopmentReport && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Informações da criança e professora
@@ -824,7 +1078,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {isParentsMeeting && (
+            {!isUnifiedCreator && isParentsMeeting && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Estrutura da reunião
@@ -859,7 +1113,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
+            {!isUnifiedCreator && !isClassDiary && !isParentsMeeting && (needsBnccFields || needsObjective || needsEvaluationPeriod) && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   {isDevelopmentReport ? 'Período avaliado' : 'Dados BNCC obrigatorios'}
@@ -942,7 +1196,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {isDevelopmentReport && (
+            {!isUnifiedCreator && isDevelopmentReport && (
               <>
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
@@ -1007,7 +1261,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfólio && (
+            {!isUnifiedCreator && !isClassDiary && !isParentsMeeting && !isPortfólio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Base do documento
@@ -1062,7 +1316,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {isPortfólio && (
+            {!isUnifiedCreator && isPortfólio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                   Tipo de portfólio
@@ -1090,7 +1344,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfólio && !isDevelopmentReport && (
+            {!isUnifiedCreator && !isClassDiary && !isParentsMeeting && !isPortfólio && !isDevelopmentReport && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-3">
                 Histórico
@@ -1123,7 +1377,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
-            {isPortfólio && (
+            {!isUnifiedCreator && isPortfólio && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
@@ -1164,7 +1418,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
-            {!isClassDiary && !isParentsMeeting && !isPortfólio && (mode === 'annotations' ? (
+            {!isUnifiedCreator && !isClassDiary && !isParentsMeeting && !isPortfólio && (mode === 'annotations' ? (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
@@ -1252,7 +1506,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             ))}
 
-            {isClassDiary && (
+            {!isUnifiedCreator && isClassDiary && (
               <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
                   Histórico do diário
@@ -1270,6 +1524,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
               </div>
             )}
 
+            {!isUnifiedCreator && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
                 {isPortfólio ? 'Instruções para a IA (obrigatório seguir)' : 'Orientações finais para a IA (opcional)'}
@@ -1295,8 +1550,9 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 onChange={(event) => setExtraContext(event.target.value)}
               />
             </div>
+            )}
 
-            {isPortfólio && (
+            {!isUnifiedCreator && isPortfólio && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-[12px] bg-gbg flex items-center justify-center text-gm flex-shrink-0">
@@ -1347,6 +1603,62 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 <span aria-hidden="true">{uploadingAttachments ? 'Enviando...' : '+ Anexar foto'}</span>
               </label>
             </div>
+            )}
+
+            {isUnifiedCreator && (
+              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-[12px] bg-gbg flex items-center justify-center text-gm flex-shrink-0">
+                    <FileUp size={18} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[13px] font-bold text-ink">Anexar referência</p>
+                    <p className="text-[11px] text-muted leading-[1.5] mt-1">
+                      Envie imagem, PDF, Word ou texto para orientar o padrão, servir de exemplo ou complementar o pedido.
+                    </p>
+                    {attachments.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        {attachments.map((item) => (
+                          <div key={item.id} className="bg-cream rounded-app-sm px-3 py-2 flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-[9px] bg-white flex items-center justify-center text-gm flex-shrink-0">
+                              {item.isImage ? <Image size={16} /> : <FileText size={16} />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[12px] font-bold text-ink truncate">{item.name}</p>
+                              <p className="text-[10px] text-muted">
+                                {formatFileSize(item.size)}
+                                {item.extractedText ? ' • texto lido' : ''}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => removeAttachment(item.id)}
+                              className="w-7 h-7 rounded-full bg-white text-muted flex items-center justify-center flex-shrink-0"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <label
+                  className={`relative block w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white text-center overflow-hidden ${
+                    uploadingAttachments ? 'opacity-60 pointer-events-none' : ''
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.txt,.md,.rtf,.csv"
+                    disabled={uploadingAttachments}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={handlePortfolioInputChange}
+                  />
+                  <span aria-hidden="true">{uploadingAttachments ? 'Preparando...' : '+ Anexar arquivo'}</span>
+                </label>
+              </div>
             )}
 
             <button
@@ -1511,6 +1823,28 @@ function MeetingTextArea(props: {
   )
 }
 
+function SourceToggle(props: {
+  selected: boolean
+  title: string
+  desc: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={props.onClick}
+      className={`w-full rounded-app-sm border px-3 py-3 text-left ${
+        props.selected ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+      }`}
+    >
+      <span className="block text-[13px] font-bold">
+        {props.selected ? '[x] ' : '[ ] '}
+        {props.title}
+      </span>
+      <span className="block text-[11px] mt-1">{props.desc}</span>
+    </button>
+  )
+}
+
 function matchesStudent(annotation: Annotation, studentId: string, studentName?: string) {
   if (annotation.studentId && annotation.studentId === studentId) return true
   if (studentName && annotation.studentName === studentName) return true
@@ -1522,7 +1856,17 @@ function matchesClass(annotation: Annotation, classId?: string) {
   return annotation.classId === classId
 }
 
+function dedupeAnnotations(annotations: Annotation[]) {
+  const seen = new Set<string>()
+  return annotations.filter((annotation) => {
+    if (seen.has(annotation.id)) return false
+    seen.add(annotation.id)
+    return true
+  })
+}
+
 function getReportGenerationType(reportKind: string, portfolioOutput: PortfólioOutput): AiGenerationType {
+  const normalized = normalize(reportKind)
   if (reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento') return 'development_report'
   if (reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo') return 'class_diary'
   if (reportKind === 'Planejamento semanal') return 'weekly_planning'
@@ -1533,6 +1877,14 @@ function getReportGenerationType(reportKind: string, portfolioOutput: Portfólio
     return portfolioOutput === 'image' ? 'portfolio_image' : 'portfolio_text'
   }
   if (isSpecialistReport(reportKind) || reportKind === 'Rel. Atipico') return 'specialist_referral'
+  if (normalized.includes('portfolio')) return 'portfolio_text'
+  if (normalized.includes('diario de bordo') || normalized.includes('diario')) return 'class_diary'
+  if (normalized.includes('reuniao') && normalized.includes('pais')) return 'parents_meeting_record'
+  if (normalized.includes('plano de aula')) return 'daily_lesson_plan'
+  if (normalized.includes('planejamento') || normalized.includes('plano')) return 'planning'
+  if (normalized.includes('projeto')) return 'pedagógical_project'
+  if (normalized.includes('especialista') || normalized.includes('encaminhamento')) return 'specialist_referral'
+  if (normalized.includes('relatorio') || normalized.includes('parecer')) return 'general_report'
   return 'general_report'
 }
 
@@ -1899,6 +2251,24 @@ function formatFileSize(size: number) {
 
 function isImageFile(file: File) {
   return file.type.startsWith('image/') || /\.(apng|avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name)
+}
+
+async function extractAttachmentText(file: File) {
+  if (!isTextAttachment(file)) return undefined
+  if (file.size > 220_000) return undefined
+  try {
+    const text = await file.text()
+    const clean = text.replace(/\s+/g, ' ').trim()
+    return clean ? clean.slice(0, 6000) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function isTextAttachment(file: File) {
+  const type = file.type.toLowerCase()
+  if (type.startsWith('text/')) return true
+  return /\.(txt|md|csv|json|rtf)$/i.test(file.name)
 }
 
 function mergeLivingReport(existingBody: string, updateBlock: string) {

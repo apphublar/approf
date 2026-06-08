@@ -75,7 +75,7 @@ export interface GeneratedImageInput {
 }
 
 export interface AiChatGenerationInput {
-  provider: 'openai' | 'anthropic'
+  provider: 'openai'
   messages: Array<{ role: 'user' | 'assistant'; content: string }>
   classId?: string | null
   studentId?: string | null

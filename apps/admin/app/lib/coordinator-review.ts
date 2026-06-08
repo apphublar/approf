@@ -133,7 +133,7 @@ export async function verifyCoordinatorAccess(input: { token: string; email: str
 
 export async function getCoordinatorWorkspace(token: string, accessToken: string) {
   const supabase = createSupabaseServiceClient()
-  const share = await requireVerifiedShare(token, accessToken)
+  const share = await requireVerifiedShare(token, accessToken, { allowFinalized: true })
 
   const [classResult, studentsResult, reportsResult, eventsResult] = await Promise.all([
     supabase.from('classes').select('id,name,shift,age_group,school_id, schools(name)').eq('id', share.class_id).maybeSingle(),
@@ -268,10 +268,11 @@ export async function finalizeCoordinatorReview(token: string, accessToken: stri
   return { approved, changesRequested, total: reports.length }
 }
 
-async function requireVerifiedShare(token: string, accessToken: string) {
+async function requireVerifiedShare(token: string, accessToken: string, options?: { allowFinalized?: boolean }) {
   const share = await getCoordinatorShareByToken(token)
   if (!share) throw new Error('Link de acesso não encontrado.')
-  if (share.access_status !== 'verified') throw new Error('Acesso ainda não validado.')
+  const isAllowedStatus = share.access_status === 'verified' || (options?.allowFinalized && share.access_status === 'review_finalized')
+  if (!isAllowedStatus) throw new Error('Acesso ainda não validado.')
   if (!isValidCoordinatorAccessToken(accessToken, share.id, share.coordinator_email)) {
     throw new Error('Acesso expirado. Valide o código novamente.')
   }

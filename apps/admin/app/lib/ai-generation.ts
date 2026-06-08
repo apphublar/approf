@@ -63,12 +63,10 @@ interface TextCompletion {
   actualCostCents: number
 }
 
-const DEFAULT_ANTHROPIC_HAIKU_MODEL = 'claude-3-5-haiku-20241022'
-const DEFAULT_ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-20250514'
 const DEFAULT_OPENAI_INTERVENTIONS_MODEL = 'gpt-4o-mini'
+const DEFAULT_OPENAI_DRAFT_MODEL = 'gpt-4o-mini'
+const DEFAULT_OPENAI_REVIEW_MODEL = 'gpt-4o'
 const DEFAULT_OPENAI_HUMANIZE_MODEL = 'gpt-5'
-const ANTHROPIC_HAIKU_FALLBACK_MODELS = ['claude-3-5-haiku-20241022', 'claude-3-haiku-20240307']
-const ANTHROPIC_SONNET_FALLBACK_MODELS = ['claude-sonnet-4-20250514', 'claude-3-7-sonnet-20250219', 'claude-3-5-sonnet-20241022']
 
 interface DocumentPipelineConfig {
   stages: 1 | 2 | 3
@@ -78,25 +76,24 @@ interface DocumentPipelineConfig {
 }
 
 function resolveHaikuModelId(): string {
-  return process.env.ANTHROPIC_HAIKU_MODEL?.trim()
-    || process.env.ANTHROPIC_DRAFT_MODEL?.trim()
-    || DEFAULT_ANTHROPIC_HAIKU_MODEL
+  return process.env.OPENAI_DRAFT_MODEL?.trim()
+    || process.env.OPENAI_TEXT_MODEL?.trim()
+    || DEFAULT_OPENAI_DRAFT_MODEL
 }
 
 function resolveSonnetModelId(): string {
-  return process.env.ANTHROPIC_SONNET_MODEL?.trim()
-    || process.env.ANTHROPIC_TEXT_MODEL?.trim()
-    || process.env.ANTHROPIC_REVIEW_MODEL?.trim()
-    || DEFAULT_ANTHROPIC_SONNET_MODEL
+  return process.env.OPENAI_REVIEW_MODEL?.trim()
+    || process.env.OPENAI_TEXT_MODEL?.trim()
+    || DEFAULT_OPENAI_REVIEW_MODEL
 }
 
 function resolveDraftModelId(): string {
-  const v = process.env.ANTHROPIC_DRAFT_MODEL?.trim()
+  const v = process.env.OPENAI_DRAFT_MODEL?.trim()
   return v || resolveHaikuModelId()
 }
 
 function resolveReviewModelId(): string {
-  const v = process.env.ANTHROPIC_REVIEW_MODEL?.trim()
+  const v = process.env.OPENAI_REVIEW_MODEL?.trim()
   return v || resolveSonnetModelId()
 }
 
@@ -273,8 +270,8 @@ export async function generatePedagogicalText(
     await persistUsage(
       reportId,
       input.ownerId,
-      'hybrid',
-      `haiku-sonnet-gpt:${s1.model}|${s2.model}|${s3.model}`,
+      'openai',
+      `gpt:${s1.model}|${s2.model}|${s3.model}`,
       inputTokens,
       outputTokens,
       actualCostCents,
@@ -290,9 +287,9 @@ export async function generatePedagogicalText(
 
     return {
       text: cleanText,
-      provider: 'hybrid',
+      provider: 'openai',
       model: s3.model,
-      pipeline: 'haiku-sonnet-gpt-humanized',
+      pipeline: 'gpt-document-pipeline',
       promptVersion: input.promptVersion,
       inputTokens,
       outputTokens,
@@ -392,9 +389,9 @@ async function ensureRequiredStructure(input: {
     missing: validation.missing,
   })
 
-  const repair = await requestClaudeText(
-    buildStructureRepairSystemPrompt(input.generationType),
-    [
+  const repair = await requestOpenAiHumanizationText({
+    system: buildStructureRepairSystemPrompt(input.generationType),
+    user: [
       'DOCUMENTO ATUAL:',
       input.candidate.text.trim(),
       '',
@@ -404,12 +401,10 @@ async function ensureRequiredStructure(input: {
       'INSTRUCAO:',
       'Reorganize o texto e garanta que todas as secoes exigidas aparecam com títulos claros.',
     ].join('\n'),
-    {
-      model: input.model,
-      maxTokens: 2200,
-      temperature: 0.25,
-    },
-  )
+    model: input.model,
+    maxTokens: 2200,
+    temperature: 0.25,
+  })
 
   const merged = {
     ...repair,
@@ -508,26 +503,24 @@ async function ensureDocumentQuality(input: {
     issues: validation.issues,
   })
 
-  const repair = await requestClaudeText(
-    [
+  const repair = await requestOpenAiHumanizationText({
+    system: [
       'Você é revisor final de documentos pedagógicos da Educação Infantil.',
       'Ajuste o texto para cumprir regras de tamanho, linguagem natural e segurança pedagógica.',
       'Preserve todas as informações relevantes da professora e não invente fatos.',
       'Retorne APENAS o documento final corrigido.',
     ].join('\n'),
-    [
+    user: [
       'DOCUMENTO ATUAL:',
       input.candidate.text.trim(),
       '',
       'AJUSTES OBRIGATORIOS:',
       ...validation.issues.map((item) => `- ${item}`),
     ].join('\n'),
-    {
-      model: input.model,
-      maxTokens: 2000,
-      temperature: 0.25,
-    },
-  )
+    model: input.model,
+    maxTokens: 2000,
+    temperature: 0.25,
+  })
 
   return {
     completion: {
@@ -678,7 +671,7 @@ function resolveDocumentPipelineConfig(
 ): DocumentPipelineConfig {
   return {
     stages: 3,
-    pipelineName: 'haiku-sonnet-gpt-humanized',
+    pipelineName: 'gpt-document-pipeline',
     draftModel: models.draft,
     reviewModel: models.review,
   }
@@ -744,9 +737,9 @@ async function runPipelineStage(
   logContext?: { requestId: string; logId: string; generationType: AiGenerationType },
 ) {
   try {
-    return await requestClaudeText(system, user, opts)
+    return await requestOpenAiHumanizationText({ system, user, ...opts })
   } catch (error) {
-    console.error(`[AI-GENERATION] Falha na etapa ${stageNumber} do pipeline Claude`, {
+    console.error(`[AI-GENERATION] Falha na etapa ${stageNumber} do pipeline GPT`, {
       ...logContext,
       stage: stageNumber,
       model: opts.model,
@@ -759,12 +752,6 @@ async function runPipelineStage(
 export async function rollbackGeneratedArtifacts(input: { reportId: string; ownerId: string }) {
   await deleteReportUsage(input.reportId, input.ownerId)
   await deleteReport(input.reportId, input.ownerId)
-}
-
-interface RequestClaudeOptions {
-  model: string
-  maxTokens?: number
-  temperature?: number
 }
 
 interface RequestOpenAiInterventionOptions {
@@ -780,87 +767,6 @@ interface RequestOpenAiHumanizationOptions {
   model: string
   maxTokens?: number
   temperature?: number
-}
-
-async function requestClaudeText(system: string, user: string, options: RequestClaudeOptions) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    throw new PublicAiGenerationError('Serviço de IA indisponível no momento. Tente novamente em instantes.')
-  }
-
-  for (const model of resolveClaudeModelAttempts(options.model)) {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: options.maxTokens ?? 1800,
-        temperature: options.temperature ?? 0.4,
-        system,
-        messages: [{ role: 'user', content: user }],
-      }),
-    })
-
-    const payload = (await response.json().catch(() => null)) as {
-      content?: Array<{ type?: string; text?: string }>
-      usage?: { input_tokens?: number; output_tokens?: number }
-      error?: { message?: string; type?: string }
-    } | null
-
-    if (!response.ok) {
-      console.error('[ai-generation] Claude HTTP', response.status, payload?.error?.message)
-      if (isClaudeModelUnavailable(response.status, payload?.error?.message, payload?.error?.type)) {
-        continue
-      }
-      throw new PublicAiGenerationError('Não foi possivel gerar o texto agora. Tente novamente em instantes.')
-    }
-
-    const text = payload?.content
-      ?.filter((item) => item?.type === 'text' && typeof item?.text === 'string')
-      .map((item) => item.text ?? '')
-      .join('\n')
-      .trim()
-
-    if (!text) {
-      throw new PublicAiGenerationError('A IA não retornou conteúdo suficiente. Ajuste o contexto e tente novamente.')
-    }
-
-    const inputTokens = payload?.usage?.input_tokens ?? 0
-    const outputTokens = payload?.usage?.output_tokens ?? 0
-    const estimatedCostCents = estimateClaudeCostCents(model, inputTokens, outputTokens)
-
-    return {
-      text,
-      provider: 'anthropic',
-      model,
-      inputTokens,
-      outputTokens,
-      estimatedCostCents,
-      actualCostCents: estimatedCostCents,
-    } satisfies TextCompletion
-  }
-
-  throw new PublicAiGenerationError('Não foi possivel gerar o texto agora. Tente novamente em instantes.')
-}
-
-function resolveClaudeModelAttempts(requestedModel: string) {
-  const candidates = [requestedModel]
-  const normalized = requestedModel.toLowerCase()
-  if (normalized.includes('haiku')) {
-    candidates.push(...ANTHROPIC_HAIKU_FALLBACK_MODELS)
-  } else if (normalized.includes('sonnet') || normalized.includes('claude')) {
-    candidates.push(...ANTHROPIC_SONNET_FALLBACK_MODELS)
-  }
-  return Array.from(new Set(candidates.filter(Boolean)))
-}
-
-function isClaudeModelUnavailable(status: number, message?: string, type?: string) {
-  const normalized = `${message ?? ''} ${type ?? ''}`.toLowerCase()
-  return status === 400 && /model|not_found|not found|invalid|does not exist|not supported/.test(normalized)
 }
 
 function sanitizeInternalLogError(error: unknown) {
@@ -1190,28 +1096,6 @@ async function deleteReport(reportId: string, ownerId: string) {
   }
 }
 
-function estimateClaudeCostCents(model: string, inputTokens: number, outputTokens: number) {
-  const m = model.toLowerCase()
-  let inputCostPerMillion: number
-  let outputCostPerMillion: number
-  if (m.includes('haiku')) {
-    inputCostPerMillion = resolveAnthropicHaikuInputUsdPerMillion()
-    outputCostPerMillion = resolveAnthropicHaikuOutputUsdPerMillion()
-  } else if (m.includes('sonnet')) {
-    inputCostPerMillion = resolveAnthropicSonnetInputUsdPerMillion()
-    outputCostPerMillion = resolveAnthropicSonnetOutputUsdPerMillion()
-  } else if (m.includes('opus')) {
-    inputCostPerMillion = resolveAnthropicOpusInputUsdPerMillion()
-    outputCostPerMillion = resolveAnthropicOpusOutputUsdPerMillion()
-  } else {
-    inputCostPerMillion = resolveAnthropicSonnetInputUsdPerMillion()
-    outputCostPerMillion = resolveAnthropicSonnetOutputUsdPerMillion()
-  }
-  const usd = (inputTokens / 1_000_000) * inputCostPerMillion + (outputTokens / 1_000_000) * outputCostPerMillion
-  const brlApprox = usd * resolveUsdToBrlRate()
-  return Math.max(0, Math.round(brlApprox * 100))
-}
-
 function estimateOpenAiInterventionCostCents(inputTokens: number, outputTokens: number) {
   const inputUsdPerMillion = resolveOpenAiTextInputUsdPerMillion()
   const outputUsdPerMillion = resolveOpenAiTextOutputUsdPerMillion()
@@ -1266,42 +1150,6 @@ function resolveOpenAiHumanizeOutputUsdPerMillion() {
   const fromEnv = Number(process.env.OPENAI_HUMANIZE_OUTPUT_COST_PER_MILLION_USD)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
   return resolveOpenAiTextOutputUsdPerMillion()
-}
-
-function resolveAnthropicHaikuInputUsdPerMillion() {
-  const fromEnv = Number(process.env.ANTHROPIC_HAIKU_INPUT_COST_PER_MILLION_USD)
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 0.25
-}
-
-function resolveAnthropicHaikuOutputUsdPerMillion() {
-  const fromEnv = Number(process.env.ANTHROPIC_HAIKU_OUTPUT_COST_PER_MILLION_USD)
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 1.25
-}
-
-function resolveAnthropicSonnetInputUsdPerMillion() {
-  const fromEnv = Number(process.env.ANTHROPIC_SONNET_INPUT_COST_PER_MILLION_USD)
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 3
-}
-
-function resolveAnthropicSonnetOutputUsdPerMillion() {
-  const fromEnv = Number(process.env.ANTHROPIC_SONNET_OUTPUT_COST_PER_MILLION_USD)
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 15
-}
-
-function resolveAnthropicOpusInputUsdPerMillion() {
-  const fromEnv = Number(process.env.ANTHROPIC_OPUS_INPUT_COST_PER_MILLION_USD)
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 15
-}
-
-function resolveAnthropicOpusOutputUsdPerMillion() {
-  const fromEnv = Number(process.env.ANTHROPIC_OPUS_OUTPUT_COST_PER_MILLION_USD)
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 75
 }
 
 function asString(value: unknown) {

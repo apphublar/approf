@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState, type ChangeEvent } from 'react'
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronLeft, ChevronRight, FileText, Search, Settings2, Sparkles, Upload, X } from 'lucide-react'
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronLeft, ChevronRight, FileText, Settings2, Sparkles, Upload, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import {
   DEFAULT_DOCUMENT_STYLE_SETTINGS,
@@ -10,28 +10,6 @@ import {
 } from '@/utils/document-style'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { uploadSchoolLogo, updateTeacherProfile } from '@/services/supabase/account'
-
-const AI_SECTIONS = [
-  {
-    title: 'Planejamentos',
-    actions: [
-      { title: 'Planejamento (Diário ou Semanal)', desc: 'Organize o que será feito na rotina pedagógica.', icon: 'plan', flow: 'planning' },
-      { title: 'Projeto Pedagógico', desc: 'Projeto temático com objetivos, etapas, atividades e avaliação.', icon: 'portfolio', flow: 'generator' },
-      { title: 'Planejamento de Reunião dos Pais', desc: 'Pauta, combinados e encaminhamentos para encontro com as famílias.', icon: 'text', flow: 'report' },
-    ],
-  },
-  {
-    title: 'Relatórios',
-    actions: [
-      { title: 'Relatório de Desenvolvimento', desc: 'Documente aprendizagens, avanços e próximos passos.', icon: 'chart', flow: 'report' },
-      { title: 'Portfólio', desc: 'Evidências, produções, fotos e relatos da jornada.', icon: 'portfolio', flow: 'report' },
-      { title: 'Diário de Bordo', desc: 'Registro pedagógico da rotina e experiências vividas.', icon: 'text', flow: 'report' },
-    ],
-  },
-] as const
-
-type AiAction = (typeof AI_SECTIONS)[number]['actions'][number]
-type SectionTitle = (typeof AI_SECTIONS)[number]['title']
 
 export default function AiPedagogicaSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
@@ -54,45 +32,11 @@ export default function AiPedagogicaSubscreen() {
         })),
     )
   }, [annotations, classes])
-  const [query, setQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
 
-  const visibleSections = useMemo(() => {
-    const normalizedQuery = normalizeText(query)
-
-    return AI_SECTIONS
-      .map((section) => ({
-        ...section,
-        actions: section.actions.filter((action) => {
-          if (!normalizedQuery) return true
-          return normalizeText(`${action.title} ${action.desc} ${section.title}`).includes(normalizedQuery)
-        }),
-      }))
-      .filter((section) => section.actions.length > 0)
-  }, [query])
-
-  const totalDocuments = AI_SECTIONS.reduce((sum, section) => sum + section.actions.length, 0)
-
   function handleBack() {
     closeSubscreen()
-  }
-
-  function handleAction(action: AiAction) {
-    if (action.flow === 'planning') {
-      openSubscreen('pedagogical-generator', { docKind: action.title })
-      return
-    }
-
-    if (action.flow === 'report') {
-      openSubscreen('report', {
-        reportKind: action.title,
-        assistantMode: action.title === 'Planejamento de Reunião dos Pais' ? 'parents-meeting' : undefined,
-      })
-      return
-    }
-
-    openSubscreen('pedagogical-generator', { docKind: action.title })
   }
 
   function updateSettings(next: Partial<DocumentStyleSettings>) {
@@ -122,19 +66,36 @@ export default function AiPedagogicaSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <span className="font-serif text-[18px] text-gd flex-1">
-          Planejamentos e Relatórios
+          Criador pedagógico
         </span>
       </div>
 
       <div className="scroll-area px-[18px]">
         <>
             <div className="rounded-app p-5 mt-[14px] mb-[16px] text-white" style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}>
-              <p className="text-[12px] opacity-70 mb-1">Assistente pedagógica</p>
+              <p className="text-[12px] opacity-70 mb-1">Assistente com ChatGPT</p>
               <h2 className="font-serif text-[22px] mb-2">O que você precisa hoje?</h2>
               <p className="text-[13px] opacity-80 leading-[1.6]">
-                {totalDocuments} modelos para planejar a rotina e documentar o que aconteceu.
+                Crie relatórios, planejamentos, diários, portfólios ou documentos livres a partir do título, das suas instruções e das anotações autorizadas.
               </p>
             </div>
+
+            <button
+              onClick={() => openSubscreen('report', { reportKind: 'Criador pedagógico', unifiedCreator: true })}
+              className="w-full rounded-app px-[15px] py-[16px] border border-gp shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
+              style={{ background: '#F0FAF4' }}
+            >
+              <div className="w-[48px] h-[48px] rounded-[13px] flex items-center justify-center flex-shrink-0 bg-white text-gm border border-gp">
+                <Sparkles size={21} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[14px] font-bold text-gd leading-tight">Criar documento</h3>
+                <p className="text-[11px] text-soft leading-snug mt-1">
+                  Informe o título, escolha se usa anotações e descreva exatamente o que deseja.
+                </p>
+              </div>
+              <ChevronRight size={18} className="text-gm flex-shrink-0" />
+            </button>
 
             <button
               onClick={() => openSubscreen('generated-documents')}
@@ -165,61 +126,6 @@ export default function AiPedagogicaSubscreen() {
               </div>
               <ChevronRight size={18} className="text-muted flex-shrink-0" />
             </button>
-
-            <div className="bg-white rounded-app p-3 border border-border shadow-card mb-4">
-              <div className="flex items-center gap-2 bg-cream border border-border rounded-app-sm px-3 py-2">
-                <Search size={16} className="text-muted flex-shrink-0" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar relatório, planejamento..."
-                  className="w-full bg-transparent border-none outline-none text-[13px] text-ink placeholder:text-muted"
-                />
-              </div>
-            </div>
-
-            {visibleSections.length > 0 ? visibleSections.map((section) => (
-              <section key={section.title} className="mb-6">
-                <div className="flex items-center justify-between gap-3 mb-[10px]">
-                  <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">
-                    {section.title}
-                  </p>
-                  <button
-                    onClick={() => openSubscreen('generated-documents', { reportTypes: getSectionReportTypes(section.title) })}
-                    className="text-[11px] font-bold text-gm"
-                  >
-                    Histórico
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-[11px]">
-                  {section.actions.map((item) => (
-                    <button
-                      key={item.title}
-                      onClick={() => handleAction(item)}
-                      className="bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform"
-                    >
-                      <div className="w-[48px] h-[48px] rounded-[13px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
-                        <FileText size={20} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-[14px] font-bold text-ink leading-tight">{item.title}</h3>
-                        <p className="text-[11px] text-muted leading-snug mt-1">{item.desc}</p>
-                      </div>
-                      <ChevronRight size={18} className="text-muted flex-shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )) : (
-              <div className="bg-white rounded-app p-5 border border-border shadow-card text-center mb-6">
-                <Sparkles size={22} className="text-gm mx-auto mb-2" />
-                <p className="text-[13px] font-bold text-ink">Nenhum modelo encontrado</p>
-                <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-                  Tente buscar por planejamento, relatório, portfólio ou diário.
-                </p>
-              </div>
-            )}
 
             <div className="rounded-app p-4 border border-gp mb-8" style={{ background: '#F0FAF4' }}>
               <div className="flex items-center gap-2 text-gm font-bold text-[13px] mb-1">
@@ -437,20 +343,6 @@ function formatReadyNames(students: Array<{ studentName: string }>, max = 3) {
   else if (names.length === 2) base = `${names[0]} e ${names[1]}`
   else base = `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
   return remaining > 0 ? `${base} e mais ${remaining}` : base
-}
-
-function normalizeText(value: string) {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-}
-
-function getSectionReportTypes(sectionTitle: SectionTitle) {
-  if (sectionTitle === 'Planejamentos') return ['weekly_planning', 'daily_lesson_plan', 'pedagógical_project', 'parents_meeting_record']
-  if (sectionTitle === 'Relatórios') return ['development_report', 'class_diary', 'portfolio_text', 'portfolio_image']
-  return undefined
 }
 
 function fileToDataUrl(file: File) {

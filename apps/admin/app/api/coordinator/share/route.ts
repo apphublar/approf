@@ -22,6 +22,8 @@ export async function GET(request: Request) {
     }
 
     const supabase = createSupabaseServiceClient()
+    const requestOrigin = new URL(request.url).origin
+    const shareOrigin = resolveCoordinatorPublicOrigin(requestOrigin)
     const { data: shares, error } = await supabase
       .from('coordinator_class_shares')
       .select('id,coordinator_name,coordinator_email,share_token,access_status,verified_at,last_access_at,updated_at')
@@ -46,7 +48,13 @@ export async function GET(request: Request) {
       changesRequested: reports?.filter((r) => r.coordinator_review_status === 'changes_requested').length ?? 0,
     }
 
-    return NextResponse.json({ shares: shares ?? [], reportSummary }, { headers: CORS_HEADERS })
+    return NextResponse.json({
+      shares: (shares ?? []).map((share) => ({
+        ...share,
+        share_url: `${shareOrigin}/coordenadora/${share.share_token}`,
+      })),
+      reportSummary,
+    }, { headers: CORS_HEADERS })
   } catch (error) {
     if (error instanceof AiAuthError) {
       return NextResponse.json({ error: 'Sessão expirada.' }, { status: 401, headers: CORS_HEADERS })
@@ -67,7 +75,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Informe turma, nome e e-mail da coordenadora.' }, { status: 400, headers: CORS_HEADERS })
     }
 
-    const origin = process.env.NEXT_PUBLIC_ADMIN_URL?.replace(/\/$/, '') || new URL(request.url).origin
+    const origin = resolveCoordinatorPublicOrigin(new URL(request.url).origin)
     const result = await createCoordinatorShare({ ownerId, classId, coordinatorName, coordinatorEmail, origin })
     return NextResponse.json(result, { status: 200, headers: CORS_HEADERS })
   } catch (error) {
@@ -76,5 +84,27 @@ export async function POST(request: Request) {
     }
     console.error('[coordinator/share] erro interno', error)
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível compartilhar a turma.' }, { status: 500, headers: CORS_HEADERS })
+  }
+}
+
+function resolveCoordinatorPublicOrigin(requestOrigin: string) {
+  const configured = process.env.NEXT_PUBLIC_ADMIN_URL?.trim().replace(/\/$/, '')
+  if (configured && !isLocalhostOrigin(configured)) return configured
+
+  const vercelUrl = process.env.VERCEL_URL?.trim()
+  if (vercelUrl) return `https://${vercelUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+
+  const cleanRequestOrigin = requestOrigin.replace(/\/$/, '')
+  if (cleanRequestOrigin && !isLocalhostOrigin(cleanRequestOrigin)) return cleanRequestOrigin
+
+  return configured || cleanRequestOrigin
+}
+
+function isLocalhostOrigin(value: string) {
+  try {
+    const url = new URL(value)
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1'
+  } catch {
+    return false
   }
 }

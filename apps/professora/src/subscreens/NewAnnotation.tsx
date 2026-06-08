@@ -63,6 +63,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [classId, setClassId] = useState(activeClass?.id ?? '')
   const [studentId, setStudentId] = useState(activeStudent?.id ?? '')
   const [tags, setTags] = useState<string[]>([])
+  const [customCategory, setCustomCategory] = useState('')
   const [attachmentName, setAttachmentName] = useState('')
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
@@ -182,6 +183,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setClassId(editConfig.classId)
     setStudentId(editConfig.studentId)
     setTags(editConfig.tags)
+    setCustomCategory('')
     setAttachmentName(editAnnotation.attachmentName ?? '')
     setError('')
     setAudioMessage('')
@@ -214,6 +216,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       classId: string
       studentId: string
       tags: string[]
+      customCategory: string
       attachmentName: string
       viewMode: AnnotationViewMode
       chatInput: string
@@ -228,6 +231,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setClassId(draft.classId || '')
     setStudentId(draft.studentId || '')
     setTags(draft.tags || [])
+    setCustomCategory(draft.customCategory || '')
     setAttachmentName(draft.attachmentName || '')
     setViewMode(draft.viewMode || 'annotation')
     setChatInput(draft.chatInput || '')
@@ -250,6 +254,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         classId,
         studentId,
         tags,
+        customCategory,
         attachmentName,
         viewMode,
         chatInput,
@@ -268,6 +273,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     modelId,
     studentId,
     tags,
+    customCategory,
     text,
     viewMode,
     workKind,
@@ -442,6 +448,10 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setSaving(true)
     setError('')
     const effectiveModel = selectedModel ?? REPORT_MODELS[1]
+    const normalizedCustomCategory = customCategory.trim()
+    const effectiveTags = normalizedCustomCategory && !tags.includes(normalizedCustomCategory)
+      ? [normalizedCustomCategory, ...tags]
+      : tags
     const resolved = isDirectStudentNote
       ? {
           category: 'evolucao' as AnnotationCategory,
@@ -459,7 +469,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       classId: targetClassId,
       studentId: targetStudentId,
       studentName: targetStudentName,
-      tags,
+      tags: effectiveTags,
       persistence: resolved.persistence,
       attachmentName: attachmentName || null,
       attachmentFile,
@@ -474,7 +484,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       date: 'Agora',
       classId: targetClassId,
       studentId: targetStudentId,
-      tags: [isDirectStudentNote ? 'Anotação direta' : effectiveModel.label, ...tags],
+      tags: [isDirectStudentNote ? 'Anotação direta' : effectiveModel.label, ...effectiveTags],
       persistence: resolved.persistence,
       attachmentName: attachmentName || null,
       scope: !isDirectStudentNote && effectiveModel.scope === 'teacher' ? 'personal' as const : undefined,
@@ -798,6 +808,16 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 ))}
               </div>
             )}
+
+            <label className="block text-[11px] font-bold text-muted uppercase tracking-[0.08em] mb-2">
+              Categoria personalizada
+            </label>
+            <input
+              className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-4"
+              placeholder="Ex: Pessoais, ideias de planejamento, reunião com famílias..."
+              value={customCategory}
+              onChange={(event) => setCustomCategory(event.target.value)}
+            />
 
             <label className="relative w-full py-[13px] rounded-app-sm border-[1.5px] border-gp bg-white text-gm font-bold text-[13px] flex items-center justify-center gap-2 overflow-hidden">
               <input
