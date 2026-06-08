@@ -121,16 +121,21 @@ function resolveCoordinatorPublicOrigin(requestOrigin: string) {
     || process.env.COORDINATOR_PUBLIC_URL?.trim().replace(/\/$/, '')
   if (customCoordinatorUrl && !isLocalhostOrigin(customCoordinatorUrl)) return customCoordinatorUrl
 
-  const productionDomain = 'https://approf.com.br'
+  const productionDomain = 'https://admin.approf.com.br'
+
+  const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim()
+  if (productionUrl && !isSiteRootOrigin(productionUrl)) {
+    return `https://${productionUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+  }
 
   const configured = process.env.NEXT_PUBLIC_ADMIN_URL?.trim().replace(/\/$/, '')
-  if (configured && !isLocalhostOrigin(configured) && !isVercelPreviewOrigin(configured)) return configured
+  if (configured && !isLocalhostOrigin(configured) && !isSiteRootOrigin(configured)) return configured
 
   const vercelUrl = process.env.VERCEL_URL?.trim()
-  if (vercelUrl && !isVercelPreviewOrigin(vercelUrl)) return `https://${vercelUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+  if (vercelUrl) return `https://${vercelUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
 
   const cleanRequestOrigin = requestOrigin.replace(/\/$/, '')
-  if (cleanRequestOrigin && !isLocalhostOrigin(cleanRequestOrigin) && !isVercelPreviewOrigin(cleanRequestOrigin)) return cleanRequestOrigin
+  if (cleanRequestOrigin && !isLocalhostOrigin(cleanRequestOrigin) && !isSiteRootOrigin(cleanRequestOrigin)) return cleanRequestOrigin
 
   return productionDomain
 }
@@ -144,10 +149,10 @@ function isLocalhostOrigin(value: string) {
   }
 }
 
-function isVercelPreviewOrigin(value: string) {
+function isSiteRootOrigin(value: string) {
   try {
     const url = new URL(value.startsWith('http') ? value : `https://${value}`)
-    return url.hostname.endsWith('.vercel.app') && !url.hostname.startsWith('approf.')
+    return url.hostname === 'approf.com.br' || url.hostname === 'www.approf.com.br'
   } catch {
     return false
   }
