@@ -89,6 +89,11 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   const hasChanges = document ? draft !== toEditorHtml(document.body ?? '') : false
 
   useEffect(() => {
+    if (!editorRef.current || isImageDocument) return
+    editorRef.current.innerHTML = draft
+  }, [document?.id, isImageDocument])
+
+  useEffect(() => {
     if (!document) return
     const sourceUrl = document.ai_artifacts?.mediumUrl
       ?? document.ai_artifacts?.imageDataUrl
@@ -116,12 +121,13 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
 
   async function save(status?: ReportStatus) {
     if (!document) return
+    const currentDraft = editorRef.current?.innerHTML ?? draft
     setSaving(true)
     setError('')
     setMessage('')
     try {
       const updated = await updateReport(document.id, {
-        body: draft,
+        body: currentDraft,
         status: status ?? document.status,
       })
       setDocument(updated)
@@ -487,7 +493,6 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                       lineHeight: String(styleSettings.lineSpacing),
                       textAlign: styleSettings.textAlign,
                     }}
-                    dangerouslySetInnerHTML={{ __html: draft }}
                     onInput={(event) => setDraft((event.currentTarget as HTMLDivElement).innerHTML)}
                   />
                 </div>
