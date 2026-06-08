@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getCoordinatorShareByToken, verifyCoordinatorAccess } from '@/app/lib/coordinator-review'
+import { getCoordinatorInviteInfo, verifyCoordinatorAccess } from '@/app/lib/coordinator-review'
 
 export async function GET(request: Request) {
   try {
     const token = new URL(request.url).searchParams.get('token')?.trim() || ''
-    const share = token ? await getCoordinatorShareByToken(token) : null
-    if (!share) return NextResponse.json({ error: 'Link de acesso não encontrado.' }, { status: 404 })
+    const invite = token ? await getCoordinatorInviteInfo(token) : null
+    if (!invite) return NextResponse.json({ error: 'Link de acesso não encontrado.' }, { status: 404 })
+    const { share, teacher, studentCount } = invite
     return NextResponse.json({
       share: {
         coordinatorName: share.coordinator_name,
         coordinatorEmail: share.coordinator_email,
         accessStatus: share.access_status,
+        teacher,
+        studentCount,
       },
     })
   } catch (error) {

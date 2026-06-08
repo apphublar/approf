@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     const workspace = await getCoordinatorWorkspace(token, accessToken)
     return NextResponse.json(workspace)
   } catch (error) {
+    console.error('[coordinator/public/workspace] erro interno', error)
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível carregar a turma.' }, { status: 401 })
   }
 }

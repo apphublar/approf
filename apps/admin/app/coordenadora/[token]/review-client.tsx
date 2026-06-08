@@ -29,6 +29,13 @@ type Workspace = {
   reports: Report[]
   events: ReviewEvent[]
 }
+type InviteInfo = {
+  coordinatorName: string
+  coordinatorEmail: string
+  accessStatus: string
+  teacher: { name: string; email: string } | null
+  studentCount: number
+}
 
 type ReviewAction = 'comment' | 'request_changes' | 'approve'
 
@@ -37,6 +44,7 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
   const [code, setCode] = useState('')
   const [accessToken, setAccessToken] = useState('')
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
+  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null)
   const [selectedStudentId, setSelectedStudentId] = useState('')
   const [selectedReportId, setSelectedReportId] = useState('')
   const [editedBody, setEditedBody] = useState('')
@@ -53,6 +61,10 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
     const saved = window.localStorage.getItem(storageKey)
     if (saved) setAccessToken(saved)
   }, [storageKey])
+
+  useEffect(() => {
+    loadInviteInfo()
+  }, [token])
 
   useEffect(() => {
     if (!accessToken) return
@@ -103,6 +115,18 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
 
   const canFinalize = reviewedCount > 0 && students.length > 0
   const isReviewFinalized = finalized || workspace?.share?.access_status === 'review_finalized'
+
+  async function loadInviteInfo() {
+    try {
+      const response = await fetch(`/api/coordinator/public/verify?token=${encodeURIComponent(token)}`)
+      const payload = await response.json()
+      if (!response.ok) return
+      setInviteInfo(payload.share as InviteInfo)
+      if (payload.share?.coordinatorEmail) setEmail(payload.share.coordinatorEmail)
+    } catch {
+      // Convite ainda pode ser validado manualmente.
+    }
+  }
 
   async function verify() {
     if (!email.trim() || !code.trim()) {
@@ -212,6 +236,9 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
     .cr-brand-text small { font-size: 12px; color: #6E8C78; }
     .cr-login h1 { font-size: 22px; font-weight: 800; margin: 0 0 6px; }
     .cr-login p { font-size: 14px; color: #5A7060; margin: 0 0 24px; line-height: 1.55; }
+    .cr-invite-info { border: 1px solid #D0E8C8; background: #F8FBF7; border-radius: 12px; padding: 12px 14px; margin: 0 0 16px; }
+    .cr-invite-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 13px; color: #5A7060; }
+    .cr-invite-row strong { color: #1A2B20; text-align: right; }
     .cr-input { width: 100%; border: 1px solid #C8DEC0; border-radius: 10px; padding: 13px 14px; font-size: 14px; color: #1A2B20; background: #F8FBF7; outline: none; margin-bottom: 10px; }
     .cr-input:focus { border-color: #3E7A3F; background: #fff; }
     .cr-btn { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #1B4332; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 4px; }
@@ -301,6 +328,22 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
               Uma professora compartilhou os relatórios de desenvolvimento da turma com você para revisão pedagógica.
               Informe seu e-mail e o código recebido para continuar.
             </p>
+            {inviteInfo && (
+              <div className="cr-invite-info">
+                <div className="cr-invite-row">
+                  <span>Professora</span>
+                  <strong>{inviteInfo.teacher?.name || 'Professora'}</strong>
+                </div>
+                <div className="cr-invite-row">
+                  <span>E-mail</span>
+                  <strong>{inviteInfo.teacher?.email || '-'}</strong>
+                </div>
+                <div className="cr-invite-row">
+                  <span>Alunos</span>
+                  <strong>{inviteInfo.studentCount}</strong>
+                </div>
+              </div>
+            )}
             <input
               className="cr-input"
               value={email}

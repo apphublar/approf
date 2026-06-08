@@ -442,6 +442,11 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                         Final
                       </span>
                     )}
+                    {doc.report_type === 'development_report' && doc.coordinator_review_status && doc.coordinator_review_status !== 'not_required' && (
+                      <span className={`text-[9px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${getCoordinatorReviewClass(doc.coordinator_review_status)}`}>
+                        {formatCoordinatorReviewStatus(doc.coordinator_review_status)}
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-muted mt-1">
                     {findStudentName(doc.student_id, classes) ?? 'Sem criança'} - {formatDate(doc.created_at)}
@@ -460,6 +465,11 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                       ? 'Imagem gerada. Toque para visualizar.'
                       : (doc.body ?? '').slice(0, 150) || formatStatus(doc.status)}
                   </p>
+                  {doc.coordinator_review_notes && (
+                    <p className="text-[11px] text-[#C1440E] mt-2 line-clamp-2">
+                      Coordenadora: {doc.coordinator_review_notes}
+                    </p>
+                  )}
                 </div>
               </button>
             ))}
@@ -695,6 +705,18 @@ function formatStatus(status: string) {
     archived: 'Arquivado',
   }
   return labels[status] ?? status
+}
+
+function formatCoordinatorReviewStatus(status: string) {
+  if (status === 'approved') return 'Aprovado'
+  if (status === 'changes_requested') return 'Corrigir'
+  return 'Pendente'
+}
+
+function getCoordinatorReviewClass(status: string) {
+  if (status === 'approved') return 'bg-gbg text-gd border border-gp'
+  if (status === 'changes_requested') return 'bg-[#FFF1F1] text-[#C1440E] border border-[#F3C0B1]'
+  return 'bg-[#FFF3CD] text-[#856404] border border-[#EAD58A]'
 }
 
 function formatDate(iso: string) {

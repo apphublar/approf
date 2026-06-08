@@ -161,7 +161,9 @@ export default function ClassStudentsSubscreen() {
         coordinatorEmail,
       })
       setCoordinatorShareUrl(result.shareUrl)
-      setCoordinatorMessage('Código de validação enviado para o e-mail da coordenadora.')
+      setCoordinatorMessage('Código de validação enviado para o e-mail da coordenadora. O acesso fica válido por 30 dias.')
+      const status = await getCoordinatorShareStatus(cls.id).catch(() => null)
+      if (status) setShareStatus(status)
     } catch (error) {
       setCoordinatorError(error instanceof Error ? error.message : 'Não foi possível compartilhar a turma.')
     } finally {
@@ -252,6 +254,20 @@ export default function ClassStudentsSubscreen() {
                       <p className="text-[11px] text-muted mt-1">
                         {approved} aprovado(s) · {changesRequested} com correção solicitada · {total - approved - changesRequested} pendente(s)
                       </p>
+                    )}
+                    {!isFinalized && total > 0 && (
+                      <p className="text-[11px] text-muted mt-1">
+                        {approved} aprovado(s) · {changesRequested} com correção solicitada · {total - approved - changesRequested} aguardando revisão
+                      </p>
+                    )}
+                    {total > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => openSubscreen('generated-documents', { reportType: 'development_report', classId: cls.id })}
+                        className="w-full mt-3 rounded-app-sm border border-gp bg-white px-3 py-2 text-left text-[11px] font-bold text-gd"
+                      >
+                        Ver relatórios, correções e aprovações
+                      </button>
                     )}
                   </div>
                 )

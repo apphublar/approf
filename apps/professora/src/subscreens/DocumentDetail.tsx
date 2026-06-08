@@ -379,6 +379,24 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 </p>
               </div>
 
+              {document.report_type === 'development_report' && document.coordinator_review_status && document.coordinator_review_status !== 'not_required' && (
+                <div className={`rounded-app p-4 border shadow-card mb-4 ${getCoordinatorReviewBoxClass(document.coordinator_review_status)}`}>
+                  <p className="text-[13px] font-bold">
+                    Coordenadora: {formatCoordinatorReviewStatus(document.coordinator_review_status)}
+                  </p>
+                  {document.coordinator_review_notes && (
+                    <p className="text-[12px] leading-[1.6] mt-2">
+                      {document.coordinator_review_notes}
+                    </p>
+                  )}
+                  {document.coordinator_review_status === 'changes_requested' && (
+                    <p className="text-[11px] leading-[1.5] mt-2">
+                      Edite o texto abaixo e salve. Depois, compartilhe novamente a turma com a coordenadora para uma nova revisão.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {isImageDocument && document.ai_artifacts?.imageDataUrl && (
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <img
@@ -619,6 +637,18 @@ function formatStatus(status: ReportStatus) {
     case 'archived': return 'Arquivado'
     default: return status
   }
+}
+
+function formatCoordinatorReviewStatus(status: string) {
+  if (status === 'approved') return 'Aprovado'
+  if (status === 'changes_requested') return 'Correção solicitada'
+  return 'Aguardando revisão'
+}
+
+function getCoordinatorReviewBoxClass(status: string) {
+  if (status === 'approved') return 'bg-gbg border-gp text-gd'
+  if (status === 'changes_requested') return 'bg-[#FFF1F1] border-[#F3C0B1] text-[#8A2F16]'
+  return 'bg-[#FFF8E8] border-[#EAD58A] text-[#856404]'
 }
 
 function getImagePrompt(document: GeneratedDocument | null) {

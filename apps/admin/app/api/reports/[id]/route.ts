@@ -51,12 +51,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Nenhuma alteracao válida enviada.' }, { status: 400, headers: CORS_HEADERS })
     }
 
+    const existing = patchBody !== undefined ? await getOwnerReportById(ownerId, id) : null
+    const shouldResubmitCoordinatorReview =
+      existing?.report_type === 'development_report'
+      && existing.coordinator_review_status === 'changes_requested'
+
     const updated = await updateOwnerReport({
       ownerId,
       reportId: id,
       body: patchBody,
       status: nextStatus,
       isFinalVersion,
+      coordinatorReviewStatus: shouldResubmitCoordinatorReview ? 'pending' : undefined,
     })
 
     if (!updated) {

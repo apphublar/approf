@@ -46,7 +46,7 @@ export async function createCoordinatorShare(input: {
   if (error) throw error
 
   const code = createAccessCode()
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 30).toISOString()
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString()
   const { error: codeError } = await supabase.from('coordinator_access_codes').insert({
     share_id: share.id,
     code_hash: hashAccessCode(code),
@@ -99,6 +99,38 @@ export async function getCoordinatorShareByToken(token: string) {
   return share
 }
 
+export async function getCoordinatorInviteInfo(token: string) {
+  const supabase = createSupabaseServiceClient()
+  const share = await getCoordinatorShareByToken(token)
+  if (!share) return null
+
+  const [ownerResult, countResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('full_name,email')
+      .eq('id', share.owner_id)
+      .maybeSingle(),
+    supabase
+      .from('students')
+      .select('id', { count: 'exact', head: true })
+      .eq('class_id', share.class_id),
+  ])
+
+  if (ownerResult.error) throw ownerResult.error
+  if (countResult.error) throw countResult.error
+
+  return {
+    share,
+    teacher: ownerResult.data
+      ? {
+          name: ownerResult.data.full_name,
+          email: ownerResult.data.email,
+        }
+      : null,
+    studentCount: countResult.count ?? 0,
+  }
+}
+
 export async function verifyCoordinatorAccess(input: { token: string; email: string; code: string }) {
   const supabase = createSupabaseServiceClient()
   const share = await getCoordinatorShareByToken(input.token)
@@ -107,22 +139,25 @@ export async function verifyCoordinatorAccess(input: { token: string; email: str
 
   const { data: codes, error } = await supabase
     .from('coordinator_access_codes')
-    .select('id, code_hash, expires_at, consumed_at')
+    .select('id, code_hash, expires_at, consumed_at, created_at')
     .eq('share_id', share.id)
-    .is('consumed_at', null)
     .order('created_at', { ascending: false })
     .limit(5)
   if (error) throw error
 
   const now = Date.now()
   const match = (codes ?? []).find((item) => {
-    if (new Date(item.expires_at).getTime() < now) return false
+    const storedExpiration = new Date(item.expires_at).getTime()
+    const minimumExpiration = new Date(item.created_at).getTime() + 1000 * 60 * 60 * 24 * 30
+    if (Math.max(storedExpiration, minimumExpiration) < now) return false
     return safeEqual(item.code_hash, hashAccessCode(input.code))
   })
   if (!match) throw new Error('Código inválido ou expirado.')
 
   const timestamp = new Date().toISOString()
-  await supabase.from('coordinator_access_codes').update({ consumed_at: timestamp }).eq('id', match.id)
+  if (!match.consumed_at) {
+    await supabase.from('coordinator_access_codes').update({ consumed_at: timestamp }).eq('id', match.id)
+  }
   await supabase
     .from('coordinator_class_shares')
     .update({ access_status: 'verified', verified_at: timestamp, last_access_at: timestamp, updated_at: timestamp })
@@ -136,8 +171,8 @@ export async function getCoordinatorWorkspace(token: string, accessToken: string
   const share = await requireVerifiedShare(token, accessToken, { allowFinalized: true })
 
   const [classResult, studentsResult, reportsResult, eventsResult] = await Promise.all([
-    supabase.from('classes').select('id,name,shift,age_group,school_id, schools(name)').eq('id', share.class_id).maybeSingle(),
-    supabase.from('students').select('id,full_name,birth_date,tag,created_at').eq('class_id', share.class_id).order('full_name'),
+    supabase.from('classes').select('id,name,shift,age_group,school_id').eq('id', share.class_id).maybeSingle(),
+    supabase.from('students').select('id,full_name,birth_date,support_tags,created_at').eq('class_id', share.class_id).order('full_name'),
     supabase
       .from('reports')
       .select('id,student_id,class_id,status,report_type,body,is_final_version,coordinator_review_status,coordinator_review_notes,coordinator_reviewed_by,coordinator_reviewed_at,created_at,updated_at')
@@ -164,7 +199,10 @@ export async function getCoordinatorWorkspace(token: string, accessToken: string
   return {
     share,
     classData: classResult.data,
-    students: studentsResult.data ?? [],
+    students: (studentsResult.data ?? []).map((student) => ({
+      ...student,
+      tag: Array.isArray(student.support_tags) && student.support_tags.length ? student.support_tags.join(', ') : null,
+    })),
     reports: reportsResult.data ?? [],
     events: eventsResult.data ?? [],
   }
