@@ -289,7 +289,8 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
     .cr-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #6E8C78; margin: 0 0 4px; }
     .cr-card h2 { font-size: 18px; font-weight: 800; margin: 0; }
     .cr-select { width: 100%; border: 1px solid #C8DEC0; border-radius: 8px; padding: 10px 12px; font-size: 13px; background: #F8FBF7; color: #1A2B20; outline: none; margin-bottom: 14px; }
-    .cr-editor-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border: 1px solid #C8DEC0; border-bottom: none; border-radius: 10px 10px 0 0; padding: 8px 10px; background: #F8FBF7; }
+    .cr-editor-wrap { position: relative; }
+    .cr-editor-toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border: 1px solid #C8DEC0; border-bottom: none; border-radius: 10px 10px 0 0; padding: 8px 10px; background: rgba(248, 251, 247, 0.96); backdrop-filter: blur(8px); box-shadow: 0 8px 18px rgba(27, 67, 50, 0.08); }
     .cr-tool-btn { border: 1px solid #D0E8C8; background: #fff; color: #1A2B20; border-radius: 8px; min-width: 34px; height: 32px; padding: 0 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
     .cr-tool-btn:hover { border-color: #3E7A3F; }
     .cr-color-btn { width: 28px; height: 28px; border-radius: 999px; border: 2px solid #fff; box-shadow: 0 0 0 1px #C8DEC0; cursor: pointer; }
@@ -532,37 +533,39 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
                 {selectedReport && (
                   <>
                     <span className="cr-section-label">Conteúdo do relatório</span>
-                    <div className="cr-editor-toolbar" aria-label="Ferramentas de marcacao do relatorio">
-                      <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('bold') }}>B</button>
-                      <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('italic') }}>I</button>
-                      <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('underline') }}>U</button>
-                      {[
-                        ['#FFF2A8', 'Amarelo'],
-                        ['#DDF7D8', 'Verde'],
-                        ['#DDEBFF', 'Azul'],
-                        ['#FFE0E6', 'Rosa'],
-                      ].map(([color, label]) => (
-                        <button
-                          key={color}
-                          type="button"
-                          className="cr-color-btn"
-                          style={{ background: color }}
-                          title={`Marcar em ${label}`}
-                          aria-label={`Marcar em ${label}`}
-                          onMouseDown={(event) => { event.preventDefault(); applyReportHighlight(color) }}
-                        />
-                      ))}
-                      <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('removeFormat') }}>Limpar</button>
+                    <div className="cr-editor-wrap">
+                      <div className="cr-editor-toolbar" aria-label="Ferramentas de marcacao do relatorio">
+                        <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('bold') }}>B</button>
+                        <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('italic') }}>I</button>
+                        <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('underline') }}>U</button>
+                        {[
+                          ['#FFF2A8', 'Amarelo'],
+                          ['#DDF7D8', 'Verde'],
+                          ['#DDEBFF', 'Azul'],
+                          ['#FFE0E6', 'Rosa'],
+                        ].map(([color, label]) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className="cr-color-btn"
+                            style={{ background: color }}
+                            title={`Marcar em ${label}`}
+                            aria-label={`Marcar em ${label}`}
+                            onMouseDown={(event) => { event.preventDefault(); applyReportHighlight(color) }}
+                          />
+                        ))}
+                        <button type="button" className="cr-tool-btn" onMouseDown={(event) => { event.preventDefault(); applyReportCommand('removeFormat') }}>Limpar</button>
+                      </div>
+                      <div
+                        key={selectedReport.id}
+                        ref={reportEditorRef}
+                        className="cr-document-editor"
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={(event) => setEditedBody(event.currentTarget.innerHTML)}
+                        dangerouslySetInnerHTML={{ __html: sanitizeReportHtml(editedBody) }}
+                      />
                     </div>
-                    <div
-                      key={selectedReport.id}
-                      ref={reportEditorRef}
-                      className="cr-document-editor"
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={(event) => setEditedBody(event.currentTarget.innerHTML)}
-                      dangerouslySetInnerHTML={{ __html: sanitizeReportHtml(editedBody) }}
-                    />
                     <p className="cr-editor-hint">Selecione um trecho do relatorio e use as cores para marcar pontos de correcao ou destaque.</p>
 
                     <span className="cr-section-label">Observação para a professora (opcional)</span>
