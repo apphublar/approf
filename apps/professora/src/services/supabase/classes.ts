@@ -6,6 +6,7 @@ import { loadSupabaseTimelineEvents } from './timeline'
 import { loadSupabaseAnnotations } from './annotations'
 import { loadSupabaseAttendanceRecords } from './attendance'
 import { loadBoardNotes } from './board-notes'
+import { loadCommunityFeatureAccess, loadCommunityPosts } from './community'
 
 export interface ClassInput {
   name: string
@@ -82,7 +83,11 @@ export async function loadTeacherWorkspace() {
     iconBg: '#D8F3DC',
     students: studentsByClassId.get(item.id) ?? [],
   }))
-  const { annotations, hasMore: annotationsHasMore } = await loadSupabaseAnnotations(user.id, classes)
+  const [{ annotations, hasMore: annotationsHasMore }, communityAccess, communityPosts] = await Promise.all([
+    loadSupabaseAnnotations(user.id, classes),
+    loadCommunityFeatureAccess(user.id),
+    loadCommunityPosts().catch(() => []),
+  ])
   const noteCountByStudentId = buildNoteCountByStudentId(classes, annotations)
   const classesWithCounts = classes.map((classData) => ({
     ...classData,
@@ -101,6 +106,8 @@ export async function loadTeacherWorkspace() {
     annotationsHasMore,
     attendanceRecords,
     boardNotes,
+    communityAccess,
+    communityPosts,
     onboardingCompleted: Number(profile.estimated_student_count ?? 0) > 0 || classes.length > 0,
   }
 }

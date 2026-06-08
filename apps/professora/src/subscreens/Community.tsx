@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ChevronLeft, Heart, MessageCircle, Send, Users } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
+import { getAppDataMode } from '@/services/app-data'
+import { createCommunityPost } from '@/services/supabase/community'
 import type { CommunityPost } from '@/types'
 
 const CATEGORY_LABEL: Record<CommunityPost['category'], string> = {
@@ -18,19 +20,39 @@ export default function CommunitySubscreen() {
 
   const enabled = isCommunityEnabled()
 
-  function publish() {
-    if (!text.trim()) return
-    addCommunityPost({
-      id: `cp-${Date.now()}`,
-      authorName: userName,
-      authorRole: 'Professora',
-      text: text.trim(),
-      category,
-      likes: 0,
-      comments: 0,
-      createdAt: 'Agora',
-    })
-    setText('')
+  const [publishing, setPublishing] = useState(false)
+  const [error, setError] = useState('')
+
+  async function publish() {
+    if (!text.trim() || publishing) return
+    setPublishing(true)
+    setError('')
+    try {
+      if (getAppDataMode() === 'supabase') {
+        const saved = await createCommunityPost({
+          text: text.trim(),
+          category,
+          authorName: userName,
+        })
+        addCommunityPost(saved)
+      } else {
+        addCommunityPost({
+          id: `cp-${Date.now()}`,
+          authorName: userName,
+          authorRole: 'Professora',
+          text: text.trim(),
+          category,
+          likes: 0,
+          comments: 0,
+          createdAt: 'Agora',
+        })
+      }
+      setText('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível publicar agora.')
+    } finally {
+      setPublishing(false)
+    }
   }
 
   return (
@@ -74,11 +96,16 @@ export default function CommunitySubscreen() {
                   <option value="material">Material</option>
                   <option value="relato">Relato</option>
                 </select>
-                <button onClick={publish} className="bg-gm text-white rounded-app-sm px-4 py-2 text-[12px] font-bold flex items-center gap-1">
+                <button
+                  onClick={() => void publish()}
+                  disabled={publishing}
+                  className="bg-gm text-white rounded-app-sm px-4 py-2 text-[12px] font-bold flex items-center gap-1 disabled:opacity-50"
+                >
                   <Send size={13} />
-                  Postar
+                  {publishing ? 'Publicando...' : 'Postar'}
                 </button>
               </div>
+              {error && <p className="text-[11px] text-[#C1440E] mt-2">{error}</p>}
             </div>
 
             {communityPosts.map((post) => (

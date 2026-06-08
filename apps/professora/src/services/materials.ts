@@ -105,6 +105,8 @@ export async function analyzeAndUploadMaterial(input: {
     emit?.([...steps])
   }
 
+  validateMaterialFile(input.file)
+
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não configurado para enviar materiais.')
 
@@ -153,85 +155,6 @@ export async function analyzeAndUploadMaterial(input: {
     const message = error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Tente novamente.'
     setStep('upload', 'Enviando arquivo', 'error', message)
     throw error
-  }
-}
-
-export async function uploadMaterialFile(
-  file: File,
-  userId: string,
-  onProgress?: (detail: string) => void,
-): Promise<{
-  file_path: string
-  signed_url: string | null
-  file_name: string
-  mime_type: string
-  file_size: number
-}> {
-  validateMaterialFile(file)
-
-  const supabase = getSupabaseClient()
-  if (!supabase) throw new Error('Supabase não configurado para enviar materiais.')
-
-  const { data: sessionData } = await supabase.auth.getSession()
-  const token = sessionData.session?.access_token
-  if (!token) throw new Error('Sessão expirada. Entre novamente.')
-
-  const uploadUrlEndpoint = `${getAdminApiUrl()}/api/materials/upload-url`
-  onProgress?.(`chamando ${uploadUrlEndpoint}`)
-  console.info('[materials] calling upload-url', {
-    uploadUrlEndpoint,
-    diagnostics: getMobileUploadDiagnostics(file, userId, true),
-  })
-
-  const uploadUrlResponse = await fetch(uploadUrlEndpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ fileName: file.name, fileType: file.type, fileSize: file.size }),
-  })
-  const rawUploadUrlBody = await uploadUrlResponse.text().catch((error) => `__READ_ERROR__:${String(error)}`)
-  const uploadUrlBody = parseJsonBody(rawUploadUrlBody) as ({ error?: string; bucket?: string; path?: string; token?: string }) | null
-  console.info('[materials] upload-url response', {
-    status: uploadUrlResponse.status,
-    ok: uploadUrlResponse.ok,
-    raw: rawUploadUrlBody,
-    body: uploadUrlBody,
-  })
-
-  if (!uploadUrlResponse.ok) {
-    throw new Error(uploadUrlBody?.error || `Falha ao obter URL de upload (HTTP ${uploadUrlResponse.status})`)
-  }
-
-  const bucket = uploadUrlBody?.bucket
-  const path = uploadUrlBody?.path
-  const signedToken = uploadUrlBody?.token
-  if (!bucket || !path || !signedToken) throw new Error('Resposta incompleta da rota de upload.')
-
-  onProgress?.(`enviando para storage: ${bucket}/${path}`)
-  const fileBuffer = await file.arrayBuffer()
-  const { error: uploadError } = await supabase
-    .storage
-    .from(bucket)
-    .uploadToSignedUrl(path, signedToken, fileBuffer, {
-      contentType: file.type || inferMimeType(file.name),
-    })
-
-  console.info('[materials] storage uploadToSignedUrl result', {
-    bucket,
-    path,
-    uploadError: uploadError ? { message: uploadError.message, status: (uploadError as { status?: number }).status } : null,
-  })
-  if (uploadError) throw new Error(`Falha no upload ao storage: ${uploadError.message}`)
-
-  onProgress?.('upload concluido')
-  return {
-    file_path: path,
-    signed_url: null,
-    file_name: file.name,
-    mime_type: file.type || inferMimeType(file.name),
-    file_size: file.size,
   }
 }
 
@@ -344,18 +267,6 @@ async function materialAction(id: string, body: Record<string, unknown>) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-}
-
-function inferMimeType(fileName: string) {
-  const lowerName = fileName.toLowerCase()
-  if (lowerName.endsWith('.pdf')) return 'application/pdf'
-  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg'
-  if (lowerName.endsWith('.png')) return 'image/png'
-  if (lowerName.endsWith('.webp')) return 'image/webp'
-  if (lowerName.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  if (lowerName.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  if (lowerName.endsWith('.pptx')) return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-  return 'application/octet-stream'
 }
 
 function parseJsonBody(raw: string) {

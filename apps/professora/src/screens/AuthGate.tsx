@@ -12,6 +12,7 @@ import {
 import { loadDocumentStyleSettings, saveDocumentStyleSettings } from '@/utils/document-style'
 import TeacherAccountSubscreen from '@/subscreens/TeacherAccount'
 import { useAppStore, useOnboardingStore } from '@/store'
+import { rememberMemberSince } from '@/utils/achievements'
 
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
 type InstallPromptEvent = Event & {
@@ -91,6 +92,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       .then((workspace) => {
         hydrateWorkspace(workspace)
         setOnboardingCompleted(Boolean(workspace.onboardingCompleted))
+        rememberMemberSince(userId)
         setHydratedUserId(userId)
       })
       .catch((error) => {
