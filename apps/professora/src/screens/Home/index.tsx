@@ -328,7 +328,7 @@ export default function HomeScreen() {
                 <Sparkles size={22} />
               </div>
               <div className="flex-1">
-                <h3 className="text-[14px] font-bold">Planejamentos e Relatórios</h3>
+                <h3 className="text-[14px] font-bold">Criador Pedagógico</h3>
                 <p className="text-[12px] opacity-80 leading-snug">Planeje a rotina e documente o percurso</p>
               </div>
               <ChevronRight size={18} className="text-white/70" />

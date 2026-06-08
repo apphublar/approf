@@ -78,6 +78,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     : ''
   const isUnifiedCreator = Boolean(typeof data === 'object' && data && 'unifiedCreator' in data && (data as { unifiedCreator?: unknown }).unifiedCreator)
     || reportKind === 'Criador pedagógico'
+    || reportKind === 'Criador Pedagógico'
   const isPortfólio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
   const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
   const isClassDiary = reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo'
@@ -86,8 +87,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
   const [documentTitle, setDocumentTitle] = useState('')
   const [useUnifiedAnnotations, setUseUnifiedAnnotations] = useState(false)
-  const [includeUnifiedClassNotes, setIncludeUnifiedClassNotes] = useState(true)
-  const [includeUnifiedChildNotes, setIncludeUnifiedChildNotes] = useState(true)
+  const [includeUnifiedClassNotes, setIncludeUnifiedClassNotes] = useState(false)
+  const [includeUnifiedChildNotes, setIncludeUnifiedChildNotes] = useState(false)
   const [childAnnotationMode, setChildAnnotationMode] = useState<ChildAnnotationMode>('all')
   const [selectedCustomCategories, setSelectedCustomCategories] = useState<string[]>([])
   const [mode, setMode] = useState<ReportMode>('annotations')
@@ -603,7 +604,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
     try {
       const styleSettings = loadDocumentStyleSettings()
       const requestClassId = isUnifiedCreator
-        ? (selectedClass?.id ?? null)
+        ? (useUnifiedAnnotations && (includeUnifiedClassNotes || includeUnifiedChildNotes) ? (selectedClass?.id ?? null) : null)
         : isClassDiary || isParentsMeeting
           ? (selectedClass?.id ?? null)
           : (selectedStudent?.classId ?? null)
@@ -796,7 +797,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         <button onClick={handleBack} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">{isUnifiedCreator ? 'Criador pedagógico' : reportKind}</span>
+        <span className="font-serif text-[18px] text-gd flex-1">{isUnifiedCreator ? 'Criador Pedagógico' : reportKind}</span>
       </div>
 
       <div key={generationViewKey} className="scroll-area px-[18px] stage-fade-in">
@@ -816,7 +817,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
                   <p className="text-[12px] text-muted leading-snug">
                     {isUnifiedCreator
-                      ? 'Informe o título, escolha as anotações que podem entrar no contexto e descreva o pedido como faria no ChatGPT.'
+                      ? 'Informe o título, escolha se deseja usar anotações e descreva exatamente o documento que precisa.'
                       : isClassDiary
                       ? 'Preencha rapidamente os dados do dia da turma para gerar o diário.'
                       : isParentsMeeting
@@ -838,20 +839,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                     onChange={(event) => setDocumentTitle(event.target.value)}
                   />
 
-                  <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">
-                    Turma de referência
-                  </label>
-                  <select
-                    className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] outline-none"
-                    value={selectedClassId}
-                    onChange={(event) => setSelectedClassId(event.target.value)}
-                  >
-                    {classes.map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                  </select>
                 </>
               ) : isClassDiary || isParentsMeeting ? (
                 <>
@@ -943,7 +930,12 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => setUseUnifiedAnnotations(false)}
+                      onClick={() => {
+                        setUseUnifiedAnnotations(false)
+                        setIncludeUnifiedClassNotes(false)
+                        setIncludeUnifiedChildNotes(false)
+                        setSelectedCustomCategories([])
+                      }}
                       className={`rounded-app-sm border px-3 py-3 text-left ${
                         !useUnifiedAnnotations ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
                       }`}
@@ -976,6 +968,28 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                         desc="Usa registros das crianças da turma ou de uma criança específica."
                         onClick={() => setIncludeUnifiedChildNotes((current) => !current)}
                       />
+
+                      {(includeUnifiedClassNotes || includeUnifiedChildNotes) && (
+                        <div>
+                          <label className="block text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
+                            Turma
+                          </label>
+                          <select
+                            className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 text-[14px] outline-none"
+                            value={selectedClassId}
+                            onChange={(event) => setSelectedClassId(event.target.value)}
+                          >
+                            {classes.map((cls) => (
+                              <option key={cls.id} value={cls.id}>
+                                {cls.name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[11px] text-muted leading-[1.5] mt-2">
+                            A turma só será usada para localizar as anotações que você escolher.
+                          </p>
+                        </div>
+                      )}
 
                       {includeUnifiedChildNotes && (
                         <div className="rounded-app-sm border border-border bg-cream p-3">
@@ -1053,7 +1067,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
 
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">
-                    O que você quer que o ChatGPT faça?
+                    O que você quer criar?
                   </label>
                   <textarea
                     className="w-full min-h-[180px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"

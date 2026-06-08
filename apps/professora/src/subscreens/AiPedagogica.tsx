@@ -66,14 +66,14 @@ export default function AiPedagogicaSubscreen() {
           <ChevronLeft size={18} />
         </button>
         <span className="font-serif text-[18px] text-gd flex-1">
-          Criador pedagógico
+          Criador Pedagógico
         </span>
       </div>
 
       <div className="scroll-area px-[18px]">
         <>
             <div className="rounded-app p-5 mt-[14px] mb-[16px] text-white" style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}>
-              <p className="text-[12px] opacity-70 mb-1">Assistente com ChatGPT</p>
+              <p className="text-[12px] opacity-70 mb-1">Criador Pedagógico</p>
               <h2 className="font-serif text-[22px] mb-2">O que você precisa hoje?</h2>
               <p className="text-[13px] opacity-80 leading-[1.6]">
                 Crie relatórios, planejamentos, diários, portfólios ou documentos livres a partir do título, das suas instruções e das anotações autorizadas.
@@ -81,7 +81,7 @@ export default function AiPedagogicaSubscreen() {
             </div>
 
             <button
-              onClick={() => openSubscreen('report', { reportKind: 'Criador pedagógico', unifiedCreator: true })}
+              onClick={() => openSubscreen('report', { reportKind: 'Criador Pedagógico', unifiedCreator: true })}
               className="w-full rounded-app px-[15px] py-[16px] border border-gp shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
               style={{ background: '#F0FAF4' }}
             >
