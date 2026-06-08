@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, type ChangeEvent } from 'react'
+﻿import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronLeft, ChevronRight, FileText, Settings2, Sparkles, Upload, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import {
@@ -10,12 +10,16 @@ import {
 } from '@/utils/document-style'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { uploadSchoolLogo, updateTeacherProfile } from '@/services/supabase/account'
+import { listReports } from '@/services/reports'
 
 export default function AiPedagogicaSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
   const { userName, schoolName, annotations, classes } = useAppStore()
+  const [studentsWithDevelopmentReport, setStudentsWithDevelopmentReport] = useState<Set<string>>(() => new Set())
+  const [reportSuggestionsLoaded, setReportSuggestionsLoaded] = useState(false)
 
   const studentsReadyForReport = useMemo(() => {
+    if (!reportSuggestionsLoaded) return []
     const countByStudent = new Map<string, number>()
     for (const annotation of annotations) {
       if (!annotation.studentId) continue
@@ -23,7 +27,7 @@ export default function AiPedagogicaSubscreen() {
     }
     return classes.flatMap((classItem) =>
       classItem.students
-        .filter((student) => (countByStudent.get(student.id) ?? 0) >= 3)
+        .filter((student) => !studentsWithDevelopmentReport.has(student.id) && (countByStudent.get(student.id) ?? 0) >= 3)
         .map((student) => ({
           studentId: student.id,
           studentName: student.name,
@@ -31,10 +35,41 @@ export default function AiPedagogicaSubscreen() {
           annotationCount: countByStudent.get(student.id) ?? 0,
         })),
     )
-  }, [annotations, classes])
+  }, [annotations, classes, reportSuggestionsLoaded, studentsWithDevelopmentReport])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
+  useEffect(() => {
+    let active = true
+    const classIds = classes.map((classItem) => classItem.id).filter(Boolean)
+    if (classIds.length === 0) {
+      setStudentsWithDevelopmentReport(new Set())
+      setReportSuggestionsLoaded(true)
+      return
+    }
 
+    setReportSuggestionsLoaded(false)
+    Promise.all(classIds.map((classId) => listReports({ classId, compact: true, limit: 300 })))
+      .then((groups) => {
+        if (!active) return
+        const studentIds = new Set<string>()
+        groups.flat().forEach((report) => {
+          if (report.report_type === 'development_report' && report.status !== 'archived' && report.student_id) {
+            studentIds.add(report.student_id)
+          }
+        })
+        setStudentsWithDevelopmentReport(studentIds)
+        setReportSuggestionsLoaded(true)
+      })
+      .catch(() => {
+        if (!active) return
+        setStudentsWithDevelopmentReport(new Set())
+        setReportSuggestionsLoaded(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [classes])
   function handleBack() {
     closeSubscreen()
   }

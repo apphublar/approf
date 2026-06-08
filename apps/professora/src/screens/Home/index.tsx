@@ -26,6 +26,7 @@ import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
 import { getCachedTeacherAccountSnapshot, getTeacherAccountSnapshot, preloadTeacherAccountSnapshot } from '@/services/supabase/account'
 import { syncBoardNotes } from '@/services/supabase/board-notes'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
+import { listReports } from '@/services/reports'
 
 const QUICK_ACCESS = [
   { label: 'Anotações', desc: 'Registre o dia a dia da turma', icon: NotebookPen, bg: '#D8F3DC', tab: 'annotations' as const, sub: null },
@@ -44,6 +45,8 @@ export default function HomeScreen() {
   const [modalOpen, setModalOpen] = useState(false)
   const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null)
   const [paymentNotice, setPaymentNotice] = useState<{ title: string; message: string } | null>(null)
+  const [studentsWithDevelopmentReport, setStudentsWithDevelopmentReport] = useState<Set<string>>(() => new Set())
+  const [reportSuggestionsLoaded, setReportSuggestionsLoaded] = useState(false)
   const touchStartX = useRef(0)
 
   const firstName = getDisplayFirstName(userName)
@@ -54,8 +57,8 @@ export default function HomeScreen() {
     [annotations, classes],
   )
   const studentsReadyForReport = useMemo(
-    () => buildStudentsReadyForReport(annotations, classes),
-    [annotations, classes],
+    () => (reportSuggestionsLoaded ? buildStudentsReadyForReport(annotations, classes, studentsWithDevelopmentReport) : []),
+    [annotations, classes, reportSuggestionsLoaded, studentsWithDevelopmentReport],
   )
   const giztokensRemaining = aiUsage?.wallet.giztokensRemaining ?? 8000
   const docsGenerated = aiUsage?.generatedDocumentsThisMonth ?? aiUsage?.generatedThisMonth ?? 0
@@ -107,6 +110,39 @@ export default function HomeScreen() {
       active = false
     }
   }, [activeTab])
+
+  useEffect(() => {
+    let active = true
+    const classIds = classes.map((classItem) => classItem.id).filter(Boolean)
+    if (classIds.length === 0) {
+      setStudentsWithDevelopmentReport(new Set())
+      setReportSuggestionsLoaded(true)
+      return
+    }
+
+    setReportSuggestionsLoaded(false)
+    Promise.all(classIds.map((classId) => listReports({ classId, compact: true, limit: 300 })))
+      .then((groups) => {
+        if (!active) return
+        const studentIds = new Set<string>()
+        groups.flat().forEach((report) => {
+          if (report.report_type === 'development_report' && report.status !== 'archived' && report.student_id) {
+            studentIds.add(report.student_id)
+          }
+        })
+        setStudentsWithDevelopmentReport(studentIds)
+        setReportSuggestionsLoaded(true)
+      })
+      .catch(() => {
+        if (!active) return
+        setStudentsWithDevelopmentReport(new Set())
+        setReportSuggestionsLoaded(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [classes])
 
   function handleQuickAccess(tab: typeof QUICK_ACCESS[number]['tab'], sub: typeof QUICK_ACCESS[number]['sub']) {
     if (tab) setTab(tab)
@@ -882,6 +918,7 @@ const MIN_ANNOTATIONS_FOR_REPORT = 3
 function buildStudentsReadyForReport(
   annotations: ReturnType<typeof useAppStore.getState>['annotations'],
   classes: ReturnType<typeof useAppStore.getState>['classes'],
+  studentsWithDevelopmentReport: Set<string>,
 ) {
   const countByStudent = new Map<string, number>()
   for (const annotation of annotations) {
@@ -891,7 +928,7 @@ function buildStudentsReadyForReport(
 
   return classes.flatMap((classItem) =>
     classItem.students
-      .filter((student) => (countByStudent.get(student.id) ?? 0) >= MIN_ANNOTATIONS_FOR_REPORT)
+      .filter((student) => !studentsWithDevelopmentReport.has(student.id) && (countByStudent.get(student.id) ?? 0) >= MIN_ANNOTATIONS_FOR_REPORT)
       .map((student) => ({
         studentId: student.id,
         studentName: student.name,
