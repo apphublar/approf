@@ -170,28 +170,53 @@ export async function getCoordinatorWorkspace(token: string, accessToken: string
   const supabase = createSupabaseServiceClient()
   const share = await requireVerifiedShare(token, accessToken, { allowFinalized: true })
 
-  const [classResult, studentsResult, reportsResult, eventsResult] = await Promise.all([
-    supabase.from('classes').select('id,name,shift,age_group,school_id').eq('id', share.class_id).maybeSingle(),
-    supabase.from('students').select('id,full_name,birth_date,support_tags,created_at').eq('class_id', share.class_id).order('full_name'),
+  const [classResult, studentsResult] = await Promise.all([
     supabase
-      .from('reports')
-      .select('id,student_id,class_id,status,report_type,body,is_final_version,coordinator_review_status,coordinator_review_notes,coordinator_reviewed_by,coordinator_reviewed_at,created_at,updated_at')
+      .from('classes')
+      .select('id,name,shift,age_group,school_id')
+      .eq('id', share.class_id)
+      .eq('owner_id', share.owner_id)
+      .is('archived_at', null)
+      .maybeSingle(),
+    supabase
+      .from('students')
+      .select('id,full_name,birth_date,support_tags,created_at')
       .eq('owner_id', share.owner_id)
       .eq('class_id', share.class_id)
-      .eq('report_type', 'development_report')
-      .neq('status', 'archived')
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('report_review_events')
-      .select('id,report_id,student_id,actor_type,actor_name,actor_email,action,notes,previous_status,next_status,created_at')
-      .eq('owner_id', share.owner_id)
-      .eq('class_id', share.class_id)
-      .order('created_at', { ascending: false })
-      .limit(200),
+      .is('archived_at', null)
+      .order('full_name'),
   ])
 
   if (classResult.error) throw classResult.error
   if (studentsResult.error) throw studentsResult.error
+  if (!classResult.data) throw new Error('Turma nÃ£o encontrada para este convite.')
+
+  const studentIds = (studentsResult.data ?? []).map((student) => student.id)
+  const reportsQuery = supabase
+    .from('reports')
+    .select('id,student_id,class_id,status,report_type,body,is_final_version,coordinator_review_status,coordinator_review_notes,coordinator_reviewed_by,coordinator_reviewed_at,created_at,updated_at')
+    .eq('owner_id', share.owner_id)
+    .eq('class_id', share.class_id)
+    .eq('report_type', 'development_report')
+    .neq('status', 'archived')
+    .order('created_at', { ascending: false })
+  const eventsQuery = supabase
+    .from('report_review_events')
+    .select('id,report_id,student_id,actor_type,actor_name,actor_email,action,notes,previous_status,next_status,created_at')
+    .eq('owner_id', share.owner_id)
+    .eq('class_id', share.class_id)
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  const [reportsResult, eventsResult] = await Promise.all([
+    studentIds.length
+      ? reportsQuery.in('student_id', studentIds)
+      : reportsQuery.is('student_id', null).limit(0),
+    studentIds.length
+      ? eventsQuery.or(`student_id.is.null,student_id.in.(${studentIds.join(',')})`)
+      : eventsQuery.is('student_id', null),
+  ])
+
   if (reportsResult.error) throw reportsResult.error
   if (eventsResult.error) throw eventsResult.error
 

@@ -52,13 +52,26 @@ export async function GET(request: Request) {
       }
     }
 
-    const { data: reports } = await supabase
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('id')
+      .eq('owner_id', ownerId)
+      .eq('class_id', classId)
+      .is('archived_at', null)
+
+    if (studentsError) throw studentsError
+
+    const studentIds = (students ?? []).map((student) => student.id)
+    const reportsQuery = supabase
       .from('reports')
       .select('id,student_id,coordinator_review_status,coordinator_review_notes,is_final_version')
       .eq('owner_id', ownerId)
       .eq('class_id', classId)
       .eq('report_type', 'development_report')
       .neq('status', 'archived')
+    const { data: reports } = studentIds.length
+      ? await reportsQuery.in('student_id', studentIds)
+      : await reportsQuery.is('student_id', null).limit(0)
 
     const reportSummary = {
       total: reports?.length ?? 0,
