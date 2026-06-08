@@ -48,6 +48,7 @@ const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
 const DEFAULT_AGE_RANGE = '0 a 5 anos'
 const UPLOAD_DRAFT_KEY = 'approf:draft:material-upload'
+const MOBILE_UPLOAD_SECURITY_MESSAGE = 'Por segurança, o compartilhamento de material de apoio deve ser feito pelo computador.'
 const DOC_ACCEPT = [
   'application/pdf',
   'application/msword',
@@ -79,6 +80,7 @@ export default function MaterialsScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [showUpload, setShowUpload] = useState(false)
   const [preview, setPreview] = useState<SupportMaterial | null>(null)
+  const [mobileUploadBlocked, setMobileUploadBlocked] = useState(() => isMobileUploadDevice())
 
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
@@ -95,14 +97,34 @@ export default function MaterialsScreen() {
     if (draftRestoredRef.current) return
     draftRestoredRef.current = true
     const draft = loadDraft<{ title: string; desc: string; ageRange: string; pedagogicalObjective: string; showUpload: boolean }>(UPLOAD_DRAFT_KEY)
-    if (draft?.showUpload) {
+    if (draft?.showUpload && !mobileUploadBlocked) {
       setTitle(draft.title || '')
       setDesc(draft.desc || '')
       setAgeRange(draft.ageRange || DEFAULT_AGE_RANGE)
       setPedagogicalObjective(draft.pedagogicalObjective || '')
       setShowUpload(true)
     }
+  }, [mobileUploadBlocked])
+
+  useEffect(() => {
+    function updateMobileUploadState() {
+      setMobileUploadBlocked(isMobileUploadDevice())
+    }
+
+    updateMobileUploadState()
+    window.addEventListener('resize', updateMobileUploadState)
+    window.addEventListener('orientationchange', updateMobileUploadState)
+    return () => {
+      window.removeEventListener('resize', updateMobileUploadState)
+      window.removeEventListener('orientationchange', updateMobileUploadState)
+    }
   }, [])
+
+  useEffect(() => {
+    if (!mobileUploadBlocked || !showUpload) return
+    clearDraft(UPLOAD_DRAFT_KEY)
+    setShowUpload(false)
+  }, [mobileUploadBlocked, showUpload])
 
   useEffect(() => {
     if (!showUpload || submitting) return
@@ -194,6 +216,7 @@ export default function MaterialsScreen() {
   }
 
   function openUpload() {
+    if (mobileUploadBlocked) return
     setTitle('')
     setDesc('')
     setAgeRange(DEFAULT_AGE_RANGE)
@@ -207,6 +230,10 @@ export default function MaterialsScreen() {
   }
 
   function addFiles(fileList: FileList | null) {
+    if (mobileUploadBlocked) {
+      setUploadMsg(MOBILE_UPLOAD_SECURITY_MESSAGE)
+      return
+    }
     if (!fileList) return
     const newEntries: QueuedFile[] = []
     for (const f of Array.from(fileList)) {
@@ -240,6 +267,10 @@ export default function MaterialsScreen() {
   }
 
   async function submitMaterial() {
+    if (mobileUploadBlocked) {
+      setUploadMsg(MOBILE_UPLOAD_SECURITY_MESSAGE)
+      return
+    }
     if (!canSubmit) return
     setSubmitting(true)
     setUploadMsg('')
@@ -349,7 +380,9 @@ export default function MaterialsScreen() {
           <button
             type="button"
             onClick={openUpload}
-            className="flex items-center gap-1.5 bg-gd text-white rounded-app-sm px-3 py-2 text-[12px] font-bold flex-shrink-0 mt-1"
+            disabled={mobileUploadBlocked}
+            title={mobileUploadBlocked ? MOBILE_UPLOAD_SECURITY_MESSAGE : undefined}
+            className="flex items-center gap-1.5 bg-gd text-white rounded-app-sm px-3 py-2 text-[12px] font-bold flex-shrink-0 mt-1 disabled:opacity-45 disabled:cursor-not-allowed"
           >
             <Plus size={14} />
             Adicionar
@@ -371,7 +404,9 @@ export default function MaterialsScreen() {
           )}
         </div>
         <div className="mt-3 rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
-          Não serão aceitos documentos ou imagens com dados pessoais, nomes de crianças, telefones, e-mails, endereços ou imagens de crianças.
+          {mobileUploadBlocked
+            ? MOBILE_UPLOAD_SECURITY_MESSAGE
+            : 'Não serão aceitos documentos ou imagens com dados pessoais, nomes de crianças, telefones, e-mails, endereços ou imagens de crianças.'}
         </div>
       </div>
 
@@ -463,7 +498,7 @@ export default function MaterialsScreen() {
       {/* ── Grid ── */}
       <div className="flex-1 min-h-0 overflow-y-auto px-[14px] pb-28 pt-1 overscroll-contain">
         {filtered.length === 0 ? (
-          <EmptyState tab={tab} hasSearch={Boolean(query.trim())} onAdd={openUpload} />
+          <EmptyState tab={tab} hasSearch={Boolean(query.trim())} uploadBlocked={mobileUploadBlocked} onAdd={openUpload} />
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {filtered.map((m) => (
@@ -868,10 +903,12 @@ function MaterialCard({
 function EmptyState({
   tab,
   hasSearch,
+  uploadBlocked,
   onAdd,
 }: {
   tab: TabId
   hasSearch: boolean
+  uploadBlocked: boolean
   onAdd: () => void
 }) {
   if (hasSearch) {
@@ -903,7 +940,12 @@ function EmptyState({
       </div>
       <p className="text-[15px] font-bold text-ink">{title}</p>
       <p className="text-[12px] text-muted mt-1 max-w-[260px] leading-[1.5]">{subtitle}</p>
-      {showAdd && (
+      {showAdd && uploadBlocked && (
+        <p className="mt-4 max-w-[280px] rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
+          {MOBILE_UPLOAD_SECURITY_MESSAGE}
+        </p>
+      )}
+      {showAdd && !uploadBlocked && (
         <button
           type="button"
           onClick={onAdd}
@@ -1146,6 +1188,12 @@ function DeleteButton({ onDelete }: { onDelete: () => Promise<void> }) {
       Excluir
     </button>
   )
+}
+
+function isMobileUploadDevice() {
+  if (typeof window === 'undefined') return false
+  const mobileUserAgent = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile/i.test(window.navigator.userAgent)
+  return window.innerWidth < 900 || mobileUserAgent
 }
 
 function getKindFromMaterial(material: SupportMaterial): MaterialKind {
