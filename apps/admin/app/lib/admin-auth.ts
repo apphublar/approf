@@ -12,6 +12,18 @@ export interface AdminSession {
   email: string | null
 }
 
+export function isAdminAllowedEmail(email: string | null | undefined) {
+  const normalizedEmail = email?.trim().toLowerCase()
+  if (!normalizedEmail) return false
+
+  const allowedEmails = process.env.ADMIN_ALLOWED_EMAILS
+    ?.split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean) ?? []
+
+  return allowedEmails.includes(normalizedEmail)
+}
+
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -44,12 +56,16 @@ export async function validateAdminAccessToken(accessToken: string): Promise<Adm
     .eq('id', userData.user.id)
     .maybeSingle()
 
-  if (profileError || !profile || !canAccessAdmin(profile.role)) return null
+  const email = userData.user.email ?? null
+  const allowedByEmail = isAdminAllowedEmail(email)
+
+  if (profileError && !allowedByEmail) return null
+  if (!allowedByEmail && (!profile || !canAccessAdmin(profile.role))) return null
 
   return {
     userId: userData.user.id,
-    role: profile.role,
-    email: userData.user.email ?? null,
+    role: allowedByEmail ? 'super_admin' : profile!.role,
+    email,
   }
 }
 

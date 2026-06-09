@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { canAccessAdmin } from '@approf/auth'
-import { ADMIN_ACCESS_COOKIE } from '@/app/lib/admin-auth'
+import { ADMIN_ACCESS_COOKIE, isAdminAllowedEmail } from '@/app/lib/admin-auth'
 import { createSupabaseServiceClient } from '@/app/lib/supabase-server'
 
 export async function POST(request: Request) {
@@ -37,7 +37,11 @@ export async function POST(request: Request) {
       .eq('id', data.user.id)
       .maybeSingle()
 
-    if (profileError || !profile || !canAccessAdmin(profile.role)) {
+    const allowedByEmail = isAdminAllowedEmail(data.user.email ?? email)
+    if (profileError && !allowedByEmail) {
+      return NextResponse.json({ error: 'Acesso restrito a administradores.' }, { status: 403 })
+    }
+    if (!allowedByEmail && (!profile || !canAccessAdmin(profile.role))) {
       return NextResponse.json({ error: 'Acesso restrito a administradores.' }, { status: 403 })
     }
 
@@ -52,8 +56,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      fullName: profile.full_name,
-      role: profile.role,
+      fullName: profile?.full_name ?? data.user.email,
+      role: allowedByEmail ? 'super_admin' : profile!.role,
     })
   } catch (error) {
     console.error('[admin/auth/login] erro interno', error)
