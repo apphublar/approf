@@ -7,18 +7,14 @@ import {
 } from '@/app/lib/ai-usage'
 import { PublicAiGenerationError } from '@/app/lib/ai-generation'
 import { estimateTranscriptionCostCents, transcribeAudio } from '@/app/lib/ai-transcription'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   let logId: string | undefined
   let reservationCompleted = false
   let reservedEstimatedCostCents = 0
@@ -28,7 +24,7 @@ export async function POST(request: Request) {
     const form = await request.formData()
     const audio = form.get('audio')
     if (!(audio instanceof File)) {
-      return NextResponse.json({ error: 'Audio inválido.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Audio inválido.' }, { status: 400, headers: corsHeaders })
     }
 
     const durationSeconds = parseDurationSeconds(form.get('durationSeconds'))
@@ -48,7 +44,7 @@ export async function POST(request: Request) {
 
     const reservedLogId = reservation.logId
     if (!reservation.allowed || !reservedLogId) {
-      return NextResponse.json(reservation, { status: 402, headers: CORS_HEADERS })
+      return NextResponse.json(reservation, { status: 402, headers: corsHeaders })
     }
 
     logId = reservedLogId
@@ -84,7 +80,7 @@ export async function POST(request: Request) {
         provider: transcription.provider,
         model: transcription.model,
       },
-      { status: 200, headers: CORS_HEADERS },
+      { status: 200, headers: corsHeaders },
     )
   } catch (error) {
     if (logId && !reservationCompleted) {
@@ -102,14 +98,14 @@ export async function POST(request: Request) {
     if (error instanceof AiAuthError) {
       return NextResponse.json(
         { error: 'Sessão expirada. Entre novamente para continuar.' },
-        { status: error.status, headers: CORS_HEADERS },
+        { status: error.status, headers: corsHeaders },
       )
     }
 
     if (error instanceof PublicAiGenerationError) {
       return NextResponse.json(
         { error: error.message },
-        { status: 400, headers: CORS_HEADERS },
+        { status: 400, headers: corsHeaders },
       )
     }
 
@@ -117,7 +113,7 @@ export async function POST(request: Request) {
     if (isMissingAudioGenerationTypeError(message)) {
       return NextResponse.json(
         { error: 'A base de dados ainda não foi atualizada para transcrição de áudio. Aplique a migration 0014 e tente novamente.' },
-        { status: 500, headers: CORS_HEADERS },
+        { status: 500, headers: corsHeaders },
       )
     }
 
@@ -125,7 +121,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { error: 'Não foi possível transcrever o áudio agora. Tente novamente em instantes.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }

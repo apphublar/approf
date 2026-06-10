@@ -1122,11 +1122,13 @@ function resolveUsdToBrlRate() {
 
 function resolveOpenAiInterventionsModel() {
   const fromEnv = process.env.OPENAI_INTERVENTIONS_MODEL?.trim()
+    || process.env.OPENAI_INTERVIEWER_MODEL?.trim()
   return fromEnv || DEFAULT_OPENAI_INTERVENTIONS_MODEL
 }
 
 function resolveOpenAiHumanizeModel() {
   const fromEnv = process.env.OPENAI_HUMANIZE_MODEL?.trim()
+    || process.env.OPENAI_ANSWER_MODEL?.trim()
   return fromEnv || DEFAULT_OPENAI_HUMANIZE_MODEL
 }
 

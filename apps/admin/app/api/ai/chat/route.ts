@@ -5,23 +5,19 @@ import {
   refundAiUsageReservation,
   reserveAiUsage,
 } from '@/app/lib/ai-usage'
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 
 type ChatProvider = 'openai'
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-5.5'
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   let logId: string | undefined
   let reservationCompleted = false
   let reservedEstimatedCostCents = 0
@@ -32,7 +28,7 @@ export async function POST(request: Request) {
     const provider = parseProvider(body.provider)
     const messages = parseMessages(body.messages)
     if (messages.length === 0) {
-      return NextResponse.json({ error: 'Envie pelo menos uma mensagem no chat.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Envie pelo menos uma mensagem no chat.' }, { status: 400, headers: corsHeaders })
     }
 
     const estimate = buildPricingEstimate(provider, messages)
@@ -48,7 +44,7 @@ export async function POST(request: Request) {
 
     const reservedLogId = reservation.logId
     if (!reservation.allowed || !reservedLogId) {
-      return NextResponse.json(reservation, { status: 402, headers: CORS_HEADERS })
+      return NextResponse.json(reservation, { status: 402, headers: corsHeaders })
     }
 
     logId = reservedLogId
@@ -80,7 +76,7 @@ export async function POST(request: Request) {
         provider,
         model: result.model,
       },
-      { status: 200, headers: CORS_HEADERS },
+      { status: 200, headers: corsHeaders },
     )
   } catch (error) {
     if (logId && !reservationCompleted) {
@@ -98,14 +94,14 @@ export async function POST(request: Request) {
     if (error instanceof AiAuthError) {
       return NextResponse.json(
         { error: 'Sessão expirada. Entre novamente para continuar.' },
-        { status: error.status, headers: CORS_HEADERS },
+        { status: error.status, headers: corsHeaders },
       )
     }
 
     console.error('[ai/chat] erro interno', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Não foi possível responder no chat agora.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }

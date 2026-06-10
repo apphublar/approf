@@ -11,12 +11,7 @@ import {
   PublicAiGenerationError,
   rollbackGeneratedArtifacts,
 } from '@/app/lib/ai-generation'
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 
 const TEXT_GENERATION_TYPES = new Set<AiGenerationType>([
   'development_report',
@@ -39,11 +34,12 @@ const TEXT_GENERATION_TYPES = new Set<AiGenerationType>([
   'other',
 ])
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   let logId: string | undefined
   let reservationCompleted = false
   let reservedEstimatedCostCents = 0
@@ -95,7 +91,7 @@ export async function POST(request: Request) {
         hasWallet: Boolean(reservation.wallet),
         hasEntitlement: Boolean(reservation.entitlement),
       })
-      return NextResponse.json(reservation, { status: 402, headers: CORS_HEADERS })
+      return NextResponse.json(reservation, { status: 402, headers: corsHeaders })
     }
 
     logId = reservedLogId
@@ -173,7 +169,7 @@ export async function POST(request: Request) {
         provider: generated.provider,
         model: generated.model,
       },
-      { status: 200, headers: CORS_HEADERS },
+      { status: 200, headers: corsHeaders },
     )
   } catch (error) {
     if (logId && !reservationCompleted) {
@@ -221,14 +217,14 @@ export async function POST(request: Request) {
     if (error instanceof AiAuthError) {
       return NextResponse.json(
         { error: 'Sessão expirada. Entre novamente para continuar.' },
-        { status: error.status, headers: CORS_HEADERS },
+        { status: error.status, headers: corsHeaders },
       )
     }
 
     if (error instanceof PublicAiGenerationError) {
       return NextResponse.json(
         { error: error.message },
-        { status: 400, headers: CORS_HEADERS },
+        { status: 400, headers: corsHeaders },
       )
     }
 
@@ -246,7 +242,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { error: message },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }

@@ -460,14 +460,19 @@ export async function generateAiChatReply(input: AiChatGenerationInput): Promise
     throw new Error('Sessão expirada. Entre novamente para usar o chat.')
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(input),
-  })
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    })
+  } catch (error) {
+    throw wrapAiFetchError(error)
+  }
 
   const result = await response.json().catch(() => null) as Partial<AiChatGenerationResult> | { error?: string } | null
 
@@ -559,6 +564,15 @@ export async function transcribeAnnotationAudio(input: {
     provider: typeof result.provider === 'string' ? result.provider : undefined,
     model: typeof result.model === 'string' ? result.model : undefined,
   }
+}
+
+function wrapAiFetchError(error: unknown): Error {
+  if (error instanceof TypeError && /failed to fetch/i.test(error.message)) {
+    return new Error(
+      'Não foi possível conectar ao servidor de IA. Verifique sua internet e se o backend está acessível (VITE_APPROF_ADMIN_API_URL).',
+    )
+  }
+  return error instanceof Error ? error : new Error('Erro inesperado ao chamar a IA.')
 }
 
 function getAudioFilename(mimeType: string) {

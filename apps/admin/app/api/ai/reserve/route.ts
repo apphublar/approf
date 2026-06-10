@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server'
 import { AiAuthError, getAuthenticatedUserId } from '@/app/lib/supabase-server'
 import { reserveAiUsage, type AiGenerationType } from '@/app/lib/ai-usage'
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 
 const GENERATION_TYPES = new Set<AiGenerationType>([
   'development_report',
@@ -25,11 +20,12 @@ const GENERATION_TYPES = new Set<AiGenerationType>([
   'other',
 ])
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const body = await request.json()
@@ -44,15 +40,15 @@ export async function POST(request: Request) {
       requestSummary: isObjectRecord(body.requestSummary) ? body.requestSummary : {},
     })
 
-    return NextResponse.json(result, { status: result.allowed ? 200 : 402, headers: CORS_HEADERS })
+    return NextResponse.json(result, { status: result.allowed ? 200 : 402, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status, headers: CORS_HEADERS })
+      return NextResponse.json({ error: error.message }, { status: error.status, headers: corsHeaders })
     }
 
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Não foi possível reservar uso de IA.' },
-      { status: 400, headers: CORS_HEADERS },
+      { status: 400, headers: corsHeaders },
     )
   }
 }

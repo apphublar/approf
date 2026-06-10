@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
 import { getMonthlyWalletPolicy } from '@/app/lib/ai-usage'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function GET(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const supabase = createSupabaseServiceClient()
@@ -126,17 +122,17 @@ export async function GET(request: Request) {
           createdAt: item.created_at,
         })),
       },
-      { status: 200, headers: CORS_HEADERS },
+      { status: 200, headers: corsHeaders },
     )
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status, headers: CORS_HEADERS })
+      return NextResponse.json({ error: error.message }, { status: error.status, headers: corsHeaders })
     }
 
     console.error('[ai/usage-summary] erro interno', error)
     return NextResponse.json(
       { error: 'Não foi possível consultar o saldo de IA agora.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }

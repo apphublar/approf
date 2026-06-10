@@ -7,20 +7,16 @@ import {
 } from '@/app/lib/ai-usage'
 import { PublicAiGenerationError, rollbackGeneratedArtifacts } from '@/app/lib/ai-generation'
 import { generatePortfolioImage } from '@/app/lib/ai-image'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 
 export const maxDuration = 300
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   let logId: string | undefined
   let reservationCompleted = false
   let reservedEstimatedCostCents = 0
@@ -49,7 +45,7 @@ export async function POST(request: Request) {
 
     const reservedLogId = reservation.logId
     if (!reservation.allowed || !reservedLogId) {
-      return NextResponse.json(reservation, { status: 402, headers: CORS_HEADERS })
+      return NextResponse.json(reservation, { status: 402, headers: corsHeaders })
     }
 
     logId = reservedLogId
@@ -98,7 +94,7 @@ export async function POST(request: Request) {
         provider: generated.provider,
         model: generated.model,
       },
-      { status: 200, headers: CORS_HEADERS },
+      { status: 200, headers: corsHeaders },
     )
   } catch (error) {
     if (logId && !reservationCompleted) {
@@ -127,14 +123,14 @@ export async function POST(request: Request) {
     if (error instanceof AiAuthError) {
       return NextResponse.json(
         { error: 'Sessão expirada. Entre novamente para continuar.' },
-        { status: error.status, headers: CORS_HEADERS },
+        { status: error.status, headers: corsHeaders },
       )
     }
 
     if (error instanceof PublicAiGenerationError) {
       return NextResponse.json(
         { error: error.message },
-        { status: 400, headers: CORS_HEADERS },
+        { status: 400, headers: corsHeaders },
       )
     }
 
@@ -142,7 +138,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { error: 'Não foi possível concluir a imagem agora. Tente novamente em instantes.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }
