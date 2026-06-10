@@ -33,12 +33,12 @@ interface ChatConversation {
 }
 
 const REPORT_MODELS: ModelOption[] = [
-  { id: 'turma', label: 'Registro da turma', desc: 'Alimenta o diário de bordo e registros coletivos.', scope: 'class' },
-  { id: 'crianca', label: 'Registro de uma criança', desc: 'Alimenta o relatório de desenvolvimento e o portfólio.', scope: 'child' },
+  { id: 'turma', label: 'Registro da turma', desc: 'Anotação coletiva vinculada à turma.', scope: 'class' },
+  { id: 'crianca', label: 'Registro de uma criança', desc: 'Anotação vinculada a uma criança.', scope: 'child' },
 ]
 
 const PLANNING_MODELS: ModelOption[] = [
-  { id: 'planejamento', label: 'Planejamento', desc: 'Alimenta planejamento diário/semanal, projeto pedagógico e reunião de pais.', scope: 'optional-class' },
+  { id: 'planejamento', label: 'Planejamento', desc: 'Anotação de planejamento (turma opcional).', scope: 'optional-class' },
 ]
 
 const PERSONAL_MODELS: ModelOption[] = [
@@ -570,7 +570,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         requestSummary: {
           source: 'new-annotation-chat',
           provider: 'openai',
-          model: 'gpt-4o-mini',
+          model: 'gpt-5.5',
           conversationLength: history.length,
         },
       })

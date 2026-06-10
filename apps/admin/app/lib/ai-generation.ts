@@ -63,10 +63,10 @@ interface TextCompletion {
   actualCostCents: number
 }
 
-const DEFAULT_OPENAI_INTERVENTIONS_MODEL = 'gpt-4o-mini'
-const DEFAULT_OPENAI_DRAFT_MODEL = 'gpt-4o-mini'
-const DEFAULT_OPENAI_REVIEW_MODEL = 'gpt-4o'
-const DEFAULT_OPENAI_HUMANIZE_MODEL = 'gpt-5'
+const DEFAULT_OPENAI_INTERVENTIONS_MODEL = 'gpt-5.5'
+const DEFAULT_OPENAI_DRAFT_MODEL = 'gpt-5.5'
+const DEFAULT_OPENAI_REVIEW_MODEL = 'gpt-5.5'
+const DEFAULT_OPENAI_HUMANIZE_MODEL = 'gpt-5.5'
 
 interface DocumentPipelineConfig {
   stages: 1 | 2 | 3
@@ -950,6 +950,8 @@ function buildPromptInputFromSummary(
   return {
     generationType: resolvedGenerationType,
     promptVersion: input.promptVersion,
+    unifiedCreator: asBoolean(summary.unifiedCreator),
+    documentTitle: asString(summary.documentTitle),
     reportKind: asString(summary.reportKind),
     docKind: asString(summary.docKind),
     studentName: asString(summary.studentName),

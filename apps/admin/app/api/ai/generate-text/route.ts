@@ -279,7 +279,7 @@ function resolveInterventionPricingOverride(summary: Record<string, unknown>) {
   if (mode !== 'suggestions' && mode !== 'feedback_analysis') return undefined
   return {
     provider: 'openai',
-    model: process.env.OPENAI_INTERVENTIONS_MODEL?.trim() || 'gpt-4o-mini',
+    model: process.env.OPENAI_INTERVENTIONS_MODEL?.trim() || 'gpt-5.5',
     estimatedCostCents: mode === 'suggestions' ? 35 : 28,
     giztokens: mode === 'suggestions' ? 350 : 280,
     inputTokens: mode === 'suggestions' ? 2200 : 2000,

@@ -15,7 +15,7 @@ const CORS_HEADERS = {
 type ChatProvider = 'openai'
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
-const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-4o-mini'
+const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-5.5'
 
 export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS })

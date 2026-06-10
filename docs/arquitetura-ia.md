@@ -28,7 +28,8 @@ Arquitetura desejada:
 Estado atual do projeto:
 
 - Claude textual esta previsto no backend `apps/admin`, usando `ANTHROPIC_API_KEY`.
-- OpenAI ainda não está implementado no codigo para imagem ou embeddings.
+- OpenAI Images esta implementado para portfólio pedagógico e imagens avulsas (`apps/admin/app/lib/ai-image.ts`). Ver guia completo em [geracao-imagem-openai-portfolio.md](./geracao-imagem-openai-portfolio.md).
+- Embeddings OpenAI ainda nao estao implementados.
 - O frontend da professora nao carrega chaves de IA, o que esta correto.
 
 Observação: nomes exatos de modelos e precos devem ser confirmados nas documentacoes oficiais antes de producao, porque mudam com frequencia.

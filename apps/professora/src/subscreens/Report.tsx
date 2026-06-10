@@ -70,26 +70,27 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const selectedStudent = allStudents.find((student) => student.id === selectedStudentId) ?? allStudents[0]
   const selectedClass = classes.find((cls) => cls.id === selectedClassId) ?? classes[0]
 
-  const reportKind = typeof data === 'object' && data && 'reportKind' in data
-    ? String((data as { reportKind?: string }).reportKind)
-    : 'Relatório de desenvolvimento'
-  const assistantMode = typeof data === 'object' && data && 'assistantMode' in data
-    ? String((data as { assistantMode?: string }).assistantMode)
-    : ''
-  const isUnifiedCreator = Boolean(typeof data === 'object' && data && 'unifiedCreator' in data && (data as { unifiedCreator?: unknown }).unifiedCreator)
-    || reportKind === 'Criador pedagógico'
-    || reportKind === 'Criador Pedagógico'
-  const isPortfólio = reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio'
-  const isDevelopmentReport = reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento'
-  const isClassDiary = reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo'
-  const isParentsMeeting = reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais'
-  const isPlanning = isPlanningKind(reportKind) && !isParentsMeeting
+  const navData = typeof data === 'object' && data !== null ? data as Record<string, unknown> : {}
+  const initialDocumentTitle = typeof navData.documentTitle === 'string' ? navData.documentTitle : ''
 
-  const [documentTitle, setDocumentTitle] = useState('')
-  const [useUnifiedAnnotations, setUseUnifiedAnnotations] = useState(false)
-  const [includeUnifiedClassNotes, setIncludeUnifiedClassNotes] = useState(false)
-  const [includeUnifiedChildNotes, setIncludeUnifiedChildNotes] = useState(false)
-  const [childAnnotationMode, setChildAnnotationMode] = useState<ChildAnnotationMode>('all')
+  const reportKind = typeof navData.reportKind === 'string'
+    ? navData.reportKind
+    : 'Criador Pedagógico'
+  const assistantMode = typeof navData.assistantMode === 'string' ? navData.assistantMode : ''
+  const isUnifiedCreator = true
+  const isPortfólio = false
+  const isDevelopmentReport = false
+  const isClassDiary = false
+  const isParentsMeeting = false
+  const isPlanning = false
+
+  const [documentTitle, setDocumentTitle] = useState(initialDocumentTitle)
+  const [useUnifiedAnnotations, setUseUnifiedAnnotations] = useState(navData.useUnifiedAnnotations === true)
+  const [includeUnifiedClassNotes, setIncludeUnifiedClassNotes] = useState(navData.includeUnifiedClassNotes === true)
+  const [includeUnifiedChildNotes, setIncludeUnifiedChildNotes] = useState(navData.includeUnifiedChildNotes === true)
+  const [childAnnotationMode, setChildAnnotationMode] = useState<ChildAnnotationMode>(
+    typeof navData.studentId === 'string' ? 'one' : 'all',
+  )
   const [selectedCustomCategories, setSelectedCustomCategories] = useState<string[]>([])
   const [mode, setMode] = useState<ReportMode>('annotations')
   const [selectedAnnotationIds, setSelectedAnnotationIds] = useState<string[]>([])
@@ -224,41 +225,18 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
   const needsAgeGroup = !isUnifiedCreator && isPlanning
   const needsObjective = !isUnifiedCreator && isPlanning
   const needsEvaluationPeriod = !isUnifiedCreator && isDevelopmentReport
-  const effectiveDocumentTitle = isUnifiedCreator ? documentTitle.trim() : reportKind
-  const currentReportType = getReportGenerationType(effectiveDocumentTitle || reportKind, portfolioOutput)
-  const isSpecialistReferral = currentReportType === 'specialist_referral' || currentReportType === 'specialist_report'
-  const hasContentBase = isUnifiedCreator
-    ? documentTitle.trim().length >= 3 && extraContext.trim().length >= 10 && (!useUnifiedAnnotations || unifiedAnnotations.length > 0)
-    : isClassDiary
-    ? diaryRawText.trim().length >= 20
-    : isPortfólio
-      ? selectedMilestones.length > 0 || extraContext.trim().length >= 10 || attachments.length > 0
-    : isParentsMeeting
-      ? meetingAgenda.trim().length >= 10
-    : mode === 'blank'
-      ? blankContext.trim().length >= 20
-      : selectedAnnotations.length > 0 || extraContext.trim().length >= 20
-  const hasRequiredBnccInput = !needsBnccFields || ((!needsAgeGroup || ageGroup.trim().length > 0) && bnccFields.length > 0)
-  const hasRequiredObjective = !needsObjective || objective.trim().length >= 10
-  const hasRequiredPeriod = !needsEvaluationPeriod || evaluationPeriod.trim().length >= 5
-  const hasRequiredDevelopmentFields = !isDevelopmentReport || finalConsiderations.trim().length >= 10
-  const hasRequiredMeetingFields = !isParentsMeeting
-    || Boolean(meetingDate && meetingDuration && meetingAgenda.trim().length >= 10)
-  const canGenerate = hasContentBase && hasRequiredBnccInput && hasRequiredObjective && hasRequiredPeriod && hasRequiredDevelopmentFields && hasRequiredMeetingFields
+  const effectiveDocumentTitle = documentTitle.trim()
+  const currentReportType = getReportGenerationType(portfolioOutput)
+  const hasContentBase = effectiveDocumentTitle.length >= 3
+    && extraContext.trim().length >= 10
+    && (!useUnifiedAnnotations || unifiedAnnotations.length > 0)
+  const canGenerate = hasContentBase
   const generationRequirementHint = getGenerationRequirementHint({
-    isClassDiary,
-    isSpecialistReferral,
-    isParentsMeeting,
-    mode,
-    selectedAnnotationsCount: selectedAnnotations.length,
+    isUnifiedCreator: true,
+    documentTitleLength: effectiveDocumentTitle.length,
+    useUnifiedAnnotations,
+    unifiedAnnotationsCount: unifiedAnnotations.length,
     extraContextLength: extraContext.trim().length,
-    blankContextLength: blankContext.trim().length,
-    diaryRawLength: diaryRawText.trim().length,
-    hasRequiredBnccInput,
-    hasRequiredObjective,
-    hasRequiredPeriod,
-    hasRequiredDevelopmentFields,
-    hasRequiredMeetingFields,
   })
   const generationViewKey = generated ? 'result' : generating ? 'loading' : 'form'
   const voiceAnnotations = useMemo(
@@ -616,7 +594,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
       const requestSummary = {
         reportKind: effectiveDocumentTitle || 'Documento pedagógico',
         documentTitle: effectiveDocumentTitle || null,
-        unifiedCreator: isUnifiedCreator,
+        unifiedCreator: true,
+        documentOutput: portfolioOutput,
         portfolioOutput,
         portfolioImageFormat,
         historyScope,
@@ -671,7 +650,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         documentStyle: styleSettings,
       }
 
-      const generationType = getReportGenerationType(effectiveDocumentTitle || reportKind, portfolioOutput)
+      const generationType = getReportGenerationType(portfolioOutput)
       const rawPhotoDataUrl = generationType === 'portfolio_image'
         ? (attachments.find((item) => item.isImage && item.dataUrl)?.dataUrl ?? null)
         : null
@@ -691,7 +670,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             generationType,
             classId: requestClassId,
             studentId: requestStudentId,
-            promptVersion: isUnifiedCreator ? 'criador-pedagogico-v1' : 'professora-report-v1',
+            promptVersion: 'criador-livre-v1',
             requestSummary,
           })
 
@@ -797,7 +776,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
         <button onClick={handleBack} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">{isUnifiedCreator ? 'Criador Pedagógico' : reportKind}</span>
+        <span className="font-serif text-[18px] text-gd flex-1">Criador Pedagógico</span>
       </div>
 
       <div key={generationViewKey} className="scroll-area px-[18px] stage-fade-in">
@@ -816,13 +795,7 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                 <div className="flex-1">
                   <h2 className="font-serif text-[20px] text-gd">Antes de gerar</h2>
                   <p className="text-[12px] text-muted leading-snug">
-                    {isUnifiedCreator
-                      ? 'Informe o título, escolha se deseja usar anotações e descreva exatamente o documento que precisa.'
-                      : isClassDiary
-                      ? 'Preencha rapidamente os dados do dia da turma para gerar o diário.'
-                      : isParentsMeeting
-                      ? 'Selecione a turma e descreva a pauta para planejar a reunião.'
-                      : 'Escolhá a criança. Orientações extras e anexos são opcionais.'}
+                    Informe o título, escolha texto ou imagem, use anotações se quiser e descreva exatamente o que precisa.
                   </p>
                 </div>
               </div>
@@ -834,10 +807,65 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   </label>
                   <input
                     className="w-full bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none"
-                    placeholder="Ex: Relatório individual do João sobre adaptação"
+                    placeholder="Ex: Planejamento semanal da turma, relatório da Maria, portfólio visual..."
                     value={documentTitle}
                     onChange={(event) => setDocumentTitle(event.target.value)}
                   />
+
+                  <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4 mb-2">
+                    Formato de saída
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPortfólioOutput('text')}
+                      className={`rounded-app-sm border px-3 py-3 text-left ${
+                        portfolioOutput === 'text' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                      }`}
+                    >
+                      <span className="block text-[13px] font-bold">Texto</span>
+                      <span className="block text-[11px] mt-1">Relatório, planejamento, portfólio escrito</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPortfólioOutput('image')}
+                      className={`rounded-app-sm border px-3 py-3 text-left ${
+                        portfolioOutput === 'image' ? 'bg-gbg border-gp text-gd' : 'bg-cream border-border text-muted'
+                      }`}
+                    >
+                      <span className="block text-[13px] font-bold">Imagem</span>
+                      <span className="block text-[11px] mt-1">Capa ou painel visual</span>
+                    </button>
+                  </div>
+
+                  {portfolioOutput === 'image' && (
+                    <div className="mt-3">
+                      <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">
+                        Orientação da imagem
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {([
+                          { id: 'portrait', label: 'Retrato', preview: '▮' },
+                          { id: 'landscape', label: 'Paisagem', preview: '▬' },
+                          { id: 'square', label: 'Quadrado', preview: '■' },
+                        ] as const).map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setPortfolioImageFormat(item.id)}
+                            className={`rounded-app-sm border px-2 py-3 text-center ${
+                              portfolioImageFormat === item.id
+                                ? 'bg-gbg border-gp text-gd'
+                                : 'bg-cream border-border text-muted'
+                            }`}
+                          >
+                            <span className="block text-[18px] leading-none">{item.preview}</span>
+                            <span className="block text-[11px] font-bold mt-2">{item.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                 </>
               ) : isClassDiary || isParentsMeeting ? (
@@ -1879,27 +1907,8 @@ function dedupeAnnotations(annotations: Annotation[]) {
   })
 }
 
-function getReportGenerationType(reportKind: string, portfolioOutput: PortfólioOutput): AiGenerationType {
-  const normalized = normalize(reportKind)
-  if (reportKind === 'Relatório de desenvolvimento' || reportKind === 'Relatório de Desenvolvimento') return 'development_report'
-  if (reportKind === 'Diário de bordo' || reportKind === 'Diário de Bordo') return 'class_diary'
-  if (reportKind === 'Planejamento semanal') return 'weekly_planning'
-  if (reportKind === 'Plano de aula diário') return 'daily_lesson_plan'
-  if (reportKind === 'Projeto pedagógico específico' || reportKind === 'Projeto Pedagógico') return 'pedagogical_project'
-  if (reportKind === 'Registro de reunião de pais' || reportKind === 'Planejamento de Reunião dos Pais') return 'parents_meeting_record'
-  if (reportKind === 'Portfólio pedagógico' || reportKind === 'Portfólio') {
-    return portfolioOutput === 'image' ? 'portfolio_image' : 'portfolio_text'
-  }
-  if (isSpecialistReport(reportKind) || reportKind === 'Rel. Atipico') return 'specialist_referral'
-  if (normalized.includes('portfolio')) return 'portfolio_text'
-  if (normalized.includes('diario de bordo') || normalized.includes('diario')) return 'class_diary'
-  if (normalized.includes('reuniao') && normalized.includes('pais')) return 'parents_meeting_record'
-  if (normalized.includes('plano de aula')) return 'daily_lesson_plan'
-  if (normalized.includes('planejamento') || normalized.includes('plano')) return 'planning'
-  if (normalized.includes('projeto')) return 'pedagogical_project'
-  if (normalized.includes('especialista') || normalized.includes('encaminhamento')) return 'specialist_referral'
-  if (normalized.includes('relatorio') || normalized.includes('parecer')) return 'general_report'
-  return 'general_report'
+function getReportGenerationType(portfolioOutput: PortfólioOutput): AiGenerationType {
+  return portfolioOutput === 'image' ? 'portfolio_image' : 'general_report'
 }
 
 function createReportPreview(input: {
@@ -2173,16 +2182,6 @@ function isSpecialistReport(reportKind: string) {
   ].includes(reportKind)
 }
 
-function isPlanningKind(reportKind: string) {
-  const normalized = reportKind
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-  return normalized.includes('planejamento')
-    || normalized.includes('plano de aula')
-    || normalized.includes('projeto pedagógico')
-}
-
 function getSpecialistSections(reportKind: string) {
   if (reportKind === 'Relatório para fonoaudiologo') {
     return {
@@ -2377,40 +2376,24 @@ function resolveDocumentLoadingVariant(reportKind: string) {
 }
 
 function getGenerationRequirementHint(input: {
-  isClassDiary: boolean
-  isSpecialistReferral: boolean
-  isParentsMeeting: boolean
-  mode: ReportMode
-  selectedAnnotationsCount: number
+  isUnifiedCreator?: boolean
+  documentTitleLength?: number
+  useUnifiedAnnotations?: boolean
+  unifiedAnnotationsCount?: number
   extraContextLength: number
-  blankContextLength: number
-  diaryRawLength: number
-  hasRequiredBnccInput: boolean
-  hasRequiredObjective: boolean
-  hasRequiredPeriod: boolean
-  hasRequiredDevelopmentFields: boolean
-  hasRequiredMeetingFields: boolean
 }) {
-  if (input.isClassDiary && input.diaryRawLength < 20) {
-    return 'Escreva um relato breve do dia da turma para criar um diário mais fiel.'
+  if (input.isUnifiedCreator) {
+    if ((input.documentTitleLength ?? 0) < 3) {
+      return 'Informe um título com pelo menos 3 caracteres.'
+    }
+    if (input.extraContextLength < 10) {
+      return 'Descreva o que você quer criar com pelo menos 10 caracteres.'
+    }
+    if (input.useUnifiedAnnotations && (input.unifiedAnnotationsCount ?? 0) === 0) {
+      return 'Selecione anotações ou desative a opção de usar anotações.'
+    }
+    return ''
   }
-  if (input.isParentsMeeting && !input.hasRequiredMeetingFields) {
-    return 'Preencha a pauta da reunião com pelo menos 10 caracteres.'
-  }
-  if (input.mode === 'blank' && input.blankContextLength < 20 && !input.isParentsMeeting) {
-    return input.isSpecialistReferral
-      ? 'Descreva o motivo do encaminhamento e os comportamentos observados na rotina.'
-      : input.isParentsMeeting
-        ? 'Descreva a pauta, observações, combinados ou encaminhamentos da reunião.'
-        : 'Descreva melhor o contexto antes de gerar o documento.'
-  }
-  if (input.mode === 'annotations' && input.selectedAnnotationsCount === 0 && input.extraContextLength < 20) {
-    return 'Selecione pelo menos uma anotação ou escreva uma orientação adicional com o contexto principal.'
-  }
-  if (!input.hasRequiredPeriod) return 'Informe o período de avaliação para contextualizar o relatório.'
-  if (!input.hasRequiredDevelopmentFields) return 'Escreva as considerações finais do relatório.'
-  if (!input.hasRequiredBnccInput) return 'Complete os campos pedagógicos obrigatórios antes de gerar.'
-  if (!input.hasRequiredObjective) return 'Informe o objetivo pedagógico com um pouco mais de detalhe.'
   return ''
 }
 

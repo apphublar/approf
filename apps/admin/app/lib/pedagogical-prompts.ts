@@ -5,6 +5,8 @@ import { FORBIDDEN_PEDAGOGICAL_WORDS } from '@approf/types'
 export interface BuildPromptInput {
   generationType: AiGenerationType
   promptVersion: string
+  unifiedCreator?: boolean
+  documentTitle?: string
   reportKind?: string
   docKind?: string
   studentName?: string
@@ -186,14 +188,22 @@ export function buildPedagogicalPrompt(input: BuildPromptInput): PedagogicalProm
   return buildStage1DraftPrompt(input)
 }
 
+function isFreeFormCreator(input: BuildPromptInput) {
+  return input.unifiedCreator === true
+    || input.promptVersion.startsWith('criador-livre')
+    || input.promptVersion.startsWith('criador-pedagogico')
+}
+
 function buildContextUserBlock(kind: string, input: BuildPromptInput): string {
   const bncc = input.bnccFields?.length ? input.bnccFields.join(', ') : 'Não informado'
   const attachments = formatAttachments(input.attachments)
   const selectedAnnotations = formatAnnotations(input.selectedAnnotations)
-  const requiredStructure = buildRequiredStructureInstructions(input)
+  const requiredStructure = isFreeFormCreator(input) ? [] : buildRequiredStructureInstructions(input)
   const documentGuidelines = buildDocumentPromptGuidelines(input)
+  const documentTitle = input.documentTitle?.trim() || kind
 
   return [
+    `TITULO SOLICITADO PELA PROFESSORA: ${documentTitle}`,
     `TIPO DE DOCUMENTO: ${kind}`,
     `TIPO DE GERACAO: ${input.generationType}`,
     `CRIANÇA: ${input.studentName ?? 'Não informado'}`,
@@ -263,6 +273,18 @@ function buildDocumentPromptGuidelines(input: BuildPromptInput) {
   const type = input.generationType
   const system: string[] = []
   const user: string[] = []
+
+  if (isFreeFormCreator(input)) {
+    system.push(
+      'A professora define livremente o tipo, estrutura, tom, extensão e conteúdo do documento.',
+      'Não imponha modelos pré-definidos, seções fixas ou formatos padrão de relatório, planejamento ou portfólio.',
+      'Siga o título e as instruções da professora com prioridade absoluta.',
+      'Use anotações e anexos apenas como contexto autorizado — não invente fatos além deles.',
+      'Mantenha português brasileiro correto, tom profissional e adequado à Educação Infantil.',
+    )
+    user.push('Organize o documento exatamente conforme pedido pela professora, sem adicionar seções não solicitadas.')
+    return { system, user }
+  }
 
   if (type === 'class_diary') {
     system.push(
@@ -394,6 +416,8 @@ function mapGenerationType(generationType: AiGenerationType) {
 }
 
 function buildRequiredStructureInstructions(input: BuildPromptInput) {
+  if (isFreeFormCreator(input)) return []
+
   const normalizedKind = normalize(input.reportKind ?? input.docKind ?? '')
 
   if (normalizedKind.includes('diario de bordo')) {

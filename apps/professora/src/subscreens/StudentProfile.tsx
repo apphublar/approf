@@ -254,14 +254,17 @@ export default function StudentProfileSubscreen() {
 
         <button
           onClick={() => openSubscreen('report', {
-            reportKind: 'Relatório de desenvolvimento',
+            unifiedCreator: true,
+            documentTitle: `Documento pedagógico de ${student.name}`,
             classId: cls.id,
             studentId: student.id,
+            useUnifiedAnnotations: true,
+            includeUnifiedChildNotes: true,
           })}
           className="w-full py-[14px] rounded-app bg-gd text-white font-bold text-[14px] border-none flex items-center justify-center gap-2 mb-5 cursor-pointer"
         >
           <Sparkles size={16} strokeWidth={2} />
-          Gerar relatório de desenvolvimento
+          Criar documento com IA
         </button>
 
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
