@@ -4,7 +4,12 @@ import { ChevronLeft, Eye, EyeOff, LogOut, Paperclip, ShieldCheck, Wallet, X } f
 import VerifiedBadge from '@/components/ui/VerifiedBadge'
 import { useAppStore, useNavStore } from '@/store'
 import { ensureTeacherSchool } from '@/services/supabase/classes'
-import { buildVerificationNotes, formatVerificationNotesSummary, parseVerificationNotes } from '@/utils/verification-notes'
+import {
+  buildVerificationNotes,
+  formatVerificationNotesSummary,
+  parseVerificationNotes,
+  resolveApprovedVerificationDetails,
+} from '@/utils/verification-notes'
 import { saveDocumentStyleSettings } from '@/utils/document-style'
 import {
   cancelTeacherSubscription,
@@ -18,6 +23,7 @@ import {
   uploadTeacherVerificationDocuments,
   type TeacherAccountSnapshot,
 } from '@/services/supabase/account'
+import { APP_VERSION } from '@/version'
 import { MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
 import { stashNavigationForFilePicker } from '@/utils/nav-session'
 import { clearPendingFiles, loadPendingFiles, savePendingFiles } from '@/utils/pending-file-store'
@@ -125,8 +131,19 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   )
   const isProfileVerified = Boolean(approvedVerification)
   const approvedVerificationDetails = useMemo(
-    () => parseVerificationNotes(approvedVerification?.notes ?? null),
-    [approvedVerification],
+    () => resolveApprovedVerificationDetails(
+      approvedVerification?.notes ?? null,
+      snapshot?.schools ?? [],
+    ),
+    [approvedVerification, snapshot?.schools],
+  )
+  const approvedNeedsSchoolDetails = Boolean(
+    isProfileVerified
+    && approvedVerificationDetails
+    && (
+      /n[aã]o informad/i.test(approvedVerificationDetails.schoolName)
+      || /n[aã]o informado/i.test(approvedVerificationDetails.period)
+    ),
   )
   const hasPendingVerification = useMemo(
     () => (snapshot?.verifications ?? []).some((item) => item.status === 'pending'),
@@ -134,29 +151,33 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   )
 
   useEffect(() => {
-    if (!approvedVerification) return
-    const parsed = parseVerificationNotes(approvedVerification.notes)
-    if (!parsed?.schoolName) return
+    if (!approvedVerification || !snapshot) return
+    const parsed = resolveApprovedVerificationDetails(approvedVerification.notes, snapshot.schools)
+    if (!parsed?.schoolName || /n[aã]o informad/i.test(parsed.schoolName)) return
     setSchoolName(parsed.schoolName)
     saveDocumentStyleSettings({
       schoolName: parsed.schoolName,
       schoolPeriod: parsed.period,
       showSchoolNameInDocuments: true,
     })
-  }, [approvedVerification, setSchoolName])
+  }, [approvedVerification, snapshot, setSchoolName])
 
   useEffect(() => {
     if (!snapshot || verificationSchoolName.trim()) return
-    const parsed = parseVerificationNotes(snapshot.verifications.find((item) => item.status === 'pending')?.notes ?? null)
-    if (parsed?.schoolName) {
+    const pendingNotes = snapshot.verifications.find((item) => item.status === 'pending')?.notes ?? null
+    const parsed = parseVerificationNotes(pendingNotes)
+      ?? (isProfileVerified
+        ? resolveApprovedVerificationDetails(approvedVerification?.notes ?? null, snapshot.schools)
+        : null)
+    if (parsed?.schoolName && !/n[aã]o informad/i.test(parsed.schoolName)) {
       setVerificationSchoolName(parsed.schoolName)
-      setVerificationPeriod(parsed.period)
+      setVerificationPeriod(parsed.period.includes('Não informado') ? '' : parsed.period)
       setVerificationObservation(parsed.observation ?? '')
       return
     }
-    const firstSchool = snapshot.schools[0]?.name
+    const firstSchool = snapshot.schools.find((school) => school.name?.trim() && !/n[aã]o informad/i.test(school.name))?.name
     if (firstSchool) setVerificationSchoolName(firstSchool)
-  }, [snapshot, verificationSchoolName])
+  }, [snapshot, verificationSchoolName, isProfileVerified, approvedVerification])
   const submittedVerificationRequests = useMemo(
     () => (snapshot?.verifications ?? []).filter((item) => item.documents.length > 0),
     [snapshot],
@@ -241,13 +262,42 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     await savePendingFiles(VERIFICATION_FILES_KEY, next)
     setPendingFiles(next)
     setError('')
-    setMessage(`${sanitized.length} arquivo(s) pronto(s) para envio. Toque em "Enviar documentos para validação".`)
+    setMessage(`${sanitized.length} arquivo(s) pronto(s) para envio. Toque em "Enviar comprovante para validação".`)
   }
 
   async function removePendingVerificationFile(index: number) {
     const next = pendingFiles.filter((_, itemIndex) => itemIndex !== index)
     await savePendingFiles(VERIFICATION_FILES_KEY, next)
     setPendingFiles(next)
+  }
+
+  async function saveVerifiedSchoolDetails() {
+    if (!snapshot) return
+    const schoolName = verificationSchoolName.trim()
+    const period = verificationPeriod.trim()
+    if (!schoolName || !period) {
+      setError('Informe o nome da escola e o período de vínculo.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    try {
+      await ensureTeacherSchool(schoolName, userId || snapshot.userId)
+      setSchoolName(schoolName)
+      saveDocumentStyleSettings({
+        schoolName,
+        schoolPeriod: period,
+        showSchoolNameInDocuments: true,
+        showSchoolPeriodInDocuments: true,
+      })
+      await refreshAccount()
+      setMessage('Escola e período salvos. Eles já aparecem nos documentos gerados.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar escola e período.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function submitVerification() {
@@ -379,7 +429,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 {isProfileVerified && <VerifiedBadge compact />}
               </div>
 
-              {isProfileVerified && approvedVerificationDetails ? (
+              {isProfileVerified && approvedVerificationDetails && !approvedNeedsSchoolDetails ? (
                 <div className="rounded-app-sm border border-gp bg-gbg px-3 py-3">
                   <p className="text-[12px] font-bold text-gd">Vínculo com a escola confirmado</p>
                   <p className="text-[12px] text-ink mt-2">
@@ -399,6 +449,38 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                     <span className="font-bold text-gd">Criador Pedagógico → Edição e Formatação</span>.
                   </p>
                 </div>
+              ) : isProfileVerified && approvedNeedsSchoolDetails ? (
+                <>
+                  <div className="rounded-app-sm border border-gp bg-gbg px-3 py-3 mb-3">
+                    <p className="text-[12px] font-bold text-gd">Perfil verificado pela equipe Approf</p>
+                    <p className="text-[11px] text-muted mt-2 leading-[1.5]">
+                      Complete o nome da escola e o período de vínculo para que essas informações apareçam nos seus
+                      relatórios e planejamentos.
+                    </p>
+                  </div>
+                  <label className="block text-[11px] font-bold text-muted">Nome da escola em que trabalha</label>
+                  <input
+                    value={verificationSchoolName}
+                    onChange={(event) => setVerificationSchoolName(event.target.value)}
+                    placeholder="Ex: EMEI Professora Maria Silva"
+                    className="w-full mt-1 mb-3 rounded-app-sm border border-border px-3 py-2 text-[13px]"
+                  />
+                  <label className="block text-[11px] font-bold text-muted">Período de vínculo</label>
+                  <input
+                    value={verificationPeriod}
+                    onChange={(event) => setVerificationPeriod(event.target.value)}
+                    placeholder="Ex: mar/2025 a dez/2025"
+                    className="w-full mt-1 mb-3 rounded-app-sm border border-border px-3 py-2 text-[13px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void saveVerifiedSchoolDetails()}
+                    disabled={saving || !verificationSchoolName.trim() || !verificationPeriod.trim()}
+                    className="w-full py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50"
+                  >
+                    {saving ? 'Salvando...' : 'Salvar escola e período'}
+                  </button>
+                </>
               ) : (
                 <>
                   <p className="text-[12px] text-muted leading-[1.5]">
@@ -613,7 +695,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             </button>
 
             <div className="mb-8 text-center">
-              <p className="text-[11px] text-muted">Approf v1.0.0</p>
+              <p className="text-[11px] text-muted">Approf v{APP_VERSION}</p>
               <p className="text-[11px] text-muted mt-1">
                 <a href={`${import.meta.env.VITE_APPROF_SITE_URL ?? 'https://approf.com.br'}/termos`} target="_blank" rel="noopener noreferrer" className="underline">Termos de uso</a> · <a href={`${import.meta.env.VITE_APPROF_SITE_URL ?? 'https://approf.com.br'}/privacidade`} target="_blank" rel="noopener noreferrer" className="underline">Privacidade</a>
               </p>

@@ -2,7 +2,11 @@
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return
 
+  void disableServiceWorkers()
   window.addEventListener('load', () => {
+    void disableServiceWorkers()
+  })
+  window.addEventListener('focus', () => {
     void disableServiceWorkers()
   })
 }

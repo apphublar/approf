@@ -48,3 +48,37 @@ export function formatVerificationNotesSummary(notes: string | null | undefined)
   if (parsed.observation) parts.push(`Observação: ${parsed.observation}`)
   return parts.join(' • ')
 }
+
+function resolveSchoolNameFromList(schools: Array<{ name?: string | null }>) {
+  const normalized = schools
+    .map((school) => school.name?.trim())
+    .filter((name): name is string => Boolean(name))
+  return (
+    normalized.find((name) => !/n[aã]o informad/i.test(name))
+    ?? normalized[0]
+    ?? null
+  )
+}
+
+/** Dados exibíveis quando a validação já foi aprovada (inclui envios antigos sem JSON). */
+export function resolveApprovedVerificationDetails(
+  notes: string | null | undefined,
+  schools: Array<{ name?: string | null }>,
+): VerificationNotesPayload | null {
+  const parsed = parseVerificationNotes(notes)
+  if (parsed) return parsed
+
+  const schoolName = resolveSchoolNameFromList(schools)
+  const legacyObservation = notes?.trim() || undefined
+
+  if (schoolName || legacyObservation) {
+    return {
+      v: 1,
+      schoolName: schoolName ?? 'Escola não informada',
+      period: 'Não informado no envio anterior',
+      observation: legacyObservation,
+    }
+  }
+
+  return null
+}

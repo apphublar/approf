@@ -1,4 +1,4 @@
-const SW_VERSION = 'approf-pwa-disabled-v1'
+const SW_VERSION = 'approf-pwa-disabled-v2'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())

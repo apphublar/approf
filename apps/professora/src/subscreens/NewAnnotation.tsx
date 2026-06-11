@@ -965,56 +965,75 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 desc="Registro privado da professora, sem vínculo com criança ou turma."
                 onClick={() => choosePersonalTarget()}
               />
-              {savedCustomCategories.map((category) => (
-                <div key={category.id} className="rounded-app-sm border border-border bg-white p-2">
-                  {editingCategoryId === category.id ? (
-                    <div className="flex gap-2">
-                      <input
-                        value={editingCategoryTitle}
-                        onChange={(event) => setEditingCategoryTitle(event.target.value)}
-                        className="min-w-0 flex-1 px-3 py-2 rounded-app-sm border border-border bg-cream text-[13px]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => renameCustomCategory(category, editingCategoryTitle)}
-                        className="px-3 rounded-app-sm bg-gm text-white text-[11px] font-bold"
-                      >
-                        Salvar
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <ChoiceButton
-                        selected={selectedCategoryKey === `custom:${category.id}`}
-                        title={category.title}
-                        desc={category.description}
-                        onClick={() => selectSavedCustomCategory(category)}
-                      />
-                      <div className="mt-2 flex items-center justify-end gap-2">
+              {savedCustomCategories.map((category) => {
+                const selected = selectedCategoryKey === `custom:${category.id}`
+                return (
+                  <div
+                    key={category.id}
+                    className="rounded-app-sm border px-3 py-3"
+                    style={{
+                      borderColor: selected ? '#4F8341' : '#D4EBC8',
+                      background: selected ? '#F0FAF4' : '#fff',
+                    }}
+                  >
+                    {editingCategoryId === category.id ? (
+                      <div className="flex gap-2">
+                        <input
+                          value={editingCategoryTitle}
+                          onChange={(event) => setEditingCategoryTitle(event.target.value)}
+                          className="min-w-0 flex-1 px-3 py-2 rounded-app-sm border border-border bg-cream text-[13px]"
+                        />
                         <button
                           type="button"
-                          onClick={() => {
-                            setEditingCategoryId(category.id)
-                            setEditingCategoryTitle(category.title)
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-muted"
+                          onClick={() => renameCustomCategory(category, editingCategoryTitle)}
+                          className="px-3 rounded-app-sm bg-gm text-white text-[11px] font-bold"
                         >
-                          <Pencil size={12} />
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void deleteCustomCategory(category)}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-[#C1440E]"
-                        >
-                          <Trash2 size={12} />
-                          Excluir
+                          Salvar
                         </button>
                       </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => selectSavedCustomCategory(category)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span
+                            className="block text-[13px] font-bold"
+                            style={{ color: selected ? '#4F8341' : '#1A1A1A' }}
+                          >
+                            {category.title}
+                          </span>
+                          <span className="block text-[11px] text-muted mt-[2px] leading-snug">
+                            {category.description}
+                          </span>
+                        </button>
+                        <div className="flex flex-col gap-1.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCategoryId(category.id)
+                              setEditingCategoryTitle(category.title)
+                            }}
+                            className="w-9 h-9 rounded-full border border-border bg-white flex items-center justify-center text-muted"
+                            aria-label={`Editar categoria ${category.title}`}
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deleteCustomCategory(category)}
+                            className="w-9 h-9 rounded-full border border-[#F2C4B8] bg-[#FFF5F2] flex items-center justify-center text-[#C1440E]"
+                            aria-label={`Excluir categoria ${category.title}`}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {(isTurmaType || isChildType) && showClassPicker && (
