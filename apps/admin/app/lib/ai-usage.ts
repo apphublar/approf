@@ -552,7 +552,8 @@ function resolvePortfolioImageEstimateCostCents() {
 }
 
 function resolvePortfolioImageEstimateModel() {
-  return process.env.OPENAI_IMAGE_MODEL?.trim() || 'gpt-image-1'
+  const fromEnv = process.env.OPENAI_IMAGE_MODEL?.trim()
+  return fromEnv || 'gpt-image-2'
 }
 
 /** Politica mensal unica (reserva, finalizacao e tela de saldo). */

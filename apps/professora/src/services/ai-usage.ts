@@ -67,8 +67,11 @@ export interface AiImageGenerationResult extends AiUsageReservationResult {
   model?: string
 }
 
+export type ImageLayoutFormat = 'portrait' | 'landscape' | 'square'
+
 export interface GeneratedImageInput {
   description: string
+  imageFormat?: ImageLayoutFormat
   quality?: 'standard' | 'medium' | 'high'
   classId?: string | null
   studentId?: string | null
@@ -382,7 +385,7 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
   const quality = input.quality ?? 'standard'
 
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 120000)
+  const timeout = window.setTimeout(() => controller.abort(), 300000)
   let response: Response
   try {
     response = await fetch(`${apiBaseUrl}/api/ai/generate-image`, {
@@ -397,6 +400,7 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
         studentId: input.studentId ?? null,
         requestSummary: {
           description: input.description,
+          imageFormat: input.imageFormat ?? 'portrait',
           imageQuality: quality,
         },
       }),

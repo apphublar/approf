@@ -845,8 +845,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                       </p>
                       <div className="grid grid-cols-3 gap-2">
                         {([
-                          { id: 'portrait', label: 'Retrato', preview: '▮' },
-                          { id: 'landscape', label: 'Paisagem', preview: '▬' },
+                          { id: 'portrait', label: 'Retrato A4', preview: '▮' },
+                          { id: 'landscape', label: 'Paisagem A4', preview: '▬' },
                           { id: 'square', label: 'Quadrado', preview: '■' },
                         ] as const).map((item) => (
                           <button
@@ -1335,8 +1335,8 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                       {([
-                        { id: 'portrait', label: 'Retrato', preview: '▮' },
-                        { id: 'landscape', label: 'Paisagem', preview: '▬' },
+                        { id: 'portrait', label: 'Retrato A4', preview: '▮' },
+                        { id: 'landscape', label: 'Paisagem A4', preview: '▬' },
                         { id: 'square', label: 'Quadrado', preview: '■' },
                       ] as const).map((item) => (
                         <button
@@ -2362,9 +2362,9 @@ function escapeHtml(value: string) {
 }
 
 function formatPortfolioImageFormat(value: PortfolioImageFormat) {
-  if (value === 'landscape') return 'paisagem'
+  if (value === 'landscape') return 'paisagem A4'
   if (value === 'square') return 'quadrado'
-  return 'retrato'
+  return 'retrato A4'
 }
 
 function resolveDocumentLoadingVariant(reportKind: string) {

@@ -1,6 +1,10 @@
 ﻿import { createSupabaseServiceClient } from './supabase-server'
 import { PublicAiGenerationError } from './ai-generation'
 import type { AiGenerationType } from './ai-usage'
+import {
+  resolveOpenAiPortfolioImageModel,
+  resolveOpenAiStandaloneImageModel,
+} from './openai-models'
 
 interface GeneratePortfolioImageInput {
   ownerId: string
@@ -48,11 +52,18 @@ interface GenerateStandaloneImageResult {
   reportId: string
 }
 
-const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-1'
-const DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL = 'gpt-image-1-mini'
-const DEFAULT_OPENAI_IMAGE_SIZE = '1024x1536'
-const DEFAULT_OPENAI_IMAGE_QUALITY = 'medium'
-const DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY = 'medium'
+type ImageLayoutFormat = 'portrait' | 'landscape' | 'square'
+
+/** Proporcoes tipo folha A4 (vertical/horizontal) e quadrado, conforme API OpenAI. */
+const IMAGE_LAYOUT_SIZES: Record<ImageLayoutFormat, string> = {
+  portrait: '1024x1536',
+  landscape: '1536x1024',
+  square: '1024x1024',
+}
+
+const DEFAULT_IMAGE_LAYOUT_FORMAT: ImageLayoutFormat = 'portrait'
+const DEFAULT_OPENAI_IMAGE_QUALITY = 'high'
+const DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY = 'high'
 const DEFAULT_OPENAI_IMAGE_COST_CENTS = 120
 const DEFAULT_OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD = 8
 const DEFAULT_OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD = 30
@@ -64,7 +75,7 @@ export async function generatePortfolioImage(
   input: GeneratePortfolioImageInput,
 ): Promise<GeneratePortfolioImageResult> {
   const summary = input.requestSummary ?? {}
-  const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_IMAGE_MODEL
+  const model = resolveOpenAiPortfolioImageModel()
   const size = resolvePortfolioImageSize(summary)
   const quality = resolvePortfolioImageQuality()
   const prompt = input.inputImageDataUrl
@@ -83,7 +94,6 @@ export async function generatePortfolioImage(
       })
     : await requestOpenAiImage({
         model,
-        fallbackModels: resolvePortfolioImageFallbackModels(model),
         prompt,
         size,
         quality,
@@ -140,7 +150,7 @@ export async function generateStandaloneImage(
   input: GenerateStandaloneImageInput,
 ): Promise<GenerateStandaloneImageResult> {
   const summary = input.requestSummary ?? {}
-  const model = process.env.OPENAI_STANDALONE_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL
+  const model = resolveOpenAiStandaloneImageModel()
   const size = resolveStandaloneImageSize(summary)
   const quality = resolveStandaloneImageQuality(summary)
   const prompt = buildStandaloneImagePrompt(summary, size)
@@ -151,7 +161,7 @@ export async function generateStandaloneImage(
     size,
     quality,
     user: input.ownerId,
-    timeoutMs: 180000,
+    timeoutMs: 270000,
   })
 
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'standalone')
@@ -201,7 +211,6 @@ export async function generateStandaloneImage(
 
 async function requestOpenAiImage(input: {
   model: string
-  fallbackModels?: string[]
   prompt: string
   size: string
   quality: string
@@ -213,85 +222,65 @@ async function requestOpenAiImage(input: {
     throw new PublicAiGenerationError('Servico de imagem indisponÃ­vel no momento. Tente novamente em instantes.')
   }
 
-  const models = [input.model, ...(input.fallbackModels ?? [])]
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .filter((item, index, list) => list.indexOf(item) === index)
-
-  let lastErrorMessage = ''
-
-  for (const model of models) {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 180000)
-    let response: Response
-    try {
-      response = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          prompt: input.prompt,
-          n: 1,
-          size: input.size,
-          quality: input.quality,
-          background: 'opaque',
-          moderation: 'low',
-          output_format: 'png',
-          user: input.user,
-        }),
-        signal: controller.signal,
-      })
-    } catch (error) {
-      clearTimeout(timeout)
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new PublicAiGenerationError('A criaÃ§Ã£o da imagem demorou mais do que o esperado. Tente novamente.')
-      }
-      throw error
-    } finally {
-      clearTimeout(timeout)
+  const model = input.model.trim()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 180000)
+  let response: Response
+  try {
+    response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(buildOpenAiImageGenerationBody({
+        model,
+        prompt: input.prompt,
+        size: input.size,
+        quality: input.quality,
+        user: input.user,
+      })),
+      signal: controller.signal,
+    })
+  } catch (error) {
+    clearTimeout(timeout)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new PublicAiGenerationError('A criaÃ§Ã£o da imagem demorou mais do que o esperado. Tente novamente.')
     }
-
-    const payload = (await response.json().catch(() => null)) as {
-      data?: Array<{ b64_json?: string; url?: string }>
-      usage?: {
-        input_tokens?: number
-        output_tokens?: number
-        total_tokens?: number
-      }
-      error?: { message?: string; code?: string; type?: string }
-    } | null
-
-    if (!response.ok) {
-      lastErrorMessage = payload?.error?.message ?? `HTTP ${response.status}`
-      console.error('[ai-image] OpenAI HTTP', response.status, model, payload?.error)
-      if (shouldTryNextImageModel(payload?.error?.message, payload?.error?.code, response.status, models, model)) {
-        continue
-      }
-      throw new PublicAiGenerationError(toPublicImageErrorMessage(response.status, payload?.error?.message))
-    }
-
-    const b64Json = payload?.data?.[0]?.b64_json
-    const imageUrl = payload?.data?.[0]?.url
-    const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
-    if (!image) {
-      lastErrorMessage = 'Resposta sem imagem'
-      console.error('[ai-image] OpenAI sem imagem', model, payload)
-      continue
-    }
-
-    return {
-      image,
-      model,
-      inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
-      outputTokens: payload?.usage?.output_tokens ?? 0,
-    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
   }
 
-  console.error('[ai-image] falha em todos os modelos', lastErrorMessage)
-  throw new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
+  const payload = (await response.json().catch(() => null)) as {
+    data?: Array<{ b64_json?: string; url?: string }>
+    usage?: {
+      input_tokens?: number
+      output_tokens?: number
+      total_tokens?: number
+    }
+    error?: { message?: string; code?: string; type?: string }
+  } | null
+
+  if (!response.ok) {
+    console.error('[ai-image] OpenAI HTTP', response.status, model, payload?.error)
+    throw new PublicAiGenerationError(toPublicImageErrorMessage(response.status, payload?.error?.message))
+  }
+
+  const b64Json = payload?.data?.[0]?.b64_json
+  const imageUrl = payload?.data?.[0]?.url
+  const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
+  if (!image) {
+    console.error('[ai-image] OpenAI sem imagem', model, payload)
+    throw new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
+  }
+
+  return {
+    image,
+    model,
+    inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
+    outputTokens: payload?.usage?.output_tokens ?? 0,
+  }
 }
 
 async function requestOpenAiImageEdit(input: {
@@ -417,8 +406,8 @@ function buildPortfolioImagePrompt(summary: Record<string, unknown>, size: strin
     ? `\nINSTRUÇÃO OBRIGATÓRIA DA PROFESSORA (seguir à risca):\n${extraContext}`
     : ''
 
-  const formatLabel = size === '1536x1024' ? 'paisagem' : size === '1024x1024' ? 'quadrado' : 'retrato'
-  return `Ilustração de portfólio pedagógico (${formatLabel}, ${size}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
+  const formatLabel = describeImageLayoutFromSize(size)
+  return `Ilustração de portfólio pedagógico (${formatLabel}) para Educação Infantil, estilo acolhedor em tons pastel, layout limpo tipo cartaz escolar.
 
 Texto visível em português brasileiro:
 - Título: PORTFÓLIO PEDAGÓGICO
@@ -487,12 +476,41 @@ CONTEÚDO PEDAGÓGICO (preencha os blocos com estes dados):
 ${observations}`
 }
 function resolvePortfolioImageSize(summary: Record<string, unknown>) {
-  const fromSummary = asString(summary.portfolioImageFormat)?.trim().toLowerCase()
-  if (fromSummary === 'landscape') return '1536x1024'
-  if (fromSummary === 'square') return '1024x1024'
-  if (fromSummary === 'portrait') return '1024x1536'
-  const fromEnv = process.env.OPENAI_IMAGE_SIZE?.trim()
-  return fromEnv || DEFAULT_OPENAI_IMAGE_SIZE
+  const format = resolveImageLayoutFormat(summary.portfolioImageFormat)
+  return IMAGE_LAYOUT_SIZES[format]
+}
+
+function resolveStandaloneImageSize(summary: Record<string, unknown>) {
+  const explicitFormat = asString(summary.imageFormat)
+  if (explicitFormat) {
+    return IMAGE_LAYOUT_SIZES[resolveImageLayoutFormat(explicitFormat)]
+  }
+
+  const description = asString(summary.description)?.toLowerCase() || ''
+  if (description.includes('horizontal') || description.includes('paisagem') || description.includes('landscape')) {
+    return IMAGE_LAYOUT_SIZES.landscape
+  }
+  if (description.includes('quadrada') || description.includes('quadrado') || description.includes('square')) {
+    return IMAGE_LAYOUT_SIZES.square
+  }
+  if (description.includes('vertical') || description.includes('retrato') || description.includes('portrait')) {
+    return IMAGE_LAYOUT_SIZES.portrait
+  }
+
+  return IMAGE_LAYOUT_SIZES[DEFAULT_IMAGE_LAYOUT_FORMAT]
+}
+
+function resolveImageLayoutFormat(value: unknown): ImageLayoutFormat {
+  const normalized = asString(value)?.trim().toLowerCase()
+  if (normalized === 'landscape' || normalized === 'horizontal' || normalized === 'paisagem') return 'landscape'
+  if (normalized === 'square' || normalized === 'quadrado' || normalized === 'quadrada') return 'square'
+  return 'portrait'
+}
+
+function describeImageLayoutFromSize(size: string) {
+  if (size === IMAGE_LAYOUT_SIZES.landscape) return 'paisagem A4 (horizontal)'
+  if (size === IMAGE_LAYOUT_SIZES.square) return 'quadrado'
+  return 'retrato A4 (vertical)'
 }
 
 function resolvePortfolioImageQuality() {
@@ -501,30 +519,32 @@ function resolvePortfolioImageQuality() {
   return DEFAULT_OPENAI_IMAGE_QUALITY
 }
 
-function resolvePortfolioImageFallbackModels(model: string) {
-  const configured = process.env.OPENAI_IMAGE_FALLBACK_MODEL?.trim()
-  const fallbacks = configured ? [configured] : ['gpt-image-2', 'gpt-image-1-mini']
-  return fallbacks.filter((item) => item !== model)
-}
-
-function resolveStandaloneImageSize(summary: Record<string, unknown>) {
-  const requested = asString(summary.description)?.toLowerCase() || ''
-  if (requested.includes('horizontal') || requested.includes('paisagem') || requested.includes('landscape')) {
-    return '1536x1024'
+function buildOpenAiImageGenerationBody(input: {
+  model: string
+  prompt: string
+  size: string
+  quality: string
+  user: string
+}) {
+  const body: Record<string, unknown> = {
+    model: input.model,
+    prompt: input.prompt,
+    n: 1,
+    size: input.size,
+    quality: input.quality,
+    output_format: 'png',
+    user: input.user,
   }
-  if (requested.includes('quadrada') || requested.includes('quadrado') || requested.includes('square')) {
-    return '1024x1024'
+  if (!input.model.trim().toLowerCase().startsWith('gpt-image-2')) {
+    body.background = 'opaque'
+    body.moderation = 'low'
   }
-  if (requested.includes('vertical') || requested.includes('retrato') || requested.includes('portrait')) {
-    return '1024x1536'
-  }
-  const fromEnv = process.env.OPENAI_IMAGE_SIZE?.trim()
-  return fromEnv || DEFAULT_OPENAI_IMAGE_SIZE
+  return body
 }
 
 function resolveStandaloneImageQuality(summary: Record<string, unknown>) {
   const requested = asString(summary.imageQuality)?.trim().toLowerCase()
-  if (requested === 'standard' || requested === 'padrao' || requested === 'padrÃ£o') return 'medium'
+  if (requested === 'standard' || requested === 'padrao' || requested === 'padrÃ£o') return 'high'
   if (requested === 'medium' || requested === 'media' || requested === 'mÃ©dia') return 'medium'
   if (requested === 'high' || requested === 'alta') return 'high'
   return process.env.OPENAI_STANDALONE_IMAGE_QUALITY?.trim() || DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY
@@ -536,15 +556,16 @@ function buildStandaloneImagePrompt(summary: Record<string, unknown>, size: stri
     throw new PublicAiGenerationError('Descreva a imagem para continuar.')
   }
 
-  return `Crie uma imagem de alta qualidade com base na descriÃ§Ã£o abaixo.
+  const layout = describeImageLayoutFromSize(size)
+  return `Crie uma imagem de alta qualidade com base na descrição abaixo.
 
 Requisitos:
-- Use portuguÃªs brasileiro quando houver texto visÃ­vel.
-- Respeite fielmente estilo, cores, cenÃ¡rio, orientaÃ§Ã£o e formato pedidos.
-- Tamanho final: ${size}.
-- Evite elementos ofensivos, diagnÃ³sticos mÃ©dicos, marcas externas ou conteÃºdo imprÃ³prio para ambiente escolar.
+- Formato obrigatório: ${layout} (${size}).
+- Use português brasileiro quando houver texto visível.
+- Respeite fielmente estilo, cores e cenário pedidos.
+- Evite elementos ofensivos, diagnósticos médicos, marcas externas ou conteúdo impróprio para ambiente escolar.
 
-DescriÃ§Ã£o da professora:
+Descrição da professora:
 ${description}`
 }
 
@@ -706,24 +727,6 @@ function asString(value: unknown) {
 function asObjectArray(value: unknown): Array<Record<string, unknown>> {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object' && !Array.isArray(item)))
-}
-
-function shouldTryNextImageModel(
-  message: string | undefined,
-  code: string | undefined,
-  status: number,
-  models: string[],
-  currentModel: string,
-) {
-  if (models.indexOf(currentModel) >= models.length - 1) return false
-  const normalized = `${message ?? ''} ${code ?? ''}`.toLowerCase()
-  return status === 400 && (
-    normalized.includes('model')
-    || normalized.includes('quality')
-    || normalized.includes('size')
-    || normalized.includes('unsupported')
-    || normalized.includes('invalid')
-  )
 }
 
 function toPublicImageErrorMessage(status: number, message?: string) {

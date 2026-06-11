@@ -8,6 +8,7 @@ import {
 import { PublicAiGenerationError, rollbackGeneratedArtifacts } from '@/app/lib/ai-generation'
 import { generateStandaloneImage } from '@/app/lib/ai-image'
 import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
+import { resolveOpenAiStandaloneImageModel } from '@/app/lib/openai-models'
 
 export const maxDuration = 300
 
@@ -171,13 +172,17 @@ function buildQualityEstimate() {
 }
 
 function resolveBaseEstimatedImageCostCents() {
-  const fromEnv = Number(process.env.OPENAI_STANDALONE_IMAGE_ESTIMATED_COST_CENTS)
+  const fromEnv = Number(
+    process.env.OPENAI_STANDALONE_IMAGE_ESTIMATED_COST_CENTS
+      ?? process.env.OPENAI_IMAGE_ESTIMATED_COST_CENTS
+      ?? process.env.OPENAI_IMAGE_COST_CENTS,
+  )
   if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.round(fromEnv)
-  return 110
+  return 80
 }
 
 function resolveStandaloneImageModel() {
-  return process.env.OPENAI_STANDALONE_IMAGE_MODEL?.trim() || 'gpt-image-1-mini'
+  return resolveOpenAiStandaloneImageModel()
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {

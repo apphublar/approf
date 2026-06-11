@@ -2,7 +2,7 @@
 import { ChevronLeft, Download, Eye, FileText, Image as ImageIcon, Plus, Search, Share2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { getCachedReportById, listReports, prefetchReportsByIds } from '@/services/reports'
-import { generateImage } from '@/services/ai-usage'
+import { generateImage, type ImageLayoutFormat } from '@/services/ai-usage'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument } from '@/types'
 import { getImageVariants, prefetchImageVariants, type ImageVariants } from '@/utils/image-performance'
@@ -36,6 +36,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   const [message, setMessage] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [description, setDescription] = useState('')
+  const [imageFormat, setImageFormat] = useState<ImageLayoutFormat>('portrait')
   const [creating, setCreating] = useState(false)
   const [imageDetailsById, setImageDetailsById] = useState<Record<string, { imageDataUrl?: string; prompt?: string; quality?: string }>>({})
   const [imageVariantsById, setImageVariantsById] = useState<Record<string, ImageVariants>>({})
@@ -198,6 +199,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
     try {
       const result = await generateImage({
         description: normalized,
+        imageFormat,
         classId: filters.classId ?? null,
         studentId: filters.studentId ?? null,
       })
@@ -210,6 +212,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
       setMessage('Imagem criada com sucesso.')
       setIsCreateOpen(false)
       setDescription('')
+      setImageFormat('portrait')
       await loadDocuments(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível criar a imagem. Tente novamente.')
@@ -498,14 +501,37 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
               <div className="p-5">
                 <p className="text-[16px] font-serif text-gd">Nova imagem</p>
                 <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-                  Descreva exatamente a imagem que deseja criar. Inclua estilo, cores, cenário e também o formato desejado.
+                  Descreva estilo, cores e cenário. Escolha o formato da imagem abaixo (padrão: retrato A4).
                 </p>
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Descreva exatamente a imagem que deseja criar. Inclua estilo, cores, cenário e também o formato desejado."
+                  placeholder="Ex.: ilustração infantil de uma sala de aula acolhedora, tons pastel, sem texto."
                   className="w-full mt-3 min-h-[180px] resize-none bg-cream border border-border rounded-app-sm px-3 py-3 text-[13px] text-ink outline-none leading-[1.6]"
                 />
+
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Formato da imagem</p>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {([
+                    { id: 'portrait', label: 'Retrato A4', preview: '▮' },
+                    { id: 'landscape', label: 'Paisagem A4', preview: '▬' },
+                    { id: 'square', label: 'Quadrado', preview: '■' },
+                  ] as const).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setImageFormat(item.id)}
+                      className={`rounded-app-sm border px-2 py-3 text-center ${
+                        imageFormat === item.id
+                          ? 'bg-gbg border-gp text-gd'
+                          : 'bg-cream border-border text-muted'
+                      }`}
+                    >
+                      <span className="block text-[18px] leading-none">{item.preview}</span>
+                      <span className="block text-[11px] font-bold mt-2">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
 
                 <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Qualidade da imagem</p>
                 <div className="mt-2 rounded-app-sm border border-gp bg-gbg px-3 py-3">

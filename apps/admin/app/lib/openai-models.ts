@@ -1,7 +1,7 @@
 export const DEFAULT_OPENAI_TEXT_MODEL = 'gpt-5.5'
 export const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-5.5'
 export const DEFAULT_OPENAI_IMAGE_MODEL = 'gpt-image-2'
-export const DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL = 'gpt-image-1-mini'
+export const DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL = 'gpt-image-2'
 export const DEFAULT_OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
 
 /** Preco oficial gpt-5.5 (USD por 1M tokens). */
@@ -11,6 +11,16 @@ export const DEFAULT_OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD = 30
 export function resolveOpenAiModel(envValue: string | undefined, fallback: string) {
   const value = envValue?.trim()
   return value || fallback
+}
+
+export function resolveOpenAiPortfolioImageModel() {
+  return resolveOpenAiModel(process.env.OPENAI_IMAGE_MODEL, DEFAULT_OPENAI_IMAGE_MODEL)
+}
+
+export function resolveOpenAiStandaloneImageModel() {
+  const fromEnv = process.env.OPENAI_STANDALONE_IMAGE_MODEL?.trim()
+    || process.env.OPENAI_IMAGE_MODEL?.trim()
+  return fromEnv || DEFAULT_OPENAI_STANDALONE_IMAGE_MODEL
 }
 
 /** Modelos recentes (gpt-5.x, o-series) so aceitam temperature padrao (1). */
