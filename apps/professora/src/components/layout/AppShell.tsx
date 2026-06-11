@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavStore } from '@/store'
-import type { Subscreen } from '@/types'
-import { clearSubscreensStack, consumeActiveSubscreen, restoreSubscreensStack } from '@/utils/nav-session'
+import type { Subscreen, Tab } from '@/types'
+import { clearSubscreensStack, consumeActiveSubscreen, consumeStashedActiveTab, restoreSubscreensStack } from '@/utils/nav-session'
 import BottomNav from './BottomNav'
 import HomeScreen from '@/screens/Home'
 import AnnotationsScreen from '@/screens/Annotations'
@@ -32,9 +32,12 @@ import InterventionsSubscreen from '@/subscreens/Interventions'
 import TeacherAccountSubscreen from '@/subscreens/TeacherAccount'
 
 export default function AppShell() {
-  const { activeTab, subscreens, openSubscreen, restoreSubscreens } = useNavStore()
+  const { activeTab, subscreens, openSubscreen, restoreSubscreens, setTab } = useNavStore()
 
   useEffect(() => {
+    const stashedTab = consumeStashedActiveTab()
+    if (stashedTab) setTab(stashedTab as Tab)
+
     const stack = restoreSubscreensStack()
     if (stack.length > 0 && useNavStore.getState().subscreens.length === 0) {
       restoreSubscreens(stack.map((frame) => ({

@@ -1,5 +1,6 @@
 const ACTIVE_SUBSCREEN_KEY = 'approf:active-subscreen'
 const SUBSCREENS_STACK_KEY = 'approf:subscreens-stack'
+const ACTIVE_TAB_KEY = 'approf:active-tab'
 
 type PersistedSubscreen = {
   screen: string
@@ -67,4 +68,22 @@ export function clearSubscreensStack() {
 export function stashNavigationForFilePicker(screen: string, subscreens: PersistedSubscreen[]) {
   stashActiveSubscreen(screen)
   persistSubscreensStack(subscreens)
+}
+
+export function stashMaterialsFilePickerNavigation() {
+  try {
+    sessionStorage.setItem(ACTIVE_TAB_KEY, 'materials')
+  } catch {
+    // ignore
+  }
+}
+
+export function consumeStashedActiveTab() {
+  try {
+    const tab = sessionStorage.getItem(ACTIVE_TAB_KEY)
+    sessionStorage.removeItem(ACTIVE_TAB_KEY)
+    return tab
+  } catch {
+    return null
+  }
 }

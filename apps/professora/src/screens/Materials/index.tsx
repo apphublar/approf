@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ExternalLink,
   FileText,
@@ -29,6 +30,9 @@ import {
 } from '@/services/materials'
 import { getSupabaseClient } from '@/services/supabase/client'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
+import { isMobileDevice, MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
+import { stashMaterialsFilePickerNavigation } from '@/utils/nav-session'
+import { clearPendingFiles, loadPendingFiles, savePendingFiles } from '@/utils/pending-file-store'
 import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 
 type QueuedFile = {
@@ -48,7 +52,10 @@ const MAX_MB = 10
 const MAX_BYTES = MAX_MB * 1024 * 1024
 const DEFAULT_AGE_RANGE = '0 a 5 anos'
 const UPLOAD_DRAFT_KEY = 'approf:draft:material-upload'
-const MOBILE_UPLOAD_SECURITY_MESSAGE = 'Por segurança, o compartilhamento de material de apoio deve ser feito pelo computador.'
+const PENDING_FILES_KEY = 'material-upload-files'
+const MATERIAL_IMAGE_INPUT_ID = 'material-image-input'
+const MATERIAL_DOC_INPUT_ID = 'material-doc-input'
+const PRIVACY_NOTICE = 'Observação: não serão aceitos arquivos ou imagens com fotos de crianças, informações ou dados de crianças, nem dados pessoais de qualquer outra pessoa (nomes, telefones, e-mails, endereços, etc.).'
 const DOC_ACCEPT = [
   'application/pdf',
   'application/msword',
@@ -80,7 +87,11 @@ export default function MaterialsScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [showUpload, setShowUpload] = useState(false)
   const [preview, setPreview] = useState<SupportMaterial | null>(null)
-  const [mobileUploadBlocked, setMobileUploadBlocked] = useState(() => isMobileUploadDevice())
+  const [restoringPendingFiles, setRestoringPendingFiles] = useState(true)
+
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const docInputRef = useRef<HTMLInputElement | null>(null)
+  const isMobile = isMobileDevice()
 
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
@@ -97,34 +108,36 @@ export default function MaterialsScreen() {
     if (draftRestoredRef.current) return
     draftRestoredRef.current = true
     const draft = loadDraft<{ title: string; desc: string; ageRange: string; pedagogicalObjective: string; showUpload: boolean }>(UPLOAD_DRAFT_KEY)
-    if (draft?.showUpload && !mobileUploadBlocked) {
+    if (draft?.showUpload) {
       setTitle(draft.title || '')
       setDesc(draft.desc || '')
       setAgeRange(draft.ageRange || DEFAULT_AGE_RANGE)
       setPedagogicalObjective(draft.pedagogicalObjective || '')
       setShowUpload(true)
     }
-  }, [mobileUploadBlocked])
-
-  useEffect(() => {
-    function updateMobileUploadState() {
-      setMobileUploadBlocked(isMobileUploadDevice())
-    }
-
-    updateMobileUploadState()
-    window.addEventListener('resize', updateMobileUploadState)
-    window.addEventListener('orientationchange', updateMobileUploadState)
-    return () => {
-      window.removeEventListener('resize', updateMobileUploadState)
-      window.removeEventListener('orientationchange', updateMobileUploadState)
-    }
   }, [])
 
   useEffect(() => {
-    if (!mobileUploadBlocked || !showUpload) return
-    clearDraft(UPLOAD_DRAFT_KEY)
-    setShowUpload(false)
-  }, [mobileUploadBlocked, showUpload])
+    let active = true
+    void loadPendingFiles(PENDING_FILES_KEY)
+      .then((files) => {
+        if (!active || files.length === 0) return
+        const restored = files.map((file) => ({
+          file,
+          previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+          status: 'pending' as const,
+          statusMsg: '',
+        }))
+        setQueue(restored)
+        setShowUpload(true)
+      })
+      .finally(() => {
+        if (active) setRestoringPendingFiles(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!showUpload || submitting) return
@@ -215,8 +228,11 @@ export default function MaterialsScreen() {
     }
   }
 
+  function stashBeforeFilePicker() {
+    stashMaterialsFilePickerNavigation()
+  }
+
   function openUpload() {
-    if (mobileUploadBlocked) return
     setTitle('')
     setDesc('')
     setAgeRange(DEFAULT_AGE_RANGE)
@@ -229,11 +245,16 @@ export default function MaterialsScreen() {
     setShowUpload(true)
   }
 
-  function addFiles(fileList: FileList | null) {
-    if (mobileUploadBlocked) {
-      setUploadMsg(MOBILE_UPLOAD_SECURITY_MESSAGE)
+  async function persistQueueFiles(entries: QueuedFile[]) {
+    const pending = entries.filter((entry) => entry.status === 'pending')
+    if (pending.length === 0) {
+      await clearPendingFiles(PENDING_FILES_KEY)
       return
     }
+    await savePendingFiles(PENDING_FILES_KEY, pending.map((entry) => entry.file))
+  }
+
+  async function addFiles(fileList: FileList | null) {
     if (!fileList) return
     const newEntries: QueuedFile[] = []
     for (const f of Array.from(fileList)) {
@@ -252,25 +273,45 @@ export default function MaterialsScreen() {
         statusMsg: '',
       })
     }
-    if (newEntries.length > 0) {
-      setQueue((current) => [...current, ...newEntries])
-      setUploadMsg('')
-    }
+    if (newEntries.length === 0) return
+
+    setQueue((current) => {
+      const next = [...current, ...newEntries]
+      void persistQueueFiles(next)
+      return next
+    })
+    setUploadMsg('')
+  }
+
+  function onImageFileChange(event: ChangeEvent<HTMLInputElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    void addFiles(event.target.files)
+    window.setTimeout(() => {
+      event.target.value = ''
+    }, 0)
+  }
+
+  function onDocumentFileChange(event: ChangeEvent<HTMLInputElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    void addFiles(event.target.files)
+    window.setTimeout(() => {
+      event.target.value = ''
+    }, 0)
   }
 
   function removeFromQueue(index: number) {
     setQueue((current) => {
       const entry = current[index]
       if (entry?.previewUrl) URL.revokeObjectURL(entry.previewUrl)
-      return current.filter((_, i) => i !== index)
+      const next = current.filter((_, i) => i !== index)
+      void persistQueueFiles(next)
+      return next
     })
   }
 
   async function submitMaterial() {
-    if (mobileUploadBlocked) {
-      setUploadMsg(MOBILE_UPLOAD_SECURITY_MESSAGE)
-      return
-    }
     if (!canSubmit) return
     setSubmitting(true)
     setUploadMsg('')
@@ -304,12 +345,24 @@ export default function MaterialsScreen() {
     setSubmitting(false)
     if (!anyError) {
       clearDraft(UPLOAD_DRAFT_KEY)
+      await clearPendingFiles(PENDING_FILES_KEY)
       setTitle('')
       setDesc('')
       setAgeRange(DEFAULT_AGE_RANGE)
       setPedagogicalObjective('')
     }
     await refresh()
+  }
+
+  async function closeUploadSheet() {
+    clearDraft(UPLOAD_DRAFT_KEY)
+    await clearPendingFiles(PENDING_FILES_KEY)
+    setQueue((current) => {
+      current.forEach((entry) => { if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl) })
+      return []
+    })
+    setUploadMsg('')
+    setShowUpload(false)
   }
 
   async function handleDelete(id: string) {
@@ -368,8 +421,42 @@ export default function MaterialsScreen() {
     await refresh()
   }
 
+  const imageFileInput = (
+    <input
+      ref={imageInputRef}
+      id={MATERIAL_IMAGE_INPUT_ID}
+      type="file"
+      accept="image/*"
+      multiple
+      disabled={submitting || restoringPendingFiles}
+      onChange={onImageFileChange}
+      className={MOBILE_FILE_INPUT_CLASS}
+      style={{ position: 'fixed', top: 0, left: 0 }}
+      tabIndex={-1}
+      aria-hidden="true"
+    />
+  )
+
+  const documentFileInput = (
+    <input
+      ref={docInputRef}
+      id={MATERIAL_DOC_INPUT_ID}
+      type="file"
+      accept={DOC_ACCEPT}
+      disabled={submitting || restoringPendingFiles}
+      onChange={onDocumentFileChange}
+      className={MOBILE_FILE_INPUT_CLASS}
+      style={{ position: 'fixed', top: 0, left: 0 }}
+      tabIndex={-1}
+      aria-hidden="true"
+    />
+  )
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
+      {typeof document !== 'undefined' ? createPortal(imageFileInput, document.body) : imageFileInput}
+      {typeof document !== 'undefined' ? createPortal(documentFileInput, document.body) : documentFileInput}
+
       {/* ── Header ── */}
       <div className="bg-white px-[18px] pt-12 pb-3 border-b border-border flex-shrink-0">
         <div className="flex items-start justify-between gap-3">
@@ -380,9 +467,7 @@ export default function MaterialsScreen() {
           <button
             type="button"
             onClick={openUpload}
-            disabled={mobileUploadBlocked}
-            title={mobileUploadBlocked ? MOBILE_UPLOAD_SECURITY_MESSAGE : undefined}
-            className="flex items-center gap-1.5 bg-gd text-white rounded-app-sm px-3 py-2 text-[12px] font-bold flex-shrink-0 mt-1 disabled:opacity-45 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 bg-gd text-white rounded-app-sm px-3 py-2 text-[12px] font-bold flex-shrink-0 mt-1"
           >
             <Plus size={14} />
             Adicionar
@@ -404,9 +489,7 @@ export default function MaterialsScreen() {
           )}
         </div>
         <div className="mt-3 rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
-          {mobileUploadBlocked
-            ? MOBILE_UPLOAD_SECURITY_MESSAGE
-            : 'Não serão aceitos documentos ou imagens com dados pessoais, nomes de crianças, telefones, e-mails, endereços ou imagens de crianças.'}
+          {PRIVACY_NOTICE}
         </div>
       </div>
 
@@ -498,7 +581,7 @@ export default function MaterialsScreen() {
       {/* ── Grid ── */}
       <div className="flex-1 min-h-0 overflow-y-auto px-[14px] pb-28 pt-1 overscroll-contain">
         {filtered.length === 0 ? (
-          <EmptyState tab={tab} hasSearch={Boolean(query.trim())} uploadBlocked={mobileUploadBlocked} onAdd={openUpload} />
+          <EmptyState tab={tab} hasSearch={Boolean(query.trim())} onAdd={openUpload} />
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {filtered.map((m) => (
@@ -522,7 +605,7 @@ export default function MaterialsScreen() {
           <div className="flex items-center gap-3 px-[18px] pt-12 pb-3 border-b border-border flex-shrink-0 bg-white">
             <button
               type="button"
-              onClick={() => { clearDraft(UPLOAD_DRAFT_KEY); setShowUpload(false) }}
+              onClick={() => void closeUploadSheet()}
               className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted"
             >
               <X size={18} />
@@ -570,36 +653,37 @@ export default function MaterialsScreen() {
                 />
               </label>
 
-              <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-4 ${submitting ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className={`rounded-app border border-dashed border-gp bg-gbg px-4 py-4 ${submitting || restoringPendingFiles ? 'opacity-50 pointer-events-none' : ''}`}>
                 <p className="text-[13px] font-bold text-gd text-center mb-1">Adicionar arquivos</p>
-                <p className="text-[11px] leading-[1.5] text-muted text-center mb-3">
+                <p className="text-[11px] leading-[1.5] text-muted text-center mb-2">
                   Imagens (JPG, PNG, WEBP) — múltiplas de uma vez. Documentos (PDF, DOCX, XLSX, PPTX) — um por vez. Até {MAX_MB} MB cada.
                 </p>
+                <p className="text-[10px] leading-[1.5] text-[#856404] text-center mb-3 px-1">
+                  {PRIVACY_NOTICE}
+                </p>
                 <div className="flex gap-2">
-                  <label className="relative flex-1 flex items-center justify-center gap-1.5 rounded-app-sm border border-gp bg-white px-3 py-2.5 text-[12px] font-bold text-gm overflow-hidden cursor-pointer">
+                  <label
+                    htmlFor={MATERIAL_IMAGE_INPUT_ID}
+                    onClick={stashBeforeFilePicker}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-app-sm border border-gp bg-white px-3 py-2.5 text-[12px] font-bold text-gm cursor-pointer"
+                  >
                     <ImageIcon size={14} />
-                    <span aria-hidden="true">Imagem</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      disabled={submitting}
-                      onChange={(event) => { addFiles(event.currentTarget.files); event.currentTarget.value = '' }}
-                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    />
+                    Imagem
                   </label>
-                  <label className="relative flex-1 flex items-center justify-center gap-1.5 rounded-app-sm bg-gd px-3 py-2.5 text-[12px] font-bold text-white overflow-hidden cursor-pointer">
+                  <label
+                    htmlFor={MATERIAL_DOC_INPUT_ID}
+                    onClick={stashBeforeFilePicker}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-app-sm bg-gd px-3 py-2.5 text-[12px] font-bold text-white cursor-pointer"
+                  >
                     <FileText size={14} />
-                    <span aria-hidden="true">Documento</span>
-                    <input
-                      type="file"
-                      accept={DOC_ACCEPT}
-                      disabled={submitting}
-                      onChange={(event) => { addFiles(event.currentTarget.files); event.currentTarget.value = '' }}
-                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    />
+                    Documento
                   </label>
                 </div>
+                {isMobile && (
+                  <p className="text-[10px] text-muted mt-2 leading-[1.4] text-center">
+                    No celular, os arquivos selecionados ficam na fila abaixo. Preencha os campos e toque em Enviar.
+                  </p>
+                )}
               </div>
 
               {queue.length > 0 && (
@@ -903,12 +987,10 @@ function MaterialCard({
 function EmptyState({
   tab,
   hasSearch,
-  uploadBlocked,
   onAdd,
 }: {
   tab: TabId
   hasSearch: boolean
-  uploadBlocked: boolean
   onAdd: () => void
 }) {
   if (hasSearch) {
@@ -940,12 +1022,7 @@ function EmptyState({
       </div>
       <p className="text-[15px] font-bold text-ink">{title}</p>
       <p className="text-[12px] text-muted mt-1 max-w-[260px] leading-[1.5]">{subtitle}</p>
-      {showAdd && uploadBlocked && (
-        <p className="mt-4 max-w-[280px] rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
-          {MOBILE_UPLOAD_SECURITY_MESSAGE}
-        </p>
-      )}
-      {showAdd && !uploadBlocked && (
+      {showAdd && (
         <button
           type="button"
           onClick={onAdd}
@@ -1188,12 +1265,6 @@ function DeleteButton({ onDelete }: { onDelete: () => Promise<void> }) {
       Excluir
     </button>
   )
-}
-
-function isMobileUploadDevice() {
-  if (typeof window === 'undefined') return false
-  const mobileUserAgent = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile/i.test(window.navigator.userAgent)
-  return window.innerWidth < 900 || mobileUserAgent
 }
 
 function getKindFromMaterial(material: SupportMaterial): MaterialKind {
