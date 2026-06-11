@@ -63,7 +63,7 @@ const IMAGE_LAYOUT_SIZES: Record<ImageLayoutFormat, string> = {
 
 const DEFAULT_IMAGE_LAYOUT_FORMAT: ImageLayoutFormat = 'portrait'
 const DEFAULT_OPENAI_IMAGE_QUALITY = 'high'
-const DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY = 'high'
+const DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY = 'medium'
 const DEFAULT_OPENAI_IMAGE_COST_CENTS = 120
 const DEFAULT_OPENAI_IMAGE_INPUT_COST_PER_MILLION_USD = 8
 const DEFAULT_OPENAI_IMAGE_OUTPUT_COST_PER_MILLION_USD = 30
@@ -162,6 +162,7 @@ export async function generateStandaloneImage(
     quality,
     user: input.ownerId,
     timeoutMs: 270000,
+    preferJpeg: true,
   })
 
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'standalone')
@@ -216,71 +217,92 @@ async function requestOpenAiImage(input: {
   quality: string
   user: string
   timeoutMs?: number
+  preferJpeg?: boolean
 }) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new PublicAiGenerationError('Servico de imagem indisponÃ­vel no momento. Tente novamente em instantes.')
+    throw new PublicAiGenerationError('Servico de imagem indisponível no momento. Tente novamente em instantes.')
   }
 
   const model = input.model.trim()
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 180000)
-  let response: Response
-  try {
-    response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(buildOpenAiImageGenerationBody({
-        model,
-        prompt: input.prompt,
-        size: input.size,
-        quality: input.quality,
-        user: input.user,
-      })),
-      signal: controller.signal,
-    })
-  } catch (error) {
-    clearTimeout(timeout)
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new PublicAiGenerationError('A criaÃ§Ã£o da imagem demorou mais do que o esperado. Tente novamente.')
+  const MAX_ATTEMPTS = 2
+  let lastError: PublicAiGenerationError | null = null
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 3000))
     }
-    throw error
-  } finally {
-    clearTimeout(timeout)
-  }
 
-  const payload = (await response.json().catch(() => null)) as {
-    data?: Array<{ b64_json?: string; url?: string }>
-    usage?: {
-      input_tokens?: number
-      output_tokens?: number
-      total_tokens?: number
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 180000)
+    let response: Response
+    try {
+      response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(buildOpenAiImageGenerationBody({
+          model,
+          prompt: input.prompt,
+          size: input.size,
+          quality: input.quality,
+          user: input.user,
+          preferJpeg: input.preferJpeg,
+        })),
+        signal: controller.signal,
+      })
+    } catch (error) {
+      clearTimeout(timeout)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new PublicAiGenerationError('A criação da imagem demorou mais do que o esperado. Tente novamente.')
+      }
+      lastError = error instanceof PublicAiGenerationError
+        ? error
+        : new PublicAiGenerationError('Erro de conexão com o serviço de imagem.')
+      continue
+    } finally {
+      clearTimeout(timeout)
     }
-    error?: { message?: string; code?: string; type?: string }
-  } | null
 
-  if (!response.ok) {
-    console.error('[ai-image] OpenAI HTTP', response.status, model, payload?.error)
-    throw new PublicAiGenerationError(toPublicImageErrorMessage(response.status, payload?.error?.message))
+    const payload = (await response.json().catch(() => null)) as {
+      data?: Array<{ b64_json?: string; url?: string }>
+      usage?: {
+        input_tokens?: number
+        output_tokens?: number
+        total_tokens?: number
+      }
+      error?: { message?: string; code?: string; type?: string }
+    } | null
+
+    if (!response.ok) {
+      console.error('[ai-image] OpenAI HTTP', response.status, model, attempt + 1, payload?.error)
+      const isRetryable = response.status >= 500 || response.status === 429
+      lastError = new PublicAiGenerationError(toPublicImageErrorMessage(response.status, payload?.error?.message))
+      if (isRetryable && attempt < MAX_ATTEMPTS - 1) continue
+      throw lastError
+    }
+
+    const b64Json = payload?.data?.[0]?.b64_json
+    const imageUrl = payload?.data?.[0]?.url
+    const mimeType = input.preferJpeg ? 'image/jpeg' : 'image/png'
+    const image = b64Json ? `data:${mimeType};base64,${b64Json}` : imageUrl
+    if (!image) {
+      console.error('[ai-image] OpenAI sem imagem', model, payload)
+      lastError = new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
+      continue
+    }
+
+    return {
+      image,
+      model,
+      inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
+      outputTokens: payload?.usage?.output_tokens ?? 0,
+    }
   }
 
-  const b64Json = payload?.data?.[0]?.b64_json
-  const imageUrl = payload?.data?.[0]?.url
-  const image = b64Json ? `data:image/png;base64,${b64Json}` : imageUrl
-  if (!image) {
-    console.error('[ai-image] OpenAI sem imagem', model, payload)
-    throw new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
-  }
-
-  return {
-    image,
-    model,
-    inputTokens: payload?.usage?.input_tokens ?? payload?.usage?.total_tokens ?? 0,
-    outputTokens: payload?.usage?.output_tokens ?? 0,
-  }
+  throw lastError ?? new PublicAiGenerationError('Não foi possível criar a imagem agora. Tente novamente em instantes.')
 }
 
 async function requestOpenAiImageEdit(input: {
@@ -525,6 +547,7 @@ function buildOpenAiImageGenerationBody(input: {
   size: string
   quality: string
   user: string
+  preferJpeg?: boolean
 }) {
   const body: Record<string, unknown> = {
     model: input.model,
@@ -532,8 +555,11 @@ function buildOpenAiImageGenerationBody(input: {
     n: 1,
     size: input.size,
     quality: input.quality,
-    output_format: 'png',
+    output_format: input.preferJpeg ? 'jpeg' : 'png',
     user: input.user,
+  }
+  if (input.preferJpeg) {
+    body.output_compression = 85
   }
   if (!input.model.trim().toLowerCase().startsWith('gpt-image-2')) {
     body.background = 'opaque'
@@ -544,8 +570,8 @@ function buildOpenAiImageGenerationBody(input: {
 
 function resolveStandaloneImageQuality(summary: Record<string, unknown>) {
   const requested = asString(summary.imageQuality)?.trim().toLowerCase()
-  if (requested === 'standard' || requested === 'padrao' || requested === 'padrÃ£o') return 'high'
-  if (requested === 'medium' || requested === 'media' || requested === 'mÃ©dia') return 'medium'
+  if (requested === 'standard' || requested === 'padrao' || requested === 'padrão') return 'medium'
+  if (requested === 'medium' || requested === 'media' || requested === 'média') return 'medium'
   if (requested === 'high' || requested === 'alta') return 'high'
   return process.env.OPENAI_STANDALONE_IMAGE_QUALITY?.trim() || DEFAULT_OPENAI_STANDALONE_IMAGE_QUALITY
 }

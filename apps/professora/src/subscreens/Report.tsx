@@ -1647,62 +1647,6 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             </div>
             )}
 
-            {isUnifiedCreator && (
-              <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-[12px] bg-gbg flex items-center justify-center text-gm flex-shrink-0">
-                    <FileUp size={18} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[13px] font-bold text-ink">Anexar referência</p>
-                    <p className="text-[11px] text-muted leading-[1.5] mt-1">
-                      Envie imagem, PDF, Word ou texto para orientar o padrão, servir de exemplo ou complementar o pedido.
-                    </p>
-                    {attachments.length > 0 && (
-                      <div className="mt-3 flex flex-col gap-2">
-                        {attachments.map((item) => (
-                          <div key={item.id} className="bg-cream rounded-app-sm px-3 py-2 flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-[9px] bg-white flex items-center justify-center text-gm flex-shrink-0">
-                              {item.isImage ? <Image size={16} /> : <FileText size={16} />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[12px] font-bold text-ink truncate">{item.name}</p>
-                              <p className="text-[10px] text-muted">
-                                {formatFileSize(item.size)}
-                                {item.extractedText ? ' • texto lido' : ''}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => removeAttachment(item.id)}
-                              className="w-7 h-7 rounded-full bg-white text-muted flex items-center justify-center flex-shrink-0"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <label
-                  className={`relative block w-full mt-3 py-[11px] rounded-app-sm border-[1.5px] border-dashed border-border text-muted text-sm font-bold bg-white text-center overflow-hidden ${
-                    uploadingAttachments ? 'opacity-60 pointer-events-none' : ''
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept="image/*,.pdf,.doc,.docx,.txt,.md,.rtf,.csv"
-                    disabled={uploadingAttachments}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onChange={handlePortfolioInputChange}
-                  />
-                  <span aria-hidden="true">{uploadingAttachments ? 'Preparando...' : '+ Anexar arquivo'}</span>
-                </label>
-              </div>
-            )}
-
             <button
               onClick={generate}
               disabled={!canGenerate || generating}

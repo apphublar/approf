@@ -9,7 +9,8 @@ import { getCachedReportById, listReports, prefetchReportsByIds } from '@/servic
 import { listReportReviewEvents, type ReportReviewEvent } from '@/services/coordinator-review'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
-import { countPedagogicalRecords } from '@/utils/pedagogical-records'
+import { countStudentMilestones, countStudentNotes } from '@/utils/pedagogical-records'
+import { countSupabaseAnnotationsForStudent } from '@/services/supabase/annotations'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 import type { GeneratedDocument } from '@/types'
 
@@ -31,51 +32,36 @@ export default function StudentProfileSubscreen() {
   const { classes, activeStudentId, activeClassId, annotations, attendanceRecords, removeAnnotation, removeTimelineEvent } = useAppStore()
   const [showAllAnnotations, setShowAllAnnotations] = useState(false)
   const [generatedCount, setGeneratedCount] = useState(0)
+  const [notesCount, setNotesCount] = useState<number | null>(null)
   const [developmentReports, setDevelopmentReports] = useState<GeneratedDocument[]>([])
   const [reviewEvents, setReviewEvents] = useState<ReportReviewEvent[]>([])
 
   useEffect(() => {
     setShowAllAnnotations(false)
+    setNotesCount(null)
   }, [activeStudentId])
 
-  const activeClass = classes.find((item) => item.id === activeClassId)
-  const classWithActiveStudent = classes.find((item) => item.students.some((student) => student.id === activeStudentId))
-  const cls = activeClass?.students.some((student) => student.id === activeStudentId)
-    ? activeClass
-    : classWithActiveStudent ?? activeClass ?? classes[0]
-  const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
-  if (!student || !cls) return null
-
-  const studentNameNormalized = normalizeText(student.name)
-  const studentAnns = annotations.filter(
-    (annotation) =>
-      annotation.studentId === student?.id ||
-      normalizeText(annotation.studentName ?? '') === studentNameNormalized ||
-      annotation.studentName === `${student?.name.split(' ')[0]} ${student?.name.split(' ')[1]?.[0]}.`,
-  )
-
-  const timeline: TimelineEvent[] = student.timeline ?? []
-  const totalNotes = studentAnns.length
-  const totalMilestones = (student.timeline ?? []).filter(
-    (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
-  ).length
-  const totalRecords = countPedagogicalRecords(student, annotations, generatedCount)
-  const attendanceSummary = getStudentAttendanceSummary(
-    student,
-    attendanceRecords.filter((record) => record.classId === cls.id),
-  )
-  const totalAttendanceCalls = attendanceSummary.totalCalls
-  const totalAbsences = attendanceSummary.absenceCount
-  const totalPresences = attendanceSummary.presences
-  const attendanceRate = attendanceSummary.rate
-  const visibleAnnotations = showAllAnnotations
-    ? studentAnns
-    : studentAnns.slice(0, ANNOTATION_PREVIEW_COUNT)
-  const hasMoreAnnotations = studentAnns.length > ANNOTATION_PREVIEW_COUNT
+  useEffect(() => {
+    if (!activeStudentId) return
+    let active = true
+    countSupabaseAnnotationsForStudent(activeStudentId)
+      .then((count) => {
+        if (!active || count === null) return
+        setNotesCount(count)
+      })
+      .catch(() => {
+        if (!active) return
+        setNotesCount(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [activeStudentId])
 
   useEffect(() => {
+    if (!activeStudentId) return
     let active = true
-    listReports({ studentId: student.id, limit: 200, compact: true })
+    listReports({ studentId: activeStudentId, limit: 200, compact: true })
       .then((reports) => {
         if (!active) return
         setGeneratedCount(reports.length)
@@ -89,11 +75,12 @@ export default function StudentProfileSubscreen() {
     return () => {
       active = false
     }
-  }, [student.id])
+  }, [activeStudentId])
 
   useEffect(() => {
+    if (!activeStudentId) return
     let active = true
-    listReportReviewEvents({ studentId: student.id })
+    listReportReviewEvents({ studentId: activeStudentId })
       .then((events) => {
         if (active) setReviewEvents(events)
       })
@@ -103,7 +90,43 @@ export default function StudentProfileSubscreen() {
     return () => {
       active = false
     }
-  }, [student.id])
+  }, [activeStudentId])
+
+  const activeClass = classes.find((item) => item.id === activeClassId)
+  const classWithActiveStudent = classes.find((item) => item.students.some((student) => student.id === activeStudentId))
+  const cls = activeClass?.students.some((student) => student.id === activeStudentId)
+    ? activeClass
+    : classWithActiveStudent ?? activeClass ?? classes[0]
+  const student = cls?.students.find((item) => item.id === activeStudentId) ?? cls?.students[0]
+  if (!student || !cls) return null
+
+  const studentAnns = annotations.filter((annotation) => {
+    const normalizedStudentName = normalizeText(student.name)
+    const firstName = student.name.split(' ')[0] ?? ''
+    const abbreviatedName = student.name.split(' ').length > 1
+      ? `${firstName} ${student.name.split(' ')[1]?.[0] ?? ''}.`
+      : firstName
+    return annotation.studentId === student.id
+      || normalizeText(annotation.studentName ?? '') === normalizedStudentName
+      || annotation.studentName === abbreviatedName
+  })
+
+  const timeline: TimelineEvent[] = student.timeline ?? []
+  const totalNotes = notesCount ?? countStudentNotes(student, annotations)
+  const totalMilestones = countStudentMilestones(student)
+  const totalRecords = totalNotes + totalMilestones + generatedCount
+  const attendanceSummary = getStudentAttendanceSummary(
+    student,
+    attendanceRecords.filter((record) => record.classId === cls.id),
+  )
+  const totalAttendanceCalls = attendanceSummary.totalCalls
+  const totalAbsences = attendanceSummary.absenceCount
+  const totalPresences = attendanceSummary.presences
+  const attendanceRate = attendanceSummary.rate
+  const visibleAnnotations = showAllAnnotations
+    ? studentAnns
+    : studentAnns.slice(0, ANNOTATION_PREVIEW_COUNT)
+  const hasMoreAnnotations = studentAnns.length > ANNOTATION_PREVIEW_COUNT
 
   async function handleDeleteTimelineEvent(eventId: string) {
     const confirmed = window.confirm('Deseja excluir este marco? Esta ação não pode ser desfeita.')

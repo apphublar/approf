@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, getAuthenticatedUserId } from '@/app/lib/supabase-server'
 import { createOwnerReport, listOwnerReports, parseReportStatus } from '@/app/lib/reports'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function GET(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { searchParams } = new URL(request.url)
@@ -43,21 +39,22 @@ export async function GET(request: Request) {
       compact,
     })
 
-    return NextResponse.json({ reports }, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json({ reports }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
 
     console.error('[reports/list] erro interno', error)
     return NextResponse.json(
       { error: 'Não foi possível carregar seus documentos agora.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
@@ -68,11 +65,11 @@ export async function POST(request: Request) {
     const classId = typeof body.classId === 'string' ? body.classId : null
 
     if (!reportType) {
-      return NextResponse.json({ error: 'Tipo de documento obrigatorio.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Tipo de documento obrigatorio.' }, { status: 400, headers: corsHeaders })
     }
 
     if (content.trim().length < 10) {
-      return NextResponse.json({ error: 'Conteúdo do documento muito curto.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Conteúdo do documento muito curto.' }, { status: 400, headers: corsHeaders })
     }
 
     const report = await createOwnerReport({
@@ -85,16 +82,16 @@ export async function POST(request: Request) {
       status: 'ready',
     })
 
-    return NextResponse.json({ report }, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json({ report }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
 
     console.error('[reports/create] erro interno', error)
     return NextResponse.json(
       { error: 'Não foi possível criar o documento agora.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }

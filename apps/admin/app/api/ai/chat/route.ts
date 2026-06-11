@@ -159,8 +159,9 @@ async function requestOpenAiChat(messages: ChatMessage[]) {
     },
     body: JSON.stringify(withOpenAiTemperature({
       model,
+      max_completion_tokens: 700,
       messages: [
-        { role: 'system', content: 'Você é um assistente útil, claro e cordial para professoras de educação infantil. Responda em português brasileiro. Escreva sempre em texto corrido e limpo, sem formatação Markdown: sem asteriscos, sem hashtags, sem traços de lista, sem backticks, sem negrito nem itálico.' },
+        { role: 'system', content: 'Você é um assistente útil, claro e cordial para professoras de educação infantil. Responda em português brasileiro de forma direta e objetiva, em até 3 parágrafos curtos. Escreva sempre em texto corrido e limpo, sem formatação Markdown: sem asteriscos, sem hashtags, sem traços de lista, sem backticks, sem negrito nem itálico.' },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
     }, model, 0.5)),

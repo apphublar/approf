@@ -90,6 +90,26 @@ export async function loadSupabaseAnnotations(ownerId: string, classes: ClassDat
   return { annotations: mapped, hasMore }
 }
 
+export async function countSupabaseAnnotationsForStudent(studentId: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) return null
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError) throw userError
+  const ownerId = userData.user?.id
+  if (!ownerId) return null
+
+  const { count, error } = await supabase
+    .from('annotation_targets')
+    .select('annotation_id', { count: 'exact', head: true })
+    .eq('owner_id', ownerId)
+    .eq('target_type', 'student')
+    .eq('target_id', studentId)
+
+  if (error) throw toError(error, 'Não foi possível contar as anotações da criança.')
+  return count ?? 0
+}
+
 export async function deleteSupabaseAnnotation(annotationId: string) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')

@@ -78,6 +78,13 @@ export async function createReportShareLink(reportId: string) {
   return response.shareUrl
 }
 
+function wrapReportsFetchError(error: unknown): Error {
+  if (error instanceof TypeError && /failed to fetch/i.test(error.message)) {
+    return new Error('Não foi possível conectar ao servidor de documentos. Verifique sua internet e tente novamente.')
+  }
+  return error instanceof Error ? error : new Error('Erro inesperado ao acessar documentos.')
+}
+
 function buildQuery(filters: ListReportsFilters) {
   const params = new URLSearchParams()
   if (filters.status) params.set('status', filters.status)
@@ -108,13 +115,18 @@ async function callReportsApi<T>(path: string, init: RequestInit): Promise<T> {
   const token = data.session?.access_token
   if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init.headers ?? {}),
+      },
+    })
+  } catch (error) {
+    throw wrapReportsFetchError(error)
+  }
 
   const payload = await response.json().catch(() => null) as { error?: string } | Record<string, unknown> | null
   if (!response.ok) {

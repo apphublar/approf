@@ -8,19 +8,22 @@ function normalizeText(value: string) {
     .trim()
 }
 
-function countStudentNotes(student: Student, annotations: Annotation[]) {
+export function countStudentNotes(student: Student, annotations: Annotation[]) {
   const normalizedStudentName = normalizeText(student.name)
+  const firstName = student.name.split(' ')[0] ?? ''
+  const abbreviatedName = student.name.split(' ').length > 1
+    ? `${firstName} ${student.name.split(' ')[1]?.[0] ?? ''}.`
+    : firstName
   return annotations.filter((annotation) => {
     if (annotation.studentId === student.id) return true
     if (normalizeText(annotation.studentName ?? '') === normalizedStudentName) return true
+    if (annotation.studentName === abbreviatedName) return true
     return false
   }).length
 }
 
-function countStudentMilestones(student: Student) {
-  return (student.timeline ?? []).filter(
-    (event) => event.type === 'marco' || normalizeText(event.title).includes('marco'),
-  ).length
+export function countStudentMilestones(student: Student) {
+  return (student.timeline ?? []).length
 }
 
 export function countPedagogicalRecords(

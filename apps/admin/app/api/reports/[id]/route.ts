@@ -1,41 +1,38 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, getAuthenticatedUserId } from '@/app/lib/supabase-server'
 import { createReportShareToken, getOwnerReportById, parseReportStatus, updateOwnerReport } from '@/app/lib/reports'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, PATCH, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { id } = await params
     const report = await getOwnerReportById(ownerId, id)
     if (!report) {
-      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: corsHeaders })
     }
 
-    return NextResponse.json({ report }, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json({ report }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
 
     console.error('[reports/get] erro interno', error)
     return NextResponse.json(
       { error: 'Não foi possível carregar o documento agora.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
@@ -48,7 +45,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const isFinalVersion = typeof body.isFinalVersion === 'boolean' ? body.isFinalVersion : undefined
 
     if (!nextStatus && patchBody === undefined && isFinalVersion === undefined) {
-      return NextResponse.json({ error: 'Nenhuma alteracao válida enviada.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Nenhuma alteracao válida enviada.' }, { status: 400, headers: corsHeaders })
     }
 
     const existing = patchBody !== undefined ? await getOwnerReportById(ownerId, id) : null
@@ -66,24 +63,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     })
 
     if (!updated) {
-      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: corsHeaders })
     }
 
-    return NextResponse.json({ report: updated }, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json({ report: updated }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
 
     console.error('[reports/update] erro interno', error)
     return NextResponse.json(
       { error: 'Não foi possível salvar o documento agora.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { id } = await params
@@ -91,28 +89,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const action = typeof body.action === 'string' ? body.action : ''
 
     if (action !== 'create-share-link') {
-      return NextResponse.json({ error: 'Ação inválida.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Ação inválida.' }, { status: 400, headers: corsHeaders })
     }
 
     const report = await getOwnerReportById(ownerId, id)
     if (!report) {
-      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404, headers: corsHeaders })
     }
 
     const token = createReportShareToken(id)
     const origin = process.env.NEXT_PUBLIC_ADMIN_URL?.replace(/\/$/, '') || new URL(request.url).origin
     const shareUrl = `${origin}/public/reports/${id}?token=${encodeURIComponent(token)}`
 
-    return NextResponse.json({ shareUrl }, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json({ shareUrl }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
 
     console.error('[reports/share] erro interno', error)
     return NextResponse.json(
       { error: 'Não foi possível criar o link de compartilhamento agora.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }
