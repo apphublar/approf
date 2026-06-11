@@ -65,6 +65,9 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [tags, setTags] = useState<string[]>([])
   const [customCategory, setCustomCategory] = useState('')
   const [newCustomCategory, setNewCustomCategory] = useState('')
+  const [savedCustomCategories, setSavedCustomCategories] = useState<string[]>([])
+  const [categoryMessage, setCategoryMessage] = useState('')
+  const detailsSectionRef = useRef<HTMLDivElement | null>(null)
   const [attachmentName, setAttachmentName] = useState('')
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
@@ -168,6 +171,17 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   }, [draftMessage])
 
   useEffect(() => {
+    if (!categoryMessage) return
+    const timeout = window.setTimeout(() => setCategoryMessage(''), 3500)
+    return () => window.clearTimeout(timeout)
+  }, [categoryMessage])
+
+  useEffect(() => {
+    if (!userId) return
+    setSavedCustomCategories(loadSavedCustomCategories(userId))
+  }, [userId])
+
+  useEffect(() => {
     if (chatConversations.length === 0) {
       const initial = buildNewConversation()
       setChatConversations([initial])
@@ -231,8 +245,8 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     }>(key)
     if (!draft) return
     setText(draft.text || '')
-    setWorkKind(draft.workKind || '')
-    setModelId(draft.modelId || '')
+    setWorkKind(draft.workKind || 'report')
+    setModelId(draft.modelId || 'turma')
     setClassId(draft.classId || '')
     setStudentId(draft.studentId || '')
     setTags(draft.tags || [])
@@ -346,6 +360,16 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     }
     chooseCustomCategory(normalized)
     setNewCustomCategory('')
+    setError('')
+    setCategoryMessage(`Categoria "${normalized}" criada e selecionada.`)
+    setSavedCustomCategories((current) => {
+      const next = [normalized, ...current.filter((item) => normalizeText(item) !== normalizeText(normalized))]
+      if (userId) persistSavedCustomCategories(userId, next)
+      return next
+    })
+    window.setTimeout(() => {
+      detailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
   }
 
   function updateClass(id: string) {
@@ -830,6 +854,12 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                   placeholder="Ex: Diário de Bordo"
                   value={newCustomCategory}
                   onChange={(event) => setNewCustomCategory(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      createCustomCategory()
+                    }
+                  }}
                 />
                 <button
                   type="button"
@@ -840,6 +870,47 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                   Criar
                 </button>
               </div>
+              {customCategory && (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="px-3 py-1.5 rounded-full bg-gm text-white text-[11px] font-bold">
+                    {customCategory}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCustomCategory('')}
+                    className="text-[11px] font-bold text-[#C1440E]"
+                  >
+                    remover
+                  </button>
+                </div>
+              )}
+              {categoryMessage && (
+                <p className="text-[11px] text-gm mt-2 leading-[1.4] font-bold">{categoryMessage}</p>
+              )}
+              {savedCustomCategories.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted mb-2">Suas categorias</p>
+                  <div className="flex flex-wrap gap-2">
+                    {savedCustomCategories.map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        onClick={() => {
+                          chooseCustomCategory(category)
+                          setCategoryMessage(`Categoria "${category}" selecionada.`)
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold border ${
+                          normalizeText(customCategory) === normalizeText(category)
+                            ? 'bg-gm text-white border-gm'
+                            : 'bg-gbg text-gm border-gp'
+                        }`}
+                      >
+                        {category}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -881,7 +952,8 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         )}
 
         {(selectedModel || isDirectStudentNote) && (
-          <>
+          <div ref={detailsSectionRef}>
+            <>
             <StepTitle number={isDirectStudentNote ? '2' : '3'} title="Detalhes opcionais" />
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
@@ -911,7 +983,8 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
               <span aria-hidden="true">Anexar imagem</span>
             </label>
             {attachmentName && <p className="text-[11px] text-muted mt-2 leading-[1.5]">Anexo preparado: {attachmentName}</p>}
-          </>
+            </>
+          </div>
         )}
 
         {error && <p className="text-[12px] text-[#C1440E] mt-4 leading-[1.5]">{error}</p>}
@@ -1100,6 +1173,26 @@ function hexToRgb(hex: string) {
 
 function findModelById(modelId: string) {
   return [...REPORT_MODELS, ...PLANNING_MODELS, ...PERSONAL_MODELS].find((item) => item.id === modelId)
+}
+
+function loadSavedCustomCategories(userId: string) {
+  try {
+    const raw = window.localStorage.getItem(`approf:annotation-categories:${userId}`)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+  } catch {
+    return []
+  }
+}
+
+function persistSavedCustomCategories(userId: string, categories: string[]) {
+  try {
+    window.localStorage.setItem(`approf:annotation-categories:${userId}`, JSON.stringify(categories))
+  } catch {
+    // localStorage pode estar indisponível em navegação privada.
+  }
 }
 
 function isWorkKind(value: unknown): value is WorkKind {

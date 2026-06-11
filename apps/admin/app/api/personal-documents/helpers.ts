@@ -9,10 +9,16 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp
 export function validatePersonalDocument(input: { fileName: string; fileType: string; fileSize: number }) {
   const lowerName = input.fileName.toLowerCase()
   const mimeType = input.fileType.toLowerCase()
+  const hasAllowedExtension = ['.jpg', '.jpeg', '.png', '.webp', ...ALLOWED_DOCUMENT_EXTENSIONS]
+    .some((extension) => lowerName.endsWith(extension))
   const allowed = ALLOWED_IMAGE_TYPES.includes(mimeType)
     || mimeType === 'application/pdf'
-    || ['.jpg', '.jpeg', '.png', '.webp'].some((extension) => lowerName.endsWith(extension))
-    || ALLOWED_DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
+    || mimeType === 'application/msword'
+    || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    || mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    || mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    || (mimeType === 'application/octet-stream' && hasAllowedExtension)
+    || hasAllowedExtension
   if (!allowed) return 'Arquivo não permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.'
   if (input.fileSize > MAX_FILE_SIZE_BYTES) return 'Arquivo muito grande. Use arquivos de até 15 MB.'
   return ''

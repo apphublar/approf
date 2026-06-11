@@ -1,19 +1,24 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { ChevronLeft, FileText, Loader2, Paperclip, Search, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { ChevronLeft, FileText, Loader2, Paperclip, Search, Trash2, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument } from '@/services/personal-documents'
 import type { TeacherPersonalDocument } from '@/types'
+import { peekDocumentsSelectedFile, stashDocumentsSelectedFile } from '@/utils/upload-session'
 
 const ACCEPTED_TYPES = '.pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp,application/pdf'
+const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
 
 export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
   const { personalDocuments, removePersonalDocument } = useAppStore()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const migratedRef = useRef(false)
   const [documents, setDocuments] = useState<TeacherPersonalDocument[]>([])
   const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState('')
   const [uploadError, setUploadError] = useState('')
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(() => peekDocumentsSelectedFile())
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
 
@@ -22,9 +27,16 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   }, [])
 
   useEffect(() => {
-    if (loading || personalDocuments.length === 0) return
+    if (loading || personalDocuments.length === 0 || migratedRef.current) return
+    migratedRef.current = true
     void migrateLocalDocuments()
   }, [loading, personalDocuments])
+
+  useEffect(() => {
+    if (!uploadSuccess) return
+    const timeout = window.setTimeout(() => setUploadSuccess(''), 4000)
+    return () => window.clearTimeout(timeout)
+  }, [uploadSuccess])
 
   const visibleDocuments = useMemo(() => {
     const normalizedQuery = normalizeText(query)
@@ -33,10 +45,10 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   }, [documents, query])
 
   async function refreshDocuments() {
-    setLoading(true)
     setLoadError('')
     try {
-      setDocuments(await listPersonalDocuments())
+      const nextDocuments = await listPersonalDocuments()
+      setDocuments(nextDocuments)
     } catch (error) {
       setDocuments([])
       setLoadError(error instanceof Error ? error.message : 'Não foi possível carregar seus documentos.')
@@ -65,23 +77,57 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     }
   }
 
-  function handleFileSelect(file: File | null) {
-    if (!file) {
-      return
+  function validateSelectedFile(file: File) {
+    const lowerName = file.name.toLowerCase()
+    const mimeType = file.type.toLowerCase()
+    const allowed = mimeType.startsWith('image/')
+      || mimeType === 'application/pdf'
+      || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      || mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      || mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      || mimeType === 'application/octet-stream'
+      || ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.docx', '.xlsx', '.pptx'].some((extension) => lowerName.endsWith(extension))
+    if (!allowed) {
+      throw new Error('Arquivo não permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
     }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      throw new Error('Arquivo muito grande. Use arquivos de até 15 MB.')
+    }
+  }
 
+  function handleFileSelect(file: File | null) {
     setUploadError('')
-    setSelectedFile(file)
+    setUploadSuccess('')
+    if (!file) return
+
+    try {
+      validateSelectedFile(file)
+      stashDocumentsSelectedFile(file)
+      setSelectedFile(file)
+    } catch (error) {
+      stashDocumentsSelectedFile(null)
+      setSelectedFile(null)
+      setUploadError(error instanceof Error ? error.message : 'Não foi possível selecionar o arquivo.')
+    }
+  }
+
+  function clearSelectedFile() {
+    stashDocumentsSelectedFile(null)
+    setSelectedFile(null)
+    setUploadError('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   async function uploadSelectedDocument() {
     if (!selectedFile || uploading) return
     setUploadError('')
+    setUploadSuccess('')
     setUploading(true)
     try {
       const uploaded = await uploadPersonalDocument(selectedFile)
       setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
-      setSelectedFile(null)
+      clearSelectedFile()
+      setUploadSuccess(`"${uploaded.name}" salvo com sucesso.`)
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Não foi possível anexar o arquivo. Tente novamente.')
     } finally {
@@ -90,17 +136,21 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   }
 
   function onNativeDocumentChange(event: ChangeEvent<HTMLInputElement>) {
-    const input = event.currentTarget
-    const selectedFile = input.files?.[0] ?? null
-    handleFileSelect(selectedFile)
-    window.setTimeout(() => {
-      input.value = ''
-    }, 0)
+    const input = event.target
+    const file = input.files?.[0] ?? null
+    handleFileSelect(file)
+    input.value = ''
+  }
+
+  function openFilePicker() {
+    if (uploading) return
+    fileInputRef.current?.click()
   }
 
   async function handleRemove(id: string) {
     if (!window.confirm('Excluir este documento permanentemente?')) return
     setUploadError('')
+    setUploadSuccess('')
     try {
       await deletePersonalDocument(id)
       setDocuments((current) => current.filter((doc) => doc.id !== id))
@@ -112,7 +162,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
-        <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
+        <button type="button" onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
         <span className="font-serif text-[18px] text-gd flex-1">Meus documentos</span>
@@ -131,19 +181,30 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </p>
           </div>
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_TYPES}
+            disabled={uploading}
+            onChange={onNativeDocumentChange}
+            className="hidden"
+          />
+
           <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white p-3">
-            <label className={`relative flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white overflow-hidden ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+            <button
+              type="button"
+              onClick={openFilePicker}
+              disabled={uploading}
+              className={`relative flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+            >
               {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-              <span aria-hidden="true">{uploading ? 'Anexando...' : 'Escolher arquivo'}</span>
-              <input
-                type="file"
-                accept={ACCEPTED_TYPES}
-                disabled={uploading}
-                onChange={(event) => void onNativeDocumentChange(event)}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-            </label>
+              {uploading ? 'Enviando arquivo...' : 'Escolher arquivo'}
+            </button>
           </div>
+
+          {uploadSuccess && (
+            <p className="text-[12px] text-gm mb-4 leading-[1.5] font-bold">{uploadSuccess}</p>
+          )}
 
           {(uploadError || loadError) && (
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>
@@ -154,9 +215,18 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
               <div className="flex items-center gap-3">
                 <FileText size={20} className="text-gm" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncaté text-[13px] font-bold text-ink">{selectedFile.name}</p>
-                  <p className="text-[11px] text-muted">{formatFileSize(selectedFile.size)} - {selectedFile.type || 'MIME vazio'}</p>
+                  <p className="truncate text-[13px] font-bold text-ink">{selectedFile.name}</p>
+                  <p className="text-[11px] text-muted">{formatFileSize(selectedFile.size)} - pronto para enviar</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={clearSelectedFile}
+                  disabled={uploading}
+                  className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted bg-white flex-shrink-0 disabled:opacity-50"
+                  aria-label="Remover arquivo selecionado"
+                >
+                  <X size={14} />
+                </button>
               </div>
               <button
                 type="button"
@@ -165,7 +235,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd py-3 text-[13px] font-bold text-white disabled:opacity-50"
               >
                 {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-                {uploading ? 'Enviando arquivo...' : 'Adicionar arquivo'}
+                {uploading ? 'Salvando arquivo...' : 'Salvar arquivo'}
               </button>
             </div>
           )}
@@ -192,7 +262,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
               <FileText size={24} className="text-gm mx-auto mb-2" />
               <p className="text-[13px] font-bold text-ink">Nenhum documento anexado</p>
               <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-                Toque em &quot;Anexar documento&quot; para guardar certificados, diplomas ou outros arquivos importantes.
+                Toque em &quot;Escolher arquivo&quot;, confira o preview e depois em &quot;Salvar arquivo&quot;.
               </p>
             </div>
           ) : (

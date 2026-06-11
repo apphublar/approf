@@ -1,17 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, ChevronLeft, Eye, EyeOff, LogOut, ShieldCheck, Wallet } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { BadgeCheck, ChevronLeft, Eye, EyeOff, LogOut, Paperclip, ShieldCheck, Wallet, X } from 'lucide-react'
 import { useNavStore } from '@/store'
 import {
   cancelTeacherSubscription,
   getTeacherAccountSnapshot,
   isTeacherAccessBlocked,
   logoutTeacher,
+  peekTeacherAccountSnapshot,
   submitTeacherVerificationRequest,
   updateTeacherPassword,
   updateTeacherProfile,
   uploadTeacherVerificationDocuments,
   type TeacherAccountSnapshot,
 } from '@/services/supabase/account'
+import {
+  clearVerificationPendingFiles,
+  peekVerificationPendingFiles,
+  stashVerificationPendingFiles,
+} from '@/utils/upload-session'
 
 export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
@@ -22,8 +28,11 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     typeof data === 'object' && data && 'initialSnapshot' in data
       ? ((data as { initialSnapshot?: TeacherAccountSnapshot }).initialSnapshot ?? null)
       : null
-  const [snapshot, setSnapshot] = useState<TeacherAccountSnapshot | null>(initialSnapshot)
-  const [loading, setLoading] = useState(!initialSnapshot)
+  const verificationInputRef = useRef<HTMLInputElement | null>(null)
+  const [snapshot, setSnapshot] = useState<TeacherAccountSnapshot | null>(
+    () => initialSnapshot ?? peekTeacherAccountSnapshot(),
+  )
+  const [loading, setLoading] = useState(() => !initialSnapshot && !peekTeacherAccountSnapshot())
   const [saving, setSaving] = useState(false)
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [error, setError] = useState('')
@@ -38,7 +47,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [verificationNotes, setVerificationNotes] = useState('')
-  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [pendingFiles, setPendingFiles] = useState<File[]>(() => peekVerificationPendingFiles())
 
   async function refreshAccount() {
     const account = await getTeacherAccountSnapshot({ forceRefresh: true })
@@ -57,15 +66,28 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
 
   useEffect(() => {
     let active = true
-    if (!initialSnapshot) setLoading(true)
-    refreshAccount()
-      .catch((err) => {
+
+    async function loadAccount(showBlockingLoader: boolean) {
+      if (showBlockingLoader) setLoading(true)
+      try {
+        await refreshAccount()
+      } catch (err) {
         if (!active) return
         setError(err instanceof Error ? err.message : 'Não foi possível carregar sua conta.')
-      })
-      .finally(() => {
+      } finally {
         if (active) setLoading(false)
-      })
+      }
+    }
+
+    if (initialSnapshot) {
+      setLoading(false)
+      return () => {
+        active = false
+      }
+    }
+
+    const hasCachedSnapshot = Boolean(peekTeacherAccountSnapshot())
+    void loadAccount(!hasCachedSnapshot)
     return () => {
       active = false
     }
@@ -140,19 +162,40 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   function queueVerificationFiles(files: FileList | null) {
     if (!files?.length) return
     const allowedExtensions = ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'txt']
+    const rejected: string[] = []
     const sanitized = Array.from(files).filter((file) => {
       const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
       const validExtension = allowedExtensions.includes(extension)
       const validSize = file.size <= 15 * 1024 * 1024
+      if (!validExtension) rejected.push(`${file.name} (formato não suportado)`)
+      else if (!validSize) rejected.push(`${file.name} (acima de 15 MB)`)
       return validExtension && validSize
     })
 
     if (!sanitized.length) {
-      setError('Use arquivos PDF, imagem, DOC/DOCX ou TXT de até 15 MB.')
+      setError(rejected[0] ? `Não foi possível anexar: ${rejected.join(', ')}` : 'Use arquivos PDF, imagem, DOC/DOCX ou TXT de até 15 MB.')
       return
     }
-    setPendingFiles((current) => [...current, ...sanitized].slice(-10))
+
+    setPendingFiles((current) => {
+      const next = [...current, ...sanitized].slice(-10)
+      stashVerificationPendingFiles(next)
+      return next
+    })
     setError('')
+    setMessage(`${sanitized.length} arquivo(s) pronto(s) para envio. Toque em "Enviar documentos para validação".`)
+  }
+
+  function removePendingVerificationFile(index: number) {
+    setPendingFiles((current) => {
+      const next = current.filter((_, itemIndex) => itemIndex !== index)
+      stashVerificationPendingFiles(next)
+      return next
+    })
+  }
+
+  function openVerificationFilePicker() {
+    verificationInputRef.current?.click()
   }
 
   async function submitVerification() {
@@ -176,7 +219,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
         documents: uploaded,
       })
       setPendingFiles([])
+      clearVerificationPendingFiles()
       setVerificationNotes('')
+      if (verificationInputRef.current) verificationInputRef.current.value = ''
       await refreshAccount()
       setMessage('Documentos enviados para validação com sucesso.')
     } catch (err) {
@@ -340,37 +385,48 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 placeholder="Observações para a equipe (opcional)."
                 className="w-full mt-3 min-h-[88px] rounded-app-sm border border-border px-3 py-2 text-[12px]"
               />
-              <label className="relative w-full mt-3 inline-flex justify-center py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer overflow-hidden">
-                <span aria-hidden="true">Anexar documentos</span>
-                <input
-                  type="file"
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  multiple
-                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
-                  onChange={(event) => {
-                    queueVerificationFiles(event.currentTarget.files)
-                    event.currentTarget.value = ''
-                  }}
-                />
-              </label>
+              <input
+                ref={verificationInputRef}
+                type="file"
+                className="hidden"
+                multiple
+                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt,application/pdf,image/*"
+                onChange={(event) => {
+                  queueVerificationFiles(event.target.files)
+                  event.target.value = ''
+                }}
+              />
+              <button
+                type="button"
+                onClick={openVerificationFilePicker}
+                disabled={submittingVerification}
+                className="w-full mt-3 inline-flex items-center justify-center gap-2 py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold disabled:opacity-50"
+              >
+                <Paperclip size={14} />
+                Anexar documentos
+              </button>
               {pendingFiles.length > 0 && (
                 <div className="mt-3 space-y-2">
+                  <p className="text-[11px] font-bold text-ink">Arquivos prontos para envio</p>
                   {pendingFiles.map((file, index) => (
-                    <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2">
-                      <p className="text-[11px] text-muted">
-                        {file.name} ({Math.max(1, Math.round(file.size / 1024))} KB)
-                      </p>
+                    <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-app-sm border border-border bg-cream px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold text-ink truncate">{file.name}</p>
+                        <p className="text-[10px] text-muted">{Math.max(1, Math.round(file.size / 1024))} KB</p>
+                      </div>
                       <button
-                        onClick={() => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                        className="text-[11px] text-[#C1440E] font-bold"
+                        type="button"
+                        onClick={() => removePendingVerificationFile(index)}
+                        className="w-7 h-7 rounded-full border border-border bg-white flex items-center justify-center text-muted flex-shrink-0"
+                        aria-label={`Remover ${file.name}`}
                       >
-                        remover
+                        <X size={12} />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
-              <button onClick={submitVerification} disabled={submittingVerification} className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50">
+              <button type="button" onClick={() => void submitVerification()} disabled={submittingVerification || pendingFiles.length === 0} className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50">
                 {submittingVerification ? 'Enviando documentos...' : 'Enviar documentos para validação'}
               </button>
               {submittedVerificationRequests.length > 0 && (

@@ -46,9 +46,11 @@ export async function deletePersonalDocument(id: string): Promise<void> {
 function validatePersonalDocumentFile(file: File) {
   const lowerName = file.name.toLowerCase()
   const mimeType = file.type.toLowerCase()
+  const hasAllowedExtension = ALLOWED_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
   const allowed = ALLOWED_IMAGE_MIME_TYPES.includes(mimeType)
     || mimeType === 'application/pdf'
-    || ALLOWED_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
+    || mimeType === 'application/octet-stream'
+    || hasAllowedExtension
   if (!allowed) throw new Error('Arquivo não permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
   if (file.size > MAX_PERSONAL_DOCUMENT_SIZE_BYTES) throw new Error('Arquivo muito grande. Use arquivos de até 15 MB.')
 }

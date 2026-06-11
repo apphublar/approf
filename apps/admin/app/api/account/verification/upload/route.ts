@@ -49,15 +49,17 @@ export async function POST(request: Request) {
       }
 
       const mimeType = (file.type || 'application/octet-stream').toLowerCase()
-      if (mimeType !== 'application/octet-stream' && !ALLOWED_TYPES.has(mimeType)) {
+      const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+      const allowedByExtension = ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'txt'].includes(extension)
+      if (mimeType !== 'application/octet-stream' && !ALLOWED_TYPES.has(mimeType) && !allowedByExtension) {
         return NextResponse.json(
           { error: `Formato não suportado para ${file.name}. Use PDF, imagem, DOC/DOCX ou TXT.` },
           { status: 400, headers: corsHeaders },
         )
       }
 
-      const extension = file.name.split('.').pop()?.toLowerCase() || 'bin'
-      const path = `${ownerId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizeFileName(file.name, extension)}`
+      const safeExtension = extension || 'bin'
+      const path = `${ownerId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${sanitizeFileName(file.name, safeExtension)}`
       const { error } = await supabase.storage.from('profile-verification').upload(path, file, {
         cacheControl: '3600',
         upsert: false,

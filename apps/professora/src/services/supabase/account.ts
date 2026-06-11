@@ -68,6 +68,13 @@ export interface TeacherAccountSnapshot {
 const SUBSCRIPTION_EVENT = 'approf-subscription-state-change'
 const ACCOUNT_CACHE_MAX_AGE_MS = 60_000
 let teacherAccountCache: { value: TeacherAccountSnapshot; fetchedAt: number } | null = null
+
+export function peekTeacherAccountSnapshot(): TeacherAccountSnapshot | null {
+  if (!teacherAccountCache) return null
+  const age = Date.now() - teacherAccountCache.fetchedAt
+  if (age > ACCOUNT_CACHE_MAX_AGE_MS) return null
+  return teacherAccountCache.value
+}
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   app: {
     relatoriosPendentes: true,
