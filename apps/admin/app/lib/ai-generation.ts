@@ -1,4 +1,9 @@
 ﻿import type { AiGenerationType } from './ai-usage'
+import {
+  DEFAULT_OPENAI_TEXT_INPUT_COST_PER_MILLION_USD,
+  DEFAULT_OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD,
+  withOpenAiTemperature,
+} from './openai-models'
 import { createSupabaseServiceClient } from './supabase-server'
 import type { BuildPromptInput } from './pedagogical-prompts'
 import {
@@ -793,9 +798,8 @@ async function requestOpenAiInterventionText(options: RequestOpenAiInterventionO
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withOpenAiTemperature({
       model: options.model,
-      temperature: 0.35,
       messages: [
         { role: 'system', content: options.system },
         { role: 'user', content: options.user },
@@ -810,7 +814,7 @@ async function requestOpenAiInterventionText(options: RequestOpenAiInterventionO
             : interventionFeedbackSchema(),
         },
       },
-    }),
+    }, options.model, 0.35)),
   })
 
   const payload = (await response.json().catch(() => null)) as {
@@ -849,31 +853,20 @@ async function requestOpenAiHumanizationText(options: RequestOpenAiHumanizationO
     throw new PublicAiGenerationError('Serviço de IA indisponível no momento. Tente novamente em instantes.')
   }
 
-  const requestPayload: {
-    model: string
-    max_completion_tokens: number
-    messages: Array<{ role: 'system' | 'user'; content: string }>
-    temperature?: number
-  } = {
-    model: options.model,
-    max_completion_tokens: options.maxTokens ?? 1800,
-    messages: [
-      { role: 'system', content: options.system },
-      { role: 'user', content: options.user },
-    ],
-  }
-  const normalizedModel = options.model.toLowerCase()
-  if (!normalizedModel.startsWith('gpt-5')) {
-    requestPayload.temperature = options.temperature ?? 0.35
-  }
-
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(requestPayload),
+    body: JSON.stringify(withOpenAiTemperature({
+      model: options.model,
+      max_completion_tokens: options.maxTokens ?? 1800,
+      messages: [
+        { role: 'system', content: options.system },
+        { role: 'user', content: options.user },
+      ],
+    }, options.model, options.temperature ?? 0.35)),
   })
 
   const payload = (await response.json().catch(() => null)) as {
@@ -1135,13 +1128,13 @@ function resolveOpenAiHumanizeModel() {
 function resolveOpenAiTextInputUsdPerMillion() {
   const fromEnv = Number(process.env.OPENAI_TEXT_INPUT_COST_PER_MILLION_USD)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 0.15
+  return DEFAULT_OPENAI_TEXT_INPUT_COST_PER_MILLION_USD
 }
 
 function resolveOpenAiTextOutputUsdPerMillion() {
   const fromEnv = Number(process.env.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 0.6
+  return DEFAULT_OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD
 }
 
 function resolveOpenAiHumanizeInputUsdPerMillion() {

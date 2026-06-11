@@ -6,11 +6,16 @@ import {
   reserveAiUsage,
 } from '@/app/lib/ai-usage'
 import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
+import {
+  DEFAULT_OPENAI_CHAT_MODEL,
+  DEFAULT_OPENAI_TEXT_INPUT_COST_PER_MILLION_USD,
+  DEFAULT_OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD,
+  resolveOpenAiModel,
+  withOpenAiTemperature,
+} from '@/app/lib/openai-models'
 
 type ChatProvider = 'openai'
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
-
-const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-5.5'
 
 export function OPTIONS(request: Request) {
   return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
@@ -152,14 +157,13 @@ async function requestOpenAiChat(messages: ChatMessage[]) {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+    body: JSON.stringify(withOpenAiTemperature({
       model,
-      temperature: 0.5,
       messages: [
         { role: 'system', content: 'Você é um assistente útil, claro e cordial para professoras de educação infantil. Responda em português brasileiro. Escreva sempre em texto corrido e limpo, sem formatação Markdown: sem asteriscos, sem hashtags, sem traços de lista, sem backticks, sem negrito nem itálico.' },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
-    }),
+    }, model, 0.5)),
   })
   const payload = (await response.json().catch(() => null)) as {
     choices?: Array<{ message?: { content?: string | null } }>
@@ -204,8 +208,7 @@ function stripMarkdown(value: string) {
 }
 
 function resolveOpenAiChatModel() {
-  const fromEnv = process.env.OPENAI_CHAT_MODEL?.trim()
-  return fromEnv || DEFAULT_OPENAI_CHAT_MODEL
+  return resolveOpenAiModel(process.env.OPENAI_CHAT_MODEL, DEFAULT_OPENAI_CHAT_MODEL)
 }
 
 function resolveUsdToBrlRate() {
@@ -217,13 +220,13 @@ function resolveUsdToBrlRate() {
 function resolveOpenAiInputUsdPerMillion() {
   const fromEnv = Number(process.env.OPENAI_TEXT_INPUT_COST_PER_MILLION_USD)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 0.15
+  return DEFAULT_OPENAI_TEXT_INPUT_COST_PER_MILLION_USD
 }
 
 function resolveOpenAiOutputUsdPerMillion() {
   const fromEnv = Number(process.env.OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
-  return 0.6
+  return DEFAULT_OPENAI_TEXT_OUTPUT_COST_PER_MILLION_USD
 }
 
 function estimateOpenAiCostCents(inputTokens: number, outputTokens: number) {

@@ -1,3 +1,4 @@
+import { withOpenAiTemperature } from '@/app/lib/openai-models'
 import { createSupabaseServiceClient } from '@/app/lib/supabase-server'
 
 export const MATERIALS_CORS_HEADERS = {
@@ -243,9 +244,8 @@ async function analyzeMaterialWithOpenAi(input: {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+    body: JSON.stringify(withOpenAiTemperature({
       model,
-      temperature: 0,
       messages: [
         { role: 'system', content: 'Você analisa materiais pedagogicos para Educação Infantil e responde apenas JSON válido no schema solicitado.' },
         { role: 'user', content },
@@ -254,7 +254,7 @@ async function analyzeMaterialWithOpenAi(input: {
         type: 'json_schema',
         json_schema: { name: 'material_review', strict: true, schema: MATERIAL_REVIEW_SCHEMA },
       },
-    }),
+    }, model, 0)),
   })
 
   const payload = (await response.json().catch(() => null)) as {
