@@ -1,3 +1,4 @@
+import { isMobileDevice } from '@/utils/device'
 import { getSupabaseClient } from './client'
 
 export type TeacherSubscriptionStatus = 'trial' | 'active' | 'overdue' | 'blocked' | 'canceled'
@@ -265,13 +266,16 @@ export async function cancelTeacherSubscription() {
 }
 
 export async function uploadTeacherVerificationDocuments(files: File[]) {
+  if (isMobileDevice()) {
+    return uploadTeacherVerificationDocumentsDirect(files)
+  }
+
   try {
     const response = await callAccountApiForm<{ documents: VerificationDocument[] }>('/api/account/verification/upload', files)
     const docs = Array.isArray(response.documents) ? response.documents : []
     if (!docs.length) throw new Error('Nenhum documento foi processado para verificação.')
     return docs
   } catch (apiError) {
-    // Fallback local em caso de falha do endpoint (ambiente antigo sem rota nova).
     return uploadTeacherVerificationDocumentsDirect(files, apiError)
   }
 }

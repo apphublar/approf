@@ -3,7 +3,11 @@ import { ChevronLeft, FileText, Loader2, Paperclip, Search, Trash2, X } from 'lu
 import { useAppStore, useNavStore } from '@/store'
 import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument } from '@/services/personal-documents'
 import type { TeacherPersonalDocument } from '@/types'
-import { peekDocumentsSelectedFile, stashDocumentsSelectedFile } from '@/utils/upload-session'
+import { MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
+import { stashActiveSubscreen } from '@/utils/nav-session'
+import { clearPendingFile, loadPendingFile, savePendingFile } from '@/utils/pending-file-store'
+
+const PENDING_FILE_KEY = 'documents-selected'
 
 const ACCEPTED_TYPES = '.pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp,application/pdf'
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
@@ -18,12 +22,29 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const [loadError, setLoadError] = useState('')
   const [uploadError, setUploadError] = useState('')
   const [uploadSuccess, setUploadSuccess] = useState('')
-  const [selectedFile, setSelectedFile] = useState<File | null>(() => peekDocumentsSelectedFile())
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [restoringPendingFile, setRestoringPendingFile] = useState(true)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     void refreshDocuments()
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    void loadPendingFile(PENDING_FILE_KEY)
+      .then((file) => {
+        if (!active || !file) return
+        setSelectedFile(file)
+        setUploadError('')
+      })
+      .finally(() => {
+        if (active) setRestoringPendingFile(false)
+      })
+    return () => {
+      active = false
+    }
   }, [])
 
   useEffect(() => {
@@ -95,24 +116,25 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     }
   }
 
-  function handleFileSelect(file: File | null) {
+  async function handleFileSelect(file: File | null) {
     setUploadError('')
     setUploadSuccess('')
     if (!file) return
 
     try {
       validateSelectedFile(file)
-      stashDocumentsSelectedFile(file)
+      stashActiveSubscreen('documents')
+      await savePendingFile(PENDING_FILE_KEY, file)
       setSelectedFile(file)
     } catch (error) {
-      stashDocumentsSelectedFile(null)
+      await clearPendingFile(PENDING_FILE_KEY)
       setSelectedFile(null)
       setUploadError(error instanceof Error ? error.message : 'Não foi possível selecionar o arquivo.')
     }
   }
 
-  function clearSelectedFile() {
-    stashDocumentsSelectedFile(null)
+  async function clearSelectedFile() {
+    await clearPendingFile(PENDING_FILE_KEY)
     setSelectedFile(null)
     setUploadError('')
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -126,7 +148,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     try {
       const uploaded = await uploadPersonalDocument(selectedFile)
       setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
-      clearSelectedFile()
+      await clearSelectedFile()
       setUploadSuccess(`"${uploaded.name}" salvo com sucesso.`)
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Não foi possível anexar o arquivo. Tente novamente.')
@@ -136,15 +158,14 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   }
 
   function onNativeDocumentChange(event: ChangeEvent<HTMLInputElement>) {
+    event.preventDefault()
+    event.stopPropagation()
     const input = event.target
     const file = input.files?.[0] ?? null
-    handleFileSelect(file)
-    input.value = ''
-  }
-
-  function openFilePicker() {
-    if (uploading) return
-    fileInputRef.current?.click()
+    void handleFileSelect(file)
+    window.setTimeout(() => {
+      input.value = ''
+    }, 0)
   }
 
   async function handleRemove(id: string) {
@@ -183,23 +204,25 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
 
           <input
             ref={fileInputRef}
+            id="documents-file-input"
             type="file"
             accept={ACCEPTED_TYPES}
-            disabled={uploading}
+            disabled={uploading || restoringPendingFile}
             onChange={onNativeDocumentChange}
-            className="hidden"
+            className={MOBILE_FILE_INPUT_CLASS}
+            tabIndex={-1}
+            aria-hidden="true"
           />
 
           <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white p-3">
-            <button
-              type="button"
-              onClick={openFilePicker}
-              disabled={uploading}
-              className={`relative flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+            <label
+              htmlFor="documents-file-input"
+              onClick={() => stashActiveSubscreen('documents')}
+              className={`relative flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white cursor-pointer ${uploading || restoringPendingFile ? 'opacity-60 pointer-events-none' : ''}`}
             >
               {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-              {uploading ? 'Enviando arquivo...' : 'Escolher arquivo'}
-            </button>
+              {uploading ? 'Enviando arquivo...' : restoringPendingFile ? 'Recuperando arquivo...' : 'Escolher arquivo'}
+            </label>
           </div>
 
           {uploadSuccess && (

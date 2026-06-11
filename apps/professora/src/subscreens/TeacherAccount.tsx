@@ -13,11 +13,11 @@ import {
   uploadTeacherVerificationDocuments,
   type TeacherAccountSnapshot,
 } from '@/services/supabase/account'
-import {
-  clearVerificationPendingFiles,
-  peekVerificationPendingFiles,
-  stashVerificationPendingFiles,
-} from '@/utils/upload-session'
+import { MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
+import { stashActiveSubscreen } from '@/utils/nav-session'
+import { clearPendingFiles, loadPendingFiles, savePendingFiles } from '@/utils/pending-file-store'
+
+const VERIFICATION_FILES_KEY = 'verification-pending'
 
 export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
@@ -47,7 +47,8 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [verificationNotes, setVerificationNotes] = useState('')
-  const [pendingFiles, setPendingFiles] = useState<File[]>(() => peekVerificationPendingFiles())
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [restoringPendingFiles, setRestoringPendingFiles] = useState(true)
 
   async function refreshAccount() {
     const account = await getTeacherAccountSnapshot({ forceRefresh: true })
@@ -63,6 +64,21 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     setPhone(initialSnapshot.phone ?? '')
     setEmail(initialSnapshot.email ?? '')
   }, [initialSnapshot])
+
+  useEffect(() => {
+    let active = true
+    void loadPendingFiles(VERIFICATION_FILES_KEY)
+      .then((files) => {
+        if (!active || files.length === 0) return
+        setPendingFiles(files)
+      })
+      .finally(() => {
+        if (active) setRestoringPendingFiles(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -159,7 +175,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     }
   }
 
-  function queueVerificationFiles(files: FileList | null) {
+  async function queueVerificationFiles(files: FileList | null) {
     if (!files?.length) return
     const allowedExtensions = ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'txt']
     const rejected: string[] = []
@@ -177,25 +193,18 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       return
     }
 
-    setPendingFiles((current) => {
-      const next = [...current, ...sanitized].slice(-10)
-      stashVerificationPendingFiles(next)
-      return next
-    })
+    stashActiveSubscreen('teacher-account')
+    const next = [...pendingFiles, ...sanitized].slice(-10)
+    await savePendingFiles(VERIFICATION_FILES_KEY, next)
+    setPendingFiles(next)
     setError('')
     setMessage(`${sanitized.length} arquivo(s) pronto(s) para envio. Toque em "Enviar documentos para validação".`)
   }
 
-  function removePendingVerificationFile(index: number) {
-    setPendingFiles((current) => {
-      const next = current.filter((_, itemIndex) => itemIndex !== index)
-      stashVerificationPendingFiles(next)
-      return next
-    })
-  }
-
-  function openVerificationFilePicker() {
-    verificationInputRef.current?.click()
+  async function removePendingVerificationFile(index: number) {
+    const next = pendingFiles.filter((_, itemIndex) => itemIndex !== index)
+    await savePendingFiles(VERIFICATION_FILES_KEY, next)
+    setPendingFiles(next)
   }
 
   async function submitVerification() {
@@ -219,7 +228,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
         documents: uploaded,
       })
       setPendingFiles([])
-      clearVerificationPendingFiles()
+      await clearPendingFiles(VERIFICATION_FILES_KEY)
       setVerificationNotes('')
       if (verificationInputRef.current) verificationInputRef.current.value = ''
       await refreshAccount()
@@ -387,24 +396,31 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               />
               <input
                 ref={verificationInputRef}
+                id="verification-file-input"
                 type="file"
-                className="hidden"
+                className={MOBILE_FILE_INPUT_CLASS}
+                tabIndex={-1}
+                aria-hidden="true"
                 multiple
                 accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt,application/pdf,image/*"
+                disabled={submittingVerification || restoringPendingFiles}
                 onChange={(event) => {
-                  queueVerificationFiles(event.target.files)
-                  event.target.value = ''
+                  event.preventDefault()
+                  event.stopPropagation()
+                  void queueVerificationFiles(event.target.files)
+                  window.setTimeout(() => {
+                    event.target.value = ''
+                  }, 0)
                 }}
               />
-              <button
-                type="button"
-                onClick={openVerificationFilePicker}
-                disabled={submittingVerification}
-                className="w-full mt-3 inline-flex items-center justify-center gap-2 py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold disabled:opacity-50"
+              <label
+                htmlFor="verification-file-input"
+                onClick={() => stashActiveSubscreen('teacher-account')}
+                className={`w-full mt-3 inline-flex items-center justify-center gap-2 py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer ${submittingVerification || restoringPendingFiles ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <Paperclip size={14} />
-                Anexar documentos
-              </button>
+                {restoringPendingFiles ? 'Recuperando anexos...' : 'Anexar documentos'}
+              </label>
               {pendingFiles.length > 0 && (
                 <div className="mt-3 space-y-2">
                   <p className="text-[11px] font-bold text-ink">Arquivos prontos para envio</p>

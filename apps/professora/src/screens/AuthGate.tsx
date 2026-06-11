@@ -15,6 +15,24 @@ import { useAppStore, useOnboardingStore } from '@/store'
 import { rememberMemberSince } from '@/utils/achievements'
 
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
+const HYDRATED_USER_KEY = 'approf:hydrated-user-id'
+
+function readPersistedHydratedUserId() {
+  try {
+    return sessionStorage.getItem(HYDRATED_USER_KEY)
+  } catch {
+    return null
+  }
+}
+
+function persistHydratedUserId(userId: string | null) {
+  try {
+    if (userId) sessionStorage.setItem(HYDRATED_USER_KEY, userId)
+    else sessionStorage.removeItem(HYDRATED_USER_KEY)
+  } catch {
+    // sessionStorage indisponível
+  }
+}
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
@@ -27,7 +45,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
   const [checkingAccess, setCheckingAccess] = useState(false)
   const [subscriptionBlocked, setSubscriptionBlocked] = useState(false)
-  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null)
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(readPersistedHydratedUserId)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const hydrateWorkspace = useAppStore((state) => state.hydrateWorkspace)
   const setOnboardingCompleted = useOnboardingStore((state) => state.setCompleted)
@@ -53,6 +71,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_OUT') {
         setSession(null)
         setHydratedUserId(null)
+        persistHydratedUserId(null)
         setSubscriptionBlocked(false)
         return
       }
@@ -73,6 +92,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       } else if (document.visibilityState === 'visible' && hiddenAt !== null) {
         if (Date.now() - hiddenAt > 30 * 60 * 1000) {
           setHydratedUserId(null)
+          persistHydratedUserId(null)
         }
         hiddenAt = null
       }
@@ -94,6 +114,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setOnboardingCompleted(Boolean(workspace.onboardingCompleted))
         rememberMemberSince(userId)
         setHydratedUserId(userId)
+        persistHydratedUserId(userId)
       })
       .catch((error) => {
         console.error('Não foi possível carregar dados do Supabase.', error)
@@ -140,7 +161,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [session?.user?.id])
 
-  if (loadingSession || loadingWorkspace || checkingAccess) {
+  const shouldBlockForWorkspace = loadingWorkspace && !hydratedUserId
+  const shouldBlockForAccess = checkingAccess && !hydratedUserId
+  if (loadingSession || shouldBlockForWorkspace || shouldBlockForAccess) {
     return (
       <div className="absolute inset-0 chalk-bg flex items-center justify-center px-6">
         <div className="auth-loading-wrap">

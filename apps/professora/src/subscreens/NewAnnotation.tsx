@@ -32,6 +32,12 @@ interface ChatConversation {
   messages: ChatMessage[]
 }
 
+interface SavedCustomCategory {
+  id: string
+  title: string
+  description: string
+}
+
 const REPORT_MODELS: ModelOption[] = [
   { id: 'turma', label: 'Registro da turma', desc: 'Anotação coletiva vinculada à turma.', scope: 'class' },
   { id: 'crianca', label: 'Registro de uma criança', desc: 'Anotação vinculada a uma criança.', scope: 'child' },
@@ -65,7 +71,8 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [tags, setTags] = useState<string[]>([])
   const [customCategory, setCustomCategory] = useState('')
   const [newCustomCategory, setNewCustomCategory] = useState('')
-  const [savedCustomCategories, setSavedCustomCategories] = useState<string[]>([])
+  const [savedCustomCategories, setSavedCustomCategories] = useState<SavedCustomCategory[]>([])
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState('turma')
   const [categoryMessage, setCategoryMessage] = useState('')
   const detailsSectionRef = useRef<HTMLDivElement | null>(null)
   const [attachmentName, setAttachmentName] = useState('')
@@ -127,10 +134,10 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const selectedStudent = selectedClass?.students.find((item) => item.id === studentId)
   const availableStudents = useMemo(() => selectedClass?.students ?? [], [selectedClass])
   const hasMultipleClasses = classes.length > 1
-  const isTurmaType = workKind === 'report' && modelId === 'turma'
-  const isChildType = workKind === 'report' && modelId === 'crianca'
-  const isPlanningType = workKind === 'planning'
-  const isPersonalType = workKind === 'personal'
+  const isTurmaType = selectedCategoryKey === 'turma'
+  const isChildType = selectedCategoryKey === 'crianca'
+  const isPlanningType = selectedCategoryKey === 'planejamento'
+  const isPersonalType = selectedCategoryKey === 'pessoal'
   const showClassPicker = (isDirectStudentNote || isTurmaType || isChildType) && hasMultipleClasses
   const showStudentPicker = isDirectStudentNote || isChildType
   const canSave = isDirectStudentNote
@@ -202,6 +209,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setStudentId(editConfig.studentId)
     setTags(editConfig.tags)
     setCustomCategory(editConfig.customCategory)
+    setSelectedCategoryKey(inferSelectedCategoryKey(editConfig.workKind, editConfig.modelId, editConfig.customCategory))
     setAttachmentName(editAnnotation.attachmentName ?? '')
     setError('')
     setAudioMessage('')
@@ -252,6 +260,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setTags(draft.tags || [])
     setCustomCategory(draft.customCategory || '')
     setNewCustomCategory(draft.newCustomCategory || '')
+    setSelectedCategoryKey(inferSelectedCategoryKey(draft.workKind || 'report', draft.modelId || 'turma', draft.customCategory || ''))
     setAttachmentName(draft.attachmentName || '')
     setViewMode(draft.viewMode || 'annotation')
     setChatInput(draft.chatInput || '')
@@ -302,6 +311,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   ])
 
   function choosePlanningTarget() {
+    setSelectedCategoryKey('planejamento')
     setWorkKind('planning')
     setModelId('planejamento')
     setCustomCategory('')
@@ -311,6 +321,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   }
 
   function choosePersonalTarget() {
+    setSelectedCategoryKey('pessoal')
     setWorkKind('personal')
     setModelId('pessoal')
     setCustomCategory('')
@@ -326,30 +337,38 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setError('')
     setClassId(fallbackClass?.id ?? '')
     if (target === 'class') {
+      setSelectedCategoryKey('turma')
       setModelId('turma')
       setStudentId('')
       return
     }
+    setSelectedCategoryKey('crianca')
     setModelId('crianca')
     setStudentId(activeStudent?.id ?? fallbackClass?.students[0]?.id ?? '')
   }
 
-  function chooseCustomCategory(category: string) {
-    const normalized = category.trim()
-    if (!normalized) return
-    const normalizedKey = normalizeText(normalized)
+  function applySavedCustomCategory(category: SavedCustomCategory) {
+    const normalizedKey = normalizeText(category.title)
     const isPlanningCategory = normalizedKey.includes('planej') || normalizedKey.includes('projeto')
     if (isPlanningCategory) {
-      choosePlanningTarget()
-      setCustomCategory(normalized)
-      return
+      setWorkKind('planning')
+      setModelId('planejamento')
+      setClassId('')
+      setStudentId('')
+    } else {
+      setWorkKind('personal')
+      setModelId('pessoal')
+      setClassId('')
+      setStudentId('')
     }
-    setWorkKind('personal')
-    setModelId('pessoal')
-    setCustomCategory(normalized)
-    setClassId('')
-    setStudentId('')
+    setCustomCategory(category.title)
+    setSelectedCategoryKey(`custom:${category.id}`)
     setError('')
+  }
+
+  function selectSavedCustomCategory(category: SavedCustomCategory) {
+    applySavedCustomCategory(category)
+    setCategoryMessage(`Categoria "${category.title}" selecionada.`)
   }
 
   function createCustomCategory() {
@@ -358,15 +377,24 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
       setError('Informe o nome da categoria.')
       return
     }
-    chooseCustomCategory(normalized)
-    setNewCustomCategory('')
-    setError('')
-    setCategoryMessage(`Categoria "${normalized}" criada e selecionada.`)
+
+    const category: SavedCustomCategory = {
+      id: slugifyCategory(normalized),
+      title: normalized,
+      description: buildCustomCategoryDescription(normalized),
+    }
+
     setSavedCustomCategories((current) => {
-      const next = [normalized, ...current.filter((item) => normalizeText(item) !== normalizeText(normalized))]
+      const withoutDuplicate = current.filter((item) => item.id !== category.id)
+      const next = [...withoutDuplicate, category]
       if (userId) persistSavedCustomCategories(userId, next)
       return next
     })
+
+    applySavedCustomCategory(category)
+    setNewCustomCategory('')
+    setError('')
+    setCategoryMessage(`Categoria "${normalized}" adicionada abaixo.`)
     window.setTimeout(() => {
       detailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 80)
@@ -809,6 +837,15 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 desc="Registro privado da professora, sem vínculo com criança ou turma."
                 onClick={() => choosePersonalTarget()}
               />
+              {savedCustomCategories.map((category) => (
+                <ChoiceButton
+                  key={category.id}
+                  selected={selectedCategoryKey === `custom:${category.id}`}
+                  title={category.title}
+                  desc={category.description}
+                  onClick={() => selectSavedCustomCategory(category)}
+                />
+              ))}
             </div>
 
             {(isTurmaType || isChildType) && showClassPicker && (
@@ -870,46 +907,8 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                   Criar
                 </button>
               </div>
-              {customCategory && (
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="px-3 py-1.5 rounded-full bg-gm text-white text-[11px] font-bold">
-                    {customCategory}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCustomCategory('')}
-                    className="text-[11px] font-bold text-[#C1440E]"
-                  >
-                    remover
-                  </button>
-                </div>
-              )}
               {categoryMessage && (
                 <p className="text-[11px] text-gm mt-2 leading-[1.4] font-bold">{categoryMessage}</p>
-              )}
-              {savedCustomCategories.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted mb-2">Suas categorias</p>
-                  <div className="flex flex-wrap gap-2">
-                    {savedCustomCategories.map((category) => (
-                      <button
-                        key={category}
-                        type="button"
-                        onClick={() => {
-                          chooseCustomCategory(category)
-                          setCategoryMessage(`Categoria "${category}" selecionada.`)
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold border ${
-                          normalizeText(customCategory) === normalizeText(category)
-                            ? 'bg-gm text-white border-gm'
-                            : 'bg-gbg text-gm border-gp'
-                        }`}
-                      >
-                        {category}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               )}
             </div>
           </>
@@ -1175,24 +1174,81 @@ function findModelById(modelId: string) {
   return [...REPORT_MODELS, ...PLANNING_MODELS, ...PERSONAL_MODELS].find((item) => item.id === modelId)
 }
 
-function loadSavedCustomCategories(userId: string) {
+function loadSavedCustomCategories(userId: string): SavedCustomCategory[] {
   try {
     const raw = window.localStorage.getItem(`approf:annotation-categories:${userId}`)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    return parsed
+      .map((value) => normalizeSavedCategory(value))
+      .filter((value): value is SavedCustomCategory => Boolean(value))
   } catch {
     return []
   }
 }
 
-function persistSavedCustomCategories(userId: string, categories: string[]) {
+function persistSavedCustomCategories(userId: string, categories: SavedCustomCategory[]) {
   try {
     window.localStorage.setItem(`approf:annotation-categories:${userId}`, JSON.stringify(categories))
   } catch {
     // localStorage pode estar indisponível em navegação privada.
   }
+}
+
+function normalizeSavedCategory(value: unknown): SavedCustomCategory | null {
+  if (typeof value === 'string' && value.trim()) {
+    const title = value.trim()
+    return {
+      id: slugifyCategory(title),
+      title,
+      description: buildCustomCategoryDescription(title),
+    }
+  }
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const title = typeof record.title === 'string' ? record.title.trim() : ''
+  if (!title) return null
+  const id = typeof record.id === 'string' && record.id.trim() ? record.id.trim() : slugifyCategory(title)
+  const description = typeof record.description === 'string' && record.description.trim()
+    ? record.description.trim()
+    : buildCustomCategoryDescription(title)
+  return { id, title, description }
+}
+
+function inferSelectedCategoryKey(workKind: WorkKind, modelId: string, customCategoryValue: string) {
+  if (customCategoryValue.trim()) {
+    return `custom:${slugifyCategory(customCategoryValue)}`
+  }
+  if (workKind === 'planning' || modelId === 'planejamento') return 'planejamento'
+  if (workKind === 'personal' || modelId === 'pessoal') return 'pessoal'
+  if (modelId === 'crianca') return 'crianca'
+  return 'turma'
+}
+
+function slugifyCategory(title: string) {
+  const slug = normalizeText(title).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  return slug || `categoria-${Date.now()}`
+}
+
+function buildCustomCategoryDescription(title: string) {
+  const key = normalizeText(title)
+  if (key.includes('diario') || key.includes('bordo')) {
+    return 'Registro diário da rotina e observações da prática pedagógica.'
+  }
+  if (key.includes('lembrete') || key.includes('pendencia')) {
+    return 'Lembretes e pendências importantes para acompanhar depois.'
+  }
+  if (key.includes('reuniao') || key.includes('pais')) {
+    return 'Anotações para preparar conversas e registros de reunião com famílias.'
+  }
+  if (key.includes('planej') || key.includes('projeto')) {
+    return 'Organização de ideias e registros para planejamento pedagógico.'
+  }
+  if (key.includes('formacao') || key.includes('curso')) {
+    return 'Registros da sua formação continuada e desenvolvimento profissional.'
+  }
+  return `Anotações organizadas em "${title}" para consulta rápida na sua rotina.`
 }
 
 function isWorkKind(value: unknown): value is WorkKind {
@@ -1211,6 +1267,7 @@ function StepTitle({ number, title }: { number: string; title: string }) {
 function ChoiceButton({ selected, title, desc, onClick }: { selected: boolean; title: string; desc: string; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className="w-full rounded-app-sm border text-left px-3 py-3"
       style={{

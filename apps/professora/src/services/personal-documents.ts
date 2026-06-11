@@ -1,10 +1,12 @@
 import type { TeacherPersonalDocument } from '@/types'
+import { isMobileDevice } from '@/utils/device'
 import { getSupabaseClient } from './supabase/client'
 import { uploadFileToBackend, type VisualUploadDebugStep } from './uploads'
 
 const MAX_PERSONAL_DOCUMENT_SIZE_BYTES = 15 * 1024 * 1024
 const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.docx', '.xlsx', '.pptx']
+const PERSONAL_DOCUMENT_BUCKET = 'teacher-documents'
 
 export async function listPersonalDocuments(): Promise<TeacherPersonalDocument[]> {
   const payload = await callPersonalDocumentsApi<{ documents?: TeacherPersonalDocument[] }>('/api/personal-documents', {
@@ -26,16 +28,58 @@ export async function uploadPersonalDocument(
   if (error) throw error
   const token = data.session?.access_token
   const userId = data.session?.user.id
-  if (!token) throw new Error('Você precisa estar logada para enviar documentos.')
+  if (!token || !userId) throw new Error('Você precisa estar logada para enviar documentos.')
 
   console.info('[personal-documents/mobile-diagnostics]', getMobileUploadDiagnostics(file, userId, Boolean(token)))
 
-  const payload = await uploadFileToBackend<{ document?: TeacherPersonalDocument; error?: string }>({
-    module: 'meus_documentos',
-    file,
-    onDebugStep,
+  if (isMobileDevice()) {
+    try {
+      return await uploadPersonalDocumentDirect(file, userId)
+    } catch (directError) {
+      console.warn('[personal-documents] upload direto falhou, tentando backend', directError)
+    }
+  }
+
+  try {
+    const payload = await uploadFileToBackend<{ document?: TeacherPersonalDocument; error?: string }>({
+      module: 'meus_documentos',
+      file,
+      onDebugStep,
+    })
+    if (!payload.document) throw new Error('Documento enviado, mas a resposta do servidor foi inválida.')
+    return payload.document
+  } catch (backendError) {
+    console.warn('[personal-documents] upload via backend falhou, tentando direto', backendError)
+    return uploadPersonalDocumentDirect(file, userId)
+  }
+}
+
+async function uploadPersonalDocumentDirect(file: File, userId: string): Promise<TeacherPersonalDocument> {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não configurado para enviar documentos.')
+
+  const mimeType = inferMimeType(file)
+  const filePath = `${userId}/${Date.now()}-${safeFileName(file.name)}`
+  const { error: storageError } = await supabase.storage.from(PERSONAL_DOCUMENT_BUCKET).upload(filePath, file, {
+    contentType: mimeType,
+    upsert: false,
   })
-  if (!payload.document) throw new Error('Documento enviado, mas a resposta do servidor foi inválida.')
+  if (storageError) {
+    throw new Error(`Não foi possível salvar o arquivo no storage. ${storageError.message}`)
+  }
+
+  const payload = await callPersonalDocumentsApi<{ document?: TeacherPersonalDocument }>('/api/personal-documents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filePath,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType,
+    }),
+  })
+
+  if (!payload.document) throw new Error('Arquivo enviado, mas o registro não foi criado no servidor.')
   return payload.document
 }
 
@@ -53,6 +97,33 @@ function validatePersonalDocumentFile(file: File) {
     || hasAllowedExtension
   if (!allowed) throw new Error('Arquivo não permitido. Envie PDF, DOCX, XLSX, PPTX, JPG, PNG ou WEBP.')
   if (file.size > MAX_PERSONAL_DOCUMENT_SIZE_BYTES) throw new Error('Arquivo muito grande. Use arquivos de até 15 MB.')
+}
+
+function inferMimeType(file: File) {
+  if (file.type) return file.type
+  const lowerName = file.name.toLowerCase()
+  if (lowerName.endsWith('.pdf')) return 'application/pdf'
+  if (lowerName.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  if (lowerName.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  if (lowerName.endsWith('.pptx')) return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  if (lowerName.endsWith('.png')) return 'image/png'
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg'
+  if (lowerName.endsWith('.webp')) return 'image/webp'
+  return 'application/octet-stream'
+}
+
+function safeFileName(fileName: string) {
+  const normalized = fileName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  const extension = normalized.split('.').pop()?.replace(/[^a-z0-9]/g, '') || 'bin'
+  const base = normalized
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'arquivo'
+  return `${base}.${extension}`
 }
 
 async function callPersonalDocumentsApi<T>(path: string, init: RequestInit): Promise<T> {
