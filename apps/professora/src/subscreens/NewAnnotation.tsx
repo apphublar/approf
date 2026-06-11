@@ -123,17 +123,20 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const selectedClass = classes.find((item) => item.id === classId) ?? activeClass
   const selectedStudent = selectedClass?.students.find((item) => item.id === studentId)
   const availableStudents = useMemo(() => selectedClass?.students ?? [], [selectedClass])
-  const customAnnotationCategories = useMemo(() => buildCustomAnnotationCategories(annotations), [annotations])
-  const needsClass = isDirectStudentNote || selectedModel?.scope === 'class' || selectedModel?.scope === 'child'
-  const needsStudent = isDirectStudentNote || selectedModel?.scope === 'child'
-  const showsClass = needsClass || selectedModel?.scope === 'optional-class'
+  const hasMultipleClasses = classes.length > 1
+  const isTurmaType = workKind === 'report' && modelId === 'turma'
+  const isChildType = workKind === 'report' && modelId === 'crianca'
+  const isPlanningType = workKind === 'planning'
+  const isPersonalType = workKind === 'personal'
+  const showClassPicker = (isDirectStudentNote || isTurmaType || isChildType) && hasMultipleClasses
+  const showStudentPicker = isDirectStudentNote || isChildType
   const canSave = isDirectStudentNote
     ? text.trim().length >= 5 && Boolean(classId) && Boolean(studentId)
     : (
         text.trim().length >= 5 &&
         Boolean(workKind && selectedModel) &&
-        (!needsClass || Boolean(classId)) &&
-        (!needsStudent || Boolean(studentId))
+        (!isTurmaType && !isChildType || Boolean(classId)) &&
+        (!isChildType || Boolean(studentId))
       )
 
   useEffect(() => {
@@ -285,11 +288,19 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   ])
 
   function choosePlanningTarget() {
-    const fallbackClass = activeClass ?? classes[0]
     setWorkKind('planning')
     setModelId('planejamento')
     setCustomCategory('')
-    setClassId(fallbackClass?.id ?? '')
+    setClassId('')
+    setStudentId('')
+    setError('')
+  }
+
+  function choosePersonalTarget() {
+    setWorkKind('personal')
+    setModelId('pessoal')
+    setCustomCategory('')
+    setClassId('')
     setStudentId('')
     setError('')
   }
@@ -346,8 +357,11 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   function selectFile(files: FileList | null) {
     const file = files?.[0]
     if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Neste campo só é possível anexar imagem.')
+      return
+    }
     setError('')
-
     setAttachmentFile(file)
     setAttachmentName(file.name)
   }
@@ -756,42 +770,64 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         {!isDirectStudentNote && (
           <>
             <StepTitle number="1" title="Tipo de anotação" />
-            <div className="grid grid-cols-1 gap-2 mb-4">
-              <ChoiceButton selected={workKind === 'report' && modelId === 'turma'} title="Turma" desc="Anotação geral da turma, sem escolher uma criança específica." onClick={() => chooseDefaultTarget('class')} />
-              <ChoiceButton selected={workKind === 'report' && modelId === 'crianca'} title="Criança" desc="Anotação vinculada a uma criança da turma." onClick={() => chooseDefaultTarget('child')} />
+            <div className="grid grid-cols-1 gap-2 mb-3">
+              <ChoiceButton selected={isTurmaType} title="Turma" desc="Anotação geral da turma, sem escolher uma criança específica." onClick={() => chooseDefaultTarget('class')} />
+              <ChoiceButton selected={isChildType} title="Criança" desc="Anotação vinculada a uma criança da turma." onClick={() => chooseDefaultTarget('child')} />
               <ChoiceButton
-                selected={workKind === 'planning'}
+                selected={isPlanningType}
                 title="Planejamento"
                 desc="Alimenta planejamento diário/semanal, projeto pedagógico e reunião de pais."
                 onClick={() => choosePlanningTarget()}
               />
+              <ChoiceButton
+                selected={isPersonalType}
+                title="Anotação pessoal"
+                desc="Registro privado da professora, sem vínculo com criança ou turma."
+                onClick={() => choosePersonalTarget()}
+              />
             </div>
 
-            <div className="rounded-app-sm border border-border bg-white p-3 mb-4">
-              <p className="text-[12px] font-bold text-ink mb-1">Categorias criadas pela professora</p>
-              <p className="text-[11px] text-muted leading-[1.5] mb-3">Use para anotações pessoais, planejamentos, lembretes ou outras categorias próprias.</p>
-              {customAnnotationCategories.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {customAnnotationCategories.map((category) => (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => chooseCustomCategory(category)}
-                      className={`px-3 py-[8px] rounded-full border text-[11px] font-bold ${
-                        workKind === 'personal' && normalizeText(customCategory) === normalizeText(category)
-                          ? 'bg-gbg border-gp text-gd'
-                          : 'bg-cream border-border text-muted'
-                      }`}
-                    >
-                      {category}
-                    </button>
+            {(isTurmaType || isChildType) && showClassPicker && (
+              <div className="mb-3">
+                <p className="text-[11px] font-bold text-muted mb-2">Escolha a turma</p>
+                <select
+                  className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors"
+                  value={classId}
+                  onChange={(event) => updateClass(event.target.value)}
+                >
+                  <option value="">Escolher turma</option>
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
                   ))}
-                </div>
-              )}
+                </select>
+              </div>
+            )}
+
+            {isChildType && showStudentPicker && (
+              <div className="mb-4">
+                <p className="text-[11px] font-bold text-muted mb-2">Escolha a criança</p>
+                <select
+                  className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors"
+                  value={studentId}
+                  onChange={(event) => setStudentId(event.target.value)}
+                >
+                  <option value="">Escolher criança</option>
+                  {availableStudents.map((student) => (
+                    <option key={student.id} value={student.id}>{student.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <StepTitle number="2" title="Nova categoria" />
+            <div className="rounded-app-sm border border-border bg-white p-3 mb-4">
+              <p className="text-[11px] text-muted leading-[1.5] mb-3">
+                Crie uma categoria própria para organizar anotações, lembretes ou registros especiais.
+              </p>
               <div className="flex gap-2">
                 <input
                   className="min-w-0 flex-1 px-3 py-3 rounded-app-sm border border-border bg-cream font-sans text-sm text-ink outline-none focus:border-gl"
-                  placeholder="Ex: PESSOAL"
+                  placeholder="Ex: Diário de Bordo"
                   value={newCustomCategory}
                   onChange={(event) => setNewCustomCategory(event.target.value)}
                 />
@@ -808,40 +844,45 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           </>
         )}
 
-        {!isDirectStudentNote && (selectedModel || isDirectStudentNote) && showsClass && (
+        {isDirectStudentNote && (
           <>
-            <StepTitle
-              number={isDirectStudentNote ? '1' : '2'}
-              title={needsStudent || isDirectStudentNote ? 'Escolha a criança' : selectedModel?.scope === 'optional-class' ? 'Turma vinculada' : 'Escolha a turma'}
-            />
-            <select
-              className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-3"
-              value={classId}
-              onChange={(event) => updateClass(event.target.value)}
-            >
-              <option value="">{selectedModel?.scope === 'optional-class' ? 'Sem turma vinculada' : 'Escolher turma'}</option>
-              {classes.map((cls) => (
-                <option key={cls.id} value={cls.id}>{cls.name}</option>
-              ))}
-            </select>
-            {(needsStudent || isDirectStudentNote) && (
-              <select
-                className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors mb-4"
-                value={studentId}
-                onChange={(event) => setStudentId(event.target.value)}
-              >
-                <option value="">Escolher criança</option>
-                {availableStudents.map((student) => (
-                  <option key={student.id} value={student.id}>{student.name}</option>
-                ))}
-              </select>
+            <StepTitle number="1" title="Vínculo da anotação" />
+            {showClassPicker && (
+              <div className="mb-3">
+                <p className="text-[11px] font-bold text-muted mb-2">Escolha a turma</p>
+                <select
+                  className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors"
+                  value={classId}
+                  onChange={(event) => updateClass(event.target.value)}
+                >
+                  <option value="">Escolher turma</option>
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {showStudentPicker && (
+              <div className="mb-4">
+                <p className="text-[11px] font-bold text-muted mb-2">Escolha a criança</p>
+                <select
+                  className="w-full px-4 py-3 rounded-app-sm border-[1.5px] border-border bg-white font-sans text-sm text-ink outline-none focus:border-gl transition-colors"
+                  value={studentId}
+                  onChange={(event) => setStudentId(event.target.value)}
+                >
+                  <option value="">Escolher criança</option>
+                  {availableStudents.map((student) => (
+                    <option key={student.id} value={student.id}>{student.name}</option>
+                  ))}
+                </select>
+              </div>
             )}
           </>
         )}
 
-        {selectedModel && !isDirectStudentNote && (
+        {(selectedModel || isDirectStudentNote) && (
           <>
-            <StepTitle number={showsClass ? '3' : '2'} title="Detalhes opcionais" />
+            <StepTitle number={isDirectStudentNote ? '2' : '3'} title="Detalhes opcionais" />
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {tags.map((tag) => (
@@ -867,7 +908,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 }}
               />
               <Paperclip size={15} />
-              <span aria-hidden="true">Anexar imagem ou arquivo</span>
+              <span aria-hidden="true">Anexar imagem</span>
             </label>
             {attachmentName && <p className="text-[11px] text-muted mt-2 leading-[1.5]">Anexo preparado: {attachmentName}</p>}
           </>
@@ -1149,19 +1190,6 @@ function findModelByLabel(label: string) {
   }
 
   return null
-}
-
-function buildCustomAnnotationCategories(annotations: Annotation[]) {
-  const categories = new Map<string, string>()
-  for (const annotation of annotations) {
-    for (const value of [annotation.label, ...(annotation.tags ?? [])]) {
-      const trimmed = value.trim()
-      if (!trimmed || isReservedAnnotationCategoryLabel(trimmed)) continue
-      const key = normalizeText(trimmed)
-      if (!categories.has(key)) categories.set(key, trimmed)
-    }
-  }
-  return [...categories.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'))
 }
 
 function getCustomCategoryFromAnnotation(annotation: Annotation) {
