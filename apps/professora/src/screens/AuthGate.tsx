@@ -76,8 +76,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return
       }
       setSession(nextSession)
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        setHydratedUserId(null)
+      const nextUserId = nextSession?.user?.id ?? null
+      if (event === 'SIGNED_IN' && nextUserId) {
+        setHydratedUserId((current) => {
+          if (current === nextUserId) return current
+          persistHydratedUserId(null)
+          return null
+        })
       }
     })
 
@@ -105,6 +110,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const userId = session?.user?.id
     if (!userId) return
     if (hydratedUserId === userId) return
+
+    const persistedUserId = readPersistedHydratedUserId()
+    if (persistedUserId === userId) {
+      setHydratedUserId(userId)
+      return
+    }
 
     setLoadingWorkspace(true)
     setWorkspaceError(null)
@@ -161,8 +172,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [session?.user?.id])
 
-  const shouldBlockForWorkspace = loadingWorkspace && !hydratedUserId
-  const shouldBlockForAccess = checkingAccess && !hydratedUserId
+  const sessionUserId = session?.user?.id ?? null
+  const effectiveHydratedUserId = hydratedUserId ?? readPersistedHydratedUserId()
+  const isWorkspaceReady = !sessionUserId || effectiveHydratedUserId === sessionUserId
+  const shouldBlockForWorkspace = loadingWorkspace && !isWorkspaceReady
+  const shouldBlockForAccess = checkingAccess && !isWorkspaceReady
   if (loadingSession || shouldBlockForWorkspace || shouldBlockForAccess) {
     return (
       <div className="absolute inset-0 chalk-bg flex items-center justify-center px-6">
@@ -214,7 +228,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!hydratedUserId) {
+  if (!isWorkspaceReady) {
     return (
       <div className="absolute inset-0 chalk-bg flex items-center justify-center px-6">
         <div className="auth-loading-wrap">

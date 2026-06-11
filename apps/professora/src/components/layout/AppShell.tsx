@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavStore } from '@/store'
 import type { Subscreen } from '@/types'
-import { consumeActiveSubscreen } from '@/utils/nav-session'
+import { clearSubscreensStack, consumeActiveSubscreen, restoreSubscreensStack } from '@/utils/nav-session'
 import BottomNav from './BottomNav'
 import HomeScreen from '@/screens/Home'
 import AnnotationsScreen from '@/screens/Annotations'
@@ -32,14 +32,24 @@ import InterventionsSubscreen from '@/subscreens/Interventions'
 import TeacherAccountSubscreen from '@/subscreens/TeacherAccount'
 
 export default function AppShell() {
-  const { activeTab, subscreens, openSubscreen } = useNavStore()
+  const { activeTab, subscreens, openSubscreen, restoreSubscreens } = useNavStore()
 
   useEffect(() => {
+    const stack = restoreSubscreensStack()
+    if (stack.length > 0 && useNavStore.getState().subscreens.length === 0) {
+      restoreSubscreens(stack.map((frame) => ({
+        screen: frame.screen as Subscreen,
+        data: frame.data,
+      })))
+      clearSubscreensStack()
+      return
+    }
+
     const screen = consumeActiveSubscreen()
     if (!screen) return
     const alreadyOpen = useNavStore.getState().subscreens.some((item) => item.screen === screen)
     if (!alreadyOpen) openSubscreen(screen as Subscreen)
-  }, [openSubscreen])
+  }, [openSubscreen, restoreSubscreens])
 
   return (
     <div id="app-root" className="flex flex-col">

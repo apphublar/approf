@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, FileText, Loader2, Paperclip, Search, Trash2, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { deletePersonalDocument, listPersonalDocuments, uploadPersonalDocument } from '@/services/personal-documents'
 import type { TeacherPersonalDocument } from '@/types'
-import { MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
-import { stashActiveSubscreen } from '@/utils/nav-session'
+import { isMobileDevice, MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
+import { stashNavigationForFilePicker } from '@/utils/nav-session'
 import { clearPendingFile, loadPendingFile, savePendingFile } from '@/utils/pending-file-store'
 
 const PENDING_FILE_KEY = 'documents-selected'
+const FILE_INPUT_ID = 'documents-file-input'
 
 const ACCEPTED_TYPES = '.pdf,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp,application/pdf'
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
 
 export default function DocumentsSubscreen(_props?: { data?: unknown }) {
-  const { closeSubscreen } = useNavStore()
+  const { closeSubscreen, subscreens } = useNavStore()
   const { personalDocuments, removePersonalDocument } = useAppStore()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const migratedRef = useRef(false)
@@ -26,6 +28,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
   const [restoringPendingFile, setRestoringPendingFile] = useState(true)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const isMobile = isMobileDevice()
 
   useEffect(() => {
     void refreshDocuments()
@@ -38,6 +41,9 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
         if (!active || !file) return
         setSelectedFile(file)
         setUploadError('')
+        if (isMobile) {
+          void uploadSelectedDocument(file)
+        }
       })
       .finally(() => {
         if (active) setRestoringPendingFile(false)
@@ -64,6 +70,10 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     if (!normalizedQuery) return documents
     return documents.filter((doc) => normalizeText(doc.name).includes(normalizedQuery))
   }, [documents, query])
+
+  function stashNavigationBeforePicker() {
+    stashNavigationForFilePicker('documents', subscreens)
+  }
 
   async function refreshDocuments() {
     setLoadError('')
@@ -123,9 +133,12 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
 
     try {
       validateSelectedFile(file)
-      stashActiveSubscreen('documents')
+      stashNavigationBeforePicker()
       await savePendingFile(PENDING_FILE_KEY, file)
       setSelectedFile(file)
+      if (isMobile) {
+        await uploadSelectedDocument(file)
+      }
     } catch (error) {
       await clearPendingFile(PENDING_FILE_KEY)
       setSelectedFile(null)
@@ -140,13 +153,14 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  async function uploadSelectedDocument() {
-    if (!selectedFile || uploading) return
+  async function uploadSelectedDocument(fileOverride?: File) {
+    const fileToUpload = fileOverride ?? selectedFile
+    if (!fileToUpload || uploading) return
     setUploadError('')
     setUploadSuccess('')
     setUploading(true)
     try {
-      const uploaded = await uploadPersonalDocument(selectedFile)
+      const uploaded = await uploadPersonalDocument(fileToUpload)
       setDocuments((current) => [uploaded, ...current.filter((doc) => doc.id !== uploaded.id)])
       await clearSelectedFile()
       setUploadSuccess(`"${uploaded.name}" salvo com sucesso.`)
@@ -180,8 +194,25 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
     }
   }
 
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      id={FILE_INPUT_ID}
+      type="file"
+      accept={ACCEPTED_TYPES}
+      disabled={uploading || restoringPendingFile}
+      onChange={onNativeDocumentChange}
+      className={MOBILE_FILE_INPUT_CLASS}
+      style={{ position: 'fixed', top: 0, left: 0 }}
+      tabIndex={-1}
+      aria-hidden="true"
+    />
+  )
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
+      {typeof document !== 'undefined' ? createPortal(fileInput, document.body) : fileInput}
+
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
         <button type="button" onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
@@ -202,27 +233,20 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             </p>
           </div>
 
-          <input
-            ref={fileInputRef}
-            id="documents-file-input"
-            type="file"
-            accept={ACCEPTED_TYPES}
-            disabled={uploading || restoringPendingFile}
-            onChange={onNativeDocumentChange}
-            className={MOBILE_FILE_INPUT_CLASS}
-            tabIndex={-1}
-            aria-hidden="true"
-          />
-
           <div className="mb-4 rounded-app-sm border-[1.5px] border-gp bg-white p-3">
             <label
-              htmlFor="documents-file-input"
-              onClick={() => stashActiveSubscreen('documents')}
+              htmlFor={FILE_INPUT_ID}
+              onClick={stashNavigationBeforePicker}
               className={`relative flex w-full items-center justify-center gap-2 rounded-app-sm bg-gd px-3 py-3 text-[13px] font-bold text-white cursor-pointer ${uploading || restoringPendingFile ? 'opacity-60 pointer-events-none' : ''}`}
             >
               {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-              {uploading ? 'Enviando arquivo...' : restoringPendingFile ? 'Recuperando arquivo...' : 'Escolher arquivo'}
+              {uploading ? 'Salvando arquivo...' : restoringPendingFile ? 'Recuperando arquivo...' : 'Escolher arquivo'}
             </label>
+            {isMobile && (
+              <p className="text-[10px] text-muted mt-2 leading-[1.4] text-center">
+                No celular, o arquivo é salvo automaticamente após a seleção.
+              </p>
+            )}
           </div>
 
           {uploadSuccess && (
@@ -233,7 +257,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
             <p className="text-[12px] text-[#C1440E] mb-4 leading-[1.5]">{uploadError || loadError}</p>
           )}
 
-          {selectedFile && (
+          {selectedFile && !isMobile && (
             <div className="mb-4 rounded-app-sm border border-border bg-white p-3">
               <div className="flex items-center gap-3">
                 <FileText size={20} className="text-gm" />
@@ -243,7 +267,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
                 </div>
                 <button
                   type="button"
-                  onClick={clearSelectedFile}
+                  onClick={() => void clearSelectedFile()}
                   disabled={uploading}
                   className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted bg-white flex-shrink-0 disabled:opacity-50"
                   aria-label="Remover arquivo selecionado"
@@ -260,6 +284,16 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
                 {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
                 {uploading ? 'Salvando arquivo...' : 'Salvar arquivo'}
               </button>
+            </div>
+          )}
+
+          {selectedFile && isMobile && uploading && (
+            <div className="mb-4 rounded-app-sm border border-border bg-white p-3 flex items-center gap-3">
+              <Loader2 size={18} className="animate-spin text-gm" />
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-bold text-ink">{selectedFile.name}</p>
+                <p className="text-[11px] text-muted">Salvando arquivo...</p>
+              </div>
             </div>
           )}
 
@@ -285,7 +319,7 @@ export default function DocumentsSubscreen(_props?: { data?: unknown }) {
               <FileText size={24} className="text-gm mx-auto mb-2" />
               <p className="text-[13px] font-bold text-ink">Nenhum documento anexado</p>
               <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-                Toque em &quot;Escolher arquivo&quot;, confira o preview e depois em &quot;Salvar arquivo&quot;.
+                Toque em &quot;Escolher arquivo&quot; para anexar um documento.
               </p>
             </div>
           ) : (

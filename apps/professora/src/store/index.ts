@@ -56,6 +56,7 @@ interface NavStore {
   openSubscreen: (screen: Subscreen, data?: unknown) => void
   closeSubscreen: () => void
   closeAllSubscreens: () => void
+  restoreSubscreens: (frames: SubscreenFrame[]) => void
 }
 
 export const useNavStore = create<NavStore>()((set) => ({
@@ -67,6 +68,7 @@ export const useNavStore = create<NavStore>()((set) => ({
   closeSubscreen: () =>
     set((state) => ({ subscreens: state.subscreens.slice(0, -1) })),
   closeAllSubscreens: () => set({ subscreens: [] }),
+  restoreSubscreens: (frames) => set({ subscreens: frames }),
 }))
 
 interface AppStore {

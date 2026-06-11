@@ -2,6 +2,15 @@ const DB_NAME = 'approf-pending-files'
 const STORE = 'files'
 const DB_VERSION = 1
 
+type PendingFileRecord = {
+  name: string
+  type: string
+  lastModified: number
+  buffer: ArrayBuffer
+}
+
+type PendingFilesRecord = PendingFileRecord[]
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
@@ -30,14 +39,35 @@ function runTransaction<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore
   }))
 }
 
+async function serializeFile(file: File): Promise<PendingFileRecord> {
+  return {
+    name: file.name,
+    type: file.type || 'application/octet-stream',
+    lastModified: file.lastModified,
+    buffer: await file.arrayBuffer(),
+  }
+}
+
+function deserializeFile(record: PendingFileRecord) {
+  return new File([record.buffer], record.name, {
+    type: record.type,
+    lastModified: record.lastModified,
+  })
+}
+
 export async function savePendingFile(key: string, file: File) {
-  await runTransaction('readwrite', (store) => store.put(file, key))
+  const record = await serializeFile(file)
+  await runTransaction('readwrite', (store) => store.put(record, key))
 }
 
 export async function loadPendingFile(key: string): Promise<File | null> {
   try {
-    const value = await runTransaction<File | undefined>('readonly', (store) => store.get(key))
-    return value instanceof File ? value : null
+    const value = await runTransaction<PendingFileRecord | File | undefined>('readonly', (store) => store.get(key))
+    if (value instanceof File) return value
+    if (value && typeof value === 'object' && value.buffer instanceof ArrayBuffer) {
+      return deserializeFile(value)
+    }
+    return null
   } catch {
     return null
   }
@@ -52,13 +82,23 @@ export async function clearPendingFile(key: string) {
 }
 
 export async function savePendingFiles(key: string, files: File[]) {
-  await runTransaction('readwrite', (store) => store.put(files, key))
+  const records = await Promise.all(files.map((file) => serializeFile(file)))
+  await runTransaction('readwrite', (store) => store.put(records, key))
 }
 
 export async function loadPendingFiles(key: string): Promise<File[]> {
   try {
-    const value = await runTransaction<File[] | undefined>('readonly', (store) => store.get(key))
-    return Array.isArray(value) ? value.filter((item): item is File => item instanceof File) : []
+    const value = await runTransaction<PendingFilesRecord | File[] | undefined>('readonly', (store) => store.get(key))
+    if (Array.isArray(value)) {
+      return value.map((item) => {
+        if (item instanceof File) return item
+        if (item && typeof item === 'object' && item.buffer instanceof ArrayBuffer) {
+          return deserializeFile(item)
+        }
+        return null
+      }).filter((item): item is File => item instanceof File)
+    }
+    return []
   } catch {
     return []
   }

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { BadgeCheck, ChevronLeft, Eye, EyeOff, LogOut, Paperclip, ShieldCheck, Wallet, X } from 'lucide-react'
 import { useNavStore } from '@/store'
 import {
@@ -14,13 +15,14 @@ import {
   type TeacherAccountSnapshot,
 } from '@/services/supabase/account'
 import { MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
-import { stashActiveSubscreen } from '@/utils/nav-session'
+import { stashNavigationForFilePicker } from '@/utils/nav-session'
 import { clearPendingFiles, loadPendingFiles, savePendingFiles } from '@/utils/pending-file-store'
 
 const VERIFICATION_FILES_KEY = 'verification-pending'
+const VERIFICATION_FILE_INPUT_ID = 'verification-file-input'
 
 export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
-  const { closeSubscreen } = useNavStore()
+  const { closeSubscreen, subscreens } = useNavStore()
   const forcedMode = typeof data === 'object' && data && 'forcedMode' in data
     ? Boolean((data as { forcedMode?: boolean }).forcedMode)
     : false
@@ -193,7 +195,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       return
     }
 
-    stashActiveSubscreen('teacher-account')
+    stashNavigationForFilePicker('teacher-account', subscreens)
     const next = [...pendingFiles, ...sanitized].slice(-10)
     await savePendingFiles(VERIFICATION_FILES_KEY, next)
     setPendingFiles(next)
@@ -247,8 +249,34 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     window.location.reload()
   }
 
+  function onVerificationFileChange(event: ChangeEvent<HTMLInputElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    void queueVerificationFiles(event.target.files)
+    window.setTimeout(() => {
+      event.target.value = ''
+    }, 0)
+  }
+
+  const verificationFileInput = (
+    <input
+      ref={verificationInputRef}
+      id={VERIFICATION_FILE_INPUT_ID}
+      type="file"
+      className={MOBILE_FILE_INPUT_CLASS}
+      style={{ position: 'fixed', top: 0, left: 0 }}
+      tabIndex={-1}
+      aria-hidden="true"
+      multiple
+      accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt,application/pdf,image/*"
+      disabled={submittingVerification || restoringPendingFiles}
+      onChange={onVerificationFileChange}
+    />
+  )
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
+      {typeof document !== 'undefined' ? createPortal(verificationFileInput, document.body) : verificationFileInput}
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
         {!forcedMode && (
           <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
@@ -394,28 +422,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 placeholder="Observações para a equipe (opcional)."
                 className="w-full mt-3 min-h-[88px] rounded-app-sm border border-border px-3 py-2 text-[12px]"
               />
-              <input
-                ref={verificationInputRef}
-                id="verification-file-input"
-                type="file"
-                className={MOBILE_FILE_INPUT_CLASS}
-                tabIndex={-1}
-                aria-hidden="true"
-                multiple
-                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt,application/pdf,image/*"
-                disabled={submittingVerification || restoringPendingFiles}
-                onChange={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  void queueVerificationFiles(event.target.files)
-                  window.setTimeout(() => {
-                    event.target.value = ''
-                  }, 0)
-                }}
-              />
               <label
-                htmlFor="verification-file-input"
-                onClick={() => stashActiveSubscreen('teacher-account')}
+                htmlFor={VERIFICATION_FILE_INPUT_ID}
+                onClick={() => stashNavigationForFilePicker('teacher-account', subscreens)}
                 className={`w-full mt-3 inline-flex items-center justify-center gap-2 py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer ${submittingVerification || restoringPendingFiles ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <Paperclip size={14} />
