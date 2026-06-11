@@ -349,13 +349,18 @@ async function callAccountApi<T = Record<string, unknown>>(path: string, init: R
   const token = data.session?.access_token
   if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init.headers ?? {}),
+      },
+    })
+  } catch (error) {
+    throw wrapAccountFetchError(error)
+  }
 
   const payload = await response.json().catch(() => null) as { error?: string } | T | null
   if (!response.ok) {
@@ -385,13 +390,18 @@ async function callAccountApiForm<T = Record<string, unknown>>(path: string, fil
   const formData = new FormData()
   files.slice(0, 10).forEach((file) => formData.append('files', file))
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  })
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    })
+  } catch (error) {
+    throw wrapAccountFetchError(error)
+  }
 
   const payload = await response.json().catch(() => null) as { error?: string } | T | null
   if (!response.ok) {
@@ -402,6 +412,13 @@ async function callAccountApiForm<T = Record<string, unknown>>(path: string, fil
   }
 
   return (payload ?? {}) as T
+}
+
+function wrapAccountFetchError(error: unknown): Error {
+  if (error instanceof TypeError && /failed to fetch/i.test(error.message)) {
+    return new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.')
+  }
+  return error instanceof Error ? error : new Error('Erro inesperado ao acessar sua conta.')
 }
 
 function sanitizeFileName(fileName: string, fallbackExtension: string) {

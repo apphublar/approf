@@ -1,19 +1,21 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
-import { PERSONAL_DOCUMENT_BUCKET, PERSONAL_DOCUMENT_CORS_HEADERS } from '../helpers'
+import { PERSONAL_DOCUMENT_BUCKET } from '../helpers'
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { id } = await params
-    if (!id) return jsonError('Documento inválido.', 400)
+    if (!id) return jsonError('Documento inválido.', 400, corsHeaders)
 
     const supabase = createSupabaseServiceClient()
     const { data: document, error: loadError } = await supabase
@@ -23,7 +25,7 @@ export async function DELETE(
       .eq('owner_id', ownerId)
       .single()
 
-    if (loadError || !document) return jsonError('Documento não encontrado.', 404)
+    if (loadError || !document) return jsonError('Documento não encontrado.', 404, corsHeaders)
 
     const { error: storageError } = await supabase.storage
       .from(PERSONAL_DOCUMENT_BUCKET)
@@ -37,18 +39,18 @@ export async function DELETE(
       .eq('owner_id', ownerId)
     if (deleteError) throw toError(deleteError, 'Não foi possível excluir o documento.')
 
-    return NextResponse.json({ ok: true }, { status: 200, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
+    return NextResponse.json({ ok: true }, { status: 200, headers: corsHeaders })
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401, corsHeaders)
     if (isMissingPersonalDocumentsTable(error)) {
-      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
+      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503, corsHeaders)
     }
-    return jsonError(error instanceof Error ? error.message : 'Não foi possível excluir o documento.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível excluir o documento.', 500, corsHeaders)
   }
 }
 
-function jsonError(error: string, status: number) {
-  return NextResponse.json({ error }, { status, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
+function jsonError(error: string, status: number, corsHeaders: Record<string, string>) {
+  return NextResponse.json({ error }, { status, headers: corsHeaders })
 }
 
 function toError(error: unknown, fallback: string) {

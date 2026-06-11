@@ -67,13 +67,16 @@ export async function uploadFileToBackend<T>(input: {
       body: formData,
     })
   } catch (fetchError) {
+    const message = fetchError instanceof TypeError && /failed to fetch/i.test(fetchError.message)
+      ? 'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.'
+      : fetchError instanceof Error ? fetchError.message : 'Erro inesperado ao enviar o arquivo.'
     input.onDebugStep?.({
       id: 'api-start',
       label: 'Início do envio',
       status: 'error',
-      detail: stringifyDebug(fetchError),
+      detail: message,
     })
-    throw fetchError
+    throw new Error(message)
   }
   const rawBody = await response.text().catch((readError) => `__READ_ERROR__:${String(readError)}`)
   const payload = parseJsonBody(rawBody) as ({ error?: string } & Record<string, unknown>) | null

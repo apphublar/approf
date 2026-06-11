@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
 import {
   finalizeMaterialUpload,
   inferMimeType,
   MATERIAL_BUCKET,
-  MATERIALS_CORS_HEADERS,
   safeFileName,
   toError,
   validateMaterialFile,
@@ -21,16 +21,12 @@ export const maxDuration = 60
 
 type UploadModule = 'material_apoio' | 'meus_documentos'
 
-const UPLOAD_CORS_HEADERS = {
-  ...MATERIALS_CORS_HEADERS,
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: UPLOAD_CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   const startedAt = Date.now()
   const debug: UploadDebugItem[] = []
   const setDebug = (id: string, label: string, status: UploadDebugItem['status'], detail?: unknown) => {
@@ -54,11 +50,11 @@ export async function POST(request: Request) {
 
     if (!(file instanceof File)) {
       setDebug('file', 'Arquivo recebido no backend', 'error', 'FormData nao contem File')
-      return jsonError('Arquivo não recebido pelo servidor.', 400, debug)
+      return jsonError('Arquivo não recebido pelo servidor.', 400, debug, corsHeaders)
     }
     if (module !== 'material_apoio' && module !== 'meus_documentos') {
       setDebug('module', 'Modulo de upload', 'error', { module })
-      return jsonError('Modulo de upload inválido.', 400, debug)
+      return jsonError('Modulo de upload inválido.', 400, debug, corsHeaders)
     }
 
     const fileName = file.name || 'arquivo'
@@ -98,7 +94,7 @@ export async function POST(request: Request) {
       : validatePersonalDocument({ fileName, fileType: mimeType, fileSize })
     if (validationError) {
       setDebug('validation', 'Validacao do arquivo', 'error', validationError)
-      return jsonError(validationError, 400, debug)
+      return jsonError(validationError, 400, debug, corsHeaders)
     }
     setDebug('validation', 'Validacao do arquivo', 'ok')
 
@@ -131,11 +127,11 @@ export async function POST(request: Request) {
       const pedagogicalObjective = typeof metadata.pedagogicalObjective === 'string' ? metadata.pedagogicalObjective.trim() : ''
       if (!title) {
         setDebug('metadata', 'Dados do material', 'error', 'Título ausente')
-        return jsonError('Informe o tema ou nome do arquivo.', 400, debug)
+        return jsonError('Informe o tema ou nome do arquivo.', 400, debug, corsHeaders)
       }
       if (!description) {
         setDebug('metadata', 'Dados do material', 'error', 'Descrição ausente')
-        return jsonError('Informe a descrição do material.', 400, debug)
+        return jsonError('Informe a descrição do material.', 400, debug, corsHeaders)
       }
       setDebug('metadata', 'Dados do material', 'ok', { title, descriptionLength: description.length })
 
@@ -171,7 +167,7 @@ export async function POST(request: Request) {
         filePath,
         debug,
         ...result.payload,
-      }, { status: 200, headers: UPLOAD_CORS_HEADERS })
+      }, { status: 200, headers: corsHeaders })
     }
 
     setDebug('database', 'Resposta do banco', 'running', 'Criando registro do documento')
@@ -214,15 +210,15 @@ export async function POST(request: Request) {
         uploadedAt: insert.data.created_at,
         url: await createSignedDownloadUrl(insert.data.file_path),
       },
-    }, { status: 200, headers: UPLOAD_CORS_HEADERS })
+    }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
       setDebug('auth', 'Usuária autenticada no backend', 'error', serializeError(error))
-      return jsonError('Sua sessão expirou. Faça login novamente.', error.status, debug)
+      return jsonError('Sua sessão expirou. Faça login novamente.', error.status, debug, corsHeaders)
     }
     setDebug('error', 'Erro completo', 'error', serializeError(error))
     console.error('[uploads] unhandled error', serializeError(error))
-    return jsonError(error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Tente novamente.', 500, debug)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Tente novamente.', 500, debug, corsHeaders)
   }
 }
 
@@ -263,6 +259,6 @@ function serializeError(error: unknown) {
   return { message: String(error) }
 }
 
-function jsonError(error: string, status: number, debug?: UploadDebugItem[]) {
-  return NextResponse.json({ error, debug: debug ?? [] }, { status, headers: UPLOAD_CORS_HEADERS })
+function jsonError(error: string, status: number, debug: UploadDebugItem[] | undefined, corsHeaders: Record<string, string>) {
+  return NextResponse.json({ error, debug: debug ?? [] }, { status, headers: corsHeaders })
 }

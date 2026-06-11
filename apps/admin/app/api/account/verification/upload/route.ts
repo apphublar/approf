@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
 
 type UploadedVerificationDocument = {
   path: string
@@ -25,11 +20,12 @@ const ALLOWED_TYPES = new Set([
   'text/plain',
 ])
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const form = await request.formData()
@@ -38,7 +34,7 @@ export async function POST(request: Request) {
       .filter((item): item is File => typeof File !== 'undefined' && item instanceof File)
 
     if (!files.length) {
-      return NextResponse.json({ error: 'Nenhum arquivo recebido para upload.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Nenhum arquivo recebido para upload.' }, { status: 400, headers: corsHeaders })
     }
 
     const supabase = createSupabaseServiceClient()
@@ -48,7 +44,7 @@ export async function POST(request: Request) {
       if (file.size > MAX_FILE_SIZE_BYTES) {
         return NextResponse.json(
           { error: `O arquivo ${file.name} excede o limite de 15 MB.` },
-          { status: 400, headers: CORS_HEADERS },
+          { status: 400, headers: corsHeaders },
         )
       }
 
@@ -56,7 +52,7 @@ export async function POST(request: Request) {
       if (mimeType !== 'application/octet-stream' && !ALLOWED_TYPES.has(mimeType)) {
         return NextResponse.json(
           { error: `Formato não suportado para ${file.name}. Use PDF, imagem, DOC/DOCX ou TXT.` },
-          { status: 400, headers: CORS_HEADERS },
+          { status: 400, headers: corsHeaders },
         )
       }
 
@@ -71,7 +67,7 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json(
           { error: `Falha ao enviar ${file.name}. ${error.message}` },
-          { status: 400, headers: CORS_HEADERS },
+          { status: 400, headers: corsHeaders },
         )
       }
 
@@ -83,14 +79,14 @@ export async function POST(request: Request) {
       })
     }
 
-    return NextResponse.json({ documents: uploaded }, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json({ documents: uploaded }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Não foi possível enviar os documentos agora.' },
-      { status: 400, headers: CORS_HEADERS },
+      { status: 400, headers: corsHeaders },
     )
   }
 }

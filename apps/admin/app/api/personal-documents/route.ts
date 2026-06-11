@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
-import { createSignedDownloadUrl, PERSONAL_DOCUMENT_CORS_HEADERS } from './helpers'
+import { createSignedDownloadUrl } from './helpers'
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function GET(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const supabase = createSupabaseServiceClient()
@@ -29,17 +31,18 @@ export async function GET(request: Request) {
       url: await createSignedDownloadUrl(item.file_path),
     })))
 
-    return NextResponse.json({ documents }, { status: 200, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
+    return NextResponse.json({ documents }, { status: 200, headers: corsHeaders })
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401, corsHeaders)
     if (isMissingPersonalDocumentsTable(error)) {
-      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
+      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503, corsHeaders)
     }
-    return jsonError(error instanceof Error ? error.message : 'Não foi possível listar seus documentos.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível listar seus documentos.', 500, corsHeaders)
   }
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
     const mimeType = typeof body.mimeType === 'string' ? body.mimeType : 'application/octet-stream'
 
     if (!filePath.startsWith(`${ownerId}/`) || !fileName || !Number.isFinite(fileSize)) {
-      return jsonError('Dados do documento inválidos.', 400)
+      return jsonError('Dados do documento inválidos.', 400, corsHeaders)
     }
 
     const supabase = createSupabaseServiceClient()
@@ -79,18 +82,18 @@ export async function POST(request: Request) {
         uploadedAt: data.created_at,
         url: await createSignedDownloadUrl(data.file_path),
       },
-    }, { status: 200, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
+    }, { status: 200, headers: corsHeaders })
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', 401, corsHeaders)
     if (isMissingPersonalDocumentsTable(error)) {
-      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503)
+      return jsonError('Banco de dados ainda não atualizado. Aplique a migration 0021_teacher_personal_documents.sql e recarregue o schema do Supabase.', 503, corsHeaders)
     }
-    return jsonError(error instanceof Error ? error.message : 'Não foi possível salvar seu documento.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível salvar seu documento.', 500, corsHeaders)
   }
 }
 
-function jsonError(error: string, status: number) {
-  return NextResponse.json({ error }, { status, headers: PERSONAL_DOCUMENT_CORS_HEADERS })
+function jsonError(error: string, status: number, corsHeaders: Record<string, string>) {
+  return NextResponse.json({ error }, { status, headers: corsHeaders })
 }
 
 function toError(error: unknown, fallback: string) {

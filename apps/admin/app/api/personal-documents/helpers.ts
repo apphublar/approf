@@ -1,12 +1,6 @@
 import { createSupabaseServiceClient } from '@/app/lib/supabase-server'
 
 export const PERSONAL_DOCUMENT_BUCKET = 'teacher-documents'
-export const PERSONAL_DOCUMENT_CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-  'Access-Control-Max-Age': '86400',
-}
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
 const ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.pptx']

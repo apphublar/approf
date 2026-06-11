@@ -64,13 +64,18 @@ async function callPersonalDocumentsApi<T>(path: string, init: RequestInit): Pro
 
   const url = `${getAdminApiUrl()}${path}`
   console.info('[personal-documents] API call', { method: init.method, url })
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init.headers ?? {}),
+      },
+    })
+  } catch (error) {
+    throw wrapPersonalDocumentsFetchError(error)
+  }
   const rawBody = await response.text().catch((readError) => `__READ_ERROR__:${String(readError)}`)
   const payload = parseJsonBody(rawBody) as ({ error?: string } & Record<string, unknown>) | null
   console.info('[personal-documents] API response', { url, status: response.status, ok: response.ok, raw: rawBody, payload })
@@ -92,6 +97,13 @@ function parseJsonBody(raw: string) {
   } catch {
     return null
   }
+}
+
+function wrapPersonalDocumentsFetchError(error: unknown): Error {
+  if (error instanceof TypeError && /failed to fetch/i.test(error.message)) {
+    return new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.')
+  }
+  return error instanceof Error ? error : new Error('Erro inesperado ao acessar seus documentos.')
 }
 
 function getMobileUploadDiagnostics(file: File, userId?: string, hasToken?: boolean) {

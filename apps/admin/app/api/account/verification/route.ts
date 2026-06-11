@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, getAuthenticatedUserId } from '@/app/lib/supabase-server'
 import { createTeacherVerificationRequest, getTeacherAccountData } from '@/app/lib/account'
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
 
 type VerificationDocInput = {
   path: string
@@ -15,11 +10,12 @@ type VerificationDocInput = {
   size: number
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
@@ -35,14 +31,14 @@ export async function POST(request: Request) {
       documents,
     })
     const account = await getTeacherAccountData(ownerId)
-    return NextResponse.json({ verification, account }, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json({ verification, account }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Não foi possível enviar a verificação agora.' },
-      { status: 400, headers: CORS_HEADERS },
+      { status: 400, headers: corsHeaders },
     )
   }
 }
