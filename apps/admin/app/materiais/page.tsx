@@ -305,10 +305,15 @@ async function updateMaterialStatus(formData: FormData) {
     age_range: ageRange || null,
     pedagogical_objective: pedagogicalObjective || null,
     content_preview: contentPreview || null,
-    ai_analysis_status: status === 'published' ? 'approved_by_admin' : status,
     reviewed_at: new Date().toISOString(),
   }
-  if (status === 'published') payload.published_at = new Date().toISOString()
+  if (status === 'published') {
+    payload.published_at = new Date().toISOString()
+    payload.auto_hidden_at = null
+    payload.ai_analysis_status = 'approved'
+  } else {
+    payload.ai_analysis_status = status
+  }
   if (status === 'blocked' || status === 'review_required') payload.auto_hidden_at = new Date().toISOString()
 
   const { error } = await supabase.from('materials').update(payload).eq('id', materialId)

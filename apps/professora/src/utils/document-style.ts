@@ -11,6 +11,11 @@ export interface DocumentStyleSettings {
   boldTitles: boolean
   schoolLogoDataUrl: string | null
   letterheadStyle: LetterheadStyle
+  schoolName: string
+  schoolPeriod: string
+  showSchoolNameInDocuments: boolean
+  showSchoolPeriodInDocuments: boolean
+  showTeacherNameInDocuments: boolean
 }
 
 const STORAGE_KEY = 'approf:document-style-settings'
@@ -24,6 +29,11 @@ export const DEFAULT_DOCUMENT_STYLE_SETTINGS: DocumentStyleSettings = {
   boldTitles: true,
   schoolLogoDataUrl: null,
   letterheadStyle: 'minimal',
+  schoolName: '',
+  schoolPeriod: '',
+  showSchoolNameInDocuments: true,
+  showSchoolPeriodInDocuments: false,
+  showTeacherNameInDocuments: true,
 }
 
 export function loadDocumentStyleSettings(): DocumentStyleSettings {
@@ -83,5 +93,23 @@ function sanitizeSettings(value: Partial<DocumentStyleSettings>): DocumentStyleS
     letterheadStyle: value.letterheadStyle === 'centered' || value.letterheadStyle === 'watermark'
       ? value.letterheadStyle
       : 'minimal',
+    schoolName: typeof value.schoolName === 'string' ? value.schoolName.trim() : '',
+    schoolPeriod: typeof value.schoolPeriod === 'string' ? value.schoolPeriod.trim() : '',
+    showSchoolNameInDocuments: value.showSchoolNameInDocuments !== false,
+    showSchoolPeriodInDocuments: value.showSchoolPeriodInDocuments === true,
+    showTeacherNameInDocuments: value.showTeacherNameInDocuments !== false,
+  }
+}
+
+export function resolveDocumentExportContext(
+  settings: DocumentStyleSettings,
+  fallback: { teacherName?: string; schoolName?: string },
+) {
+  return {
+    teacherName: settings.showTeacherNameInDocuments ? (fallback.teacherName?.trim() || 'Professora') : '',
+    schoolName: settings.showSchoolNameInDocuments
+      ? (settings.schoolName.trim() || fallback.schoolName?.trim() || 'Escola')
+      : '',
+    schoolPeriod: settings.showSchoolPeriodInDocuments ? settings.schoolPeriod.trim() : '',
   }
 }

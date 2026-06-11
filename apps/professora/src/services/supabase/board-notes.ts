@@ -17,10 +17,19 @@ export async function loadBoardNotes(userId: string): Promise<BoardNote[]> {
 
 export async function syncBoardNotes(userId: string, notes: BoardNote[]): Promise<void> {
   const supabase = getSupabaseClient()
-  if (!supabase) return
+  if (!supabase) throw new Error('Supabase não configurado para salvar o quadro.')
 
-  await supabase
+  const { error } = await supabase
     .from('profiles')
     .update({ board_notes: notes, updated_at: new Date().toISOString() })
     .eq('id', userId)
+
+  if (error) throw error
+}
+
+export function mergeBoardNotes(local: BoardNote[], remote: BoardNote[]) {
+  const merged = new Map<string, BoardNote>()
+  remote.forEach((note) => merged.set(note.id, note))
+  local.forEach((note) => merged.set(note.id, note))
+  return Array.from(merged.values())
 }

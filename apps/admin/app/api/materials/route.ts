@@ -1,27 +1,24 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
 import { MATERIAL_BUCKET } from './material-upload'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function GET(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const supabase = createSupabaseServiceClient()
     const { data, error } = await supabase
       .from('materials')
       .select('id, title, description, type, age_range, pedagogical_objective, file_path, file_name, file_type, file_size_bytes, mime_type, status, ai_analysis_status, detected_category, content_preview, published_at, submitted_by, author_id, author_name, author_avatar, downloads_count, views_count, ratings_count, average_rating, reports_count, created_at')
-      .or(`status.eq.published,submitted_by.eq.${ownerId}`)
+      .or(`status.eq.published,submitted_by.eq.${ownerId},author_id.eq.${ownerId}`)
+      .order('published_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
-      .limit(80)
+      .limit(120)
 
     if (error) throw toError(error, 'Não foi possível listar os materiais de apoio.')
 
@@ -103,15 +100,15 @@ export async function GET(request: Request) {
       }
     }))
 
-    return NextResponse.json({ materials }, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json({ materials }, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
     console.error('[materials/list] erro interno', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Não foi possível listar os materiais de apoio.' },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     )
   }
 }

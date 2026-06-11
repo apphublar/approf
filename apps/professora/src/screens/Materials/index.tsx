@@ -100,6 +100,7 @@ export default function MaterialsScreen() {
   const [queue, setQueue] = useState<QueuedFile[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [uploadMsg, setUploadMsg] = useState('')
+  const [loadError, setLoadError] = useState('')
   const draftRestoredRef = useRef(false)
 
   const canSubmit = Boolean(title.trim() && desc.trim() && queue.length > 0 && !submitting)
@@ -219,10 +220,12 @@ export default function MaterialsScreen() {
 
   async function refresh() {
     setLoading(true)
+    setLoadError('')
     try {
       setMaterials(await listSupportMaterials())
-    } catch {
+    } catch (error) {
       setMaterials([])
+      setLoadError(error instanceof Error ? error.message : 'Não foi possível carregar os materiais.')
     } finally {
       setLoading(false)
     }
@@ -317,6 +320,7 @@ export default function MaterialsScreen() {
     setUploadMsg('')
     const snapshot = queue.slice()
     let anyError = false
+    let anyPublished = false
 
     for (let i = 0; i < snapshot.length; i++) {
       if (snapshot[i].status !== 'pending') continue
@@ -331,6 +335,7 @@ export default function MaterialsScreen() {
           pedagogicalObjective: pedagogicalObjective.trim() || desc.trim(),
           file: snapshot[i].file,
         })
+        if (result.status === 'published') anyPublished = true
         setQueue((current) => current.map((entry, idx) =>
           idx === i ? { ...entry, status: 'done', statusMsg: getStatusMessage(result.status) } : entry,
         ))
@@ -350,6 +355,11 @@ export default function MaterialsScreen() {
       setDesc('')
       setAgeRange(DEFAULT_AGE_RANGE)
       setPedagogicalObjective('')
+      setShowUpload(false)
+      setTab(anyPublished ? 'all' : 'mine')
+      setUploadMsg(anyPublished
+        ? 'Material publicado! Já está visível para todas as professoras na aba Todos.'
+        : 'Material enviado. Acompanhe o status em Meus enviados.')
     }
     await refresh()
   }
@@ -491,6 +501,12 @@ export default function MaterialsScreen() {
         <div className="mt-3 rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
           {PRIVACY_NOTICE}
         </div>
+        {loadError && (
+          <p className="mt-2 text-[11px] leading-[1.5] text-[#C1440E]">{loadError}</p>
+        )}
+        {uploadMsg && !showUpload && (
+          <p className="mt-2 text-[11px] leading-[1.5] text-gm font-bold">{uploadMsg}</p>
+        )}
       </div>
 
       {/* ── Tabs ── */}

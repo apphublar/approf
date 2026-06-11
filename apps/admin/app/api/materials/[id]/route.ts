@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
-import { MATERIAL_BUCKET, MATERIALS_CORS_HEADERS } from '../material-upload'
+import { MATERIAL_BUCKET } from '../material-upload'
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: MATERIALS_CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { id } = await params
@@ -14,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
     const action = typeof body.action === 'string' ? body.action : ''
 
-    if (!materialId) return jsonError('ID do material não informado.', 400)
+    if (!materialId) return jsonError('ID do material não informado.', 400, corsHeaders)
 
     const supabase = createSupabaseServiceClient()
     const { data: material, error: materialError } = await supabase
@@ -24,23 +26,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .maybeSingle()
 
     if (materialError) throw new Error(materialError.message)
-    if (!material) return jsonError('Material não encontrado.', 404)
+    if (!material) return jsonError('Material não encontrado.', 404, corsHeaders)
 
     const canInteract = material.status === 'published'
       || material.submitted_by === ownerId
       || material.author_id === ownerId
-    if (!canInteract) return jsonError('Material indisponível.', 403)
+    if (!canInteract) return jsonError('Material indisponível.', 403, corsHeaders)
 
     if (action === 'view') {
       await incrementMaterialCounter(supabase, materialId, 'views_count')
       await logMaterialAction(supabase, ownerId, 'material_viewed', materialId)
-      return NextResponse.json({ ok: true }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+      return NextResponse.json({ ok: true }, { status: 200, headers: corsHeaders })
     }
 
     if (action === 'download') {
       await incrementMaterialCounter(supabase, materialId, 'downloads_count')
       await logMaterialAction(supabase, ownerId, 'material_downloaded', materialId)
-      return NextResponse.json({ ok: true }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+      return NextResponse.json({ ok: true }, { status: 200, headers: corsHeaders })
     }
 
     if (action === 'favorite') {
@@ -59,13 +61,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         if (error) throw new Error(error.message)
       }
       await logMaterialAction(supabase, ownerId, favorite ? 'material_favorited' : 'material_unfavorited', materialId)
-      return NextResponse.json({ ok: true, favorite }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+      return NextResponse.json({ ok: true, favorite }, { status: 200, headers: corsHeaders })
     }
 
     if (action === 'rate') {
       const rating = Number(body.rating)
       const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 800) : ''
-      if (!Number.isInteger(rating) || rating < 1 || rating > 5) return jsonError('Informe uma avaliação de 1 a 5 estrelas.', 400)
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return jsonError('Informe uma avaliação de 1 a 5 estrelas.', 400, corsHeaders)
+      }
       const { error } = await supabase
         .from('material_ratings')
         .upsert(
@@ -75,13 +79,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (error) throw new Error(error.message)
       await refreshMaterialRatingSummary(supabase, materialId)
       await logMaterialAction(supabase, ownerId, 'material_rated', materialId, { rating })
-      return NextResponse.json({ ok: true }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+      return NextResponse.json({ ok: true }, { status: 200, headers: corsHeaders })
     }
 
     if (action === 'report') {
       const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 120) : ''
       const details = typeof body.details === 'string' ? body.details.trim().slice(0, 800) : ''
-      if (!reason) return jsonError('Informe o motivo da denuncia.', 400)
+      if (!reason) return jsonError('Informe o motivo da denuncia.', 400, corsHeaders)
       const { error } = await supabase
         .from('material_reports')
         .upsert(
@@ -91,30 +95,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (error) throw new Error(error.message)
       const reportsCount = await refreshMaterialReportsSummary(supabase, materialId)
       await logMaterialAction(supabase, ownerId, 'material_reported', materialId, { reason, reportsCount })
-      return NextResponse.json({ ok: true, reportsCount }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+      return NextResponse.json({ ok: true, reportsCount }, { status: 200, headers: corsHeaders })
     }
 
-    return jsonError('Ação inválida.', 400)
+    return jsonError('Ação inválida.', 400, corsHeaders)
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', error.status)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', error.status, corsHeaders)
     console.error('[materials/action] unhandled error', error instanceof Error ? error.message : error)
-    return jsonError(error instanceof Error ? error.message : 'Não foi possível atualizar o material.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível atualizar o material.', 500, corsHeaders)
   }
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { id } = await params
     const materialId = id?.trim()
 
-    if (!materialId) return jsonError('ID do material não informado.', 400)
+    if (!materialId) return jsonError('ID do material não informado.', 400, corsHeaders)
 
     console.info('[materials/delete] request received', { ownerId, materialId })
 
     const supabase = createSupabaseServiceClient()
 
-    // Fetch the material to verify ownership and get file_path
     const { data: material, error: fetchError } = await supabase
       .from('materials')
       .select('id, file_path, submitted_by, author_id, status')
@@ -125,17 +129,16 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       console.error('[materials/delete] fetch error', fetchError.message)
       throw new Error(fetchError.message)
     }
-    if (!material) return jsonError('Material não encontrado.', 404)
+    if (!material) return jsonError('Material não encontrado.', 404, corsHeaders)
 
     const isOwner = material.submitted_by === ownerId || material.author_id === ownerId
     if (!isOwner) {
       console.warn('[materials/delete] unauthorized', { ownerId, submitted_by: material.submitted_by, author_id: material.author_id })
-      return jsonError('Sem permissao para excluir este material.', 403)
+      return jsonError('Sem permissao para excluir este material.', 403, corsHeaders)
     }
 
     console.info('[materials/delete] deleting material', { materialId, status: material.status, filePath: material.file_path })
 
-    // Delete file from storage (best-effort)
     const filePath = typeof material.file_path === 'string' ? material.file_path : null
     if (filePath) {
       const { error: storageError } = await supabase.storage.from(MATERIAL_BUCKET).remove([filePath])
@@ -146,7 +149,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       }
     }
 
-    // Delete DB record
     const { error: deleteError } = await supabase
       .from('materials')
       .delete()
@@ -158,16 +160,16 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
 
     console.info('[materials/delete] material deleted successfully', { materialId })
-    return NextResponse.json({ ok: true }, { status: 200, headers: MATERIALS_CORS_HEADERS })
+    return NextResponse.json({ ok: true }, { status: 200, headers: corsHeaders })
   } catch (error) {
-    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', error.status)
+    if (error instanceof AiAuthError) return jsonError('Sessão expirada. Entre novamente.', error.status, corsHeaders)
     console.error('[materials/delete] unhandled error', error instanceof Error ? error.message : error)
-    return jsonError(error instanceof Error ? error.message : 'Não foi possível excluir o material.', 500)
+    return jsonError(error instanceof Error ? error.message : 'Não foi possível excluir o material.', 500, corsHeaders)
   }
 }
 
-function jsonError(error: string, status: number) {
-  return NextResponse.json({ error }, { status, headers: MATERIALS_CORS_HEADERS })
+function jsonError(error: string, status: number, corsHeaders: Record<string, string>) {
+  return NextResponse.json({ error }, { status, headers: corsHeaders })
 }
 
 async function incrementMaterialCounter(

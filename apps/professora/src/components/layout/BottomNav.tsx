@@ -89,7 +89,7 @@ export default function BottomNav() {
 
       <div className="px-2 flex items-center justify-center">
         <button
-          onClick={() => openSubscreen('new-annotation')}
+          onClick={() => openSubscreen('new-annotation', { stayAfterSave: true })}
           className="subtle-attention w-[52px] h-[52px] rounded-full bg-gm text-white border-none shadow-fab flex items-center justify-center -mt-5"
           aria-label="Nova anotação"
         >

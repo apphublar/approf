@@ -7,7 +7,7 @@ import { previewGeneratedMaterialShare, publishGeneratedMaterialShare, type Gene
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument, ReportStatus } from '@/types'
 import { getImageVariants, type ImageVariants } from '@/utils/image-performance'
-import { fontFamilyCss, fontFamilyLabel, loadDocumentStyleSettings, textAlignLabel, type DocumentStyleSettings } from '@/utils/document-style'
+import { fontFamilyCss, fontFamilyLabel, loadDocumentStyleSettings, resolveDocumentExportContext, textAlignLabel, type DocumentStyleSettings } from '@/utils/document-style'
 
 interface DocumentDetailSubscreenProps {
   data?: unknown
@@ -317,6 +317,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   function downloadWord() {
     if (!document) return
     const title = formatReportType(document.report_type)
+    const exportContext = resolveDocumentExportContext(styleSettings, { teacherName: userName, schoolName })
     const html = buildExportHtml(
       title,
       studentName,
@@ -324,8 +325,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
       draft,
       styleSettings,
       imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl,
-      userName,
-      schoolName,
+      exportContext,
     )
     const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' })
     downloadBlob(blob, `${slugify(title)}.doc`)
@@ -347,8 +347,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
         draft,
         styleSettings,
         imageVariants?.originalUrl ?? document.ai_artifacts?.imageDataUrl,
-        userName,
-        schoolName,
+        resolveDocumentExportContext(styleSettings, { teacherName: userName, schoolName }),
       ),
     )
     printWindow.document.close()
@@ -703,8 +702,7 @@ function buildExportHtml(
   bodyHtml: string,
   settings: DocumentStyleSettings,
   imageDataUrl?: string,
-  teacherName?: string,
-  schoolName?: string,
+  exportContext?: { teacherName: string; schoolName: string; schoolPeriod: string },
 ) {
   const bodyContent = imageDataUrl
     ? `<div class="image-wrap"><img src="${imageDataUrl}" alt="Imagem do documento" /></div>`
@@ -737,12 +735,13 @@ function buildExportHtml(
   <div class="meta">
     <p><strong>Criança:</strong> ${escapeHtml(studentName ?? 'Sem criança')}</p>
     <p><strong>Turma:</strong> ${escapeHtml(className ?? 'Sem turma')}</p>
+    ${exportContext?.schoolPeriod ? `<p><strong>Período:</strong> ${escapeHtml(exportContext.schoolPeriod)}</p>` : ''}
   </div>
   ${bodyContent}
-  <div class="sheet-footer">
-    <span>${escapeHtml(teacherName ?? 'Professora')}</span>
-    <span>${escapeHtml(schoolName ?? 'Escola')}</span>
-  </div>
+  ${exportContext?.teacherName || exportContext?.schoolName ? `<div class="sheet-footer">
+    <span>${escapeHtml(exportContext.teacherName || '')}</span>
+    <span>${escapeHtml(exportContext.schoolName || '')}</span>
+  </div>` : ''}
 </body>
 </html>`
 }

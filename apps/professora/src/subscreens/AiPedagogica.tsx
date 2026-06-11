@@ -5,6 +5,7 @@ import {
   DEFAULT_DOCUMENT_STYLE_SETTINGS,
   fontFamilyLabel,
   loadDocumentStyleSettings,
+  resolveDocumentExportContext,
   saveDocumentStyleSettings,
   type DocumentStyleSettings,
 } from '@/utils/document-style'
@@ -14,7 +15,7 @@ import { listReports } from '@/services/reports'
 
 export default function AiPedagogicaSubscreen() {
   const { closeSubscreen, openSubscreen } = useNavStore()
-  const { userName, schoolName, annotations, classes } = useAppStore()
+  const { userName, schoolName, setSchoolName, annotations, classes } = useAppStore()
   const [studentsWithDevelopmentReport, setStudentsWithDevelopmentReport] = useState<Set<string>>(() => new Set())
   const [reportSuggestionsLoaded, setReportSuggestionsLoaded] = useState(false)
 
@@ -37,7 +38,15 @@ export default function AiPedagogicaSubscreen() {
     )
   }, [annotations, classes, reportSuggestionsLoaded, studentsWithDevelopmentReport])
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
+  const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => {
+    const loaded = loadDocumentStyleSettings()
+    if (!loaded.schoolName && schoolName) {
+      return { ...loaded, schoolName }
+    }
+    return loaded
+  })
+  const exportPreview = resolveDocumentExportContext(styleSettings, { teacherName: userName, schoolName })
+
   useEffect(() => {
     let active = true
     const classIds = classes.map((classItem) => classItem.id).filter(Boolean)
@@ -78,6 +87,9 @@ export default function AiPedagogicaSubscreen() {
     const merged = { ...styleSettings, ...next }
     setStyleSettings(merged)
     saveDocumentStyleSettings(merged)
+    if (typeof next.schoolName === 'string' && next.schoolName.trim()) {
+      setSchoolName(next.schoolName.trim())
+    }
   }
 
   async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -191,7 +203,53 @@ export default function AiPedagogicaSubscreen() {
                 </button>
               </div>
 
-              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Fonte padrão</p>
+              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Identificação nos documentos</p>
+              <label className="block mt-2 text-[12px] text-muted">
+                Nome da escola
+                <input
+                  value={styleSettings.schoolName}
+                  onChange={(event) => updateSettings({ schoolName: event.target.value })}
+                  placeholder="Ex: EMEI Professora Maria Silva"
+                  className="w-full mt-1 rounded-app-sm border border-border px-3 py-2 text-[13px] text-ink"
+                />
+              </label>
+              <label className="block mt-3 text-[12px] text-muted">
+                Período (opcional)
+                <input
+                  value={styleSettings.schoolPeriod}
+                  onChange={(event) => updateSettings({ schoolPeriod: event.target.value })}
+                  placeholder="Ex: 2025 ou mar/2025 a dez/2025"
+                  className="w-full mt-1 rounded-app-sm border border-border px-3 py-2 text-[13px] text-ink"
+                />
+              </label>
+              <div className="mt-3 space-y-2">
+                <label className="flex items-center gap-2 text-[12px] text-muted">
+                  <input
+                    type="checkbox"
+                    checked={styleSettings.showSchoolNameInDocuments}
+                    onChange={(event) => updateSettings({ showSchoolNameInDocuments: event.target.checked })}
+                  />
+                  Exibir nome da escola nos relatórios e planejamentos
+                </label>
+                <label className="flex items-center gap-2 text-[12px] text-muted">
+                  <input
+                    type="checkbox"
+                    checked={styleSettings.showSchoolPeriodInDocuments}
+                    onChange={(event) => updateSettings({ showSchoolPeriodInDocuments: event.target.checked })}
+                  />
+                  Exibir período nos documentos
+                </label>
+                <label className="flex items-center gap-2 text-[12px] text-muted">
+                  <input
+                    type="checkbox"
+                    checked={styleSettings.showTeacherNameInDocuments}
+                    onChange={(event) => updateSettings({ showTeacherNameInDocuments: event.target.checked })}
+                  />
+                  Exibir nome da professora no rodapé
+                </label>
+              </div>
+
+              <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-5">Fonte padrão</p>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {(['arial', 'times-new-roman'] as const).map((family) => (
                   <button
@@ -348,12 +406,17 @@ export default function AiPedagogicaSubscreen() {
                     <div className="h-2 bg-[#F0F0F0] rounded w-[84%]" />
                     <div className="h-2 bg-[#ECECEC] rounded w-[72%]" />
                   </div>
-                  <div className="absolute bottom-3 left-4 right-4 text-[10px] text-muted flex justify-between">
-                    <span>{userName || 'Nome da professora'}</span>
-                    <span>{schoolName || 'Nome da escola'}</span>
+                  <div className="absolute bottom-3 left-4 right-4 text-[10px] text-muted flex justify-between gap-2">
+                    <span>{exportPreview.teacherName || '—'}</span>
+                    <span>{exportPreview.schoolName || '—'}</span>
                   </div>
                 </div>
-                <p className="text-[10px] text-muted mt-2">Rodapé automático com professora e escola em todas as páginas exportadas.</p>
+                <p className="text-[10px] text-muted mt-2">
+                  {exportPreview.schoolPeriod
+                    ? `Período: ${exportPreview.schoolPeriod}. `
+                    : ''}
+                  Ajuste acima o que deve aparecer nos relatórios e planejamentos exportados.
+                </p>
               </div>
 
               <button

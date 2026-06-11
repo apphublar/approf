@@ -1,9 +1,9 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, Check, Mic, Paperclip, PlusCircle, Send, Square, Trash2 } from 'lucide-react'
+import { ChevronLeft, Check, Mic, Paperclip, Pencil, PlusCircle, Send, Square, Trash2 } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { getAppDataMode } from '@/services/app-data'
 import { formatAiUsageMessage, generateAiChatReply, transcribeAnnotationAudio } from '@/services/ai-usage'
-import { createSupabaseAnnotation, updateSupabaseAnnotation } from '@/services/supabase/annotations'
+import { createSupabaseAnnotation, deleteSupabaseAnnotation, updateSupabaseAnnotation } from '@/services/supabase/annotations'
 import { isSupabaseConfigured } from '@/services/supabase/config'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import type { Annotation, AnnotationCategory, AnnotationPersistence } from '@/types'
@@ -54,7 +54,7 @@ const PERSONAL_MODELS: ModelOption[] = [
 const MAX_AUDIO_SECONDS = 30
 export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const { closeSubscreen } = useNavStore()
-  const { addAnnotation, updateAnnotation, annotations, classes, activeClassId, activeStudentId, userId } = useAppStore()
+  const { addAnnotation, updateAnnotation, removeAnnotation, annotations, classes, activeClassId, activeStudentId, userId } = useAppStore()
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -74,6 +74,9 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [savedCustomCategories, setSavedCustomCategories] = useState<SavedCustomCategory[]>([])
   const [selectedCategoryKey, setSelectedCategoryKey] = useState('turma')
   const [categoryMessage, setCategoryMessage] = useState('')
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState('')
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [editingCategoryTitle, setEditingCategoryTitle] = useState('')
   const detailsSectionRef = useRef<HTMLDivElement | null>(null)
   const [attachmentName, setAttachmentName] = useState('')
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
@@ -128,6 +131,11 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     }
   }, [props?.data])
   const isDirectStudentNote = Boolean(prefillData?.directStudentNote) && !isEditing
+  const stayAfterSave = useMemo(() => {
+    const data = props?.data
+    if (!data || typeof data !== 'object' || isEditing) return false
+    return Boolean((data as { stayAfterSave?: boolean }).stayAfterSave)
+  }, [props?.data, isEditing])
 
   const selectedModel = findModelById(modelId)
   const selectedClass = classes.find((item) => item.id === classId) ?? activeClass
@@ -371,6 +379,121 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     setCategoryMessage(`Categoria "${category.title}" selecionada.`)
   }
 
+  function countAnnotationsForCategory(category: SavedCustomCategory) {
+    return annotations.filter((annotation) =>
+      annotation.label === category.title || (annotation.tags ?? []).includes(category.title),
+    ).length
+  }
+
+  function renameCustomCategory(category: SavedCustomCategory, nextTitle: string) {
+    const normalized = nextTitle.trim()
+    if (!normalized || normalized === category.title) return
+
+    const nextCategory: SavedCustomCategory = {
+      id: slugifyCategory(normalized),
+      title: normalized,
+      description: buildCustomCategoryDescription(normalized),
+    }
+
+    setSavedCustomCategories((current) => {
+      const withoutOld = current.filter((item) => item.id !== category.id && item.id !== nextCategory.id)
+      const next = [...withoutOld, nextCategory]
+      if (userId) persistSavedCustomCategories(userId, next)
+      return next
+    })
+
+    const affected = annotations.filter((annotation) =>
+      annotation.label === category.title || (annotation.tags ?? []).includes(category.title),
+    )
+
+    for (const annotation of affected) {
+      const nextTags = (annotation.tags ?? []).map((tag) => (tag === category.title ? normalized : tag))
+      const nextAnnotation = {
+        ...annotation,
+        label: annotation.label === category.title ? normalized : annotation.label,
+        tags: nextTags,
+      }
+      updateAnnotation(nextAnnotation)
+      if (getAppDataMode() === 'supabase' && isSupabaseConfigured()) {
+        void updateSupabaseAnnotation({
+          annotationId: annotation.id,
+          category: annotation.category,
+          label: nextAnnotation.label,
+          text: annotation.text,
+          classId: annotation.classId,
+          studentId: annotation.studentId,
+          studentName: annotation.studentName,
+          tags: nextTags,
+          persistence: annotation.persistence ?? [],
+          attachmentName: annotation.attachmentName ?? null,
+        }).catch(() => undefined)
+      }
+    }
+
+    if (selectedCategoryKey === `custom:${category.id}` || customCategory === category.title) {
+      applySavedCustomCategory(nextCategory)
+    }
+    setEditingCategoryId(null)
+    setEditingCategoryTitle('')
+    setCategoryMessage(`Categoria renomeada para "${normalized}".`)
+  }
+
+  async function deleteCustomCategory(category: SavedCustomCategory) {
+    const affectedCount = countAnnotationsForCategory(category)
+    const confirmed = window.confirm(
+      affectedCount > 0
+        ? `Esta categoria possui ${affectedCount} anotação(ões). Se você excluir, todas serão apagadas permanentemente e não poderão ser recuperadas. Deseja continuar?`
+        : `Excluir a categoria "${category.title}"?`,
+    )
+    if (!confirmed) return
+
+    const affected = annotations.filter((annotation) =>
+      annotation.label === category.title || (annotation.tags ?? []).includes(category.title),
+    )
+
+    for (const annotation of affected) {
+      removeAnnotation(annotation.id)
+      if (getAppDataMode() === 'supabase' && isSupabaseConfigured()) {
+        try {
+          await deleteSupabaseAnnotation(annotation.id)
+        } catch {
+          // mantém remoção local mesmo se a API falhar
+        }
+      }
+    }
+
+    setSavedCustomCategories((current) => {
+      const next = current.filter((item) => item.id !== category.id)
+      if (userId) persistSavedCustomCategories(userId, next)
+      return next
+    })
+
+    if (selectedCategoryKey === `custom:${category.id}` || customCategory === category.title) {
+      chooseDefaultTarget('class')
+    }
+    setEditingCategoryId(null)
+    setEditingCategoryTitle('')
+    setCategoryMessage(
+      affectedCount > 0
+        ? `Categoria excluída com ${affectedCount} anotação(ões) removida(s).`
+        : `Categoria "${category.title}" excluída.`,
+    )
+  }
+
+  function resetAnnotationForm() {
+    setText('')
+    setTags([])
+    setAttachmentName('')
+    setAttachmentFile(null)
+    setAudioBlob(null)
+    setRecordedSeconds(0)
+    setRecordingSeconds(0)
+    setUsageMessage('')
+    setAudioMessage('')
+    setError('')
+    if (draftKeyRef.current) clearDraft(draftKeyRef.current)
+  }
+
   function createCustomCategory() {
     const normalized = newCustomCategory.trim()
     if (!normalized) {
@@ -600,10 +723,15 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
         }
       }
 
-      if (!isEditing && draftKeyRef.current) {
-        clearDraft(draftKeyRef.current)
+      if (stayAfterSave) {
+        resetAnnotationForm()
+        setSaveSuccessMessage('Anotação salva. Você pode registrar outra agora.')
+      } else {
+        if (!isEditing && draftKeyRef.current) {
+          clearDraft(draftKeyRef.current)
+        }
+        closeSubscreen()
       }
-      closeSubscreen()
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Não foi possível salvar a anotação agora.')
     } finally {
@@ -838,13 +966,54 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
                 onClick={() => choosePersonalTarget()}
               />
               {savedCustomCategories.map((category) => (
-                <ChoiceButton
-                  key={category.id}
-                  selected={selectedCategoryKey === `custom:${category.id}`}
-                  title={category.title}
-                  desc={category.description}
-                  onClick={() => selectSavedCustomCategory(category)}
-                />
+                <div key={category.id} className="rounded-app-sm border border-border bg-white p-2">
+                  {editingCategoryId === category.id ? (
+                    <div className="flex gap-2">
+                      <input
+                        value={editingCategoryTitle}
+                        onChange={(event) => setEditingCategoryTitle(event.target.value)}
+                        className="min-w-0 flex-1 px-3 py-2 rounded-app-sm border border-border bg-cream text-[13px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => renameCustomCategory(category, editingCategoryTitle)}
+                        className="px-3 rounded-app-sm bg-gm text-white text-[11px] font-bold"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <ChoiceButton
+                        selected={selectedCategoryKey === `custom:${category.id}`}
+                        title={category.title}
+                        desc={category.description}
+                        onClick={() => selectSavedCustomCategory(category)}
+                      />
+                      <div className="mt-2 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCategoryId(category.id)
+                            setEditingCategoryTitle(category.title)
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-muted"
+                        >
+                          <Pencil size={12} />
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteCustomCategory(category)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-[#C1440E]"
+                        >
+                          <Trash2 size={12} />
+                          Excluir
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               ))}
             </div>
 
@@ -986,6 +1155,9 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
           </div>
         )}
 
+        {saveSuccessMessage && (
+          <p className="text-[12px] text-gm mt-4 leading-[1.5] font-bold">{saveSuccessMessage}</p>
+        )}
         {error && <p className="text-[12px] text-[#C1440E] mt-4 leading-[1.5]">{error}</p>}
           </>
         ) : (

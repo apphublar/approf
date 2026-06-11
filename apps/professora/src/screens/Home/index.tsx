@@ -365,7 +365,7 @@ export default function HomeScreen() {
               </div>
               <div className="flex-1">
                 <h3 className="text-[14px] font-bold">Criador Pedagógico</h3>
-                <p className="text-[12px] opacity-80 leading-snug">Planeje a rotina e documente o percurso</p>
+                <p className="text-[12px] opacity-80 leading-snug">Gere relatórios, planejamentos e documentos pedagógicos com IA a partir das suas anotações</p>
               </div>
               <ChevronRight size={18} className="text-white/70" />
             </div>
@@ -652,7 +652,7 @@ function BoardNoteModal({
     dragStartY.current = null
   }
 
-  function save() {
+  async function save() {
     if (!title.trim() && !body.trim()) return alert('Escreva algo antes de salvar.')
     if (isEditing) deleteBoardNote(initialNote.id)
     addBoardNote({
@@ -663,7 +663,12 @@ function BoardNoteModal({
       expiresAt: expires || null,
     })
     if (isSupabaseAuthEnabled()) {
-      syncBoardNotes(userId, useAppStore.getState().boardNotes).catch(() => {})
+      try {
+        await syncBoardNotes(userId, useAppStore.getState().boardNotes)
+      } catch {
+        alert('A nota foi salva no aparelho, mas não foi possível sincronizar com a nuvem. Tente novamente.')
+        return
+      }
     }
     onClose()
   }
@@ -766,7 +771,7 @@ function BoardNoteModal({
             />
 
             <button
-              onClick={save}
+              onClick={() => void save()}
               className="w-full py-[14px] rounded-app-sm text-white font-bold text-[15px] border-none cursor-pointer mb-2"
               style={{ background: '#83C451' }}
             >

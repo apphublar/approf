@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { BadgeCheck, ChevronLeft, Eye, EyeOff, LogOut, Paperclip, ShieldCheck, Wallet, X } from 'lucide-react'
-import { useNavStore } from '@/store'
+import { ChevronLeft, Eye, EyeOff, LogOut, Paperclip, ShieldCheck, Wallet, X } from 'lucide-react'
+import VerifiedBadge from '@/components/ui/VerifiedBadge'
+import { useAppStore, useNavStore } from '@/store'
+import { ensureTeacherSchool } from '@/services/supabase/classes'
+import { buildVerificationNotes, formatVerificationNotesSummary, parseVerificationNotes } from '@/utils/verification-notes'
+import { saveDocumentStyleSettings } from '@/utils/document-style'
 import {
   cancelTeacherSubscription,
   getTeacherAccountSnapshot,
@@ -23,6 +27,7 @@ const VERIFICATION_FILE_INPUT_ID = 'verification-file-input'
 
 export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen, subscreens } = useNavStore()
+  const { setSchoolName, userId } = useAppStore()
   const forcedMode = typeof data === 'object' && data && 'forcedMode' in data
     ? Boolean((data as { forcedMode?: boolean }).forcedMode)
     : false
@@ -48,7 +53,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [verificationNotes, setVerificationNotes] = useState('')
+  const [verificationSchoolName, setVerificationSchoolName] = useState('')
+  const [verificationPeriod, setVerificationPeriod] = useState('')
+  const [verificationObservation, setVerificationObservation] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [restoringPendingFiles, setRestoringPendingFiles] = useState(true)
 
@@ -112,10 +119,44 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   }, [initialSnapshot])
 
   const blocked = useMemo(() => isTeacherAccessBlocked(snapshot?.subscription?.status ?? null), [snapshot])
-  const isProfileVerified = useMemo(
-    () => (snapshot?.verifications ?? []).some((item) => item.status === 'approved'),
+  const approvedVerification = useMemo(
+    () => (snapshot?.verifications ?? []).find((item) => item.status === 'approved') ?? null,
     [snapshot],
   )
+  const isProfileVerified = Boolean(approvedVerification)
+  const approvedVerificationDetails = useMemo(
+    () => parseVerificationNotes(approvedVerification?.notes ?? null),
+    [approvedVerification],
+  )
+  const hasPendingVerification = useMemo(
+    () => (snapshot?.verifications ?? []).some((item) => item.status === 'pending'),
+    [snapshot],
+  )
+
+  useEffect(() => {
+    if (!approvedVerification) return
+    const parsed = parseVerificationNotes(approvedVerification.notes)
+    if (!parsed?.schoolName) return
+    setSchoolName(parsed.schoolName)
+    saveDocumentStyleSettings({
+      schoolName: parsed.schoolName,
+      schoolPeriod: parsed.period,
+      showSchoolNameInDocuments: true,
+    })
+  }, [approvedVerification, setSchoolName])
+
+  useEffect(() => {
+    if (!snapshot || verificationSchoolName.trim()) return
+    const parsed = parseVerificationNotes(snapshot.verifications.find((item) => item.status === 'pending')?.notes ?? null)
+    if (parsed?.schoolName) {
+      setVerificationSchoolName(parsed.schoolName)
+      setVerificationPeriod(parsed.period)
+      setVerificationObservation(parsed.observation ?? '')
+      return
+    }
+    const firstSchool = snapshot.schools[0]?.name
+    if (firstSchool) setVerificationSchoolName(firstSchool)
+  }, [snapshot, verificationSchoolName])
   const submittedVerificationRequests = useMemo(
     () => (snapshot?.verifications ?? []).filter((item) => item.documents.length > 0),
     [snapshot],
@@ -215,8 +256,14 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       setError('Anexe ao menos um documento para enviar a validação.')
       return
     }
-    if (snapshot.schools.length === 0) {
-      setError('Cadastre ao menos uma escola antes de solicitar a verificação do perfil.')
+    const schoolName = verificationSchoolName.trim()
+    const period = verificationPeriod.trim()
+    if (!schoolName) {
+      setError('Informe o nome da escola em que você trabalha.')
+      return
+    }
+    if (!period) {
+      setError('Informe o período de vínculo com a escola.')
       return
     }
 
@@ -224,14 +271,28 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     setError('')
     try {
       const uploaded = await uploadTeacherVerificationDocuments(pendingFiles)
+      const schoolId = await ensureTeacherSchool(schoolName, userId || snapshot.userId)
+      const notes = buildVerificationNotes({
+        schoolName,
+        period,
+        observation: verificationObservation.trim() || undefined,
+      })
       await submitTeacherVerificationRequest({
-        schoolIds: snapshot.schools.map((school) => school.id),
-        notes: verificationNotes.trim() || undefined,
+        schoolIds: [schoolId],
+        notes,
         documents: uploaded,
+      })
+      setSchoolName(schoolName)
+      saveDocumentStyleSettings({
+        schoolName,
+        schoolPeriod: period,
+        showSchoolNameInDocuments: true,
       })
       setPendingFiles([])
       await clearPendingFiles(VERIFICATION_FILES_KEY)
-      setVerificationNotes('')
+      setVerificationSchoolName('')
+      setVerificationPeriod('')
+      setVerificationObservation('')
       if (verificationInputRef.current) verificationInputRef.current.value = ''
       await refreshAccount()
       setMessage('Documentos enviados para validação com sucesso.')
@@ -299,14 +360,149 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] font-bold text-ink truncate">{snapshot.fullName}</p>
                   <p className="text-[11px] text-muted mt-1">Professora</p>
+                  {isProfileVerified && approvedVerificationDetails?.schoolName && (
+                    <p className="text-[11px] text-gm mt-1 font-bold truncate">
+                      {approvedVerificationDetails.schoolName}
+                    </p>
+                  )}
                 </div>
-                {isProfileVerified && (
-                  <div className="inline-flex items-center gap-1.5 flex-shrink-0">
-                    <BadgeCheck size={14} className="text-gm" />
-                    <span className="text-[11px] text-gm font-bold">Perfil validado</span>
-                  </div>
-                )}
+                {isProfileVerified && <VerifiedBadge />}
               </div>
+            </div>
+
+            <div className="bg-white rounded-app p-4 border border-gp shadow-card mb-4">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={15} className="text-gm" />
+                  <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Validação profissional</p>
+                </div>
+                {isProfileVerified && <VerifiedBadge compact />}
+              </div>
+
+              {isProfileVerified && approvedVerificationDetails ? (
+                <div className="rounded-app-sm border border-gp bg-gbg px-3 py-3">
+                  <p className="text-[12px] font-bold text-gd">Vínculo com a escola confirmado</p>
+                  <p className="text-[12px] text-ink mt-2">
+                    <span className="font-bold">Escola:</span> {approvedVerificationDetails.schoolName}
+                  </p>
+                  <p className="text-[12px] text-ink mt-1">
+                    <span className="font-bold">Período:</span> {approvedVerificationDetails.period}
+                  </p>
+                  {approvedVerificationDetails.observation && (
+                    <p className="text-[11px] text-muted mt-2 leading-[1.5]">
+                      {approvedVerificationDetails.observation}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-muted mt-3 leading-[1.5]">
+                    O nome da escola já aparece automaticamente nos documentos gerados. Você pode ajustar a exibição em
+                    {' '}
+                    <span className="font-bold text-gd">Criador Pedagógico → Edição e Formatação</span>.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-[12px] text-muted leading-[1.5]">
+                    Comprove que você trabalha em uma escola informando o nome da instituição, o período de vínculo e
+                    enviando um comprovante como holerite, declaração da escola ou contrato.
+                  </p>
+                  {hasPendingVerification && (
+                    <p className="mt-3 rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
+                      Seus documentos estão em análise. A equipe Approf revisará o comprovante enviado.
+                    </p>
+                  )}
+                  <label className="block mt-3 text-[11px] font-bold text-muted">Nome da escola em que trabalha</label>
+                  <input
+                    value={verificationSchoolName}
+                    onChange={(event) => setVerificationSchoolName(event.target.value)}
+                    placeholder="Ex: EMEI Professora Maria Silva"
+                    className="w-full mt-1 mb-3 rounded-app-sm border border-border px-3 py-2 text-[13px]"
+                    disabled={hasPendingVerification}
+                  />
+                  <label className="block text-[11px] font-bold text-muted">Período de vínculo</label>
+                  <input
+                    value={verificationPeriod}
+                    onChange={(event) => setVerificationPeriod(event.target.value)}
+                    placeholder="Ex: mar/2025 a dez/2025"
+                    className="w-full mt-1 mb-3 rounded-app-sm border border-border px-3 py-2 text-[13px]"
+                    disabled={hasPendingVerification}
+                  />
+                  <label className="block text-[11px] font-bold text-muted">Observação (opcional)</label>
+                  <textarea
+                    value={verificationObservation}
+                    onChange={(event) => setVerificationObservation(event.target.value)}
+                    placeholder="Informações adicionais para a equipe de validação."
+                    className="w-full mt-1 min-h-[72px] rounded-app-sm border border-border px-3 py-2 text-[12px]"
+                    disabled={hasPendingVerification}
+                  />
+                  <p className="text-[11px] text-muted mt-3 leading-[1.5]">
+                    Anexe o comprovante de vínculo (holerite, declaração da escola, contrato ou documento equivalente).
+                  </p>
+                  <label
+                    htmlFor={VERIFICATION_FILE_INPUT_ID}
+                    onClick={() => stashNavigationForFilePicker('teacher-account', subscreens)}
+                    className={`w-full mt-3 inline-flex items-center justify-center gap-2 py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer ${submittingVerification || restoringPendingFiles || hasPendingVerification ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    <Paperclip size={14} />
+                    {restoringPendingFiles ? 'Recuperando anexos...' : 'Anexar comprovante'}
+                  </label>
+                  {pendingFiles.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-[11px] font-bold text-ink">Comprovantes prontos para envio</p>
+                      {pendingFiles.map((file, index) => (
+                        <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-app-sm border border-border bg-cream px-3 py-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-bold text-ink truncate">{file.name}</p>
+                            <p className="text-[10px] text-muted">{Math.max(1, Math.round(file.size / 1024))} KB</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removePendingVerificationFile(index)}
+                            className="w-7 h-7 rounded-full border border-border bg-white flex items-center justify-center text-muted flex-shrink-0"
+                            aria-label={`Remover ${file.name}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void submitVerification()}
+                    disabled={
+                      submittingVerification
+                      || hasPendingVerification
+                      || pendingFiles.length === 0
+                      || !verificationSchoolName.trim()
+                      || !verificationPeriod.trim()
+                    }
+                    className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50"
+                  >
+                    {submittingVerification ? 'Enviando comprovante...' : 'Enviar comprovante para validação'}
+                  </button>
+                </>
+              )}
+
+              {submittedVerificationRequests.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-[11px] font-bold text-muted mb-2">Histórico de envios</p>
+                  {submittedVerificationRequests.slice(0, 4).map((item) => (
+                    <div key={item.id} className="rounded-app-sm border border-border p-3 mb-2">
+                      <p className="text-[12px] font-bold text-ink">
+                        Status: {formatVerificationStatus(item.status)}
+                      </p>
+                      <p className="text-[11px] text-muted mt-1">
+                        {item.documents.length} documento(s) enviado(s) em {formatDate(item.created_at)}
+                      </p>
+                      {formatVerificationNotesSummary(item.notes) && (
+                        <p className="text-[11px] text-soft mt-1 leading-[1.5]">
+                          {formatVerificationNotesSummary(item.notes)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {blocked && (
@@ -406,85 +602,6 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               <button onClick={requestCancellation} disabled={saving || blocked} className="w-full mt-3 py-2 rounded-app-sm border border-[#C1440E] text-[#C1440E] text-[12px] font-bold disabled:opacity-50">
                 {blocked ? 'Assinatura já restrita' : 'Cancelar assinatura'}
               </button>
-            </div>
-
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <ShieldCheck size={15} className="text-gm" />
-                <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Validação profissional</p>
-              </div>
-              <p className="text-[12px] text-muted leading-[1.5]">
-                Esta etapa serve apenas para validar o vínculo profissional da professora com a escola. A revisão é feita pela equipe da Approf.
-              </p>
-              <textarea
-                value={verificationNotes}
-                onChange={(event) => setVerificationNotes(event.target.value)}
-                placeholder="Observações para a equipe (opcional)."
-                className="w-full mt-3 min-h-[88px] rounded-app-sm border border-border px-3 py-2 text-[12px]"
-              />
-              <label
-                htmlFor={VERIFICATION_FILE_INPUT_ID}
-                onClick={() => stashNavigationForFilePicker('teacher-account', subscreens)}
-                className={`w-full mt-3 inline-flex items-center justify-center gap-2 py-2 rounded-app-sm border border-gp text-gd text-[12px] font-bold cursor-pointer ${submittingVerification || restoringPendingFiles ? 'opacity-50 pointer-events-none' : ''}`}
-              >
-                <Paperclip size={14} />
-                {restoringPendingFiles ? 'Recuperando anexos...' : 'Anexar documentos'}
-              </label>
-              {pendingFiles.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-[11px] font-bold text-ink">Arquivos prontos para envio</p>
-                  {pendingFiles.map((file, index) => (
-                    <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-app-sm border border-border bg-cream px-3 py-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-bold text-ink truncate">{file.name}</p>
-                        <p className="text-[10px] text-muted">{Math.max(1, Math.round(file.size / 1024))} KB</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removePendingVerificationFile(index)}
-                        className="w-7 h-7 rounded-full border border-border bg-white flex items-center justify-center text-muted flex-shrink-0"
-                        aria-label={`Remover ${file.name}`}
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button type="button" onClick={() => void submitVerification()} disabled={submittingVerification || pendingFiles.length === 0} className="w-full mt-3 py-2 rounded-app-sm bg-gm text-white text-[12px] font-bold disabled:opacity-50">
-                {submittingVerification ? 'Enviando documentos...' : 'Enviar documentos para validação'}
-              </button>
-              {submittedVerificationRequests.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-[11px] font-bold text-muted mb-2">Documentos enviados para validação</p>
-                  {submittedVerificationRequests.slice(0, 4).map((item) => (
-                    <div key={item.id} className="rounded-app-sm border border-border p-3 mb-2">
-                      <p className="text-[12px] font-bold text-ink">
-                        Status: {formatVerificationStatus(item.status)}
-                      </p>
-                      <p className="text-[11px] text-muted mt-1">
-                        {item.documents.length} documento(s) enviado(s) em {formatDate(item.created_at)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-              <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Escolas vinculadas</p>
-              {snapshot.schools.length === 0 ? (
-                <p className="text-[12px] text-muted">Nenhuma escola cadastrada.</p>
-              ) : (
-                snapshot.schools.map((school) => (
-                  <div key={school.id} className="rounded-app-sm border border-border p-3 mb-2">
-                    <p className="text-[13px] font-bold text-ink">{school.name}</p>
-                    <p className="text-[11px] text-muted mt-1">
-                      {[school.city, school.state].filter(Boolean).join(' - ') || 'Localidade não informada'}
-                    </p>
-                  </div>
-                ))
-              )}
             </div>
 
             {message && <p className="text-[12px] text-gm mb-3">{message}</p>}

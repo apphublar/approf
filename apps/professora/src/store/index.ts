@@ -16,6 +16,7 @@ import type {
   TimelineEvent,
 } from '@/types'
 import { getInitialAppData } from '@/services/app-data'
+import { mergeBoardNotes } from '@/services/supabase/board-notes'
 
 const initialAppData = getInitialAppData()
 
@@ -181,7 +182,7 @@ export const useAppStore = create<AppStore>()(
         return state.communityAccess.global || state.communityAccess.allowedUserIds.includes(state.userId)
       },
       hydrateWorkspace: (data) =>
-        set({
+        set((state) => ({
           userId: data.userId,
           userName: data.userName,
           schoolName: data.schoolName,
@@ -189,7 +190,7 @@ export const useAppStore = create<AppStore>()(
           annotations: data.annotations ?? [],
           annotationsHasMore: data.annotationsHasMore ?? false,
           attendanceRecords: data.attendanceRecords ?? [],
-          boardNotes: data.boardNotes ?? [],
+          boardNotes: mergeBoardNotes(state.boardNotes, data.boardNotes ?? []),
           activeClassId: data.classes[0]?.id ?? null,
           activeStudentId: null,
           teacherCode: data.teacherCode ?? '',
@@ -198,7 +199,7 @@ export const useAppStore = create<AppStore>()(
           interventions: data.interventions ?? [],
           calendarEvents: [],
           personalDocuments: [],
-        }),
+        })),
       setAnnotationsHasMore: (hasMore) => set({ annotationsHasMore: hasMore }),
       setAnnotations: (annotations) => set({ annotations }),
       setUserName: (name: string) => set({ userName: name }),

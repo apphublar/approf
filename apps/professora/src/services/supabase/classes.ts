@@ -146,7 +146,7 @@ export async function createSupabaseClass(input: ClassInput) {
   const ownerId = userData.user?.id
   if (!ownerId) throw new Error('Sessão não encontrada.')
 
-  const schoolId = await ensureSchool(input.school, ownerId)
+  const schoolId = await ensureTeacherSchool(input.school, ownerId)
   const { data, error } = await supabase
     .from('classes')
     .insert({
@@ -182,7 +182,7 @@ export async function updateSupabaseClass(classId: string, input: ClassInput) {
   const ownerId = userData.user?.id
   if (!ownerId) throw new Error('Sessão não encontrada.')
 
-  const schoolId = await ensureSchool(input.school, ownerId)
+  const schoolId = await ensureTeacherSchool(input.school, ownerId)
   const { error } = await supabase
     .from('classes')
     .update({
@@ -197,7 +197,7 @@ export async function updateSupabaseClass(classId: string, input: ClassInput) {
   if (error) throw error
 }
 
-async function ensureSchool(name: string, ownerId: string) {
+export async function ensureTeacherSchool(name: string, ownerId: string) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')
 
