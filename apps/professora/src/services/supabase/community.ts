@@ -22,8 +22,9 @@ type CommunityCommentRow = {
 }
 
 const COMMUNITY_POST_SELECT = 'id, body, category, likes_count, comments_count, created_at, author_id'
-const COMMUNITY_POST_WITH_PROFILE_SELECT = `${COMMUNITY_POST_SELECT}, profiles(full_name)`
-const COMMUNITY_COMMENT_SELECT = 'id, post_id, author_id, body, created_at, profiles(full_name)'
+const COMMUNITY_COMMENT_SELECT = 'id, post_id, author_id, body, created_at'
+
+type ProfileNameRow = { id: string; full_name: string | null }
 
 export async function loadCommunityFeatureAccess(userId: string): Promise<FeatureAccess> {
   const supabase = getSupabaseClient()
@@ -61,15 +62,17 @@ export async function loadCommunityPosts(): Promise<CommunityPost[]> {
   const userId = await getCurrentUserId(supabase)
   const { data, error } = await supabase
     .from('community_posts')
-    .select(COMMUNITY_POST_WITH_PROFILE_SELECT)
+    .select(COMMUNITY_POST_SELECT)
     .eq('status', 'published')
     .order('created_at', { ascending: false })
     .limit(50)
 
   if (error) throw toCommunityError(error, 'Não foi possível carregar as postagens da comunidade.')
 
+  const rows = (data as CommunityPostRow[] | null ?? [])
+  const authorNames = await loadAuthorNames(supabase, rows.map((row) => row.author_id))
   const likedPostIds = userId ? await loadLikedPostIds(supabase, userId) : new Set<string>()
-  return (data as CommunityPostRow[] | null ?? []).map((row) => mapCommunityPost(row, likedPostIds))
+  return rows.map((row) => mapCommunityPost(row, likedPostIds, authorNames.get(row.author_id)))
 }
 
 export async function loadCommunityComments(postId: string): Promise<CommunityComment[]> {
@@ -83,7 +86,9 @@ export async function loadCommunityComments(postId: string): Promise<CommunityCo
     .order('created_at', { ascending: true })
 
   if (error) throw toCommunityError(error, 'Não foi possível carregar os comentários.')
-  return (data as CommunityCommentRow[] | null ?? []).map(mapCommunityComment)
+  const rows = (data as CommunityCommentRow[] | null ?? [])
+  const authorNames = await loadAuthorNames(supabase, rows.map((row) => row.author_id))
+  return rows.map((row) => mapCommunityComment(row, authorNames.get(row.author_id)))
 }
 
 export async function createCommunityPost(input: {
@@ -112,11 +117,9 @@ export async function createCommunityPost(input: {
   if (!data) throw new Error('Não foi possível publicar na comunidade.')
 
   return mapCommunityPost(
-    {
-      ...(data as CommunityPostRow),
-      profiles: { full_name: input.authorName },
-    },
+    data as CommunityPostRow,
     new Set(),
+    input.authorName,
   )
 }
 
@@ -168,10 +171,7 @@ export async function createCommunityComment(input: {
   if (error) throw toCommunityError(error, 'Não foi possível comentar agora.')
   if (!data) throw new Error('Não foi possível comentar agora.')
 
-  const comment = mapCommunityComment({
-    ...(data as CommunityCommentRow),
-    profiles: { full_name: input.authorName },
-  })
+  const comment = mapCommunityComment(data as CommunityCommentRow, input.authorName)
   const post = await fetchCommunityPostById(input.postId, userId)
   return { comment, post }
 }
@@ -198,13 +198,37 @@ async function fetchCommunityPostById(postId: string, userId: string): Promise<C
 
   const { data, error } = await supabase
     .from('community_posts')
-    .select(COMMUNITY_POST_WITH_PROFILE_SELECT)
+    .select(COMMUNITY_POST_SELECT)
     .eq('id', postId)
     .single()
 
   if (error) throw toCommunityError(error, 'Não foi possível carregar a postagem.')
+  const row = data as CommunityPostRow
+  const authorNames = await loadAuthorNames(supabase, [row.author_id])
   const likedPostIds = await loadLikedPostIds(supabase, userId)
-  return mapCommunityPost(data as CommunityPostRow, likedPostIds)
+  return mapCommunityPost(row, likedPostIds, authorNames.get(row.author_id))
+}
+
+async function loadAuthorNames(
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  authorIds: string[],
+) {
+  const uniqueIds = Array.from(new Set(authorIds.filter(Boolean)))
+  if (uniqueIds.length === 0) return new Map<string, string>()
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .in('id', uniqueIds)
+
+  if (error) return new Map<string, string>()
+
+  return new Map(
+    ((data as ProfileNameRow[] | null) ?? []).map((profile) => [
+      profile.id,
+      profile.full_name?.trim() || 'Professora',
+    ]),
+  )
 }
 
 async function loadLikedPostIds(supabase: NonNullable<ReturnType<typeof getSupabaseClient>>, userId: string) {
@@ -233,12 +257,16 @@ async function getCurrentUserId(supabase: NonNullable<ReturnType<typeof getSupab
   return data.user?.id ?? null
 }
 
-function mapCommunityPost(row: CommunityPostRow, likedPostIds: Set<string>): CommunityPost {
+function mapCommunityPost(
+  row: CommunityPostRow,
+  likedPostIds: Set<string>,
+  authorName?: string | null,
+): CommunityPost {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
   return {
     id: row.id,
     authorId: row.author_id,
-    authorName: profile?.full_name?.trim() || 'Professora',
+    authorName: authorName?.trim() || profile?.full_name?.trim() || 'Professora',
     authorRole: 'Professora',
     text: row.body,
     category: normalizeCategory(row.category),
@@ -249,13 +277,13 @@ function mapCommunityPost(row: CommunityPostRow, likedPostIds: Set<string>): Com
   }
 }
 
-function mapCommunityComment(row: CommunityCommentRow): CommunityComment {
+function mapCommunityComment(row: CommunityCommentRow, authorName?: string | null): CommunityComment {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
   return {
     id: row.id,
     postId: row.post_id,
     authorId: row.author_id,
-    authorName: profile?.full_name?.trim() || 'Professora',
+    authorName: authorName?.trim() || profile?.full_name?.trim() || 'Professora',
     text: row.body,
     createdAt: formatCommunityDate(row.created_at),
   }
@@ -282,6 +310,9 @@ function toCommunityError(error: unknown, fallbackMessage: string) {
   if (error && typeof error === 'object') {
     const record = error as { message?: string; details?: string; hint?: string; code?: string }
     const message = record.message || record.details || record.hint
+    if (message?.includes('more than one relationship was found')) {
+      return new Error('Não foi possível carregar os dados da comunidade. Atualize o app e tente novamente.')
+    }
     if (message?.includes('row-level security')) {
       return new Error('Sua conta ainda não tem permissão para publicar na comunidade. Peça liberação ao suporte.')
     }
