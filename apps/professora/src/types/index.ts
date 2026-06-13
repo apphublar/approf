@@ -248,6 +248,25 @@ export interface InterventionSuggestion {
   recordText: string
 }
 
+export type InterventionActivityType =
+  | 'created'
+  | 'chosen'
+  | 'return'
+  | 'analysis'
+  | 'followup_chosen'
+  | 'concluded'
+
+export interface InterventionActivityEntry {
+  at: string
+  type: InterventionActivityType
+  label: string
+  teacherReturn?: string
+  returnChoice?: InterventionReturnChoice
+  aiAnalysis?: string
+  evolutionRecord?: string
+  chosenIntervention?: InterventionSuggestion
+}
+
 export interface InterventionHistoryItem {
   id: string
   studentId: string
@@ -255,6 +274,7 @@ export interface InterventionHistoryItem {
   classId: string
   className: string
   createdAt: string
+  updatedAt?: string
   observationInitial: string
   suggestions: InterventionSuggestion[]
   chosenIntervention?: InterventionSuggestion
@@ -262,5 +282,6 @@ export interface InterventionHistoryItem {
   returnChoice?: InterventionReturnChoice
   aiAnalysis?: string
   evolutionRecord?: string
+  activityLog?: InterventionActivityEntry[]
   status: InterventionProgressStatus
 }

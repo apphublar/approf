@@ -1,4 +1,4 @@
-import type { InterventionHistoryItem, InterventionReturnChoice, InterventionSuggestion } from '@/types'
+import type { InterventionActivityEntry, InterventionHistoryItem, InterventionReturnChoice, InterventionSuggestion } from '@/types'
 import { getSupabaseClient } from './client'
 
 type InterventionRow = {
@@ -14,7 +14,9 @@ type InterventionRow = {
   return_choice: InterventionReturnChoice | null
   ai_analysis: string | null
   evolution_record: string | null
+  activity_log: InterventionActivityEntry[] | null
   created_at: string
+  updated_at: string
   students?: { full_name: string | null } | { full_name: string | null }[] | null
   classes?: { name: string | null } | { name: string | null }[] | null
 }
@@ -25,7 +27,7 @@ export async function loadInterventionRecords(ownerId: string): Promise<Interven
 
   const { data, error } = await supabase
     .from('intervention_records')
-    .select('id, student_id, class_id, status, observation_initial, suggestions, chosen_intervention, teacher_return, return_choice, ai_analysis, evolution_record, created_at, students(full_name), classes(name)')
+    .select('id, student_id, class_id, status, observation_initial, suggestions, chosen_intervention, teacher_return, return_choice, ai_analysis, evolution_record, activity_log, created_at, updated_at, students(full_name), classes(name)')
     .eq('owner_id', ownerId)
     .order('created_at', { ascending: false })
 
@@ -54,6 +56,7 @@ export async function saveInterventionRecord(item: InterventionHistoryItem): Pro
     return_choice: item.returnChoice ?? null,
     ai_analysis: item.aiAnalysis ?? null,
     evolution_record: item.evolutionRecord ?? null,
+    activity_log: item.activityLog ?? [],
   }
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id)
@@ -63,7 +66,7 @@ export async function saveInterventionRecord(item: InterventionHistoryItem): Pro
       .update(payload)
       .eq('id', item.id)
       .eq('owner_id', ownerId)
-      .select('id, student_id, class_id, status, observation_initial, suggestions, chosen_intervention, teacher_return, return_choice, ai_analysis, evolution_record, created_at, students(full_name), classes(name)')
+      .select('id, student_id, class_id, status, observation_initial, suggestions, chosen_intervention, teacher_return, return_choice, ai_analysis, evolution_record, activity_log, created_at, updated_at, students(full_name), classes(name)')
       .single()
     if (error) throw error
     return mapInterventionRow(data as InterventionRow)
@@ -72,7 +75,7 @@ export async function saveInterventionRecord(item: InterventionHistoryItem): Pro
   const { data, error } = await supabase
     .from('intervention_records')
     .insert(payload)
-    .select('id, student_id, class_id, status, observation_initial, suggestions, chosen_intervention, teacher_return, return_choice, ai_analysis, evolution_record, created_at, students(full_name), classes(name)')
+    .select('id, student_id, class_id, status, observation_initial, suggestions, chosen_intervention, teacher_return, return_choice, ai_analysis, evolution_record, activity_log, created_at, updated_at, students(full_name), classes(name)')
     .single()
   if (error) throw error
   return mapInterventionRow(data as InterventionRow)
@@ -96,6 +99,7 @@ function mapInterventionRow(row: InterventionRow): InterventionHistoryItem {
     classId: row.class_id,
     className: classData?.name?.trim() || 'Turma',
     createdAt: formatInterventionDate(row.created_at),
+    updatedAt: formatInterventionDate(row.updated_at),
     observationInitial: row.observation_initial ?? '',
     suggestions: Array.isArray(row.suggestions) ? row.suggestions : [],
     chosenIntervention: row.chosen_intervention ?? undefined,
@@ -103,6 +107,7 @@ function mapInterventionRow(row: InterventionRow): InterventionHistoryItem {
     returnChoice: row.return_choice ?? undefined,
     aiAnalysis: row.ai_analysis ?? undefined,
     evolutionRecord: row.evolution_record ?? undefined,
+    activityLog: Array.isArray(row.activity_log) ? row.activity_log : [],
     status: row.status,
   }
 }

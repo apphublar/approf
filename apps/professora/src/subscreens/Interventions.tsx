@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, Sparkles } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { getAppDataMode } from '@/services/app-data'
@@ -7,12 +7,27 @@ import { deleteInterventionRecord, saveInterventionRecord } from '@/services/sup
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 import type {
+  InterventionActivityEntry,
   InterventionHistoryItem,
   InterventionReturnChoice,
   InterventionSuggestion,
 } from '@/types'
 
-type Step = 'form' | 'suggestions' | 'chosen' | 'feedback' | 'analysis'
+type Step = 'form' | 'suggestions' | 'chosen' | 'feedback' | 'analysis' | 'detail'
+
+type InterventionDraft = {
+  selectedStudentIds: string[]
+  activeStudentIndex: number
+  observation: string
+  generatedObservation: string
+  teacherReturn: string
+  returnChoice: InterventionReturnChoice
+  step: Step
+  suggestions: InterventionSuggestion[]
+  chosenSuggestion: InterventionSuggestion | null
+  activeInterventionId: string
+  historyFilterStudentId: string
+}
 
 export default function InterventionsSubscreen() {
   const { closeSubscreen } = useNavStore()
@@ -22,8 +37,14 @@ export default function InterventionsSubscreen() {
     () => classes.flatMap((classData) => classData.students.map((student) => ({ ...student, classId: classData.id, className: classData.name }))),
     [classes],
   )
-  const [selectedStudentId, setSelectedStudentId] = useState(activeStudentId ?? allStudents[0]?.id ?? '')
-  const selectedStudent = allStudents.find((student) => student.id === selectedStudentId) ?? allStudents[0]
+
+  const defaultStudentId = activeStudentId ?? allStudents[0]?.id ?? ''
+  const skipStudentResetRef = useRef(false)
+  const restoringDraftRef = useRef(false)
+
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>(defaultStudentId ? [defaultStudentId] : [])
+  const [activeStudentIndex, setActiveStudentIndex] = useState(0)
+  const [historyFilterStudentId, setHistoryFilterStudentId] = useState('all')
   const [observation, setObservation] = useState('')
   const [generatedObservation, setGeneratedObservation] = useState('')
   const [step, setStep] = useState<Step>('form')
@@ -38,60 +59,99 @@ export default function InterventionsSubscreen() {
   const [analysisText, setAnalysisText] = useState('')
   const [followupSuggestions, setFollowupSuggestions] = useState<InterventionSuggestion[]>([])
   const [activeInterventionId, setActiveInterventionId] = useState('')
+  const [detailItem, setDetailItem] = useState<InterventionHistoryItem | null>(null)
   const [draftMessage, setDraftMessage] = useState('')
+  const [pendingStudentQueue, setPendingStudentQueue] = useState<string[]>([])
+
   const draftKey = `approf:draft:interventions:${userId}`
   const generationViewKey = (generating || analyzing) ? 'loading' : step
 
-  const studentHistory = useMemo(
-    () => interventions.filter((item) => item.studentId === selectedStudent?.id),
-    [interventions, selectedStudent?.id],
-  )
+  const currentStudentId = selectedStudentIds[activeStudentIndex] ?? selectedStudentIds[0] ?? ''
+  const selectedStudent = allStudents.find((student) => student.id === currentStudentId) ?? allStudents[0]
+
+  const filteredHistory = useMemo(() => {
+    const sorted = [...interventions].sort((a, b) => {
+      const left = parseHistoryDate(b.createdAt)
+      const right = parseHistoryDate(a.createdAt)
+      return left - right
+    })
+    if (historyFilterStudentId === 'all') return sorted
+    return sorted.filter((item) => item.studentId === historyFilterStudentId)
+  }, [historyFilterStudentId, interventions])
 
   useEffect(() => {
-    setStep('form')
-    setObservation('')
-    setGeneratedObservation('')
-    setError('')
-    setSuggestions([])
-    setChosenSuggestion(null)
-    setTeacherReturn('')
-    setAnalysisText('')
-    setFollowupSuggestions([])
-    setActiveInterventionId('')
-    setReturnChoice('houve_avanco')
-    setAnalysisReturnChoice('houve_avanco')
-  }, [selectedStudentId])
+    if (skipStudentResetRef.current) {
+      skipStudentResetRef.current = false
+      return
+    }
+    if (restoringDraftRef.current) return
+    if (step === 'form') {
+      setObservation('')
+      setGeneratedObservation('')
+      setSuggestions([])
+      setChosenSuggestion(null)
+      setTeacherReturn('')
+      setAnalysisText('')
+      setFollowupSuggestions([])
+      setActiveInterventionId('')
+      setReturnChoice('houve_avanco')
+      setAnalysisReturnChoice('houve_avanco')
+      setError('')
+    }
+  }, [currentStudentId, step])
 
   useEffect(() => {
-    const draft = loadDraft<{
-      selectedStudentId: string
-      observation: string
-      teacherReturn: string
-      returnChoice: InterventionReturnChoice
-      step: Step
-    }>(draftKey)
-    if (!draft) return
-    if (draft.selectedStudentId) setSelectedStudentId(draft.selectedStudentId)
-    setObservation(draft.observation || '')
-    setTeacherReturn(draft.teacherReturn || '')
-    setReturnChoice(draft.returnChoice || 'houve_avanco')
-    if (draft.step === 'form' || draft.step === 'feedback') setStep(draft.step)
-    setDraftMessage('Rascunho recuperado')
+    restoringDraftRef.current = true
+    const draft = loadDraft<InterventionDraft>(draftKey)
+    if (draft) {
+      if (draft.selectedStudentIds?.length) setSelectedStudentIds(draft.selectedStudentIds)
+      if (typeof draft.activeStudentIndex === 'number') setActiveStudentIndex(draft.activeStudentIndex)
+      setObservation(draft.observation || '')
+      setGeneratedObservation(draft.generatedObservation || '')
+      setTeacherReturn(draft.teacherReturn || '')
+      setReturnChoice(draft.returnChoice || 'houve_avanco')
+      setSuggestions(Array.isArray(draft.suggestions) ? draft.suggestions : [])
+      setChosenSuggestion(draft.chosenSuggestion ?? null)
+      setActiveInterventionId(draft.activeInterventionId || '')
+      if (draft.historyFilterStudentId) setHistoryFilterStudentId(draft.historyFilterStudentId)
+      if (draft.step && draft.step !== 'detail') setStep(draft.step)
+      setDraftMessage('Rascunho recuperado')
+    }
+    restoringDraftRef.current = false
   }, [draftKey])
 
   useEffect(() => {
-    if (step !== 'form' && step !== 'feedback') return
+    if (!['form', 'feedback', 'chosen'].includes(step)) return
     const timeout = window.setTimeout(() => {
       saveDraft(draftKey, {
-        selectedStudentId,
+        selectedStudentIds,
+        activeStudentIndex,
         observation,
+        generatedObservation,
         teacherReturn,
         returnChoice,
         step,
-      })
+        suggestions,
+        chosenSuggestion,
+        activeInterventionId,
+        historyFilterStudentId,
+      } satisfies InterventionDraft)
     }, 350)
     return () => window.clearTimeout(timeout)
-  }, [draftKey, observation, returnChoice, selectedStudentId, step, teacherReturn])
+  }, [
+    activeInterventionId,
+    activeStudentIndex,
+    chosenSuggestion,
+    draftKey,
+    generatedObservation,
+    historyFilterStudentId,
+    observation,
+    returnChoice,
+    selectedStudentIds,
+    step,
+    suggestions,
+    teacherReturn,
+  ])
 
   useEffect(() => {
     if (!draftMessage) return
@@ -99,8 +159,39 @@ export default function InterventionsSubscreen() {
     return () => window.clearTimeout(timeout)
   }, [draftMessage])
 
-  async function handleGenerateSuggestions() {
-    if (!selectedStudent || observation.trim().length < 12) return
+  function toggleStudentSelection(studentId: string) {
+    setSelectedStudentIds((current) => {
+      if (current.includes(studentId)) {
+        const next = current.filter((id) => id !== studentId)
+        return next.length > 0 ? next : current
+      }
+      return [...current, studentId]
+    })
+  }
+
+  function validateAnalyzeReturn() {
+    if (!selectedStudent) {
+      setError('Selecione ao menos uma criança para continuar.')
+      return false
+    }
+    if (!chosenSuggestion) {
+      setError('A intervenção escolhida não foi encontrada. Volte e selecione uma estratégia novamente.')
+      return false
+    }
+    if (teacherReturn.trim().length < 8) {
+      setError('Descreva o retorno com pelo menos 8 caracteres.')
+      return false
+    }
+    return true
+  }
+
+  async function handleGenerateSuggestions(forStudentId?: string) {
+    const student = allStudents.find((item) => item.id === (forStudentId ?? currentStudentId)) ?? selectedStudent
+    if (!student || observation.trim().length < 12) return
+    if (selectedStudentIds.length === 0) {
+      setError('Selecione ao menos uma criança.')
+      return
+    }
 
     setGenerating(true)
     setError('')
@@ -112,15 +203,18 @@ export default function InterventionsSubscreen() {
     try {
       const result = await generateAiTextDocument({
         generationType: 'other',
-        classId: selectedStudent.classId,
-        studentId: selectedStudent.id,
+        classId: student.classId,
+        studentId: student.id,
         promptVersion: 'interventions-v1',
         requestSummary: {
           interventionMode: 'suggestions',
-          studentName: selectedStudent.name,
-          studentAge: `${selectedStudent.age} anos${selectedStudent.ageMonths ? ` e ${selectedStudent.ageMonths} meses` : ''}`,
-          className: selectedStudent.className,
+          studentName: student.name,
+          studentAge: `${student.age} anos${student.ageMonths ? ` e ${student.ageMonths} meses` : ''}`,
+          className: student.className,
           observation,
+          selectedStudents: selectedStudentIds.length > 1
+            ? selectedStudentIds.map((id) => allStudents.find((entry) => entry.id === id)?.name).filter(Boolean)
+            : undefined,
         },
       })
 
@@ -134,6 +228,7 @@ export default function InterventionsSubscreen() {
         setError('Não foi possível estruturar sugestões suficientes agora. Tente novamente.')
         return
       }
+
       setSuggestions(parsedSuggestions)
       setGeneratedObservation(observation.trim())
       setStep('suggestions')
@@ -146,31 +241,59 @@ export default function InterventionsSubscreen() {
     }
   }
 
-  function chooseIntervention(suggestion: InterventionSuggestion) {
+  async function chooseIntervention(suggestion: InterventionSuggestion) {
     setChosenSuggestion(suggestion)
+    const itemId = activeInterventionId || `int-${Date.now()}`
+    setActiveInterventionId(itemId)
     setStep('chosen')
-    setActiveInterventionId(`int-${Date.now()}`)
+    if (selectedStudent) {
+      await persistIntervention({
+        id: itemId,
+        status: 'em_acompanhamento',
+        chosenIntervention: suggestion,
+        suggestions,
+        appendLog: {
+          type: 'chosen',
+          label: `Intervenção escolhida: ${suggestion.title}`,
+          chosenIntervention: suggestion,
+        },
+      })
+    }
+  }
+
+  async function openFeedbackStep() {
+    if (!chosenSuggestion) {
+      setError('Selecione uma intervenção antes de registrar o retorno.')
+      return
+    }
+    setError('')
+    if (selectedStudent && activeInterventionId) {
+      await persistIntervention({
+        id: activeInterventionId,
+        status: 'em_acompanhamento',
+        chosenIntervention: chosenSuggestion,
+        suggestions,
+      })
+    }
+    setStep('feedback')
   }
 
   async function chooseFollowupIntervention(suggestion: InterventionSuggestion) {
     if (!selectedStudent || !activeInterventionId) return
 
     const nextSuggestions = followupSuggestions.length > 0 ? followupSuggestions : [suggestion]
-    const item: InterventionHistoryItem = {
-      id: activeInterventionId,
-      studentId: selectedStudent.id,
-      studentName: selectedStudent.name,
-      classId: selectedStudent.classId,
-      className: selectedStudent.className,
-      createdAt: new Date().toISOString(),
-      observationInitial: generatedObservation || observation.trim(),
-      suggestions: nextSuggestions,
-      chosenIntervention: suggestion,
-      status: 'em_acompanhamento',
-    }
-
     try {
-      const saved = await upsertIntervention(item)
+      const saved = await persistIntervention({
+        id: activeInterventionId,
+        status: 'em_acompanhamento',
+        suggestions: nextSuggestions,
+        chosenIntervention: suggestion,
+        appendLog: {
+          type: 'followup_chosen',
+          label: `Nova estratégia escolhida: ${suggestion.title}`,
+          chosenIntervention: suggestion,
+        },
+      })
       setActiveInterventionId(saved.id)
       setSuggestions(nextSuggestions)
       setChosenSuggestion(suggestion)
@@ -180,7 +303,7 @@ export default function InterventionsSubscreen() {
       setAnalysisText('')
       setStep('chosen')
     } catch {
-      // upsertIntervention already exposes the persistence error to the user.
+      // persistIntervention already sets error
     }
   }
 
@@ -188,27 +311,27 @@ export default function InterventionsSubscreen() {
     closeSubscreen()
   }
 
-  function savePendingIntervention() {
+  async function savePendingIntervention() {
     if (!selectedStudent || !chosenSuggestion || !activeInterventionId) return
-
-    const item: InterventionHistoryItem = {
+    await persistIntervention({
       id: activeInterventionId,
-      studentId: selectedStudent.id,
-      studentName: selectedStudent.name,
-      classId: selectedStudent.classId,
-      className: selectedStudent.className,
-      createdAt: new Date().toISOString(),
-      observationInitial: generatedObservation || observation.trim(),
-      suggestions,
-      chosenIntervention: chosenSuggestion,
       status: 'pendente',
-    }
-    void upsertIntervention(item).finally(() => closeSubscreen())
+      chosenIntervention: chosenSuggestion,
+      suggestions,
+      appendLog: {
+        type: 'chosen',
+        label: `Intervenção salva para acompanhar: ${chosenSuggestion.title}`,
+        chosenIntervention: chosenSuggestion,
+      },
+    })
+    closeSubscreen()
   }
 
   function resumeIntervention(item: InterventionHistoryItem) {
     if (!item.chosenIntervention) return
-    setSelectedStudentId(item.studentId)
+    skipStudentResetRef.current = true
+    setSelectedStudentIds([item.studentId])
+    setActiveStudentIndex(0)
     setGeneratedObservation(item.observationInitial)
     setObservation(item.observationInitial)
     setSuggestions(item.suggestions)
@@ -216,35 +339,105 @@ export default function InterventionsSubscreen() {
     setActiveInterventionId(item.id)
     setTeacherReturn(item.teacherReturn ?? '')
     setReturnChoice(item.returnChoice ?? 'houve_avanco')
+    setDetailItem(null)
     setError('')
     setStep('feedback')
   }
 
-  function completeWithoutAnalysis(item: InterventionHistoryItem) {
-    void upsertIntervention({
-      ...item,
+  function openHistoryDetail(item: InterventionHistoryItem) {
+    setDetailItem(item)
+    setStep('detail')
+  }
+
+  async function completeIntervention(options?: { item?: InterventionHistoryItem; note?: string }) {
+    const base = options?.item ?? interventions.find((item) => item.id === activeInterventionId)
+    if (!base) return
+
+    const note = options?.note ?? 'Intervenção concluída pela professora.'
+    const activityLog = [
+      ...(base.activityLog ?? []),
+      {
+        at: new Date().toISOString(),
+        type: 'concluded' as const,
+        label: note,
+        returnChoice: base.returnChoice ?? analysisReturnChoice,
+        aiAnalysis: base.aiAnalysis ?? analysisText,
+      },
+    ]
+
+    const item: InterventionHistoryItem = {
+      ...base,
       status: 'concluida',
-      teacherReturn: item.teacherReturn ?? 'Intervenção concluída manualmente pela professora.',
-      returnChoice: item.returnChoice ?? 'houve_avanco',
-      aiAnalysis: item.aiAnalysis ?? '',
-    })
+      teacherReturn: base.teacherReturn ?? note,
+      returnChoice: base.returnChoice ?? analysisReturnChoice,
+      aiAnalysis: base.aiAnalysis ?? analysisText,
+      updatedAt: new Date().toISOString(),
+      activityLog,
+    }
+
+    try {
+      const saved = getAppDataMode() === 'supabase'
+        ? await saveInterventionRecord(item)
+        : item
+      updateIntervention(saved)
+    } catch (persistError) {
+      setError(persistError instanceof Error ? persistError.message : 'Não foi possível concluir a intervenção.')
+      return
+    }
+
+    const remainingQueue = pendingStudentQueue.filter((id) => id !== base.studentId)
+    setPendingStudentQueue(remainingQueue)
+
+    if (remainingQueue.length > 0) {
+      const nextId = remainingQueue[0]
+      skipStudentResetRef.current = true
+      setSelectedStudentIds([nextId])
+      setActiveStudentIndex(0)
+      setStep('form')
+      setObservation('')
+      setGeneratedObservation('')
+      setSuggestions([])
+      setChosenSuggestion(null)
+      setTeacherReturn('')
+      setAnalysisText('')
+      setFollowupSuggestions([])
+      setActiveInterventionId('')
+      setDetailItem(null)
+      setDraftMessage(`Intervenção concluída. Continue com ${allStudents.find((student) => student.id === nextId)?.name ?? 'a próxima criança'}.`)
+      return
+    }
+
+    setStep('form')
+    setChosenSuggestion(null)
+    setAnalysisText('')
+    setFollowupSuggestions([])
+    setDetailItem(null)
+    clearDraft(draftKey)
+  }
+
+  async function completeWithoutAnalysis(item: InterventionHistoryItem) {
+    await completeIntervention({ item, note: 'Intervenção concluída manualmente pela professora.' })
   }
 
   async function discardIntervention(item: InterventionHistoryItem) {
-    const confirmed = window.confirm('Deseja remover esta intervenção do histórico da criança?')
+    const confirmed = window.confirm('Deseja remover esta intervenção do histórico?')
     if (!confirmed) return
     try {
       if (getAppDataMode() === 'supabase') {
         await deleteInterventionRecord(item.id)
       }
       removeIntervention(item.id)
+      if (detailItem?.id === item.id) {
+        setDetailItem(null)
+        setStep('form')
+      }
     } catch (discardError) {
       setError(discardError instanceof Error ? discardError.message : 'Não foi possível remover a intervenção.')
     }
   }
 
   async function handleAnalyzeReturn() {
-    if (!selectedStudent || !chosenSuggestion || teacherReturn.trim().length < 8) return
+    if (!validateAnalyzeReturn()) return
 
     setAnalyzing(true)
     setError('')
@@ -252,12 +445,12 @@ export default function InterventionsSubscreen() {
     try {
       const result = await generateAiTextDocument({
         generationType: 'other',
-        classId: selectedStudent.classId,
-        studentId: selectedStudent.id,
+        classId: selectedStudent!.classId,
+        studentId: selectedStudent!.id,
         promptVersion: 'interventions-feedback-v1',
         requestSummary: {
           interventionMode: 'feedback_analysis',
-          studentName: selectedStudent.name,
+          studentName: selectedStudent!.name,
           observationInitial: generatedObservation || observation,
           interventionChosen: chosenSuggestion,
           teacherReturn,
@@ -273,24 +466,25 @@ export default function InterventionsSubscreen() {
       const parsed = parseInterventionFeedback(result.generatedText)
       const status = returnChoice === 'houve_avanco' ? 'concluida' : 'em_acompanhamento'
       const itemId = activeInterventionId || `int-${Date.now()}`
-      const item: InterventionHistoryItem = {
+
+      const saved = await persistIntervention({
         id: itemId,
-        studentId: selectedStudent.id,
-        studentName: selectedStudent.name,
-        classId: selectedStudent.classId,
-        className: selectedStudent.className,
-        createdAt: new Date().toISOString(),
-        observationInitial: generatedObservation || observation.trim(),
+        status,
+        chosenIntervention: chosenSuggestion!,
         suggestions,
-        chosenIntervention: chosenSuggestion,
         teacherReturn: teacherReturn.trim(),
         returnChoice,
         aiAnalysis: parsed.analysisText,
         evolutionRecord: parsed.evolutionRecord,
-        status,
-      }
-
-      const saved = await upsertIntervention(item)
+        appendLog: {
+          type: 'analysis',
+          label: formatReturnChoiceLabel(returnChoice),
+          teacherReturn: teacherReturn.trim(),
+          returnChoice,
+          aiAnalysis: parsed.analysisText,
+          evolutionRecord: parsed.evolutionRecord,
+        },
+      })
       setActiveInterventionId(saved.id)
 
       if (returnChoice === 'houve_avanco') {
@@ -299,11 +493,11 @@ export default function InterventionsSubscreen() {
           category: 'evolucao',
           label: 'Evolução de intervenção',
           badgeClass: 'badge-ev',
-          studentName: selectedStudent.name,
+          studentName: selectedStudent!.name,
           text: parsed.evolutionRecord || parsed.analysisText,
           date: 'Agora',
-          classId: selectedStudent.classId,
-          studentId: selectedStudent.id,
+          classId: selectedStudent!.classId,
+          studentId: selectedStudent!.id,
           tags: ['Intervenção', 'Houve avanço'],
           persistence: ['observacao-continua', 'evolucao-positiva'],
         })
@@ -311,10 +505,9 @@ export default function InterventionsSubscreen() {
 
       setAnalysisText(parsed.analysisText)
       setAnalysisReturnChoice(returnChoice)
-      setFollowupSuggestions(returnChoice === 'houve_avanco' ? [] : parsed.recommendedSuggestions)
+      const needsFollowup = returnChoice !== 'houve_avanco'
+      setFollowupSuggestions(needsFollowup ? parsed.recommendedSuggestions : [])
       setStep('analysis')
-      setObservation('')
-      setGeneratedObservation(returnChoice === 'houve_avanco' ? '' : item.observationInitial)
       setTeacherReturn('')
       setReturnChoice('houve_avanco')
       clearDraft(draftKey)
@@ -325,17 +518,60 @@ export default function InterventionsSubscreen() {
     }
   }
 
-  async function upsertIntervention(item: InterventionHistoryItem) {
+  async function persistIntervention(input: {
+    id: string
+    status: InterventionHistoryItem['status']
+    suggestions?: InterventionSuggestion[]
+    chosenIntervention?: InterventionSuggestion
+    teacherReturn?: string
+    returnChoice?: InterventionReturnChoice
+    aiAnalysis?: string
+    evolutionRecord?: string
+    appendLog?: Omit<InterventionActivityEntry, 'at'>
+  } & Partial<InterventionHistoryItem>) {
+    if (!selectedStudent) throw new Error('Criança não selecionada.')
+
+    const existing = interventions.find((item) => item.id === input.id)
+    const activityLog = [...(existing?.activityLog ?? input.activityLog ?? [])]
+    if (input.appendLog) {
+      activityLog.push({ at: new Date().toISOString(), ...input.appendLog })
+    }
+
+    const item: InterventionHistoryItem = {
+      id: input.id,
+      studentId: input.studentId ?? selectedStudent.id,
+      studentName: input.studentName ?? selectedStudent.name,
+      classId: input.classId ?? selectedStudent.classId,
+      className: input.className ?? selectedStudent.className,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      observationInitial: input.observationInitial ?? (generatedObservation || observation.trim()),
+      suggestions: input.suggestions ?? suggestions,
+      chosenIntervention: input.chosenIntervention ?? chosenSuggestion ?? undefined,
+      teacherReturn: input.teacherReturn ?? existing?.teacherReturn,
+      returnChoice: input.returnChoice ?? existing?.returnChoice,
+      aiAnalysis: input.aiAnalysis ?? existing?.aiAnalysis,
+      evolutionRecord: input.evolutionRecord ?? existing?.evolutionRecord,
+      activityLog,
+      status: input.status,
+    }
+
+    if (!existing && !activityLog.some((entry) => entry.type === 'created')) {
+      activityLog.unshift({
+        at: new Date().toISOString(),
+        type: 'created',
+        label: 'Intervenção iniciada',
+      })
+      item.activityLog = activityLog
+    }
+
     try {
       const saved = getAppDataMode() === 'supabase'
         ? await saveInterventionRecord(item)
         : item
       const exists = interventions.some((current) => current.id === item.id || current.id === saved.id)
-      if (exists) {
-        updateIntervention(saved)
-      } else {
-        addIntervention(saved)
-      }
+      if (exists) updateIntervention(saved)
+      else addIntervention(saved)
       return saved
     } catch (persistError) {
       setError(persistError instanceof Error ? persistError.message : 'Não foi possível salvar a intervenção.')
@@ -343,17 +579,39 @@ export default function InterventionsSubscreen() {
     }
   }
 
+  function beginGenerationForSelection() {
+    if (selectedStudentIds.length > 1) {
+      const [first, ...rest] = selectedStudentIds
+      setPendingStudentQueue(rest)
+      setSelectedStudentIds([first])
+      setActiveStudentIndex(0)
+      void handleGenerateSuggestions(first)
+      return
+    }
+    void handleGenerateSuggestions()
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-cream">
       <div className="bg-white flex items-center gap-3 px-[14px] pt-12 pb-3 border-b border-border flex-shrink-0">
-        <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
+        <button
+          onClick={() => {
+            if (step === 'detail') {
+              setStep('form')
+              setDetailItem(null)
+              return
+            }
+            closeSubscreen()
+          }}
+          className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white"
+        >
           <ChevronLeft size={18} />
         </button>
         <span className="font-serif text-[18px] text-gd flex-1">Intervenções</span>
       </div>
 
       <div key={generationViewKey} className="scroll-area px-[18px] py-4 stage-fade-in">
-        {!selectedStudent && (
+        {!selectedStudent && step !== 'detail' && (
           <div className="bg-white rounded-app border border-border shadow-card p-4">
             <p className="text-[13px] font-bold text-ink">Nenhuma criança encontrada</p>
             <p className="text-[12px] text-muted mt-1 leading-[1.6]">
@@ -366,156 +624,90 @@ export default function InterventionsSubscreen() {
           <GenerationDocumentLoadingScreen variant="intervention" />
         ) : (
           <>
-        {step === 'form' && (
-          <>
-            <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
-              <p className="text-[13px] text-soft leading-[1.6]">
-                Registre uma observação sobre a criança e receba sugestões pedagógicas alinhadas à BNCC para apoiar o desenvolvimento infantil.
-              </p>
-            </div>
-
-            <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Aluno</label>
-            <select
-              className="w-full bg-white rounded-app-sm border border-border px-3 py-3 mt-2 mb-4 text-[14px] outline-none"
-              value={selectedStudentId}
-              onChange={(event) => setSelectedStudentId(event.target.value)}
-            >
-              {allStudents.map((student) => (
-                <option key={student.id} value={student.id}>{student.name} - {student.className}</option>
-              ))}
-            </select>
-
-            <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Observação da professora</label>
-            <textarea
-              className="w-full min-h-[160px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-              placeholder="Descreva o que foi observado na rotina da criança..."
-              value={observation}
-              onChange={(event) => setObservation(event.target.value)}
-            />
-
-            <button
-              onClick={handleGenerateSuggestions}
-              disabled={!selectedStudent || generating || observation.trim().length < 12}
-              className="w-full mt-4 py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <><Sparkles size={17} /> Gerar sugestões</>
-            </button>
-          </>
-        )}
-
-        {step === 'suggestions' && (
-          <>
-            <p className="text-[13px] text-muted mb-3">Selecione uma estrategia pedagógica para aplicar com a criança.</p>
-            <div className="flex flex-col gap-3">
-              {suggestions.map((suggestion) => (
-                <div key={suggestion.id} className="bg-white rounded-app border border-border shadow-card p-4">
-                  <p className="text-[13px] font-bold text-gd">{suggestion.title}</p>
-                  <p className="text-[12px] text-muted mt-1 leading-[1.5]">{suggestion.summary}</p>
-                  <p className="text-[12px] text-ink mt-2"><strong>Objetivo:</strong> {suggestion.objective}</p>
-                  <button
-                    onClick={() => chooseIntervention(suggestion)}
-                    className="w-full mt-3 py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[12px] font-bold"
-                  >
-                    Escolher esta intervenção
-                  </button>
+            {step === 'form' && selectedStudent && (
+              <>
+                <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
+                  <p className="text-[13px] text-soft leading-[1.6]">
+                    Registre uma observação e receba sugestões pedagógicas alinhadas à BNCC. Você pode selecionar
+                    {' '}
+                    <strong>uma ou mais crianças</strong>
+                    {' '}
+                    para solicitar intervenções.
+                  </p>
+                  {pendingStudentQueue.length > 0 && (
+                    <p className="mt-2 text-[11px] text-gm font-bold leading-[1.5]">
+                      Fila: {pendingStudentQueue.length} criança(s) aguardando após esta intervenção.
+                    </p>
+                  )}
                 </div>
-              ))}
-            </div>
-          </>
-        )}
 
-        {step === 'chosen' && chosenSuggestion && (
-          <div className="bg-white rounded-app border border-border shadow-card p-4">
-            <p className="text-[12px] text-muted mb-2">{selectedStudent?.name}</p>
-            <h3 className="text-[16px] font-bold text-gd">{chosenSuggestion.title}</h3>
-            <p className="text-[12px] text-ink mt-3"><strong>Observação inicial:</strong> {generatedObservation || observation}</p>
-            <p className="text-[12px] text-ink mt-3"><strong>Objetivo pedagógico:</strong> {chosenSuggestion.objective}</p>
-            <p className="text-[12px] text-ink mt-3"><strong>Como aplicar:</strong> {chosenSuggestion.howToApply}</p>
-            <p className="text-[12px] text-ink mt-3"><strong>O que observar:</strong> {chosenSuggestion.whatToObserve}</p>
-            <p className="text-[12px] text-ink mt-3"><strong>Texto para registro:</strong> {chosenSuggestion.recordText}</p>
+                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Crianças</p>
+                <div className="flex flex-col gap-2 mb-4">
+                  {allStudents.map((student) => {
+                    const checked = selectedStudentIds.includes(student.id)
+                    return (
+                      <label
+                        key={student.id}
+                        className={`flex items-start gap-3 rounded-app-sm border px-3 py-3 cursor-pointer ${
+                          checked ? 'border-gp bg-gbg' : 'border-border bg-white'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleStudentSelection(student.id)}
+                          className="mt-1"
+                        />
+                        <span>
+                          <span className="block text-[13px] font-bold text-ink">{student.name}</span>
+                          <span className="block text-[11px] text-muted mt-0.5">{student.className}</span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
 
-            <button
-              onClick={() => setStep('feedback')}
-              className="w-full mt-4 py-3 rounded-app-sm bg-gd text-white text-[13px] font-bold border-none"
-            >
-              Registrar retorno
-            </button>
-            <button
-              onClick={closeWithoutRegistering}
-              className="w-full mt-2 py-3 rounded-app-sm border border-border bg-white text-muted text-[13px] font-bold"
-            >
-              Fechar sem registrar
-            </button>
-            <button
-              onClick={savePendingIntervention}
-              className="w-full mt-2 py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[13px] font-bold"
-            >
-              Salvar para acompanhar depois
-            </button>
-          </div>
-        )}
+                {selectedStudentIds.length > 1 && (
+                  <p className="text-[11px] text-muted mb-3 leading-[1.5]">
+                    As sugestões serão geradas para
+                    {' '}
+                    <strong>{selectedStudent.name}</strong>
+                    . Após concluir, você poderá continuar com as demais crianças selecionadas.
+                  </p>
+                )}
 
-        {step === 'feedback' && (
-          <div className="bg-white rounded-app border border-border shadow-card p-4">
-            <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Retorno da professora</label>
-            <textarea
-              className="w-full min-h-[130px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
-              value={teacherReturn}
-              onChange={(event) => setTeacherReturn(event.target.value)}
-              placeholder="Descreva o que foi feito, como a criança reagiu e os resultados observados."
-            />
+                <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Observação da professora</label>
+                <textarea
+                  className="w-full min-h-[160px] resize-none bg-white rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
+                  placeholder="Descreva o que foi observado na rotina da criança..."
+                  value={observation}
+                  onChange={(event) => setObservation(event.target.value)}
+                />
 
-            <div className="mt-3 flex flex-col gap-2">
-              <ChoiceOption
-                selected={returnChoice === 'houve_avanco'}
-                label="Houve avanço"
-                onClick={() => setReturnChoice('houve_avanco')}
-              />
-              <ChoiceOption
-                selected={returnChoice === 'houve_avanco_parcial'}
-                label="Houve avanço parcial"
-                onClick={() => setReturnChoice('houve_avanco_parcial')}
-              />
-              <ChoiceOption
-                selected={returnChoice === 'necessita_acompanhamento'}
-                label="Ainda necessita acompanhamento"
-                onClick={() => setReturnChoice('necessita_acompanhamento')}
-              />
-            </div>
-
-            <button
-              onClick={handleAnalyzeReturn}
-              disabled={!selectedStudent || analyzing || teacherReturn.trim().length < 8}
-              className="w-full mt-4 py-3 rounded-app-sm bg-gd text-white text-[13px] font-bold border-none disabled:opacity-50"
-            >
-              Analisar retorno
-            </button>
-          </div>
-        )}
-
-        {step === 'analysis' && (
-          <div className="bg-white rounded-app border border-border shadow-card p-4">
-            <p className="text-[14px] font-bold text-gd mb-2">Análise pedagógica</p>
-            <p className="text-[12px] text-soft leading-[1.6] whitespace-pre-wrap">{analysisText}</p>
-            {analysisReturnChoice === 'houve_avanco' && (
-              <p className="mt-3 text-[12px] font-bold text-gd">Evolução registrada com sucesso.</p>
-            )}
-            {analysisReturnChoice !== 'houve_avanco' && (
-              <p className="mt-3 text-[12px] text-muted leading-[1.5]">
-                Recomenda-se continuidade do acompanhamento pedagógico com intencionalidade e registro sistemático.
-              </p>
+                <button
+                  onClick={beginGenerationForSelection}
+                  disabled={generating || observation.trim().length < 12 || selectedStudentIds.length === 0}
+                  className="w-full mt-4 py-4 rounded-app bg-gd text-white font-bold text-[15px] border-none flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Sparkles size={17} />
+                  Gerar sugestões
+                  {selectedStudentIds.length > 1 ? ` (${selectedStudentIds.length} crianças)` : ''}
+                </button>
+              </>
             )}
 
-            {followupSuggestions.length > 0 && (
-              <div className="mt-4">
-                <p className="text-[12px] font-bold text-ink mb-2">Novas estrategias sugeridas</p>
-                <div className="flex flex-col gap-2">
-                  {followupSuggestions.map((suggestion) => (
-                    <div key={suggestion.id} className="rounded-app-sm border border-border bg-cream p-3">
-                      <p className="text-[12px] font-bold text-gd">{suggestion.title}</p>
-                      <p className="text-[11px] text-muted mt-1">{suggestion.summary}</p>
+            {step === 'suggestions' && (
+              <>
+                <p className="text-[13px] text-muted mb-1">{selectedStudent?.name}</p>
+                <p className="text-[12px] text-muted mb-3">Selecione uma estratégia pedagógica para aplicar.</p>
+                <div className="flex flex-col gap-3">
+                  {suggestions.map((suggestion) => (
+                    <div key={suggestion.id} className="bg-white rounded-app border border-border shadow-card p-4">
+                      <p className="text-[13px] font-bold text-gd">{suggestion.title}</p>
+                      <p className="text-[12px] text-muted mt-1 leading-[1.5]">{suggestion.summary}</p>
+                      <p className="text-[12px] text-ink mt-2"><strong>Objetivo:</strong> {suggestion.objective}</p>
                       <button
-                        onClick={() => void chooseFollowupIntervention(suggestion)}
+                        onClick={() => void chooseIntervention(suggestion)}
                         className="w-full mt-3 py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[12px] font-bold"
                       >
                         Escolher esta intervenção
@@ -523,77 +715,330 @@ export default function InterventionsSubscreen() {
                     </div>
                   ))}
                 </div>
+              </>
+            )}
+
+            {step === 'chosen' && chosenSuggestion && (
+              <div className="bg-white rounded-app border border-border shadow-card p-4">
+                <p className="text-[12px] text-muted mb-2">{selectedStudent?.name}</p>
+                <h3 className="text-[16px] font-bold text-gd">{chosenSuggestion.title}</h3>
+                <p className="text-[12px] text-ink mt-3"><strong>Observação inicial:</strong> {generatedObservation || observation}</p>
+                <p className="text-[12px] text-ink mt-3"><strong>Objetivo pedagógico:</strong> {chosenSuggestion.objective}</p>
+                <p className="text-[12px] text-ink mt-3"><strong>Como aplicar:</strong> {chosenSuggestion.howToApply}</p>
+                <p className="text-[12px] text-ink mt-3"><strong>O que observar:</strong> {chosenSuggestion.whatToObserve}</p>
+                <p className="text-[12px] text-ink mt-3"><strong>Texto para registro:</strong> {chosenSuggestion.recordText}</p>
+
+                <button
+                  onClick={() => void openFeedbackStep()}
+                  className="w-full mt-4 py-3 rounded-app-sm bg-gd text-white text-[13px] font-bold border-none"
+                >
+                  Registrar retorno
+                </button>
+                <button
+                  onClick={closeWithoutRegistering}
+                  className="w-full mt-2 py-3 rounded-app-sm border border-border bg-white text-muted text-[13px] font-bold"
+                >
+                  Fechar sem registrar
+                </button>
+                <button
+                  onClick={() => void savePendingIntervention()}
+                  className="w-full mt-2 py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[13px] font-bold"
+                >
+                  Salvar para acompanhar depois
+                </button>
               </div>
             )}
 
-            <button
-              onClick={closeSubscreen}
-              className="w-full mt-4 py-3 rounded-app-sm bg-gd text-white text-[13px] font-bold border-none"
-            >
-              Concluir
-            </button>
-          </div>
-        )}
+            {step === 'feedback' && (
+              <div className="bg-white rounded-app border border-border shadow-card p-4">
+                <p className="text-[12px] font-bold text-gd mb-1">{selectedStudent?.name}</p>
+                {chosenSuggestion && (
+                  <p className="text-[11px] text-muted mb-3 leading-[1.5]">
+                    Intervenção em andamento:
+                    {' '}
+                    <strong>{chosenSuggestion.title}</strong>
+                  </p>
+                )}
+                <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Retorno da professora</label>
+                <textarea
+                  className="w-full min-h-[130px] resize-none bg-cream rounded-app-sm border border-border px-3 py-3 mt-2 text-[14px] text-ink outline-none leading-[1.6]"
+                  value={teacherReturn}
+                  onChange={(event) => setTeacherReturn(event.target.value)}
+                  placeholder="Descreva o que foi feito, como a criança reagiu e os resultados observados."
+                />
 
-        {error && (
-          <p className="mt-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] leading-[1.5] text-red-700">
-            {error}
-          </p>
-        )}
-        {error && (step === 'form' || step === 'feedback') && (
-          <button
-            onClick={step === 'form' ? handleGenerateSuggestions : handleAnalyzeReturn}
-            className="mt-2 w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold"
-          >
-            Tentar novamente
-          </button>
-        )}
-        {draftMessage && <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>}
-
-        {studentHistory.length > 0 && (
-          <div className="mt-5">
-            <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Histórico da criança</p>
-            <div className="flex flex-col gap-2 pb-8">
-              {studentHistory.map((item) => (
-                <div key={item.id} className="bg-white rounded-app-sm border border-border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[12px] font-bold text-ink">{item.chosenIntervention?.title ?? 'Intervenção pendente'}</p>
-                    <span className="text-[10px] px-2 py-1 rounded-full bg-gbg text-gd border border-gp">
-                      {formatStatus(item.status)}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-muted mt-1 line-clamp-2">{item.observationInitial}</p>
-                  {item.status !== 'concluida' && (
-                    <div className="grid grid-cols-3 gap-2 mt-3">
-                      <button
-                        onClick={() => resumeIntervention(item)}
-                        disabled={!item.chosenIntervention}
-                        className="rounded-app-sm border border-gp bg-gbg px-2 py-2 text-[10px] font-bold text-gd disabled:opacity-50"
-                      >
-                        Retomar
-                      </button>
-                      <button
-                        onClick={() => completeWithoutAnalysis(item)}
-                        className="rounded-app-sm border border-border bg-white px-2 py-2 text-[10px] font-bold text-muted"
-                      >
-                        Finalizar
-                      </button>
-                      <button
-                        onClick={() => discardIntervention(item)}
-                        className="rounded-app-sm border border-red-200 bg-red-50 px-2 py-2 text-[10px] font-bold text-red-700"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  )}
+                <div className="mt-3 flex flex-col gap-2">
+                  <ChoiceOption selected={returnChoice === 'houve_avanco'} label="Houve avanço" onClick={() => setReturnChoice('houve_avanco')} />
+                  <ChoiceOption selected={returnChoice === 'houve_avanco_parcial'} label="Houve avanço parcial" onClick={() => setReturnChoice('houve_avanco_parcial')} />
+                  <ChoiceOption selected={returnChoice === 'necessita_acompanhamento'} label="Ainda necessita acompanhamento" onClick={() => setReturnChoice('necessita_acompanhamento')} />
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+
+                {!chosenSuggestion && (
+                  <p className="mt-3 text-[11px] text-[#C1440E] leading-[1.5]">
+                    A intervenção escolhida não foi recuperada. Volte ao histórico e toque em Retomar, ou escolha uma estratégia novamente.
+                  </p>
+                )}
+
+                <button
+                  onClick={() => void handleAnalyzeReturn()}
+                  disabled={!selectedStudent || !chosenSuggestion || analyzing || teacherReturn.trim().length < 8}
+                  className="w-full mt-4 py-3 rounded-app-sm bg-gd text-white text-[13px] font-bold border-none disabled:opacity-50"
+                >
+                  Analisar retorno
+                </button>
+                {chosenSuggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setStep('chosen')}
+                    className="w-full mt-2 py-3 rounded-app-sm border border-border bg-white text-muted text-[13px] font-bold"
+                  >
+                    Voltar à intervenção escolhida
+                  </button>
+                )}
+              </div>
+            )}
+
+            {step === 'analysis' && (
+              <div className="bg-white rounded-app border border-border shadow-card p-4">
+                <p className="text-[12px] text-muted mb-1">{selectedStudent?.name}</p>
+                <p className="text-[14px] font-bold text-gd mb-2">Análise pedagógica</p>
+                <p className="text-[12px] text-soft leading-[1.6] whitespace-pre-wrap">{analysisText}</p>
+
+                {analysisReturnChoice === 'houve_avanco' && (
+                  <p className="mt-3 text-[12px] font-bold text-gd">Evolução registrada com sucesso.</p>
+                )}
+
+                {analysisReturnChoice === 'houve_avanco_parcial' && (
+                  <p className="mt-3 rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
+                    Houve avanço parcial. Você pode iniciar uma nova estratégia ou concluir este ciclo de acompanhamento.
+                  </p>
+                )}
+
+                {analysisReturnChoice === 'necessita_acompanhamento' && (
+                  <p className="mt-3 rounded-app-sm border border-[#EAD58A] bg-[#FFF8D8] px-3 py-2 text-[11px] leading-[1.5] text-[#856404]">
+                    A IA sugere novas alternativas. Escolha uma estratégia para continuar o acompanhamento ou conclua se preferir encerrar este ciclo.
+                  </p>
+                )}
+
+                {followupSuggestions.length > 0 ? (
+                  <div className="mt-4">
+                    <p className="text-[12px] font-bold text-ink mb-2">Novas estratégias sugeridas</p>
+                    <div className="flex flex-col gap-2">
+                      {followupSuggestions.map((suggestion) => (
+                        <div key={suggestion.id} className="rounded-app-sm border border-border bg-cream p-3">
+                          <p className="text-[12px] font-bold text-gd">{suggestion.title}</p>
+                          <p className="text-[11px] text-muted mt-1">{suggestion.summary}</p>
+                          <button
+                            onClick={() => void chooseFollowupIntervention(suggestion)}
+                            className="w-full mt-3 py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[12px] font-bold"
+                          >
+                            Escolher esta intervenção
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : analysisReturnChoice !== 'houve_avanco' && (
+                  <p className="mt-3 text-[11px] text-muted leading-[1.5]">
+                    Nenhuma alternativa extra foi gerada agora. Você pode concluir o ciclo ou retomar depois pelo histórico.
+                  </p>
+                )}
+
+                {analysisReturnChoice !== 'houve_avanco' && (
+                  <button
+                    onClick={() => void completeIntervention({ note: 'Ciclo de intervenção concluído pela professora.' })}
+                    className="w-full mt-4 py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[13px] font-bold"
+                  >
+                    Concluir e fechar intervenção
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    if (analysisReturnChoice === 'houve_avanco') void completeIntervention()
+                    else closeSubscreen()
+                  }}
+                  className="w-full mt-2 py-3 rounded-app-sm bg-gd text-white text-[13px] font-bold border-none"
+                >
+                  {analysisReturnChoice === 'houve_avanco' ? 'Concluir' : 'Sair e acompanhar depois'}
+                </button>
+              </div>
+            )}
+
+            {step === 'detail' && detailItem && (
+              <InterventionDetailView
+                item={detailItem}
+                onResume={() => resumeIntervention(detailItem)}
+                onComplete={() => void completeWithoutAnalysis(detailItem)}
+                onRemove={() => void discardIntervention(detailItem)}
+              />
+            )}
+
+            {error && (
+              <p className="mt-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] leading-[1.5] text-red-700">
+                {error}
+              </p>
+            )}
+            {error && (step === 'form' || step === 'feedback') && (
+              <button
+                onClick={() => void (step === 'form' ? handleGenerateSuggestions() : handleAnalyzeReturn())}
+                className="mt-2 w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold"
+              >
+                Tentar novamente
+              </button>
+            )}
+            {draftMessage && <p className="mt-2 text-[12px] text-gm">{draftMessage}</p>}
+
+            {step !== 'detail' && filteredHistory.length > 0 && (
+              <div className="mt-5">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Histórico de intervenções</p>
+                  <select
+                    value={historyFilterStudentId}
+                    onChange={(event) => setHistoryFilterStudentId(event.target.value)}
+                    className="rounded-app-sm border border-border bg-white px-2 py-1 text-[11px] text-ink"
+                  >
+                    <option value="all">Todas as crianças</option>
+                    {allStudents.map((student) => (
+                      <option key={student.id} value={student.id}>{student.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2 pb-8">
+                  {filteredHistory.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => openHistoryDetail(item)}
+                      className="bg-white rounded-app-sm border border-border p-3 text-left"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[12px] font-bold text-ink">{item.chosenIntervention?.title ?? 'Intervenção pendente'}</p>
+                        <span className="text-[10px] px-2 py-1 rounded-full bg-gbg text-gd border border-gp flex-shrink-0">
+                          {formatStatus(item.status)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gm mt-1 font-bold">{item.studentName} · {item.className}</p>
+                      <p className="text-[10px] text-muted mt-1">Início: {item.createdAt}{item.updatedAt ? ` · Atualização: ${item.updatedAt}` : ''}</p>
+                      <p className="text-[11px] text-muted mt-1 line-clamp-2">{item.observationInitial}</p>
+                      {item.status !== 'concluida' && (
+                        <div className="grid grid-cols-3 gap-2 mt-3" onClick={(event) => event.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => resumeIntervention(item)}
+                            disabled={!item.chosenIntervention}
+                            className="rounded-app-sm border border-gp bg-gbg px-2 py-2 text-[10px] font-bold text-gd disabled:opacity-50"
+                          >
+                            Retomar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void completeWithoutAnalysis(item)}
+                            className="rounded-app-sm border border-border bg-white px-2 py-2 text-[10px] font-bold text-muted"
+                          >
+                            Finalizar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void discardIntervention(item)}
+                            className="rounded-app-sm border border-red-200 bg-red-50 px-2 py-2 text-[10px] font-bold text-red-700"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+function InterventionDetailView({
+  item,
+  onResume,
+  onComplete,
+  onRemove,
+}: {
+  item: InterventionHistoryItem
+  onResume: () => void
+  onComplete: () => void
+  onRemove: () => void
+}) {
+  const timeline = buildInterventionTimeline(item)
+
+  return (
+    <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
+      <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Detalhe da intervenção</p>
+      <h3 className="text-[16px] font-bold text-gd mt-2">{item.chosenIntervention?.title ?? 'Intervenção'}</h3>
+      <p className="text-[12px] text-ink mt-1">{item.studentName} · {item.className}</p>
+      <p className="text-[11px] text-muted mt-1">Início: {item.createdAt}{item.updatedAt ? ` · Última atualização: ${item.updatedAt}` : ''}</p>
+      <p className="text-[11px] mt-2 px-2 py-1 inline-block rounded-full bg-gbg text-gd border border-gp">{formatStatus(item.status)}</p>
+
+      <DetailBlock title="Observação inicial" text={item.observationInitial} />
+
+      {item.chosenIntervention && (
+        <>
+          <DetailBlock title="Objetivo pedagógico" text={item.chosenIntervention.objective} />
+          <DetailBlock title="Como foi aplicada" text={item.chosenIntervention.howToApply} />
+          <DetailBlock title="O que observar" text={item.chosenIntervention.whatToObserve} />
+        </>
+      )}
+
+      {item.teacherReturn && <DetailBlock title="Retorno da professora" text={item.teacherReturn} />}
+      {item.returnChoice && (
+        <p className="text-[11px] text-muted mt-3">
+          Resultado informado:
+          {' '}
+          <strong>{formatReturnChoiceLabel(item.returnChoice)}</strong>
+        </p>
+      )}
+      {item.aiAnalysis && <DetailBlock title="Análise da IA" text={item.aiAnalysis} />}
+      {item.evolutionRecord && <DetailBlock title="Registro de evolução" text={item.evolutionRecord} />}
+
+      {timeline.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Linha do tempo</p>
+          <div className="flex flex-col gap-2">
+            {timeline.map((entry, index) => (
+              <div key={`${entry.at}-${index}`} className="rounded-app-sm border border-border bg-cream px-3 py-2">
+                <p className="text-[11px] font-bold text-ink">{entry.label}</p>
+                <p className="text-[10px] text-muted mt-0.5">{formatTimelineDate(entry.at)}</p>
+                {entry.teacherReturn && <p className="text-[11px] text-soft mt-1 leading-[1.5]">{entry.teacherReturn}</p>}
+                {entry.aiAnalysis && <p className="text-[11px] text-soft mt-1 leading-[1.5] whitespace-pre-wrap">{entry.aiAnalysis}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {item.status !== 'concluida' && (
+        <div className="grid grid-cols-1 gap-2 mt-4">
+          <button onClick={onResume} disabled={!item.chosenIntervention} className="py-3 rounded-app-sm bg-gd text-white text-[12px] font-bold disabled:opacity-50">
+            Retomar retorno da professora
+          </button>
+          <button onClick={onComplete} className="py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[12px] font-bold">
+            Concluir intervenção
+          </button>
+          <button onClick={onRemove} className="py-3 rounded-app-sm border border-red-200 bg-red-50 text-red-700 text-[12px] font-bold">
+            Remover do histórico
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DetailBlock({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="mt-3">
+      <p className="text-[11px] font-bold text-muted">{title}</p>
+      <p className="text-[12px] text-ink mt-1 leading-[1.6] whitespace-pre-wrap">{text}</p>
     </div>
   )
 }
@@ -611,12 +1056,54 @@ function ChoiceOption({ selected, label, onClick }: { selected: boolean; label: 
   )
 }
 
+function buildInterventionTimeline(item: InterventionHistoryItem): InterventionActivityEntry[] {
+  if (item.activityLog?.length) return item.activityLog
+  const fallback: InterventionActivityEntry[] = [{
+    at: item.createdAt,
+    type: 'created',
+    label: 'Intervenção iniciada',
+  }]
+  if (item.chosenIntervention) {
+    fallback.push({
+      at: item.createdAt,
+      type: 'chosen',
+      label: `Intervenção escolhida: ${item.chosenIntervention.title}`,
+      chosenIntervention: item.chosenIntervention,
+    })
+  }
+  if (item.teacherReturn) {
+    fallback.push({
+      at: item.updatedAt ?? item.createdAt,
+      type: 'return',
+      label: 'Retorno da professora registrado',
+      teacherReturn: item.teacherReturn,
+      returnChoice: item.returnChoice,
+    })
+  }
+  if (item.aiAnalysis) {
+    fallback.push({
+      at: item.updatedAt ?? item.createdAt,
+      type: 'analysis',
+      label: item.returnChoice ? formatReturnChoiceLabel(item.returnChoice) : 'Análise pedagógica',
+      aiAnalysis: item.aiAnalysis,
+      evolutionRecord: item.evolutionRecord,
+      returnChoice: item.returnChoice,
+    })
+  }
+  if (item.status === 'concluida') {
+    fallback.push({
+      at: item.updatedAt ?? item.createdAt,
+      type: 'concluded',
+      label: 'Intervenção concluída',
+    })
+  }
+  return fallback
+}
+
 function parseInterventionSuggestions(rawText: string) {
   const parsed = tryParseJson(rawText) as { suggestions?: Array<Record<string, unknown>> } | null
   const fromJson = parsed?.suggestions?.map((item, index) => mapSuggestion(item, index)).filter(Boolean) as InterventionSuggestion[] | undefined
-  if (fromJson && fromJson.length >= 3) {
-    return fromJson.slice(0, 5)
-  }
+  if (fromJson && fromJson.length >= 3) return fromJson.slice(0, 5)
   return []
 }
 
@@ -681,4 +1168,21 @@ function formatStatus(status: InterventionHistoryItem['status']) {
   if (status === 'em_acompanhamento') return 'Em acompanhamento'
   if (status === 'descartada') return 'Descartada'
   return 'Concluída'
+}
+
+function formatReturnChoiceLabel(choice: InterventionReturnChoice) {
+  if (choice === 'houve_avanco') return 'Houve avanço'
+  if (choice === 'houve_avanco_parcial') return 'Houve avanço parcial'
+  return 'Ainda necessita acompanhamento'
+}
+
+function formatTimelineDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function parseHistoryDate(value: string) {
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? 0 : parsed
 }
