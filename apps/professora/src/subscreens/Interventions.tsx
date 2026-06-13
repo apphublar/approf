@@ -152,6 +152,38 @@ export default function InterventionsSubscreen() {
     setActiveInterventionId(`int-${Date.now()}`)
   }
 
+  async function chooseFollowupIntervention(suggestion: InterventionSuggestion) {
+    if (!selectedStudent || !activeInterventionId) return
+
+    const nextSuggestions = followupSuggestions.length > 0 ? followupSuggestions : [suggestion]
+    const item: InterventionHistoryItem = {
+      id: activeInterventionId,
+      studentId: selectedStudent.id,
+      studentName: selectedStudent.name,
+      classId: selectedStudent.classId,
+      className: selectedStudent.className,
+      createdAt: new Date().toISOString(),
+      observationInitial: generatedObservation || observation.trim(),
+      suggestions: nextSuggestions,
+      chosenIntervention: suggestion,
+      status: 'em_acompanhamento',
+    }
+
+    try {
+      const saved = await upsertIntervention(item)
+      setActiveInterventionId(saved.id)
+      setSuggestions(nextSuggestions)
+      setChosenSuggestion(suggestion)
+      setTeacherReturn('')
+      setReturnChoice('houve_avanco')
+      setFollowupSuggestions([])
+      setAnalysisText('')
+      setStep('chosen')
+    } catch {
+      // upsertIntervention already exposes the persistence error to the user.
+    }
+  }
+
   function closeWithoutRegistering() {
     closeSubscreen()
   }
@@ -258,7 +290,8 @@ export default function InterventionsSubscreen() {
         status,
       }
 
-      await upsertIntervention(item)
+      const saved = await upsertIntervention(item)
+      setActiveInterventionId(saved.id)
 
       if (returnChoice === 'houve_avanco') {
         addAnnotation({
@@ -281,7 +314,7 @@ export default function InterventionsSubscreen() {
       setFollowupSuggestions(returnChoice === 'houve_avanco' ? [] : parsed.recommendedSuggestions)
       setStep('analysis')
       setObservation('')
-      setGeneratedObservation('')
+      setGeneratedObservation(returnChoice === 'houve_avanco' ? '' : item.observationInitial)
       setTeacherReturn('')
       setReturnChoice('houve_avanco')
       clearDraft(draftKey)
@@ -303,6 +336,7 @@ export default function InterventionsSubscreen() {
       } else {
         addIntervention(saved)
       }
+      return saved
     } catch (persistError) {
       setError(persistError instanceof Error ? persistError.message : 'Não foi possível salvar a intervenção.')
       throw persistError
@@ -480,6 +514,12 @@ export default function InterventionsSubscreen() {
                     <div key={suggestion.id} className="rounded-app-sm border border-border bg-cream p-3">
                       <p className="text-[12px] font-bold text-gd">{suggestion.title}</p>
                       <p className="text-[11px] text-muted mt-1">{suggestion.summary}</p>
+                      <button
+                        onClick={() => void chooseFollowupIntervention(suggestion)}
+                        className="w-full mt-3 py-3 rounded-app-sm border border-gp bg-gbg text-gd text-[12px] font-bold"
+                      >
+                        Escolher esta intervenção
+                      </button>
                     </div>
                   ))}
                 </div>

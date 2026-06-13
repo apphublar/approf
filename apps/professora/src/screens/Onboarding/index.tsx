@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti'
 import { useAppStore, useOnboardingStore } from '@/store'
 import { getAppDataMode } from '@/services/app-data'
 import { isSupabaseConfigured } from '@/services/supabase/config'
+import { createSupabaseClass } from '@/services/supabase/classes'
 import { updateTeacherOnboardingProfile } from '@/services/supabase/profile'
 import AgeRangeSelector from '@/components/ui/AgeRangeSelector'
 
@@ -11,7 +12,7 @@ const SHIFTS = ['Manhã', 'Tarde', 'Integral']
 
 export default function Onboarding() {
   const { step, data, setStep, setData, complete } = useOnboardingStore()
-  const { setUserName, setSchoolName, addAnnotation } = useAppStore()
+  const { setUserName, setSchoolName, addAnnotation, addClass, setActiveClass } = useAppStore()
 
   const [s1School, setS1School] = useState(data.schoolName ?? '')
   const [s1Shift, setS1Shift] = useState(data.shift ?? SHIFTS[0])
@@ -45,10 +46,30 @@ export default function Onboarding() {
 
     try {
       if (getAppDataMode() === 'supabase' && isSupabaseConfigured()) {
+        const createdClass = await createSupabaseClass({
+          name: s2Class.trim(),
+          school: s1School.trim(),
+          shift: s1Shift,
+          ageGroup: s2Age,
+        })
+        addClass(createdClass)
+        setActiveClass(createdClass.id)
         await updateTeacherOnboardingProfile({
           fullName: name,
           estimatedStudentCount,
         })
+      } else {
+        const localClass = {
+          id: `class-${Date.now()}`,
+          name: s2Class.trim(),
+          school: s1School.trim(),
+          shift: s1Shift,
+          ageGroup: s2Age,
+          iconBg: '#D8F3DC',
+          students: [],
+        }
+        addClass(localClass)
+        setActiveClass(localClass.id)
       }
 
       setData({ firstNote: s3Note, estimatedStudentCount })
@@ -344,4 +365,3 @@ function clampStudentCount(value: number) {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.min(300, Math.round(value)))
 }
-
