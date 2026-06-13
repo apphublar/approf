@@ -29,10 +29,10 @@ import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { listReports } from '@/services/reports'
 
 const QUICK_ACCESS = [
+  { label: 'Comunidade', desc: 'Troque ideias com professoras', icon: Users, bg: '#D8F3DC', tab: null, sub: 'community' as const },
   { label: 'Anotações', desc: 'Registre o dia a dia da turma', icon: NotebookPen, bg: '#D8F3DC', tab: 'annotations' as const, sub: null },
   { label: 'Minhas Turmas', desc: 'Alunos, perfis e progressos', icon: School, bg: '#FFF3CD', tab: 'classes' as const, sub: null },
   { label: 'Calendário', desc: 'Eventos e tarefas pedagógicas', icon: CalendarDays, bg: '#E3D5F5', tab: null, sub: 'calendar' as const },
-  { label: 'Comunidade', desc: 'Troque ideias com professoras', icon: Users, bg: '#D8F3DC', tab: null, sub: 'community' as const },
   { label: 'Conquistas', desc: 'Acompanhe sua evolução', icon: Trophy, bg: '#FFF3CD', tab: 'achievements' as const, sub: null },
   { label: 'Documentos', desc: 'Arquivos pessoais com segurança', icon: FolderClosed, bg: '#D0E8FF', tab: null, sub: 'documents' as const },
 ] as const
@@ -51,11 +51,6 @@ export default function HomeScreen() {
 
   const firstName = getDisplayFirstName(userName)
   const recentNotes = annotations.slice(0, 3)
-  const weeklySummary = useMemo(() => buildWeeklySummary(annotations, classes), [annotations, classes])
-  const studentsWithoutRecentNotes = useMemo(
-    () => buildStudentsWithoutRecentNotes(annotations, classes).slice(0, 3),
-    [annotations, classes],
-  )
   const studentsReadyForReport = useMemo(
     () => (reportSuggestionsLoaded ? buildStudentsReadyForReport(annotations, classes, studentsWithDevelopmentReport) : []),
     [annotations, classes, reportSuggestionsLoaded, studentsWithDevelopmentReport],
@@ -411,72 +406,6 @@ export default function HomeScreen() {
             <ChevronRight size={18} className="text-muted" />
           </button>
 
-          <section className="bg-white rounded-app p-4 mb-[14px] border border-border shadow-card">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Resumo semanal</p>
-                <p className="text-[13px] font-bold text-ink mt-1">{weeklySummary.title}</p>
-              </div>
-              <button
-                onClick={() => setTab('annotations')}
-                className="text-[11px] font-bold text-gm"
-              >
-                Ver anotações
-              </button>
-            </div>
-            <div className="mt-3 flex flex-col gap-2 text-[11px] text-muted leading-[1.45]">
-              <p>- {weeklySummary.totalNotes} registros nos últimos 7 dias.</p>
-              <p>- Categoria em destaque: {weeklySummary.topCategory}.</p>
-              <p>- Crianças sem registro recente: {weeklySummary.studentsWithoutRecentNote}.</p>
-              {weeklySummary.topStudent && <p>- Maior volume de registros: {weeklySummary.topStudent}.</p>}
-            </div>
-          </section>
-
-          <section className="bg-white rounded-app p-4 mb-[14px] border border-border shadow-card">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Detector sem registro</p>
-                <p className="text-[13px] font-bold text-ink mt-1">
-                  {studentsWithoutRecentNotes.length
-                    ? `${studentsWithoutRecentNotes.length} crianças sem anotação recente`
-                    : 'Nenhuma criança sem registro recente'}
-                </p>
-              </div>
-              <button
-                onClick={() => setTab('annotations')}
-                className="text-[11px] font-bold text-gm"
-              >
-                Ir para anotações
-              </button>
-            </div>
-            {studentsWithoutRecentNotes.length > 0 ? (
-              <div className="mt-3 flex flex-col gap-2">
-                {studentsWithoutRecentNotes.map((item) => (
-                  <button
-                    key={item.studentId}
-                    onClick={() => openSubscreen('new-annotation', {
-                      prefill: {
-                        workKind: 'memory',
-                        modelId: 'observacao',
-                        classId: item.classId,
-                        studentId: item.studentId,
-                        text: `Observação de acompanhamento para ${item.studentName} (${item.className}): `,
-                      },
-                    })}
-                    className="w-full rounded-app-sm border border-border bg-cream px-3 py-3 text-left active:scale-[.98] transition-transform"
-                  >
-                    <p className="text-[12px] font-bold text-ink">{item.studentName}</p>
-                    <p className="text-[11px] text-muted mt-1">Turma {item.className} - sem registro nos últimos 7 dias</p>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-[11px] text-muted leading-[1.5]">
-                Continue mantendo registros recorrentes para alimentar relatórios e planejamentos com dados atualizados.
-              </p>
-            )}
-          </section>
-
           <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mt-[18px] mb-[10px]">
             Acesso rápido
           </p>
@@ -808,114 +737,6 @@ function formatCompactNumber(value: number) {
 
 function formatFullNumber(value: number) {
   return String(Math.round(value))
-}
-
-function buildWeeklySummary(
-  annotations: ReturnType<typeof useAppStore.getState>['annotations'],
-  classes: ReturnType<typeof useAppStore.getState>['classes'],
-) {
-  const now = new Date()
-  const from = new Date(now)
-  from.setDate(now.getDate() - 7)
-
-  const weekly = annotations.filter((annotation) => {
-    const parsed = parseAnnotationDate(annotation.date)
-    if (!parsed) return false
-    return parsed >= from && parsed <= now
-  })
-
-  const categoryCounts = new Map<string, number>()
-  const studentCounts = new Map<string, number>()
-  for (const annotation of weekly) {
-    categoryCounts.set(annotation.category, (categoryCounts.get(annotation.category) ?? 0) + 1)
-    if (annotation.studentId) {
-      studentCounts.set(annotation.studentId, (studentCounts.get(annotation.studentId) ?? 0) + 1)
-    }
-  }
-
-  const topCategoryKey = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
-  const topCategory = topCategoryKey ? formatCategory(topCategoryKey) : 'Sem destaque'
-  const topStudentId = [...studentCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
-  const topStudent = topStudentId ? findStudentName(topStudentId, classes) : null
-
-  const studentsWithWeeklyNotes = new Set(weekly.map((annotation) => annotation.studentId).filter(Boolean))
-  const totalStudents = classes.reduce((acc, classItem) => acc + classItem.students.length, 0)
-  const studentsWithoutRecentNote = Math.max(0, totalStudents - studentsWithWeeklyNotes.size)
-
-  return {
-    title: weekly.length ? 'Panorama da sua semana pedagógica' : 'Sem registros suficientes nesta semana',
-    totalNotes: weekly.length,
-    topCategory,
-    topStudent,
-    studentsWithoutRecentNote,
-  }
-}
-
-function buildStudentsWithoutRecentNotes(
-  annotations: ReturnType<typeof useAppStore.getState>['annotations'],
-  classes: ReturnType<typeof useAppStore.getState>['classes'],
-) {
-  const now = new Date()
-  const from = new Date(now)
-  from.setDate(now.getDate() - 7)
-
-  const recentByStudent = new Set(
-    annotations
-      .filter((annotation) => {
-        const parsed = parseAnnotationDate(annotation.date)
-        if (!parsed || !annotation.studentId) return false
-        return parsed >= from && parsed <= now
-      })
-      .map((annotation) => annotation.studentId as string),
-  )
-
-  return classes
-    .flatMap((classItem) =>
-      classItem.students.map((student) => ({
-        classId: classItem.id,
-        className: classItem.name,
-        studentId: student.id,
-        studentName: student.name,
-      })),
-    )
-    .filter((item) => !recentByStudent.has(item.studentId))
-}
-
-function parseAnnotationDate(value: string) {
-  if (!value) return null
-  const now = new Date()
-  if (value.toLowerCase().startsWith('hoje')) return now
-  if (value.toLowerCase().startsWith('agora')) return now
-
-  const match = value.match(/(\d{2})\/(\d{2})/)
-  if (!match) return null
-  const day = Number(match[1])
-  const month = Number(match[2]) - 1
-  if (!Number.isFinite(day) || !Number.isFinite(month)) return null
-
-  const parsed = new Date(now.getFullYear(), month, day)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-function formatCategory(category: string) {
-  const labels: Record<string, string> = {
-    evolucao: 'Evolução',
-    plano: 'Planejamento',
-    portfolio: 'Portfólio',
-    projeto: 'Projeto',
-    formacao: 'Formação',
-    carta: 'Carta',
-    atipico: 'Atípico',
-  }
-  return labels[category] ?? 'Anotações gerais'
-}
-
-function findStudentName(studentId: string, classes: ReturnType<typeof useAppStore.getState>['classes']) {
-  for (const classItem of classes) {
-    const found = classItem.students.find((student) => student.id === studentId)
-    if (found) return found.name
-  }
-  return null
 }
 
 const MIN_ANNOTATIONS_FOR_REPORT = 3

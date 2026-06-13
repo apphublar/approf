@@ -118,6 +118,8 @@ interface AppStore {
   setCalendarEvents: (events: CalendarEvent[]) => void
   addCalendarEvent: (event: CalendarEvent) => void
   addCommunityPost: (post: CommunityPost) => void
+  updateCommunityPost: (post: CommunityPost) => void
+  removeCommunityPost: (id: string) => void
   addIntervention: (item: InterventionHistoryItem) => void
   updateIntervention: (item: InterventionHistoryItem) => void
   removeIntervention: (id: string) => void
@@ -155,22 +157,26 @@ export const useAppStore = create<AppStore>()(
       communityPosts: [
         {
           id: 'cp-1',
+          authorId: 'demo-teacher-marina',
           authorName: 'Marina Costa',
           authorRole: 'Professora Jardim I',
           text: 'Como voces registram adaptações para alunos com muita dificuldade nas transicoes?',
           category: 'duvida' as const,
           likes: 18,
           comments: 7,
+          likedByMe: false,
           createdAt: 'Hoje, 08h40',
         },
         {
           id: 'cp-2',
+          authorId: 'demo-teacher-ana',
           authorName: 'Ana Lima',
           authorRole: 'Professora Pre I',
           text: 'Compartilhei com minha coordenacao um modelo de observacao semanal e funcionou muito bem.',
           category: 'relato' as const,
           likes: 31,
           comments: 5,
+          likedByMe: true,
           createdAt: 'Ontem, 17h12',
         },
       ],
@@ -256,6 +262,14 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ calendarEvents: [event, ...state.calendarEvents] })),
       addCommunityPost: (post: CommunityPost) =>
         set((state) => ({ communityPosts: [post, ...state.communityPosts] })),
+      updateCommunityPost: (post: CommunityPost) =>
+        set((state) => ({
+          communityPosts: state.communityPosts.map((current) => (current.id === post.id ? post : current)),
+        })),
+      removeCommunityPost: (id: string) =>
+        set((state) => ({
+          communityPosts: state.communityPosts.filter((post) => post.id !== id),
+        })),
       addIntervention: (item) =>
         set((state) => ({ interventions: [item, ...state.interventions] })),
       updateIntervention: (item) =>

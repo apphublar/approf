@@ -35,14 +35,25 @@ export interface FeatureAccess {
   allowedUserIds: string[]
 }
 
+export interface CommunityComment {
+  id: string
+  postId: string
+  authorId: string
+  authorName: string
+  text: string
+  createdAt: string
+}
+
 export interface CommunityPost {
   id: string
+  authorId: string
   authorName: string
   authorRole: string
   text: string
   category: 'duvida' | 'ideia' | 'material' | 'relato'
   likes: number
   comments: number
+  likedByMe: boolean
   createdAt: string
 }
 

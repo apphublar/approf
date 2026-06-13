@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { requireAdminSession } from '../lib/admin-auth'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
+import { tryGrantReferralReward } from '@/app/lib/referrals'
 
 type SubscriptionStatus = 'trial' | 'active' | 'overdue' | 'blocked' | 'canceled'
 type SubscriptionRow = {
@@ -165,6 +166,10 @@ export async function updateTeacherSubscription(formData: FormData) {
       { onConflict: 'user_id' },
     )
   if (error) throw new Error(`Subscriptions error: ${error.message}`)
+
+  if (status === 'active' && ['monthly', 'mensal', 'annual', 'anual'].includes(plan.toLowerCase())) {
+    await tryGrantReferralReward(teacherId)
+  }
 
   await supabase.from('admin_action_logs').insert({
     actor_id: admin.userId,

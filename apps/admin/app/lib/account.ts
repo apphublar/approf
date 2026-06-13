@@ -1,4 +1,5 @@
 import { createSupabaseServiceClient } from '@/app/lib/supabase-server'
+import { getTeacherReferralSummary } from '@/app/lib/referrals'
 
 type SubscriptionStatus = 'trial' | 'active' | 'overdue' | 'blocked' | 'canceled'
 
@@ -17,7 +18,7 @@ export async function getTeacherAccountData(ownerId: string) {
   const [profileResult, schoolsResult, subscriptionResult, verificationsResult, noticesResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id,full_name,email,phone,avatar_url,notification_preferences,school_logo_url')
+      .select('id,full_name,email,phone,avatar_url,notification_preferences,school_logo_url,teacher_code')
       .eq('id', ownerId)
       .maybeSingle(),
     supabase
@@ -53,6 +54,8 @@ export async function getTeacherAccountData(ownerId: string) {
   if (verificationsResult.error) throw verificationsResult.error
   if (noticesResult.error) throw noticesResult.error
 
+  const referrals = await getTeacherReferralSummary(ownerId).catch(() => null)
+
   return {
     profile: profileResult.data,
     schools: schoolsResult.data ?? [],
@@ -62,6 +65,7 @@ export async function getTeacherAccountData(ownerId: string) {
       documents: Array.isArray(item.documents) ? item.documents : [],
     })),
     notices: noticesResult.data ?? [],
+    referrals,
   }
 }
 

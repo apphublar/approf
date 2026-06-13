@@ -11,9 +11,17 @@ export async function signInWithEmail(email: string, password: string) {
 
 export type SignupPlan = 'monthly' | 'annual'
 
-export async function signUpTeacher(input: { fullName: string; email: string; password: string; plan?: SignupPlan }) {
+export async function signUpTeacher(input: {
+  fullName: string
+  email: string
+  password: string
+  plan?: SignupPlan
+  referralCode?: string | null
+}) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')
+
+  const referralCode = input.referralCode?.trim().toUpperCase() || null
 
   const { data, error } = await supabase.auth.signUp({
     email: input.email,
@@ -23,6 +31,7 @@ export async function signUpTeacher(input: { fullName: string; email: string; pa
       data: {
         full_name: input.fullName,
         selected_plan: input.plan ?? getSelectedSignupPlanFromUrl(),
+        ...(referralCode ? { referral_code: referralCode } : {}),
       },
     },
   })

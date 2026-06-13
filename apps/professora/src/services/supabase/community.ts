@@ -1,4 +1,4 @@
-import type { CommunityPost, FeatureAccess } from '@/types'
+import type { CommunityComment, CommunityPost, FeatureAccess } from '@/types'
 import { getSupabaseClient } from './client'
 
 type CommunityPostRow = {
@@ -9,6 +9,15 @@ type CommunityPostRow = {
   comments_count: number
   created_at: string
   author_id: string
+  profiles: { full_name: string | null } | { full_name: string | null }[] | null
+}
+
+type CommunityCommentRow = {
+  id: string
+  post_id: string
+  author_id: string
+  body: string
+  created_at: string
   profiles: { full_name: string | null } | { full_name: string | null }[] | null
 }
 
@@ -45,6 +54,7 @@ export async function loadCommunityPosts(): Promise<CommunityPost[]> {
   const supabase = getSupabaseClient()
   if (!supabase) return []
 
+  const userId = await getCurrentUserId(supabase)
   const { data, error } = await supabase
     .from('community_posts')
     .select('id, body, category, likes_count, comments_count, created_at, author_id, profiles(full_name)')
@@ -53,7 +63,23 @@ export async function loadCommunityPosts(): Promise<CommunityPost[]> {
     .limit(50)
 
   if (error) throw error
-  return (data as CommunityPostRow[] | null ?? []).map(mapCommunityPost)
+
+  const likedPostIds = userId ? await loadLikedPostIds(supabase, userId) : new Set<string>()
+  return (data as CommunityPostRow[] | null ?? []).map((row) => mapCommunityPost(row, likedPostIds))
+}
+
+export async function loadCommunityComments(postId: string): Promise<CommunityComment[]> {
+  const supabase = getSupabaseClient()
+  if (!supabase) return []
+
+  const { data, error } = await supabase
+    .from('community_post_comments')
+    .select('id, post_id, author_id, body, created_at, profiles(full_name)')
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return (data as CommunityCommentRow[] | null ?? []).map(mapCommunityComment)
 }
 
 export async function createCommunityPost(input: {
@@ -64,9 +90,7 @@ export async function createCommunityPost(input: {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')
 
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError) throw userError
-  const userId = userData.user?.id
+  const userId = await getCurrentUserId(supabase)
   if (!userId) throw new Error('Sessão não encontrada.')
 
   const { data, error } = await supabase
@@ -84,19 +108,135 @@ export async function createCommunityPost(input: {
   return mapCommunityPost({
     ...(data as CommunityPostRow),
     profiles: { full_name: input.authorName },
-  })
+  }, new Set())
 }
 
-function mapCommunityPost(row: CommunityPostRow): CommunityPost {
+export async function toggleCommunityPostLike(postId: string, liked: boolean): Promise<CommunityPost> {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não está configurado.')
+
+  const userId = await getCurrentUserId(supabase)
+  if (!userId) throw new Error('Sessão não encontrada.')
+
+  if (liked) {
+    const { error } = await supabase
+      .from('community_post_likes')
+      .delete()
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+    if (error) throw error
+  } else {
+    const { error } = await supabase
+      .from('community_post_likes')
+      .insert({ post_id: postId, user_id: userId })
+    if (error) throw error
+  }
+
+  return fetchCommunityPostById(postId, userId)
+}
+
+export async function createCommunityComment(input: {
+  postId: string
+  text: string
+  authorName: string
+}): Promise<{ comment: CommunityComment; post: CommunityPost }> {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não está configurado.')
+
+  const userId = await getCurrentUserId(supabase)
+  if (!userId) throw new Error('Sessão não encontrada.')
+
+  const { data, error } = await supabase
+    .from('community_post_comments')
+    .insert({
+      post_id: input.postId,
+      author_id: userId,
+      body: input.text.trim(),
+    })
+    .select('id, post_id, author_id, body, created_at, profiles(full_name)')
+    .single()
+
+  if (error) throw error
+
+  const comment = mapCommunityComment({
+    ...(data as CommunityCommentRow),
+    profiles: { full_name: input.authorName },
+  })
+  const post = await fetchCommunityPostById(input.postId, userId)
+  return { comment, post }
+}
+
+export async function deleteCommunityPost(postId: string): Promise<void> {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não está configurado.')
+
+  const userId = await getCurrentUserId(supabase)
+  if (!userId) throw new Error('Sessão não encontrada.')
+
+  const { error } = await supabase
+    .from('community_posts')
+    .update({ status: 'removed' })
+    .eq('id', postId)
+    .eq('author_id', userId)
+
+  if (error) throw error
+}
+
+async function fetchCommunityPostById(postId: string, userId: string): Promise<CommunityPost> {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não está configurado.')
+
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select('id, body, category, likes_count, comments_count, created_at, author_id, profiles(full_name)')
+    .eq('id', postId)
+    .single()
+
+  if (error) throw error
+  const likedPostIds = await loadLikedPostIds(supabase, userId)
+  return mapCommunityPost(data as CommunityPostRow, likedPostIds)
+}
+
+async function loadLikedPostIds(supabase: NonNullable<ReturnType<typeof getSupabaseClient>>, userId: string) {
+  const { data, error } = await supabase
+    .from('community_post_likes')
+    .select('post_id')
+    .eq('user_id', userId)
+
+  if (error) throw error
+  return new Set((data ?? []).map((row) => row.post_id as string))
+}
+
+async function getCurrentUserId(supabase: NonNullable<ReturnType<typeof getSupabaseClient>>) {
+  const { data, error } = await supabase.auth.getUser()
+  if (error) throw error
+  return data.user?.id ?? null
+}
+
+function mapCommunityPost(row: CommunityPostRow, likedPostIds: Set<string>): CommunityPost {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
   return {
     id: row.id,
+    authorId: row.author_id,
     authorName: profile?.full_name?.trim() || 'Professora',
     authorRole: 'Professora',
     text: row.body,
     category: normalizeCategory(row.category),
     likes: row.likes_count ?? 0,
     comments: row.comments_count ?? 0,
+    likedByMe: likedPostIds.has(row.id),
+    createdAt: formatCommunityDate(row.created_at),
+  }
+}
+
+function mapCommunityComment(row: CommunityCommentRow): CommunityComment {
+  const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+  return {
+    id: row.id,
+    postId: row.post_id,
+    authorId: row.author_id,
+    authorName: profile?.full_name?.trim() || 'Professora',
+    text: row.body,
     createdAt: formatCommunityDate(row.created_at),
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, Eye, EyeOff, LogOut, Paperclip, ShieldCheck, Wallet, X } from 'lucide-react'
+import { ChevronLeft, Copy, Eye, EyeOff, Gift, LogOut, Paperclip, Share2, ShieldCheck, Wallet, X } from 'lucide-react'
 import VerifiedBadge from '@/components/ui/VerifiedBadge'
 import { useAppStore, useNavStore } from '@/store'
 import { ensureTeacherSchool } from '@/services/supabase/classes'
@@ -27,13 +27,14 @@ import { APP_VERSION } from '@/version'
 import { MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
 import { stashNavigationForFilePicker } from '@/utils/nav-session'
 import { clearPendingFiles, loadPendingFiles, savePendingFiles } from '@/utils/pending-file-store'
+import { buildReferralSignupUrl, buildReferralWhatsAppMessage } from '@/utils/referral'
 
 const VERIFICATION_FILES_KEY = 'verification-pending'
 const VERIFICATION_FILE_INPUT_ID = 'verification-file-input'
 
 export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen, subscreens } = useNavStore()
-  const { setSchoolName, userId } = useAppStore()
+  const { setSchoolName, userId, teacherCode } = useAppStore()
   const forcedMode = typeof data === 'object' && data && 'forcedMode' in data
     ? Boolean((data as { forcedMode?: boolean }).forcedMode)
     : false
@@ -50,6 +51,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [referralMessage, setReferralMessage] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -420,6 +422,12 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               </div>
             </div>
 
+            <ReferralCard
+              teacherCode={snapshot.referrals?.teacherCode ?? teacherCode}
+              referrals={snapshot.referrals}
+              onMessage={setReferralMessage}
+            />
+
             <div className="bg-white rounded-app p-4 border border-gp shadow-card mb-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2">
@@ -687,6 +695,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
             </div>
 
             {message && <p className="text-[12px] text-gm mb-3">{message}</p>}
+            {referralMessage && <p className="text-[12px] text-gm mb-3">{referralMessage}</p>}
             {error && <p className="text-[12px] text-[#C1440E] mb-3">{error}</p>}
 
             <button onClick={logout} className="w-full mb-6 py-2 rounded-app-sm border border-border text-[12px] font-bold text-muted flex items-center justify-center gap-2">
@@ -705,6 +714,133 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
       </div>
     </div>
   )
+}
+
+function ReferralCard({
+  teacherCode,
+  referrals,
+  onMessage,
+}: {
+  teacherCode: string
+  referrals: TeacherAccountSnapshot['referrals']
+  onMessage: (message: string) => void
+}) {
+  const code = teacherCode?.trim()
+  const referralLink = code ? buildReferralSignupUrl(code) : ''
+  const stats = referrals?.stats ?? { registered: 0, converted: 0, rewarded: 0 }
+  const availableCredit = (referrals?.availableCreditCents ?? 0) / 100
+  const totalGiz = referrals?.totalGiztokensEarned ?? 0
+  const history = referrals?.history ?? []
+
+  async function copyLink() {
+    if (!referralLink) return
+    try {
+      await navigator.clipboard.writeText(referralLink)
+      onMessage('Link de indicação copiado.')
+    } catch {
+      onMessage('Não foi possível copiar o link agora.')
+    }
+  }
+
+  function shareWhatsApp() {
+    if (!referralLink) return
+    const url = `https://wa.me/?text=${encodeURIComponent(buildReferralWhatsAppMessage(referralLink))}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Gift size={15} className="text-gm" />
+        <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Indique uma prof</p>
+      </div>
+      <p className="text-[12px] text-soft leading-[1.6]">
+        Compartilhe seu link. Quando uma colega assinar, você ganha desconto na próxima mensalidade e GizTokens extras.
+      </p>
+      <div className="mt-3 rounded-app-sm border border-border bg-cream px-3 py-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted">Seu código</p>
+        <p className="text-[13px] font-bold text-ink mt-1">{code || 'Gerando código...'}</p>
+        {referralLink && (
+          <p className="text-[11px] text-muted mt-2 break-all">{referralLink}</p>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        <button
+          type="button"
+          onClick={() => void copyLink()}
+          disabled={!referralLink}
+          className="inline-flex items-center justify-center gap-1 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[11px] font-bold text-gd disabled:opacity-50"
+        >
+          <Copy size={13} />
+          Copiar link
+        </button>
+        <button
+          type="button"
+          onClick={shareWhatsApp}
+          disabled={!referralLink}
+          className="inline-flex items-center justify-center gap-1 rounded-app-sm bg-gm px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50"
+        >
+          <Share2 size={13} />
+          WhatsApp
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+        <div className="rounded-app-sm border border-border bg-white px-2 py-2">
+          <p className="text-[14px] font-bold text-ink">{stats.registered}</p>
+          <p className="text-[10px] text-muted">Cadastros</p>
+        </div>
+        <div className="rounded-app-sm border border-border bg-white px-2 py-2">
+          <p className="text-[14px] font-bold text-ink">{stats.rewarded}</p>
+          <p className="text-[10px] text-muted">Recompensas</p>
+        </div>
+        <div className="rounded-app-sm border border-border bg-white px-2 py-2">
+          <p className="text-[14px] font-bold text-gd">{formatCurrency(availableCredit)}</p>
+          <p className="text-[10px] text-muted">Crédito</p>
+        </div>
+      </div>
+      <p className="text-[11px] text-muted mt-3 leading-[1.5]">
+        Bônus por indicação convertida: plano mensal = R$ 10,00 + 1.000 GizTokens · plano anual = R$ 36,90 + 2.000 GizTokens.
+        {totalGiz > 0 && (
+          <>
+            {' '}
+            Você já ganhou
+            {' '}
+            <strong>{totalGiz.toLocaleString('pt-BR')} GizTokens</strong>
+            .
+          </>
+        )}
+      </p>
+      {history.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Histórico</p>
+          <div className="flex flex-col gap-2">
+            {history.slice(0, 5).map((item) => (
+              <div key={item.id} className="rounded-app-sm border border-border bg-cream px-3 py-2">
+                <p className="text-[12px] font-bold text-ink">{item.referredName}</p>
+                <p className="text-[10px] text-muted mt-0.5">{formatReferralStatus(item.status)}</p>
+                {item.status === 'rewarded' && (
+                  <p className="text-[10px] text-gd mt-1">
+                    +{formatCurrency(item.creditCents / 100)} · +{item.giztokensBonus.toLocaleString('pt-BR')} Giz
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function formatReferralStatus(status: string) {
+  if (status === 'registered') return 'Cadastrou pelo seu link'
+  if (status === 'converted') return 'Assinatura convertida'
+  if (status === 'rewarded') return 'Recompensa liberada'
+  return 'Indicação inválida'
 }
 
 function formatDate(value?: string | null) {

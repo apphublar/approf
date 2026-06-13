@@ -2,6 +2,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { Check, Loader2 } from 'lucide-react'
 import { getAuthErrorMessage, getSelectedSignupPlanFromUrl, requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
+import { captureReferralCodeFromUrl, clearStoredReferralCode, getStoredReferralCode } from '@/utils/referral'
 import { loadTeacherWorkspace } from '@/services/supabase/classes'
 import { getSupabaseClient } from '@/services/supabase/client'
 import {
@@ -270,6 +271,7 @@ function AuthScreen({
   const [installDismissed, setInstallDismissed] = useState(() => getLocalStorageFlag('approf:pwa-install-dismissed'))
   const [installInstalled, setInstallInstalled] = useState(() => isRunningStandalone() || getLocalStorageFlag('approf:pwa-installed'))
   const [isStandalone, setIsStandalone] = useState(() => isRunningStandalone())
+  const [referralCode, setReferralCode] = useState<string | null>(() => getStoredReferralCode())
 
   const isIos = isIosDevice()
   const shouldShowInstallPopup =
@@ -299,6 +301,11 @@ function AuthScreen({
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleInstalled)
     }
+  }, [])
+
+  useEffect(() => {
+    const captured = captureReferralCodeFromUrl()
+    if (captured) setReferralCode(captured)
   }, [])
 
   useEffect(() => {
@@ -353,9 +360,16 @@ function AuthScreen({
           email: email.trim(),
           password,
           plan: getSelectedSignupPlanFromUrl(),
+          referralCode,
         })
+        clearStoredReferralCode()
+        setReferralCode(null)
         if (!data.session) {
-          setMessage('Cadastro criado. Confira seu e-mail para confirmar a conta.')
+          setMessage(
+            referralCode
+              ? 'Cadastro criado com indicação. Confira seu e-mail para confirmar a conta e ganhar 7 dias extras de teste.'
+              : 'Cadastro criado. Confira seu e-mail para confirmar a conta.',
+          )
         }
       } else if (mode === 'forgot') {
         await requestPasswordReset(email.trim())
@@ -449,6 +463,15 @@ function AuthScreen({
 
           {installMessage && (
             <p className="mb-4 text-xs text-gd bg-gbg border border-gp rounded-app-sm p-3">{installMessage}</p>
+          )}
+
+          {mode === 'signup' && referralCode && (
+            <p className="mb-4 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[12px] leading-[1.5] text-gd">
+              Você entrou por indicação da prof
+              {' '}
+              <strong>{referralCode}</strong>
+              . Ao confirmar o cadastro, ganha 7 dias extras de teste.
+            </p>
           )}
 
           {mode === 'signup' && (

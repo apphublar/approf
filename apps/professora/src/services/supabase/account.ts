@@ -38,6 +38,30 @@ export interface NotificationPreferences {
   }
 }
 
+export interface TeacherReferralHistoryItem {
+  id: string
+  referredName: string
+  status: string
+  referredPlan: string | null
+  creditCents: number
+  giztokensBonus: number
+  createdAt: string
+  convertedAt: string | null
+  rewardedAt: string | null
+}
+
+export interface TeacherReferralSummary {
+  teacherCode: string | null
+  stats: {
+    registered: number
+    converted: number
+    rewarded: number
+  }
+  availableCreditCents: number
+  totalGiztokensEarned: number
+  history: TeacherReferralHistoryItem[]
+}
+
 export interface TeacherAccountSnapshot {
   userId: string
   fullName: string
@@ -64,6 +88,7 @@ export interface TeacherAccountSnapshot {
     title: string
     message: string
   }>
+  referrals: TeacherReferralSummary | null
 }
 
 const SUBSCRIPTION_EVENT = 'approf-subscription-state-change'
@@ -131,6 +156,7 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
         message?: string
       }
     }>
+    referrals?: TeacherReferralSummary | null
   }>('/api/account', { method: 'GET' })
 
   if (!response.profile?.id) throw new Error('Sessão não encontrada.')
@@ -165,6 +191,7 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
       title: item.payload?.title || 'Aviso importante',
       message: item.payload?.message || 'Há uma atualização importante na sua conta.',
     })),
+    referrals: response.referrals ?? null,
   }
   teacherAccountCache = { value: snapshot, fetchedAt: Date.now() }
   return snapshot
