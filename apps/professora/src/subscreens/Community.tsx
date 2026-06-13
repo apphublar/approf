@@ -238,9 +238,9 @@ export default function CommunitySubscreen() {
             <div className="w-20 h-20 rounded-[24px] flex items-center justify-center text-gm mb-5" style={{ background: '#D8F3DC' }}>
               <Users size={40} />
             </div>
-            <h2 className="font-serif text-[22px] text-gd mb-2">Comunidade em liberação gradual</h2>
+            <h2 className="font-serif text-[22px] text-gd mb-2">Comunidade indisponível</h2>
             <p className="text-[13px] text-muted leading-[1.7] max-w-[300px]">
-              O Super Admin pode liberar para todas as professoras ou apenas para contas selecionadas.
+              Entre com uma conta de professora para participar da comunidade.
             </p>
           </div>
         ) : (

@@ -30,26 +30,14 @@ export async function loadCommunityFeatureAccess(userId: string): Promise<Featur
   const supabase = getSupabaseClient()
   if (!supabase) return { global: false, allowedUserIds: [] }
 
-  const { data: flag, error: flagError } = await supabase
-    .from('feature_flags')
-    .select('release_mode')
-    .eq('key', 'community')
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
     .maybeSingle()
 
-  if (flagError || !flag) return { global: false, allowedUserIds: [] }
-  if (flag.release_mode === 'all') return { global: true, allowedUserIds: [userId] }
-
-  if (flag.release_mode === 'selected') {
-    const { data: accessRows, error: accessError } = await supabase
-      .from('feature_user_access')
-      .select('user_id')
-      .eq('feature_key', 'community')
-
-    if (accessError) return { global: false, allowedUserIds: [] }
-    return {
-      global: false,
-      allowedUserIds: (accessRows ?? []).map((row) => row.user_id),
-    }
+  if (!error && profile?.role === 'teacher') {
+    return { global: true, allowedUserIds: [userId] }
   }
 
   return { global: false, allowedUserIds: [] }
@@ -185,7 +173,7 @@ export async function deleteCommunityPost(postId: string): Promise<void> {
 
   const { error } = await supabase
     .from('community_posts')
-    .update({ status: 'removed' })
+    .delete()
     .eq('id', postId)
     .eq('author_id', userId)
 
@@ -314,7 +302,7 @@ function toCommunityError(error: unknown, fallbackMessage: string) {
       return new Error('Não foi possível carregar os dados da comunidade. Atualize o app e tente novamente.')
     }
     if (message?.includes('row-level security')) {
-      return new Error('Sua conta ainda não tem permissão para publicar na comunidade. Peça liberação ao suporte.')
+      return new Error(fallbackMessage)
     }
     if (record.code === 'PGRST116') {
       return new Error('A postagem foi enviada, mas não pôde ser confirmada. Atualize a tela e tente novamente.')
