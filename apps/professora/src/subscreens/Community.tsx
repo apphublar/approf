@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Heart, MessageCircle, Send, Trash2, Users } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
-import { getAppDataMode } from '@/services/app-data'
+import { isSupabaseBackendActive } from '@/services/supabase/config'
 import {
   createCommunityComment,
   createCommunityPost,
   deleteCommunityPost,
   loadCommunityComments,
+  loadCommunityPosts,
   toggleCommunityPostLike,
 } from '@/services/supabase/community'
 import type { CommunityComment, CommunityPost } from '@/types'
@@ -25,6 +26,7 @@ export default function CommunitySubscreen() {
     userName,
     communityPosts,
     addCommunityPost,
+    setCommunityPosts,
     updateCommunityPost,
     removeCommunityPost,
     isCommunityEnabled,
@@ -33,6 +35,7 @@ export default function CommunitySubscreen() {
   const [text, setText] = useState('')
   const [category, setCategory] = useState<CommunityPost['category']>('duvida')
   const [publishing, setPublishing] = useState(false)
+  const [loadingPosts, setLoadingPosts] = useState(false)
   const [error, setError] = useState('')
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null)
   const [commentsByPost, setCommentsByPost] = useState<Record<string, CommunityComment[]>>({})
@@ -43,19 +46,34 @@ export default function CommunitySubscreen() {
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
 
   const enabled = isCommunityEnabled()
+  const useSupabase = isSupabaseBackendActive()
+
+  async function refreshPosts() {
+    if (!useSupabase) return
+    setLoadingPosts(true)
+    try {
+      const posts = await loadCommunityPosts()
+      setCommunityPosts(posts)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível carregar as postagens.')
+    } finally {
+      setLoadingPosts(false)
+    }
+  }
 
   async function publish() {
     if (!text.trim() || publishing) return
     setPublishing(true)
     setError('')
     try {
-      if (getAppDataMode() === 'supabase') {
+      if (useSupabase) {
         const saved = await createCommunityPost({
           text: text.trim(),
           category,
           authorName: userName,
         })
         addCommunityPost(saved)
+        void refreshPosts()
       } else {
         addCommunityPost({
           id: `cp-${Date.now()}`,
@@ -80,7 +98,7 @@ export default function CommunitySubscreen() {
 
   async function ensureCommentsLoaded(postId: string) {
     if (commentsByPost[postId]) return
-    if (getAppDataMode() !== 'supabase') {
+    if (!useSupabase) {
       setCommentsByPost((current) => ({ ...current, [postId]: [] }))
       return
     }
@@ -108,7 +126,7 @@ export default function CommunitySubscreen() {
   async function handleToggleLike(post: CommunityPost) {
     if (likingPostId) return
 
-    if (getAppDataMode() !== 'supabase') {
+    if (!useSupabase) {
       updateCommunityPost({
         ...post,
         likedByMe: !post.likedByMe,
@@ -133,7 +151,7 @@ export default function CommunitySubscreen() {
     const draft = (commentDrafts[post.id] ?? '').trim()
     if (!draft || commentingPostId) return
 
-    if (getAppDataMode() !== 'supabase') {
+    if (!useSupabase) {
       const comment: CommunityComment = {
         id: `cc-${Date.now()}`,
         postId: post.id,
@@ -177,7 +195,7 @@ export default function CommunitySubscreen() {
     const confirmed = window.confirm('Deseja excluir esta postagem da comunidade?')
     if (!confirmed || deletingPostId) return
 
-    if (getAppDataMode() !== 'supabase') {
+    if (!useSupabase) {
       removeCommunityPost(post.id)
       return
     }
@@ -194,6 +212,11 @@ export default function CommunitySubscreen() {
       setDeletingPostId(null)
     }
   }
+
+  useEffect(() => {
+    if (!enabled || !useSupabase) return
+    void refreshPosts()
+  }, [enabled, useSupabase])
 
   useEffect(() => {
     if (!expandedPostId) return
@@ -250,7 +273,16 @@ export default function CommunitySubscreen() {
                   {publishing ? 'Publicando...' : 'Postar'}
                 </button>
               </div>
+              {error && (
+                <p className="mt-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] leading-[1.5] text-red-700">
+                  {error}
+                </p>
+              )}
             </div>
+
+            {loadingPosts && communityPosts.length === 0 && (
+              <p className="text-[12px] text-muted mb-3">Carregando postagens...</p>
+            )}
 
             {communityPosts.map((post) => {
               const isExpanded = expandedPostId === post.id
@@ -352,12 +384,6 @@ export default function CommunitySubscreen() {
               )
             })}
           </>
-        )}
-
-        {error && (
-          <p className="mt-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] leading-[1.5] text-red-700">
-            {error}
-          </p>
         )}
       </div>
     </div>

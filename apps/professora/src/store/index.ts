@@ -118,6 +118,7 @@ interface AppStore {
   setCalendarEvents: (events: CalendarEvent[]) => void
   addCalendarEvent: (event: CalendarEvent) => void
   addCommunityPost: (post: CommunityPost) => void
+  setCommunityPosts: (posts: CommunityPost[]) => void
   updateCommunityPost: (post: CommunityPost) => void
   removeCommunityPost: (id: string) => void
   addIntervention: (item: InterventionHistoryItem) => void
@@ -262,6 +263,7 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ calendarEvents: [event, ...state.calendarEvents] })),
       addCommunityPost: (post: CommunityPost) =>
         set((state) => ({ communityPosts: [post, ...state.communityPosts] })),
+      setCommunityPosts: (posts: CommunityPost[]) => set({ communityPosts: posts }),
       updateCommunityPost: (post: CommunityPost) =>
         set((state) => ({
           communityPosts: state.communityPosts.map((current) => (current.id === post.id ? post : current)),

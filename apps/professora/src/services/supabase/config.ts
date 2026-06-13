@@ -15,3 +15,7 @@ export function isSupabaseConfigured() {
 export function isSupabaseAuthEnabled() {
   return getAppDataMode() === 'supabase' && isSupabaseConfigured()
 }
+
+export function isSupabaseBackendActive() {
+  return isSupabaseConfigured()
+}
