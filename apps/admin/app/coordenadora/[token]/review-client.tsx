@@ -1,6 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  formatDateTime,
+  formatReportReviewStatus as formatReportStatus,
+  formatReviewAction as formatAction,
+  mapReportStatusToBadge,
+  normalizeReportHtml,
+  sanitizeReportHtml,
+} from '../coordinator-report-content'
 
 type Student = { id: string; full_name: string; birth_date: string | null; tag: string | null }
 type Report = {
@@ -652,51 +660,6 @@ function getOverallStudentStatus(reports: Report[]): string {
   return 'pending'
 }
 
-function normalizeReportHtml(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  const decoded = decodeHtmlEntities(trimmed)
-  const hasHtml = /<\/?[a-z][\s\S]*>/i.test(decoded)
-  if (hasHtml) return sanitizeReportHtml(decoded)
-
-  const paragraphs = decoded
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
-
-  return paragraphs.join('')
-}
-
-function sanitizeReportHtml(value: string) {
-  return value
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '')
-    .replace(/\s(href|src)="javascript:[^"]*"/gi, '')
-    .replace(/\s(href|src)='javascript:[^']*'/gi, '')
-}
-
-function decodeHtmlEntities(value: string) {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&nbsp;/g, ' ')
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
 function formatStudentStatus(status: string) {
   if (status === 'approved') return 'Aprovado'
   if (status === 'changes') return 'Correção'
@@ -704,29 +667,6 @@ function formatStudentStatus(status: string) {
   return 'Pendente'
 }
 
-function mapReportStatusToBadge(status: string | null) {
-  if (status === 'approved') return 'approved'
-  if (status === 'changes_requested') return 'changes'
-  return 'pending'
-}
-
-function formatReportStatus(status: string | null) {
-  if (status === 'approved') return 'Aprovado'
-  if (status === 'changes_requested') return 'Correção solicitada'
-  return 'Aguardando revisão'
-}
-
-function formatAction(action: string) {
-  if (action === 'approve') return 'Relatório aprovado'
-  if (action === 'request_changes') return 'Correção solicitada'
-  if (action === 'comment') return 'Observação registrada'
-  return action
-}
-
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso))
-}
-
-function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 }

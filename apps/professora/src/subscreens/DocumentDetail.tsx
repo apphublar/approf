@@ -432,7 +432,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 </p>
               </div>
 
-              {document.report_type === 'development_report' && document.coordinator_review_status && document.coordinator_review_status !== 'not_required' && (
+              {document.coordinator_review_status && document.coordinator_review_status !== 'not_required' && (
                 <div className={`rounded-app p-4 border shadow-card mb-4 ${getCoordinatorReviewBoxClass(document.coordinator_review_status)}`}>
                   <p className="text-[13px] font-bold">
                     Coordenadora: {formatCoordinatorReviewStatus(document.coordinator_review_status)}
@@ -444,7 +444,10 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                   )}
                   {document.coordinator_review_status === 'changes_requested' && (
                     <p className="text-[11px] leading-[1.5] mt-2">
-                      Edite o texto abaixo e salve. Depois, compartilhe novamente a turma com a coordenadora para uma nova revisão.
+                      Edite o texto abaixo e salve.
+                      {document.report_type === 'development_report'
+                        ? ' Depois, compartilhe novamente a turma com a coordenadora para uma nova revisão.'
+                        : ' Depois, envie novamente o documento para a coordenadora se quiser uma nova revisão.'}
                     </p>
                   )}
                 </div>

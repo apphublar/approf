@@ -96,6 +96,14 @@ export async function createCoordinatorDocumentShare(input: {
   if (shareResult.error) throw toCoordinatorError(shareResult.error, 'Não foi possível compartilhar o documento.')
   const share = shareResult.data
 
+  if (!report.coordinator_review_status || report.coordinator_review_status === 'not_required') {
+    await updateOwnerReport({
+      ownerId: input.ownerId,
+      reportId: input.reportId,
+      coordinatorReviewStatus: 'pending',
+    })
+  }
+
   const accessPassword = await getTeacherCoordinatorAccessPasswordPlaintext(input.ownerId)
   const shareUrl = `${input.origin.replace(/\/$/, '')}/coordenadora/documento/${share.share_token}`
   const teacherName = await getTeacherName(input.ownerId)
@@ -171,7 +179,7 @@ export async function getCoordinatorDocumentWorkspace(token: string, accessToken
   const report = await getOwnerReportById(share.owner_id, share.report_id)
   if (!report || report.status === 'archived') throw new Error('Documento não encontrado.')
 
-  const [teacherResult, studentResult, classResult] = await Promise.all([
+  const [teacherResult, studentResult, classResult, eventsResult] = await Promise.all([
     supabase.from('profiles').select('full_name,email').eq('id', share.owner_id).maybeSingle(),
     report.student_id
       ? supabase.from('students').select('full_name').eq('id', report.student_id).eq('owner_id', share.owner_id).maybeSingle()
@@ -179,10 +187,18 @@ export async function getCoordinatorDocumentWorkspace(token: string, accessToken
     report.class_id
       ? supabase.from('classes').select('name,shift,age_group').eq('id', report.class_id).eq('owner_id', share.owner_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from('report_review_events')
+      .select('id,report_id,student_id,actor_type,actor_name,actor_email,action,notes,previous_status,next_status,created_at')
+      .eq('owner_id', share.owner_id)
+      .eq('report_id', share.report_id)
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
   if (teacherResult.error) throw teacherResult.error
   if (studentResult.error) throw studentResult.error
   if (classResult.error) throw classResult.error
+  if (eventsResult.error) throw eventsResult.error
 
   await supabase.from('coordinator_document_shares').update({ last_access_at: new Date().toISOString() }).eq('id', share.id)
 
@@ -192,6 +208,7 @@ export async function getCoordinatorDocumentWorkspace(token: string, accessToken
     report,
     student: studentResult.data,
     classData: classResult.data,
+    events: eventsResult.data ?? [],
   }
 }
 
@@ -420,6 +437,11 @@ export async function updateCoordinatorReport(input: {
   notes?: string
   action: 'comment' | 'request_changes' | 'approve'
 }) {
+  const documentShare = await resolveVerifiedDocumentShare(input.token, input.accessToken)
+  if (documentShare) {
+    return updateCoordinatorDocumentReport(documentShare, input)
+  }
+
   const supabase = createSupabaseServiceClient()
   const share = await requireVerifiedShare(input.token, input.accessToken)
   const report = await getOwnerReportById(share.owner_id, input.reportId)
@@ -459,6 +481,65 @@ export async function updateCoordinatorReport(input: {
   })
 
   return updated
+}
+
+async function updateCoordinatorDocumentReport(
+  share: Awaited<ReturnType<typeof getCoordinatorDocumentShareByToken>>,
+  input: {
+    reportId: string
+    body?: string
+    notes?: string
+    action: 'comment' | 'request_changes' | 'approve'
+  },
+) {
+  if (!share) throw new Error('Compartilhamento não encontrado.')
+  const supabase = createSupabaseServiceClient()
+  const report = await getOwnerReportById(share.owner_id, input.reportId)
+  if (!report || report.id !== share.report_id) {
+    throw new Error('Documento não encontrado para este compartilhamento.')
+  }
+
+  const previousStatus = String(report.coordinator_review_status ?? 'pending')
+  const nextStatus = input.action === 'approve'
+    ? 'approved'
+    : input.action === 'request_changes'
+      ? 'changes_requested'
+      : previousStatus
+
+  const updated = await updateOwnerReport({
+    ownerId: share.owner_id,
+    reportId: input.reportId,
+    body: input.body,
+    coordinatorReviewStatus: nextStatus,
+    coordinatorReviewNotes: input.notes ?? null,
+    coordinatorReviewedBy: `${share.coordinator_name} <${share.coordinator_email}>`,
+    isFinalVersion: input.action === 'approve' ? true : undefined,
+  })
+
+  await supabase.from('report_review_events').insert({
+    report_id: input.reportId,
+    owner_id: share.owner_id,
+    class_id: report.class_id,
+    student_id: report.student_id,
+    actor_type: 'coordinator',
+    actor_name: share.coordinator_name,
+    actor_email: share.coordinator_email,
+    action: input.action,
+    notes: input.notes ?? null,
+    previous_status: previousStatus,
+    next_status: nextStatus,
+  })
+
+  await supabase.from('coordinator_document_shares').update({ last_access_at: new Date().toISOString() }).eq('id', share.id)
+
+  return updated
+}
+
+async function resolveVerifiedDocumentShare(token: string, accessToken: string) {
+  const share = await getCoordinatorDocumentShareByToken(token)
+  if (!share || share.access_status !== 'verified') return null
+  if (!isValidCoordinatorDocumentAccessToken(accessToken, share.id, share.coordinator_email)) return null
+  return share
 }
 
 export async function finalizeCoordinatorReview(token: string, accessToken: string) {
