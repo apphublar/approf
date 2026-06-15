@@ -83,7 +83,7 @@ export async function getCoordinatorAccessPasswordStatus() {
 
 export async function saveCoordinatorAccessPassword(password: string) {
   return callCoordinatorApi<{ updatedAt: string }>('/api/coordinator/access-password', {
-    method: 'PUT',
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password }),
   })
@@ -113,13 +113,18 @@ async function callCoordinatorApi<T>(path: string, init: RequestInit): Promise<T
   const token = data.session?.access_token
   if (!token) throw new Error('Sessão expirada. Entre novamente.')
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init.headers ?? {}),
+      },
+    })
+  } catch {
+    throw new Error('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.')
+  }
 
   const payload = await response.text().then((raw) => {
     if (!raw) return null

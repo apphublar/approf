@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
 import { AiAuthError, getAuthenticatedUserId } from '@/app/lib/supabase-server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { createCoordinatorDocumentShare } from '@/app/lib/coordinator-review'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
@@ -21,7 +17,7 @@ export async function POST(request: Request) {
     const coordinatorEmail = typeof body.coordinatorEmail === 'string' ? body.coordinatorEmail.trim() : ''
 
     if (!reportId || !coordinatorName || !coordinatorEmail) {
-      return NextResponse.json({ error: 'Informe documento, nome e e-mail da coordenadora.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Informe documento, nome e e-mail da coordenadora.' }, { status: 400, headers: corsHeaders })
     }
 
     const origin = resolveCoordinatorPublicOrigin(new URL(request.url).origin)
@@ -32,15 +28,15 @@ export async function POST(request: Request) {
       coordinatorEmail,
       origin,
     })
-    return NextResponse.json(result, { headers: CORS_HEADERS })
+    return NextResponse.json(result, { headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada.' }, { status: 401, headers: corsHeaders })
     }
     console.error('[coordinator/share-document] erro interno', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Não foi possível enviar o documento.' },
-      { status: 400, headers: CORS_HEADERS },
+      { status: 400, headers: corsHeaders },
     )
   }
 }

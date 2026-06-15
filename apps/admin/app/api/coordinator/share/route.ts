@@ -1,24 +1,20 @@
 import { NextResponse } from 'next/server'
 import { AiAuthError, getAuthenticatedUserId, createSupabaseServiceClient } from '@/app/lib/supabase-server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 import { createCoordinatorShare } from '@/app/lib/coordinator-review'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function GET(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { searchParams } = new URL(request.url)
     const classId = searchParams.get('classId')?.trim() || ''
     if (!classId) {
-      return NextResponse.json({ error: 'Informe o classId.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Informe o classId.' }, { status: 400, headers: corsHeaders })
     }
 
     const supabase = createSupabaseServiceClient()
@@ -69,16 +65,17 @@ export async function GET(request: Request) {
         has_valid_access_code: true,
       })),
       reportSummary,
-    }, { headers: CORS_HEADERS })
+    }, { headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada.' }, { status: 401, headers: corsHeaders })
     }
-    return NextResponse.json({ error: 'Não foi possível carregar o status.' }, { status: 500, headers: CORS_HEADERS })
+    return NextResponse.json({ error: 'Não foi possível carregar o status.' }, { status: 500, headers: corsHeaders })
   }
 }
 
 export async function POST(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
@@ -87,18 +84,18 @@ export async function POST(request: Request) {
     const coordinatorEmail = typeof body.coordinatorEmail === 'string' ? body.coordinatorEmail.trim() : ''
 
     if (!classId || !coordinatorName || !coordinatorEmail) {
-      return NextResponse.json({ error: 'Informe turma, nome e e-mail da coordenadora.' }, { status: 400, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Informe turma, nome e e-mail da coordenadora.' }, { status: 400, headers: corsHeaders })
     }
 
     const origin = resolveCoordinatorPublicOrigin(new URL(request.url).origin)
     const result = await createCoordinatorShare({ ownerId, classId, coordinatorName, coordinatorEmail, origin })
-    return NextResponse.json(result, { status: 200, headers: CORS_HEADERS })
+    return NextResponse.json(result, { status: 200, headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
     console.error('[coordinator/share] erro interno', error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível compartilhar a turma.' }, { status: 500, headers: CORS_HEADERS })
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível compartilhar a turma.' }, { status: 500, headers: corsHeaders })
   }
 }
 

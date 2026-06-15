@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
 import { AiAuthError, getAuthenticatedUserId } from '@/app/lib/supabase-server'
 import { createSupabaseServiceClient } from '@/app/lib/supabase-server'
+import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-}
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+export function OPTIONS(request: Request) {
+  return new NextResponse(null, { status: 204, headers: buildProfessoraCorsHeaders(request) })
 }
 
 export async function GET(request: Request) {
+  const corsHeaders = buildProfessoraCorsHeaders(request)
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const { searchParams } = new URL(request.url)
@@ -29,11 +25,11 @@ export async function GET(request: Request) {
     if (classId) query = query.eq('class_id', classId)
     const { data, error } = await query
     if (error) throw error
-    return NextResponse.json({ events: data ?? [] }, { headers: CORS_HEADERS })
+    return NextResponse.json({ events: data ?? [] }, { headers: corsHeaders })
   } catch (error) {
     if (error instanceof AiAuthError) {
-      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: CORS_HEADERS })
+      return NextResponse.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401, headers: corsHeaders })
     }
-    return NextResponse.json({ error: 'Não foi possível carregar o histórico de revisão.' }, { status: 500, headers: CORS_HEADERS })
+    return NextResponse.json({ error: 'Não foi possível carregar o histórico de revisão.' }, { status: 500, headers: corsHeaders })
   }
 }

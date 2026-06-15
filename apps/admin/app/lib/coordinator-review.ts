@@ -24,6 +24,7 @@ export async function getTeacherCoordinatorAccessPasswordStatus(ownerId: string)
 
 export async function saveTeacherCoordinatorAccessPassword(ownerId: string, password: string) {
   const supabase = createSupabaseServiceClient()
+  await ensureTeacherProfile(ownerId)
   const normalized = validateCoordinatorPassword(password)
   const timestamp = new Date().toISOString()
   const { data, error } = await supabase
@@ -699,6 +700,38 @@ function toCoordinatorError(error: unknown, fallback: string) {
     return new Error(message)
   }
   return new Error(fallback)
+}
+
+async function ensureTeacherProfile(ownerId: string) {
+  const supabase = createSupabaseServiceClient()
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', ownerId)
+    .maybeSingle()
+  if (profileError) throw toCoordinatorError(profileError, 'Não foi possível carregar o perfil da professora.')
+  if (profile?.id) return
+
+  const { data: authData, error: authError } = await supabase.auth.admin.getUserById(ownerId)
+  if (authError || !authData.user) {
+    throw new Error('Conta não encontrada. Saia e entre novamente no app.')
+  }
+
+  const metadata = authData.user.user_metadata as Record<string, unknown> | undefined
+  const teacherName = typeof metadata?.full_name === 'string' && metadata.full_name.trim()
+    ? metadata.full_name.trim()
+    : typeof metadata?.name === 'string' && metadata.name.trim()
+      ? metadata.name.trim()
+      : authData.user.email?.split('@')[0] || 'Professora'
+
+  const { error: upsertError } = await supabase.from('profiles').upsert({
+    id: ownerId,
+    role: 'teacher',
+    full_name: teacherName,
+    email: authData.user.email ?? '',
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'id' })
+  if (upsertError) throw toCoordinatorError(upsertError, 'Não foi possível preparar o perfil da professora.')
 }
 
 async function sendCoordinatorAccessEmail(input: {
