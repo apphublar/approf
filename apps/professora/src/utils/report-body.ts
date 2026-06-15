@@ -18,7 +18,7 @@ const STRUCTURED_FIELD_LABELS: Record<string, string> = {
   suggestions: 'Sugestões',
 }
 
-export function normalizeReportHtml(value: string) {
+export function normalizeReportBodyHtml(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return ''
 
@@ -29,8 +29,9 @@ export function normalizeReportHtml(value: string) {
   }
 
   const decoded = decodeHtmlEntities(decodeUnicodeEscapes(trimmed))
-  const hasHtml = /<\/?[a-z][\s\S]*>/i.test(decoded)
-  if (hasHtml) return sanitizeReportHtml(decoded)
+  if (/<\/?[a-z][\s\S]*>/i.test(decoded)) {
+    return sanitizeReportHtml(decoded)
+  }
 
   return decoded
     .split(/\n{2,}/)
@@ -40,14 +41,44 @@ export function normalizeReportHtml(value: string) {
     .join('')
 }
 
-export function sanitizeReportHtml(value: string) {
-  return value
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '')
-    .replace(/\s(href|src)="javascript:[^"]*"/gi, '')
-    .replace(/\s(href|src)='javascript:[^']*'/gi, '')
+export function formatReportBodyPreview(value: string, maxLength = 150) {
+  const html = normalizeReportBodyHtml(value)
+  const plain = html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (plain.length <= maxLength) return plain
+  return `${plain.slice(0, maxLength).trim()}...`
+}
+
+export function structuredObjectToReadableText(value: unknown, depth = 0): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return decodeUnicodeEscapes(value).trim()
+  if (Array.isArray(value)) {
+    return value
+      .map((item, index) => {
+        const block = structuredObjectToReadableText(item, depth + 1)
+        return block ? `${depth === 0 ? `Sugestão ${index + 1}\n` : ''}${block}` : ''
+      })
+      .filter(Boolean)
+      .join('\n\n')
+  }
+  if (typeof value !== 'object') return String(value)
+
+  return Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => {
+      if (item == null) return ''
+      const label = STRUCTURED_FIELD_LABELS[key] || formatFieldLabel(key)
+      if (typeof item === 'string' && !item.trim()) return ''
+      if (typeof item === 'string') return `${label}\n${decodeUnicodeEscapes(item).trim()}`
+      if (Array.isArray(item) || typeof item === 'object') {
+        const nested = structuredObjectToReadableText(item, depth + 1)
+        return nested ? `${label}\n${nested}` : ''
+      }
+      return `${label}\n${String(item)}`
+    })
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 function parseStructuredBody(raw: string): unknown | null {
@@ -97,7 +128,7 @@ function parseLooseKeyValueBody(raw: string) {
 
 function formatStructuredReportContent(value: unknown): string {
   if (typeof value === 'string') {
-    return normalizeReportHtml(value)
+    return normalizeReportBodyHtml(value)
   }
 
   if (Array.isArray(value)) {
@@ -183,30 +214,12 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;')
 }
 
-export function formatReportReviewStatus(status: string | null) {
-  if (status === 'approved') return 'Aprovado'
-  if (status === 'changes_requested') return 'Correção solicitada'
-  return 'Aguardando revisão'
-}
-
-export function mapReportStatusToBadge(status: string | null) {
-  if (status === 'approved') return 'approved'
-  if (status === 'changes_requested') return 'changes'
-  return 'pending'
-}
-
-export function formatReviewAction(action: string) {
-  if (action === 'approve') return 'Documento aprovado'
-  if (action === 'request_changes') return 'Correção solicitada'
-  if (action === 'comment') return 'Observação registrada'
-  return action
-}
-
-export function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(iso))
+function sanitizeReportHtml(value: string) {
+  return value
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/\s(href|src)="javascript:[^"]*"/gi, '')
+    .replace(/\s(href|src)='javascript:[^']*'/gi, '')
 }

@@ -6,6 +6,7 @@ import { generateImage, type ImageLayoutFormat } from '@/services/ai-usage'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument } from '@/types'
 import { getImageVariants, prefetchImageVariants, type ImageVariants } from '@/utils/image-performance'
+import { formatReportBodyPreview } from '@/utils/report-body'
 
 interface GeneratedDocumentsData {
   reportType?: string
@@ -466,7 +467,7 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
                   <p className="text-[11px] text-muted mt-1 line-clamp-2">
                     {isImageReport(doc)
                       ? 'Imagem gerada. Toque para visualizar.'
-                      : (doc.body ?? '').slice(0, 150) || formatStatus(doc.status)}
+                      : formatReportBodyPreview(doc.body ?? '', 150) || formatStatus(doc.status)}
                   </p>
                   {doc.coordinator_review_notes && (
                     <p className="text-[11px] text-[#C1440E] mt-2 line-clamp-2">

@@ -695,8 +695,14 @@ function normalize(value: string) {
 }
 
 function cleanupGeneratedText(value: string) {
-  return value
-    .replace(/\r\n/g, '\n')
+  const trimmed = value.replace(/\r\n/g, '\n').trim()
+  const structured = tryParseStructuredJson(trimmed)
+  if (structured != null) {
+    const readable = structuredObjectToReadableText(structured)
+    if (readable.trim()) return readable.trim()
+  }
+
+  return trimmed
     .replace(/^#{1,6}\s+/gm, '')              // ## Títulos
     .replace(/\*\*(.*?)\*\*/g, '$1')          // **negrito**
     .replace(/__(.*?)__/g, '$1')              // __negrito__
@@ -709,10 +715,74 @@ function cleanupGeneratedText(value: string) {
     .replace(/^\d+\.\s+/gm, '')              // 1. listas numeradas
     .replace(/^-{3,}$/gm, '')                // --- separadores
     .replace(/^={3,}$/gm, '')                // === separadores
-    .replace(/[{}[\]]/g, '')
-    .replace(/"{2,}/g, '"')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+function tryParseStructuredJson(raw: string): unknown | null {
+  const candidates = [raw, extractJsonFence(raw)].filter(Boolean) as string[]
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate)
+    } catch {
+      // continua
+    }
+  }
+  return null
+}
+
+function extractJsonFence(value: string) {
+  const match = value.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  return match?.[1]?.trim() ?? null
+}
+
+function structuredObjectToReadableText(value: unknown, depth = 0): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return decodeJsonStringEscapes(value).trim()
+  if (Array.isArray(value)) {
+    return value
+      .map((item, index) => {
+        const block = structuredObjectToReadableText(item, depth + 1)
+        return block ? `${depth === 0 ? `Sugestão ${index + 1}\n` : ''}${block}` : ''
+      })
+      .filter(Boolean)
+      .join('\n\n')
+  }
+  if (typeof value !== 'object') return String(value)
+
+  const labels: Record<string, string> = {
+    analysisText: 'Análise',
+    evolutionRecord: 'Registro de evolução',
+    summary: 'Resumo',
+    objective: 'Objetivo',
+    howToApply: 'Como aplicar',
+    whatToObserve: 'O que observar',
+    recordText: 'Registro',
+    title: 'Título',
+  }
+
+  return Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => {
+      if (item == null) return ''
+      const label = labels[key] || key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ')
+      if (typeof item === 'string' && !item.trim()) return ''
+      if (typeof item === 'string') return `${label}\n${decodeJsonStringEscapes(item).trim()}`
+      if (Array.isArray(item) || typeof item === 'object') {
+        const nested = structuredObjectToReadableText(item, depth + 1)
+        return nested ? `${label}\n${nested}` : ''
+      }
+      return `${label}\n${String(item)}`
+    })
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+function decodeJsonStringEscapes(value: string) {
+  return value
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/\\n/g, '\n')
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, '\\')
 }
 
 function toStageMeta(

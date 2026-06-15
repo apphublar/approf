@@ -8,6 +8,7 @@ import { isSupabaseConfigured, isSupabaseAuthEnabled } from '@/services/supabase
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import { loadDocumentStyleSettings } from '@/utils/document-style'
+import { normalizeReportBodyHtml } from '@/utils/report-body'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { Annotation } from '@/types'
@@ -1704,13 +1705,11 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
                   value={editableContent}
                   onChange={(event) => setEditableContent(event.target.value)}
                 />
-              ) : isHtmlContent(editableContent || savedContent) ? (
+              ) : (
                 <div
                   className="document-editor text-[12px] text-ink leading-[1.7]"
-                  dangerouslySetInnerHTML={{ __html: editableContent || savedContent }}
+                  dangerouslySetInnerHTML={{ __html: toDisplayHtml(editableContent || savedContent || mockReport) }}
                 />
-              ) : (
-                <pre className="whitespace-pre-wrap font-sans text-[12px] text-ink leading-[1.7]">{editableContent || savedContent || mockReport}</pre>
               )}
             </div>
 
@@ -2103,6 +2102,13 @@ function appendPortfolioImagesToBody(body: string, attachments: ReportAttachment
   `.trim()
 }
 
+function toDisplayHtml(value: string) {
+  const normalized = normalizeReportBodyHtml(value)
+  if (normalized) return normalized
+  if (isHtmlContent(value)) return value.trim()
+  return textToHtml(value)
+}
+
 function textToHtml(value: string) {
   return value
     .trim()
@@ -2265,12 +2271,7 @@ function exportAbntDocument(content: string, title: string) {
   const filename = normalize(title)
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'documento'
-  const paragraphs = isHtmlContent(content)
-    ? content
-    : content
-      .split(/\n{2,}/)
-      .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
-      .join('')
+  const paragraphs = toDisplayHtml(content)
   const html = `<!doctype html>
 <html>
 <head>

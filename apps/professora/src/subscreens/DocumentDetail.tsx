@@ -10,6 +10,7 @@ import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoading
 import type { GeneratedDocument, ReportStatus } from '@/types'
 import { getImageVariants, type ImageVariants } from '@/utils/image-performance'
 import { fontFamilyCss, fontFamilyLabel, loadDocumentStyleSettings, resolveDocumentExportContext, textAlignLabel, type DocumentStyleSettings } from '@/utils/document-style'
+import { normalizeReportBodyHtml } from '@/utils/report-body'
 
 interface DocumentDetailSubscreenProps {
   data?: unknown
@@ -778,6 +779,9 @@ function getImagePrompt(document: GeneratedDocument | null) {
 }
 
 function toEditorHtml(value: string) {
+  const normalized = normalizeReportBodyHtml(value)
+  if (normalized) return normalized
+
   const trimmed = value.trim()
   if (!trimmed) return ''
   if (/<[a-z][\s\S]*>/i.test(trimmed)) return trimmed

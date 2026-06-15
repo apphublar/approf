@@ -185,46 +185,15 @@ export default function AiPedagogicaSubscreen() {
 
             <button
               onClick={() => openSubscreen('report', { unifiedCreator: true })}
-              className="w-full rounded-app px-[15px] py-[16px] border border-gp shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
-              style={{ background: '#F0FAF4' }}
+              className="w-full bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
             >
-              <div className="w-[48px] h-[48px] rounded-[13px] flex items-center justify-center flex-shrink-0 bg-white text-gm border border-gp">
-                <Sparkles size={21} />
+              <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center flex-shrink-0 text-gm" style={{ background: '#D8F3DC' }}>
+                <Sparkles size={20} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-[14px] font-bold text-gd leading-tight">Criar documento</h3>
-                <p className="text-[11px] text-soft leading-snug mt-1">
+                <h3 className="text-[14px] font-bold text-ink leading-tight">Criar documento</h3>
+                <p className="text-[12px] text-muted leading-snug mt-1">
                   Informe o título, escolha se usa anotações e descreva exatamente o que deseja.
-                </p>
-              </div>
-              <ChevronRight size={18} className="text-gm flex-shrink-0" />
-            </button>
-
-            <button
-              onClick={() => openSubscreen('generated-documents')}
-              className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
-            >
-              <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
-                <FileText size={18} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-ink leading-tight">Ver gerados</p>
-                <p className="text-[11px] text-muted leading-snug mt-1">Histórico do mês e geral de tudo que foi criado.</p>
-              </div>
-              <ChevronRight size={18} className="text-muted flex-shrink-0" />
-            </button>
-
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
-            >
-              <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
-                <Settings2 size={18} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-ink leading-tight">Edição e Formatação</p>
-                <p className="text-[11px] text-muted leading-snug mt-1">
-                  {fontFamilyLabel(styleSettings.fontFamily)} • {styleSettings.fontSizePt}pt • alinhamento configurado
                 </p>
               </div>
               <ChevronRight size={18} className="text-muted flex-shrink-0" />
@@ -232,16 +201,46 @@ export default function AiPedagogicaSubscreen() {
 
             <button
               onClick={() => setCoordinatorAccessOpen(true)}
-              className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
+              className="w-full bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
             >
-              <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
-                <KeyRound size={18} />
+              <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center flex-shrink-0 text-gm" style={{ background: '#FFF3CD' }}>
+                <KeyRound size={20} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-ink leading-tight">Acesso Coordenadora</p>
-                <p className="text-[11px] text-muted leading-snug mt-1">
+                <h3 className="text-[14px] font-bold text-ink leading-tight">Acesso Coordenadora</h3>
+                <p className="text-[12px] text-muted leading-snug mt-1">
                   {coordinatorPasswordConfigured ? 'Senha configurada para compartilhamentos' : 'Defina a senha usada pela coordenadora'}
                 </p>
+              </div>
+              <ChevronRight size={18} className="text-muted flex-shrink-0" />
+            </button>
+
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="w-full bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
+            >
+              <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center flex-shrink-0 text-gm" style={{ background: '#E3D5F5' }}>
+                <Settings2 size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[14px] font-bold text-ink leading-tight">Edição e Formatação</h3>
+                <p className="text-[12px] text-muted leading-snug mt-1">
+                  {fontFamilyLabel(styleSettings.fontFamily)} • {styleSettings.fontSizePt}pt • alinhamento configurado
+                </p>
+              </div>
+              <ChevronRight size={18} className="text-muted flex-shrink-0" />
+            </button>
+
+            <button
+              onClick={() => openSubscreen('generated-documents')}
+              className="w-full bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
+            >
+              <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center flex-shrink-0 text-gm" style={{ background: '#D0E8FF' }}>
+                <FileText size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[14px] font-bold text-ink leading-tight">Ver gerados</h3>
+                <p className="text-[12px] text-muted leading-snug mt-1">Histórico do mês e geral de tudo que foi criado.</p>
               </div>
               <ChevronRight size={18} className="text-muted flex-shrink-0" />
             </button>
