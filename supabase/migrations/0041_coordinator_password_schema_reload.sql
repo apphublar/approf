@@ -1,4 +1,4 @@
--- Senha de acesso da coordenadora definida pela professora + compartilhamento por documento.
+-- Reforço idempotente da senha da coordenadora + reload do schema cache da API.
 
 alter table public.profiles
   add column if not exists coordinator_access_password_hash text,

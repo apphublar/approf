@@ -24,7 +24,11 @@ export async function GET(request: Request) {
     if (error instanceof AiAuthError) {
       return NextResponse.json({ error: 'Sessão expirada.' }, { status: 401, headers: CORS_HEADERS })
     }
-    return NextResponse.json({ error: 'Não foi possível carregar a senha da coordenadora.' }, { status: 500, headers: CORS_HEADERS })
+    console.error('[coordinator/access-password] GET erro', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Não foi possível carregar a senha da coordenadora.' },
+      { status: 500, headers: CORS_HEADERS },
+    )
   }
 }
 
@@ -42,6 +46,7 @@ export async function PUT(request: Request) {
     if (error instanceof AiAuthError) {
       return NextResponse.json({ error: 'Sessão expirada.' }, { status: 401, headers: CORS_HEADERS })
     }
+    console.error('[coordinator/access-password] PUT erro', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Não foi possível salvar a senha.' },
       { status: 400, headers: CORS_HEADERS },

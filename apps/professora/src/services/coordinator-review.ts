@@ -121,11 +121,23 @@ async function callCoordinatorApi<T>(path: string, init: RequestInit): Promise<T
     },
   })
 
-  const payload = await response.json().catch(() => null) as { error?: string } | Record<string, unknown> | null
+  const payload = await response.text().then((raw) => {
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as { error?: string } | Record<string, unknown>
+    } catch {
+      return null
+    }
+  })
+
   if (!response.ok) {
     const message = payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
       ? payload.error
-      : 'Não foi possível concluir a solicitação.'
+      : response.status === 401
+        ? 'Sessão expirada. Entre novamente.'
+        : response.status >= 500
+          ? 'Servidor indisponível no momento. Tente novamente em instantes.'
+          : 'Não foi possível concluir a solicitação.'
     throw new Error(message)
   }
   return payload as T

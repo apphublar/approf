@@ -15,7 +15,7 @@ export async function getTeacherCoordinatorAccessPasswordStatus(ownerId: string)
     .select('coordinator_access_password_hash, coordinator_access_password_updated_at')
     .eq('id', ownerId)
     .maybeSingle()
-  if (error) throw error
+  if (error) throw toCoordinatorError(error, 'Não foi possível carregar a senha da coordenadora.')
   return {
     configured: Boolean(data?.coordinator_access_password_hash),
     updatedAt: data?.coordinator_access_password_updated_at ?? null,
@@ -26,7 +26,7 @@ export async function saveTeacherCoordinatorAccessPassword(ownerId: string, pass
   const supabase = createSupabaseServiceClient()
   const normalized = validateCoordinatorPassword(password)
   const timestamp = new Date().toISOString()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .update({
       coordinator_access_password_hash: hashCoordinatorPassword(normalized),
@@ -35,7 +35,12 @@ export async function saveTeacherCoordinatorAccessPassword(ownerId: string, pass
       updated_at: timestamp,
     })
     .eq('id', ownerId)
-  if (error) throw error
+    .select('coordinator_access_password_hash')
+    .maybeSingle()
+  if (error) throw toCoordinatorError(error, 'Não foi possível salvar a senha da coordenadora.')
+  if (!data?.coordinator_access_password_hash) {
+    throw new Error('Não foi possível salvar a senha. Verifique se sua conta está ativa e tente novamente.')
+  }
   return { updatedAt: timestamp }
 }
 
@@ -62,23 +67,33 @@ export async function createCoordinatorDocumentShare(input: {
     .eq('report_id', input.reportId)
     .eq('coordinator_email', email)
     .maybeSingle()
-  if (existing.error) throw existing.error
+  if (existing.error) throw toCoordinatorError(existing.error, 'Não foi possível preparar o compartilhamento do documento.')
 
-  const shareToken = existing.data?.share_token || randomBytes(24).toString('base64url')
-  const { data: share, error } = await supabase
-    .from('coordinator_document_shares')
-    .upsert({
-      owner_id: input.ownerId,
-      report_id: input.reportId,
-      coordinator_name: name,
-      coordinator_email: email,
-      share_token: shareToken,
-      access_status: existing.data?.access_status === 'verified' ? 'verified' : 'pending',
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'owner_id,report_id,coordinator_email' })
-    .select(DOCUMENT_SHARE_SELECT)
-    .single()
-  if (error) throw error
+  const timestamp = new Date().toISOString()
+  const sharePayload = {
+    owner_id: input.ownerId,
+    report_id: input.reportId,
+    coordinator_name: name,
+    coordinator_email: email,
+    share_token: existing.data?.share_token || randomBytes(24).toString('base64url'),
+    access_status: existing.data?.access_status === 'verified' ? 'verified' : 'pending',
+    updated_at: timestamp,
+  }
+
+  const shareResult = existing.data
+    ? await supabase
+      .from('coordinator_document_shares')
+      .update(sharePayload)
+      .eq('id', existing.data.id)
+      .select(DOCUMENT_SHARE_SELECT)
+      .single()
+    : await supabase
+      .from('coordinator_document_shares')
+      .insert(sharePayload)
+      .select(DOCUMENT_SHARE_SELECT)
+      .single()
+  if (shareResult.error) throw toCoordinatorError(shareResult.error, 'Não foi possível compartilhar o documento.')
+  const share = shareResult.data
 
   const accessPassword = await getTeacherCoordinatorAccessPasswordPlaintext(input.ownerId)
   const shareUrl = `${input.origin.replace(/\/$/, '')}/coordenadora/documento/${share.share_token}`
@@ -103,6 +118,8 @@ export async function createCoordinatorDocumentShare(input: {
     status: emailSent ? 'sent' : 'queued',
     sent_at: emailSent ? new Date().toISOString() : null,
     payload: { ...emailPayload, password: '[redacted]' },
+  }).then(({ error }) => {
+    if (error) console.error('[coordinator/document-share] falha ao registrar notificação', error)
   })
 
   return { share, shareUrl }
@@ -189,6 +206,8 @@ export async function createCoordinatorShare(input: {
   const name = input.coordinatorName.trim()
   if (!name || !email) throw new Error('Informe nome e e-mail da coordenadora.')
 
+  await requireTeacherCoordinatorPassword(input.ownerId)
+
   const existing = await supabase
     .from('coordinator_class_shares')
     .select(SHARE_SELECT)
@@ -197,27 +216,34 @@ export async function createCoordinatorShare(input: {
     .eq('coordinator_email', email)
     .maybeSingle()
 
-  if (existing.error) throw existing.error
+  if (existing.error) throw toCoordinatorError(existing.error, 'Não foi possível preparar o compartilhamento da turma.')
 
-  const shareToken = existing.data?.share_token || randomBytes(24).toString('base64url')
-  const upsertPayload = {
+  const timestamp = new Date().toISOString()
+  const sharePayload = {
     owner_id: input.ownerId,
     class_id: input.classId,
     coordinator_name: name,
     coordinator_email: email,
-    share_token: shareToken,
+    share_token: existing.data?.share_token || randomBytes(24).toString('base64url'),
     access_status: existing.data?.access_status === 'verified' ? 'verified' : 'pending',
-    updated_at: new Date().toISOString(),
+    updated_at: timestamp,
   }
 
-  const { data: share, error } = await supabase
-    .from('coordinator_class_shares')
-    .upsert(upsertPayload, { onConflict: 'owner_id,class_id,coordinator_email' })
-    .select(SHARE_SELECT)
-    .single()
-  if (error) throw error
+  const shareResult = existing.data
+    ? await supabase
+      .from('coordinator_class_shares')
+      .update(sharePayload)
+      .eq('id', existing.data.id)
+      .select(SHARE_SELECT)
+      .single()
+    : await supabase
+      .from('coordinator_class_shares')
+      .insert(sharePayload)
+      .select(SHARE_SELECT)
+      .single()
+  if (shareResult.error) throw toCoordinatorError(shareResult.error, 'Não foi possível compartilhar a turma.')
+  const share = shareResult.data
 
-  await requireTeacherCoordinatorPassword(input.ownerId)
   const accessPassword = await getTeacherCoordinatorAccessPasswordPlaintext(input.ownerId)
   const shareUrl = `${input.origin.replace(/\/$/, '')}/coordenadora/${share.share_token}`
   const teacherName = await getTeacherName(input.ownerId)
@@ -240,6 +266,8 @@ export async function createCoordinatorShare(input: {
     status: emailSent ? 'sent' : 'queued',
     sent_at: emailSent ? new Date().toISOString() : null,
     payload: { ...emailPayload, password: '[redacted]' },
+  }).then(({ error }) => {
+    if (error) console.error('[coordinator/share] falha ao registrar notificação', error)
   })
 
   await supabase.from('admin_action_logs').insert({
@@ -248,6 +276,8 @@ export async function createCoordinatorShare(input: {
     target_table: 'coordinator_class_shares',
     target_id: share.id,
     metadata: { classId: input.classId, coordinatorEmail: email },
+  }).then(({ error }) => {
+    if (error) console.error('[coordinator/share] falha ao registrar auditoria', error)
   })
 
   return { share, shareUrl }
@@ -541,7 +571,7 @@ async function verifyTeacherCoordinatorPassword(ownerId: string, password: strin
     .select('coordinator_access_password_hash')
     .eq('id', ownerId)
     .maybeSingle()
-  if (error) throw error
+  if (error) throw toCoordinatorError(error, 'Não foi possível validar a senha da coordenadora.')
   if (!data?.coordinator_access_password_hash) {
     throw new Error('A professora ainda não configurou a senha de acesso da coordenadora.')
   }
@@ -557,7 +587,7 @@ async function getTeacherCoordinatorAccessPasswordPlaintext(ownerId: string) {
     .select('coordinator_access_password_encrypted')
     .eq('id', ownerId)
     .maybeSingle()
-  if (error) throw error
+  if (error) throw toCoordinatorError(error, 'Não foi possível carregar a senha da coordenadora.')
   if (!data?.coordinator_access_password_encrypted) {
     throw new Error('Configure a senha de acesso da coordenadora no Criador Pedagógico antes de compartilhar.')
   }
@@ -649,6 +679,26 @@ function safeEqual(a: string, b: string) {
 
 function getCoordinatorSecret() {
   return process.env.COORDINATOR_ACCESS_SECRET || process.env.REPORT_SHARE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'approf-local-coordinator-secret'
+}
+
+function toCoordinatorError(error: unknown, fallback: string) {
+  if (error instanceof Error) return error
+  if (error && typeof error === 'object') {
+    const record = error as { message?: string; details?: string; hint?: string; code?: string }
+    const message = record.message || record.details || record.hint || fallback
+    if (
+      record.code === 'PGRST204'
+      || record.code === '42703'
+      || record.code === '42P01'
+      || /schema cache/i.test(message)
+      || /coordinator_access_password/i.test(message)
+      || /coordinator_document_shares/i.test(message)
+    ) {
+      return new Error('Banco desatualizado: rode a migration 0040 no Supabase e recarregue o schema da API.')
+    }
+    return new Error(message)
+  }
+  return new Error(fallback)
 }
 
 async function sendCoordinatorAccessEmail(input: {
