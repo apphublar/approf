@@ -1,4 +1,4 @@
-import CoordinatorDocumentClient from '../../../../admin/app/coordenadora/documento/[token]/document-client'
+import CoordinatorDocumentClient from '../../../../../admin/app/coordenadora/documento/[token]/document-client'
 
 type CoordinatorDocumentRedirectPageProps = {
   params: Promise<{ token: string }>
