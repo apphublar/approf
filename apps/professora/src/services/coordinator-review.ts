@@ -75,6 +75,32 @@ export async function listReportReviewEvents(filters: { studentId?: string; clas
   }).then((response) => response.events)
 }
 
+export async function getCoordinatorAccessPasswordStatus() {
+  return callCoordinatorApi<{ configured: boolean; updatedAt: string | null }>('/api/coordinator/access-password', {
+    method: 'GET',
+  })
+}
+
+export async function saveCoordinatorAccessPassword(password: string) {
+  return callCoordinatorApi<{ updatedAt: string }>('/api/coordinator/access-password', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+}
+
+export async function shareDocumentWithCoordinator(input: {
+  reportId: string
+  coordinatorName: string
+  coordinatorEmail: string
+}) {
+  return callCoordinatorApi<{ shareUrl: string }>('/api/coordinator/share-document', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}
+
 async function callCoordinatorApi<T>(path: string, init: RequestInit): Promise<T> {
   const apiBaseUrl = import.meta.env.VITE_APPROF_ADMIN_API_URL?.replace(/\/$/, '')
   if (!apiBaseUrl) throw new Error('Backend da coordenadora não configurado.')

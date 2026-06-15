@@ -1,10 +1,10 @@
 ﻿import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { ChevronLeft, FileText, FileUp, Image, Sparkles, X } from 'lucide-react'
+import { ChevronLeft, FileText, FileUp, Image, KeyRound, Sparkles, X } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateAiTextDocument, type AiGenerationType } from '@/services/ai-usage'
 import { listReports, updateReport } from '@/services/reports'
 import { uploadChildPortfolioMedia } from '@/services/supabase/child-media'
-import { isSupabaseConfigured } from '@/services/supabase/config'
+import { isSupabaseConfigured, isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { celebrateAiGeneration } from '@/utils/celebration'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
 import { loadDocumentStyleSettings } from '@/utils/document-style'
@@ -1734,6 +1734,16 @@ export default function ReportSubscreen({ data }: ReportSubscreenProps) {
             >
               Visualizar como documento
             </button>
+
+            {reportId && isSupabaseAuthEnabled() && currentReportType !== 'portfolio_image' && (
+              <button
+                onClick={() => openSubscreen('document-detail', { reportId, openCoordinatorShare: true })}
+                className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold mb-2 flex items-center justify-center gap-2"
+              >
+                <KeyRound size={14} />
+                Enviar para coordenadora
+              </button>
+            )}
 
             {editingDocument ? (
               <button

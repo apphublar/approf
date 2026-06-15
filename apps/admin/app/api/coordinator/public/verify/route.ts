@@ -27,11 +27,15 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({} as Record<string, unknown>))
     const token = typeof body.token === 'string' ? body.token.trim() : ''
     const email = typeof body.email === 'string' ? body.email.trim() : ''
-    const code = typeof body.code === 'string' ? body.code.trim() : ''
-    if (!token || !email || !code) {
-      return NextResponse.json({ error: 'Informe e-mail e código de acesso.' }, { status: 400 })
+    const password = typeof body.password === 'string'
+      ? body.password.trim()
+      : typeof body.code === 'string'
+        ? body.code.trim()
+        : ''
+    if (!token || !email || !password) {
+      return NextResponse.json({ error: 'Informe e-mail e senha de acesso.' }, { status: 400 })
     }
-    const accessToken = await verifyCoordinatorAccess({ token, email, code })
+    const accessToken = await verifyCoordinatorAccess({ token, email, password })
     return NextResponse.json({ accessToken })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível validar o acesso.' }, { status: 400 })

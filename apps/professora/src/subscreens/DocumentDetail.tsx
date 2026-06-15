@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, Download, FileText, Pencil, Printer, Share2 } from 'lucide-react'
+import { ChevronLeft, Download, FileText, KeyRound, Pencil, Printer, Share2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { createReportShareLink, getCachedReportById, getReportById, updateReport } from '@/services/reports'
+import { shareDocumentWithCoordinator } from '@/services/coordinator-review'
+import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
 import { previewGeneratedMaterialShare, publishGeneratedMaterialShare, type GeneratedMaterialPreview } from '@/services/materials'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
@@ -19,6 +21,9 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   const reportId = typeof data === 'object' && data && 'reportId' in data
     ? String((data as { reportId?: string }).reportId ?? '')
     : ''
+  const openCoordinatorShareOnLoad = typeof data === 'object' && data && 'openCoordinatorShare' in data
+    ? Boolean((data as { openCoordinatorShare?: boolean }).openCoordinatorShare)
+    : false
   const preloadedReport = typeof data === 'object' && data && 'preloadedReport' in data
     ? ((data as { preloadedReport?: GeneratedDocument | null }).preloadedReport ?? null)
     : null
@@ -35,6 +40,10 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   const [imageVariants, setImageVariants] = useState<ImageVariants | null>(null)
   const [materialPreview, setMaterialPreview] = useState<GeneratedMaterialPreview | null>(null)
   const [sharingAsMaterial, setSharingAsMaterial] = useState(false)
+  const [coordinatorShareOpen, setCoordinatorShareOpen] = useState(false)
+  const [coordinatorName, setCoordinatorName] = useState('')
+  const [coordinatorEmail, setCoordinatorEmail] = useState('')
+  const [sharingWithCoordinator, setSharingWithCoordinator] = useState(false)
   const [styleSettings] = useState<DocumentStyleSettings>(() => loadDocumentStyleSettings())
   const editorRef = useRef<HTMLDivElement>(null)
 
@@ -99,6 +108,12 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     if (!editorRef.current || isImageDocument) return
     editorRef.current.innerHTML = draft
   }, [document?.id, isImageDocument])
+
+  useEffect(() => {
+    if (!openCoordinatorShareOnLoad || !document || loading) return
+    if (document.report_type === 'development_report' || !isSupabaseAuthEnabled()) return
+    setCoordinatorShareOpen(true)
+  }, [openCoordinatorShareOnLoad, document, loading])
 
   useEffect(() => {
     if (!document) return
@@ -235,6 +250,32 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
       setError(err instanceof Error ? err.message : 'N\u00e3o foi poss\u00edvel atualizar a vers\u00e3o final.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function shareWithCoordinator() {
+    if (!document) return
+    if (!coordinatorName.trim() || !coordinatorEmail.trim()) {
+      setError('Informe nome e e-mail da coordenadora.')
+      return
+    }
+    setSharingWithCoordinator(true)
+    setError('')
+    setMessage('')
+    try {
+      await shareDocumentWithCoordinator({
+        reportId: document.id,
+        coordinatorName: coordinatorName.trim(),
+        coordinatorEmail: coordinatorEmail.trim(),
+      })
+      setCoordinatorShareOpen(false)
+      setCoordinatorName('')
+      setCoordinatorEmail('')
+      setMessage('Acesso enviado para a coordenadora com link e senha.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar para a coordenadora.')
+    } finally {
+      setSharingWithCoordinator(false)
     }
   }
 
@@ -584,6 +625,21 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                   {sharingAsMaterial ? 'Anonimizando...' : 'Compartilhar como material de apoio'}
                 </button>
 
+                {document.report_type !== 'development_report' && isSupabaseAuthEnabled() && (
+                  <button
+                    onClick={() => {
+                      setCoordinatorShareOpen(true)
+                      setError('')
+                      setMessage('')
+                    }}
+                    disabled={saving || sharingWithCoordinator}
+                    className="w-full py-[11px] rounded-app-sm border border-gp bg-gbg text-gd text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <KeyRound size={14} />
+                    Enviar para coordenadora
+                  </button>
+                )}
+
                 {document.report_type === 'development_report' && (
                   <button
                     onClick={toggleFinalVersion}
@@ -616,6 +672,46 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
           )}
         </div>
       </div>
+
+      {coordinatorShareOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end">
+          <div className="w-full bg-white rounded-t-[22px] border-t border-border p-5">
+            <p className="font-serif text-[18px] text-gd mb-2">Enviar para coordenadora</p>
+            <p className="text-[12px] text-muted leading-[1.6] mb-4">
+              A coordenadora receberá o link deste documento e a senha configurada em Acesso Coordenadora.
+            </p>
+            <input
+              value={coordinatorName}
+              onChange={(event) => setCoordinatorName(event.target.value)}
+              placeholder="Nome da coordenadora"
+              className="w-full rounded-app-sm border border-border px-3 py-3 text-[13px] mb-2"
+            />
+            <input
+              value={coordinatorEmail}
+              onChange={(event) => setCoordinatorEmail(event.target.value)}
+              placeholder="E-mail da coordenadora"
+              className="w-full rounded-app-sm border border-border px-3 py-3 text-[13px] mb-4"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCoordinatorShareOpen(false)}
+                className="py-3 rounded-app-sm border border-border bg-white text-muted text-[13px] font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void shareWithCoordinator()}
+                disabled={sharingWithCoordinator}
+                className="py-3 rounded-app-sm bg-gm text-white text-[13px] font-bold disabled:opacity-50"
+              >
+                {sharingWithCoordinator ? 'Enviando...' : 'Enviar acesso'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

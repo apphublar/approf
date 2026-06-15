@@ -34,24 +34,6 @@ export async function GET(request: Request) {
 
     if (error) throw error
 
-    const shareIds = (shares ?? []).map((share) => share.id)
-    const { data: accessCodes, error: codeError } = shareIds.length
-      ? await supabase
-        .from('coordinator_access_codes')
-        .select('share_id,expires_at,created_at')
-        .in('share_id', shareIds)
-        .order('created_at', { ascending: false })
-      : { data: [], error: null }
-
-    if (codeError) throw codeError
-
-    const latestCodeByShareId = new Map<string, { expires_at: string; created_at: string }>()
-    for (const code of accessCodes ?? []) {
-      if (!latestCodeByShareId.has(code.share_id)) {
-        latestCodeByShareId.set(code.share_id, code)
-      }
-    }
-
     const { data: students, error: studentsError } = await supabase
       .from('students')
       .select('id')
@@ -80,21 +62,12 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      shares: (shares ?? []).map((share) => {
-        const latestCode = latestCodeByShareId.get(share.id)
-        const accessCodeExpiresAt = latestCode
-          ? new Date(Math.max(
-            new Date(latestCode.expires_at).getTime(),
-            new Date(latestCode.created_at).getTime() + 1000 * 60 * 60 * 24 * 30,
-          )).toISOString()
-          : null
-        return {
-          ...share,
-          share_url: `${shareOrigin}/coordenadora/${share.share_token}`,
-          access_code_expires_at: accessCodeExpiresAt,
-          has_valid_access_code: accessCodeExpiresAt ? new Date(accessCodeExpiresAt).getTime() > Date.now() : false,
-        }
-      }),
+      shares: (shares ?? []).map((share) => ({
+        ...share,
+        share_url: `${shareOrigin}/coordenadora/${share.share_token}`,
+        access_code_expires_at: null,
+        has_valid_access_code: true,
+      })),
       reportSummary,
     }, { headers: CORS_HEADERS })
   } catch (error) {

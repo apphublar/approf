@@ -41,7 +41,7 @@ type ReviewAction = 'comment' | 'request_changes' | 'approve'
 
 export default function CoordinatorReviewClient({ token }: { token: string }) {
   const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
   const [accessToken, setAccessToken] = useState('')
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null)
@@ -130,8 +130,8 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
   }
 
   async function verify() {
-    if (!email.trim() || !code.trim()) {
-      setError('Informe o e-mail e o código de acesso.')
+    if (!email.trim() || !password.trim()) {
+      setError('Informe o e-mail e a senha de acesso.')
       return
     }
     setError('')
@@ -140,7 +140,7 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
       const response = await fetch('/api/coordinator/public/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, email: email.trim(), code: code.trim() }),
+        body: JSON.stringify({ token, email: email.trim(), password: password.trim() }),
       })
       const payload = await response.json()
       if (!response.ok) {
@@ -163,7 +163,7 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
       })
       const payload = await response.json()
       if (!response.ok) {
-        setError(payload.error || 'Acesso não validado. Verifique seu código.')
+        setError(payload.error || 'Acesso não validado. Verifique a senha.')
         window.localStorage.removeItem(storageKey)
         setAccessToken('')
         return
@@ -351,7 +351,7 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
             <h1>Acesso à revisão</h1>
             <p>
               Uma professora compartilhou os relatórios de desenvolvimento da turma com você para revisão pedagógica.
-              Informe seu e-mail e o código recebido para continuar.
+              Informe seu e-mail e a senha de acesso definida pela professora.
             </p>
             {inviteInfo && (
               <div className="cr-invite-info">
@@ -388,9 +388,9 @@ export default function CoordinatorReviewClient({ token }: { token: string }) {
             />
             <input
               className="cr-input"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Código de acesso (6 dígitos)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Senha de acesso (6 caracteres)"
               maxLength={6}
               onKeyDown={(e) => e.key === 'Enter' && verify()}
             />

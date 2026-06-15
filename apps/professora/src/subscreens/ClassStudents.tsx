@@ -163,7 +163,7 @@ export default function ClassStudentsSubscreen() {
       })
       setCoordinatorName('')
       setCoordinatorEmail('')
-      setCoordinatorMessage('Código de validação enviado para o e-mail da coordenadora. O acesso fica válido por 30 dias.')
+      setCoordinatorMessage('Acesso enviado para o e-mail da coordenadora com link e senha de acesso.')
       const status = await getCoordinatorShareStatus(cls.id).catch(() => null)
       if (status) setShareStatus(status)
     } catch (error) {
@@ -235,7 +235,7 @@ export default function ClassStudentsSubscreen() {
                 </div>
                 <div className="flex-1">
                   <p className="text-[14px] font-bold text-ink">Compartilhar turma com a coordenadora</p>
-                  <p className="text-[12px] text-muted leading-[1.5]">Ela valida o acesso por e-mail e revisa os relatórios de desenvolvimento das crianças.</p>
+                  <p className="text-[12px] text-muted leading-[1.5]">Ela valida o acesso com a senha definida por você e revisa os relatórios de desenvolvimento das crianças.</p>
                 </div>
               </div>
 
@@ -243,25 +243,25 @@ export default function ClassStudentsSubscreen() {
                 const latestShare = latestCoordinatorShare
                 const isFinalized = latestShare.access_status === 'review_finalized'
                 const isVerified = latestShare.access_status === 'verified'
-                const isCodeExpired = !isVerified && !isFinalized && !latestShare.has_valid_access_code
+                const isPasswordPending = !isVerified && !isFinalized
                 const { approved, changesRequested, total } = shareStatus?.reportSummary ?? { approved: 0, changesRequested: 0, total: 0 }
                 return (
-                  <div className={`rounded-app-sm border p-3 mb-3 ${isFinalized ? 'bg-[#EAF7EE] border-[#B6DECA]' : isVerified ? 'bg-[#FFF8E8] border-[#EAD58A]' : isCodeExpired ? 'bg-[#FFF1F1] border-[#F3C0B1]' : 'bg-cream border-border'}`}>
+                  <div className={`rounded-app-sm border p-3 mb-3 ${isFinalized ? 'bg-[#EAF7EE] border-[#B6DECA]' : isVerified ? 'bg-[#FFF8E8] border-[#EAD58A]' : 'bg-cream border-border'}`}>
                     <p className="text-[11px] font-bold text-ink mb-1">
                       {isFinalized
                         ? 'Revisão finalizada pela coordenadora'
                         : isVerified
                           ? 'Acesso validado pela coordenadora'
-                          : isCodeExpired
-                            ? 'Código expirado. Reenvie o acesso.'
+                          : isPasswordPending
+                            ? 'Convite enviado. Aguardando validação com a senha'
                             : 'Convite enviado. Aguardando validação'}
                     </p>
                     <p className="text-[11px] text-muted leading-[1.5]">
                       {latestShare.coordinator_name} · {latestShare.coordinator_email}
                     </p>
-                    {latestShare.access_code_expires_at && !isFinalized && (
+                    {latestShare.access_status === 'pending' && (
                       <p className="text-[11px] text-muted mt-1">
-                        Código válido até {formatDateTime(latestShare.access_code_expires_at)}.
+                        A coordenadora usará a senha configurada em Criador Pedagógico → Acesso Coordenadora.
                       </p>
                     )}
                     {isFinalized && total > 0 && (
@@ -712,15 +712,5 @@ function formatMonthTitle(date: Date) {
 
 function formatDateTitle(dateKey: string) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(parseDateKey(dateKey))
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
 }
 

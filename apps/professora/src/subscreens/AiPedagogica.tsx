@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronLeft, ChevronRight, FileText, Settings2, Sparkles, Upload, X } from 'lucide-react'
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronLeft, ChevronRight, FileText, KeyRound, Settings2, Sparkles, Upload, X } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import {
   DEFAULT_DOCUMENT_STYLE_SETTINGS,
@@ -11,6 +11,8 @@ import {
 } from '@/utils/document-style'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { uploadSchoolLogo, updateTeacherProfile } from '@/services/supabase/account'
+import { getCoordinatorAccessPasswordStatus, saveCoordinatorAccessPassword } from '@/services/coordinator-review'
+import { generateCoordinatorAccessPassword, isValidCoordinatorAccessPassword } from '@/utils/coordinator-password'
 import { listReports } from '@/services/reports'
 
 export default function AiPedagogicaSubscreen() {
@@ -38,6 +40,13 @@ export default function AiPedagogicaSubscreen() {
     )
   }, [annotations, classes, reportSuggestionsLoaded, studentsWithDevelopmentReport])
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [coordinatorAccessOpen, setCoordinatorAccessOpen] = useState(false)
+  const [coordinatorPassword, setCoordinatorPassword] = useState('')
+  const [coordinatorPasswordConfigured, setCoordinatorPasswordConfigured] = useState(false)
+  const [coordinatorPasswordUpdatedAt, setCoordinatorPasswordUpdatedAt] = useState<string | null>(null)
+  const [coordinatorPasswordMessage, setCoordinatorPasswordMessage] = useState('')
+  const [coordinatorPasswordError, setCoordinatorPasswordError] = useState('')
+  const [savingCoordinatorPassword, setSavingCoordinatorPassword] = useState(false)
   const [styleSettings, setStyleSettings] = useState<DocumentStyleSettings>(() => {
     const loaded = loadDocumentStyleSettings()
     if (!loaded.schoolName && schoolName) {
@@ -79,6 +88,33 @@ export default function AiPedagogicaSubscreen() {
       active = false
     }
   }, [classes])
+
+  useEffect(() => {
+    if (!isSupabaseAuthEnabled()) return
+    void getCoordinatorAccessPasswordStatus()
+      .then((status) => {
+        setCoordinatorPasswordConfigured(status.configured)
+        setCoordinatorPasswordUpdatedAt(status.updatedAt)
+      })
+      .catch(() => {
+        setCoordinatorPasswordConfigured(false)
+        setCoordinatorPasswordUpdatedAt(null)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (!coordinatorAccessOpen || !isSupabaseAuthEnabled()) return
+    void getCoordinatorAccessPasswordStatus()
+      .then((status) => {
+        setCoordinatorPasswordConfigured(status.configured)
+        setCoordinatorPasswordUpdatedAt(status.updatedAt)
+      })
+      .catch(() => {
+        setCoordinatorPasswordConfigured(false)
+        setCoordinatorPasswordUpdatedAt(null)
+      })
+  }, [coordinatorAccessOpen])
+
   function handleBack() {
     closeSubscreen()
   }
@@ -103,6 +139,26 @@ export default function AiPedagogicaSubscreen() {
       uploadSchoolLogo(file)
         .then((url) => updateTeacherProfile({ schoolLogoUrl: url }))
         .catch(() => { /* silent — logo saved locally */ })
+    }
+  }
+
+  async function saveCoordinatorPassword() {
+    if (!isValidCoordinatorAccessPassword(coordinatorPassword)) {
+      setCoordinatorPasswordError('A senha deve ter 6 caracteres entre letras e números.')
+      return
+    }
+    setSavingCoordinatorPassword(true)
+    setCoordinatorPasswordError('')
+    setCoordinatorPasswordMessage('')
+    try {
+      const result = await saveCoordinatorAccessPassword(coordinatorPassword)
+      setCoordinatorPasswordConfigured(true)
+      setCoordinatorPasswordUpdatedAt(result.updatedAt)
+      setCoordinatorPasswordMessage('Senha salva. Use-a ao enviar acesso para a coordenadora.')
+    } catch (error) {
+      setCoordinatorPasswordError(error instanceof Error ? error.message : 'Não foi possível salvar a senha.')
+    } finally {
+      setSavingCoordinatorPassword(false)
     }
   }
 
@@ -169,6 +225,22 @@ export default function AiPedagogicaSubscreen() {
                 <p className="text-[13px] font-bold text-ink leading-tight">Edição e Formatação</p>
                 <p className="text-[11px] text-muted leading-snug mt-1">
                   {fontFamilyLabel(styleSettings.fontFamily)} • {styleSettings.fontSizePt}pt • alinhamento configurado
+                </p>
+              </div>
+              <ChevronRight size={18} className="text-muted flex-shrink-0" />
+            </button>
+
+            <button
+              onClick={() => setCoordinatorAccessOpen(true)}
+              className="w-full bg-white rounded-app px-[15px] py-[13px] border border-border shadow-card flex items-center gap-[12px] text-left active:scale-[.98] transition-transform mb-4"
+            >
+              <div className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center flex-shrink-0 bg-gbg text-gm">
+                <KeyRound size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold text-ink leading-tight">Acesso Coordenadora</p>
+                <p className="text-[11px] text-muted leading-snug mt-1">
+                  {coordinatorPasswordConfigured ? 'Senha configurada para compartilhamentos' : 'Defina a senha usada pela coordenadora'}
                 </p>
               </div>
               <ChevronRight size={18} className="text-muted flex-shrink-0" />
@@ -425,6 +497,67 @@ export default function AiPedagogicaSubscreen() {
               >
                 Salvar configurações
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {coordinatorAccessOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end">
+          <div className="w-full bg-white rounded-t-[22px] border-t border-border max-h-[88vh] overflow-auto stage-fade-in">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-serif text-[18px] text-gd">Acesso Coordenadora</p>
+                <button onClick={() => setCoordinatorAccessOpen(false)} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <p className="text-[12px] text-soft leading-[1.6]">
+                Defina uma senha de 6 caracteres. A coordenadora usará essa senha junto com o e-mail dela para acessar os documentos que você compartilhar.
+              </p>
+              <p className="text-[11px] text-muted leading-[1.5] mt-2">
+                Atualize a senha sempre que quiser. Depois de mudar, reenvie o acesso para a coordenadora receber a nova senha.
+              </p>
+
+              <div className="mt-4 flex gap-2">
+                <input
+                  value={coordinatorPassword}
+                  onChange={(event) => setCoordinatorPassword(event.target.value.toUpperCase())}
+                  maxLength={6}
+                  placeholder="Senha de 6 caracteres"
+                  className="min-w-0 flex-1 rounded-app-sm border border-border px-3 py-3 text-[14px] tracking-[0.18em] font-bold text-ink uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCoordinatorPassword(generateCoordinatorAccessPassword())}
+                  className="rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[11px] font-bold text-gd whitespace-nowrap"
+                >
+                  Gerar
+                </button>
+              </div>
+
+              {coordinatorPasswordUpdatedAt && (
+                <p className="text-[11px] text-muted mt-2">
+                  Última atualização: {new Date(coordinatorPasswordUpdatedAt).toLocaleString('pt-BR')}
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => void saveCoordinatorPassword()}
+                disabled={savingCoordinatorPassword || !coordinatorPassword.trim()}
+                className="w-full mt-4 py-[12px] rounded-app-sm bg-gd text-white font-bold text-[13px] disabled:opacity-50"
+              >
+                {savingCoordinatorPassword ? 'Salvando...' : 'Salvar senha'}
+              </button>
+
+              {coordinatorPasswordMessage && (
+                <p className="text-[12px] text-gm mt-3 leading-[1.5]">{coordinatorPasswordMessage}</p>
+              )}
+              {coordinatorPasswordError && (
+                <p className="text-[12px] text-[#C1440E] mt-3 leading-[1.5]">{coordinatorPasswordError}</p>
+              )}
             </div>
           </div>
         </div>
