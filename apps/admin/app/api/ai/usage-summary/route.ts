@@ -15,15 +15,6 @@ export async function GET(request: Request) {
     const { start, end } = getMonthPeriod(new Date())
     const walletSummary = await syncAndLoadOwnerMonthlyWalletSummary(ownerId)
 
-    const { data: entitlements, error: entitlementsError } = await supabase
-      .from('ai_semester_entitlements')
-      .select('entitlement_type,cycle_label,student_id,class_id,included_quantity,used_quantity')
-      .eq('owner_id', ownerId)
-      .order('cycle_start', { ascending: false })
-      .limit(12)
-
-    if (entitlementsError) throw entitlementsError
-
     const { count, error: countError } = await supabase
       .from('ai_generation_logs')
       .select('id', { count: 'exact', head: true })
@@ -66,15 +57,6 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         wallet: walletSummary,
-        entitlements: (entitlements ?? []).map((item) => ({
-          entitlementType: item.entitlement_type,
-          cycleLabel: item.cycle_label,
-          studentId: item.student_id,
-          classId: item.class_id,
-          includedQuantity: item.included_quantity ?? 0,
-          usedQuantity: item.used_quantity ?? 0,
-          remainingQuantity: Math.max(0, (item.included_quantity ?? 0) - (item.used_quantity ?? 0)),
-        })),
         generatedThisMonth: count ?? 0,
         generatedDocumentsThisMonth,
         generatedImagesThisMonth,

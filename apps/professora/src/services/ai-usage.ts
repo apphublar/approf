@@ -112,15 +112,6 @@ export interface AiUsageSummary {
     periodStart: string | null
     periodEnd: string | null
   }
-  entitlements: Array<{
-    entitlementType: string
-    cycleLabel: string
-    studentId: string | null
-    classId: string | null
-    includedQuantity: number
-    usedQuantity: number
-    remainingQuantity: number
-  }>
   generatedThisMonth: number
   generatedDocumentsThisMonth?: number
   generatedImagesThisMonth?: number
@@ -591,7 +582,11 @@ export function formatAiUsageMessage(result: AiUsageReservationResult) {
   if (!result.allowed) return result.message || 'Esta geração precisa de pacote extra.'
 
   if (result.chargeSource === 'semester_entitlement' && result.entitlement) {
-    return `Cota semestral usada: ${result.entitlement.usedQuantity}/${result.entitlement.includedQuantity}.`
+    return `Entrou na cota (${result.entitlement.usedQuantity}/${result.entitlement.includedQuantity}).`
+  }
+
+  if (result.chargeSource === 'semester_entitlement') {
+    return 'Entrou na cota.'
   }
 
   if (result.wallet) {

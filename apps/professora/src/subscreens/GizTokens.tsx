@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { AlertTriangle, ChevronLeft, Coins, Gift, History, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, Coins, History, ShieldCheck } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
 
@@ -100,36 +100,8 @@ export default function GizTokensSubscreen() {
           <div className="space-y-2 text-[12px] text-muted leading-[1.6]">
             <p>GizTokens são créditos internos para gerar relatórios, planejamentos e portfólios.</p>
             <p>O saldo principal do ciclo é de {formatNumber(included)} GizTokens.</p>
-            <p>Algumas atividades podem entrar como cota inclusa e aparecer com 0 GizToken descontado.</p>
+            <p>Alguns documentos podem entrar na cota sem descontar GizTokens.</p>
             <p>Existe uma margem técnica de {formatNumber(overageLimit)} GizTokens para evitar bloqueios bruscos.</p>
-          </div>
-        </section>
-
-        <section className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-[12px] bg-[#FFF3CD] text-[#856404] flex items-center justify-center">
-              <Gift size={18} />
-            </div>
-            <div>
-              <p className="text-[13px] font-bold text-ink">Cotas inclusas</p>
-              <p className="text-[11px] text-muted">Não descontam GizTokens da professora.</p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            {(summary?.entitlements ?? []).slice(0, 4).map((item) => (
-              <div key={`${item.entitlementType}-${item.studentId ?? 'teacher'}-${item.cycleLabel}`} className="rounded-app-sm border border-border px-3 py-2">
-                <p className="text-[12px] font-bold text-ink">{formatEntitlement(item.entitlementType, item.studentId, classes)}</p>
-                <p className="text-[11px] text-muted mt-1">
-                  {item.usedQuantity}/{item.includedQuantity} usados em {item.cycleLabel}
-                </p>
-              </div>
-            ))}
-
-            {(summary?.entitlements ?? []).length === 0 && (
-              <p className="text-[12px] text-muted leading-[1.5]">
-                As cotas aparecem aqui quando você gera relatórios de desenvolvimento ou portfólios com imagem.
-              </p>
-            )}
           </div>
         </section>
 
@@ -154,8 +126,12 @@ export default function GizTokensSubscreen() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[13px] font-bold text-ink">{formatNumber(item.giztokensCharged)} Giz</p>
-                    <p className="text-[11px] text-muted">{item.chargeSource === 'semester_entitlement' ? 'cota inclusa' : formatStatus(item.status)}</p>
+                    <p className="text-[13px] font-bold text-ink">
+                      {item.chargeSource === 'semester_entitlement' ? '0 Giz' : `${formatNumber(item.giztokensCharged)} Giz`}
+                    </p>
+                    <p className="text-[11px] text-muted">
+                      {item.chargeSource === 'semester_entitlement' ? 'Entrou na cota' : formatStatus(item.status)}
+                    </p>
                   </div>
                 </div>
               </button>
@@ -204,19 +180,8 @@ function formatGenerationType(value: string) {
   return labels[value] ?? 'Documento'
 }
 
-function formatEntitlement(
-  value: string,
-  studentId: string | null,
-  classes: ReturnType<typeof useAppStore.getState>['classes'],
-) {
-  const studentName = findStudentName(studentId, classes)
-  if (value === 'development_report') return studentName ? `${studentName} - relatórios` : 'Relatórios de desenvolvimento'
-  if (value === 'portfolio_image') return 'Imagens de portfólio do mês'
-  return 'Cota inclusa'
-}
-
 function formatChargeSource(value: string) {
-  if (value === 'semester_entitlement') return 'cota inclusa'
+  if (value === 'semester_entitlement') return 'Entrou na cota'
   if (value === 'giztokens') return 'GizTokens'
   if (value === 'paid_extra') return 'pacote extra'
   return 'Recurso'

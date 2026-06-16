@@ -24,7 +24,7 @@ export type AiGenerationType =
   | 'other'
 
 type ChargeSource = 'giztokens' | 'semester_entitlement' | 'paid_extra'
-type EntitlementType = 'development_report' | 'portfolio_image'
+type EntitlementType = 'development_report' | 'portfolio_text' | 'portfolio_image'
 
 interface AiUsageRequest {
   ownerId: string
@@ -456,7 +456,8 @@ export async function refundAiUsageReservation(input: {
 
 function getEntitlementType(generationType: AiGenerationType): EntitlementType | null {
   if (generationType === 'development_report') return 'development_report'
-  if (generationType === 'general_report') return 'development_report'
+  if (generationType === 'general_report') return 'portfolio_text'
+  if (generationType === 'portfolio_text') return 'portfolio_text'
   if (generationType === 'portfolio_image') return 'portfolio_image'
   return null
 }
@@ -468,16 +469,15 @@ function getMonthPeriod(date: Date) {
 }
 
 function getEntitlementCycle(generationType: AiGenerationType, date: Date) {
-  if (generationType === 'development_report') return getYearPeriod(date)
-  if (generationType === 'general_report') return getYearPeriod(date)
-  if (generationType === 'portfolio_image') return getMonthPeriodWithLabel(date)
-  return null
+  if (!getEntitlementType(generationType)) return null
+  return getYearPeriod(date)
 }
 
 function getIncludedEntitlementQuantity(generationType: AiGenerationType) {
   if (generationType === 'development_report') return 2
   if (generationType === 'general_report') return 2
-  if (generationType === 'portfolio_image') return 2
+  if (generationType === 'portfolio_text') return 2
+  if (generationType === 'portfolio_image') return 1
   return 0
 }
 
@@ -490,11 +490,6 @@ function getYearPeriod(date: Date) {
     end: formatDate(end),
     label: `${year}`,
   }
-}
-
-function getMonthPeriodWithLabel(date: Date) {
-  const { start, end } = getMonthPeriod(date)
-  return { start, end, label: start.slice(0, 7) }
 }
 
 function formatDate(date: Date) {
