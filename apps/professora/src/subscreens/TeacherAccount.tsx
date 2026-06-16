@@ -878,14 +878,16 @@ function formatSubscriptionPlan(plan?: string | null) {
   if (!plan) return 'Não identificado'
   const normalized = plan.trim().toLowerCase()
   if (['monthly', 'mensal', 'month', 'mês', 'trial', 'teste', 'trial_7_days', 'trial_15_days'].includes(normalized)) return 'Mensal'
+  if (['semiannual', 'semestral', 'semi-annual'].includes(normalized)) return 'Semestral'
   if (['annual', 'anual', 'yearly', 'ano'].includes(normalized)) return 'Anual'
   return plan
 }
 
 function formatSubscriptionPrice(plan?: string | null) {
   const normalized = plan?.trim().toLowerCase()
-  if (normalized && ['annual', 'anual', 'yearly', 'ano'].includes(normalized)) return 'R$ 369,00 por ano'
-  return 'R$ 36,90 por mês'
+  if (normalized && ['annual', 'anual', 'yearly', 'ano'].includes(normalized)) return 'R$ 358,80 por ano'
+  if (normalized && ['semiannual', 'semestral', 'semi-annual'].includes(normalized)) return 'R$ 209,40 a cada 6 meses'
+  return 'R$ 39,90 por mês'
 }
 
 function getPaymentUrl(value?: string | null) {

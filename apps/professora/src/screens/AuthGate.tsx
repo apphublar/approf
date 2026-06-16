@@ -1,7 +1,8 @@
 ﻿import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Check, Loader2 } from 'lucide-react'
-import { getAuthErrorMessage, getSelectedSignupPlanFromUrl, requestPasswordReset, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
+import { getAuthErrorMessage, getSelectedSignupPlanFromUrl, requestPasswordReset, shouldStartStripeCheckoutFromUrl, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
+import { redirectToStripeCheckout } from '@/services/stripe-checkout'
 import { captureReferralCodeFromUrl, clearStoredReferralCode, getStoredReferralCode } from '@/utils/referral'
 import { loadTeacherWorkspace } from '@/services/supabase/classes'
 import { getSupabaseClient } from '@/services/supabase/client'
@@ -364,6 +365,10 @@ function AuthScreen({
         })
         clearStoredReferralCode()
         setReferralCode(null)
+        if (data.session && shouldStartStripeCheckoutFromUrl()) {
+          await redirectToStripeCheckout(getSelectedSignupPlanFromUrl())
+          return
+        }
         if (!data.session) {
           setMessage(
             referralCode

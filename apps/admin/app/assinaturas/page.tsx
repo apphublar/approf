@@ -39,6 +39,7 @@ const planOptions = [
   { value: 'trial_7_days', label: 'Teste 7 dias' },
   { value: 'trial_15_days', label: 'Teste 15 dias' },
   { value: 'monthly', label: 'Mensal' },
+  { value: 'semiannual', label: 'Semestral' },
   { value: 'annual', label: 'Anual' },
   { value: 'verification_required', label: 'Em analise' },
 ]
@@ -220,13 +221,13 @@ function resolveAccessState(subscription?: TeacherSubscription | null) {
   if (subscription.status === 'blocked') return 'blocked'
   if (subscription.status === 'canceled') return 'canceled'
   if (isPaymentOverdue(subscription)) return 'overdue'
-  if (subscription.plan === 'monthly' || subscription.plan === 'annual') return 'paid_ok'
+  if (['monthly', 'semiannual', 'annual'].includes(subscription.plan)) return 'paid_ok'
   return 'free'
 }
 
 function isPaymentOverdue(subscription: TeacherSubscription) {
   if (subscription.status === 'overdue') return true
-  if (!['monthly', 'annual'].includes(subscription.plan)) return false
+  if (!['monthly', 'semiannual', 'annual'].includes(subscription.plan)) return false
   if (!subscription.current_period_end) return false
   return new Date(subscription.current_period_end).getTime() < Date.now()
 }

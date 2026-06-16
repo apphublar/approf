@@ -20,6 +20,7 @@ const planOptions = [
   { value: 'trial_7_days', label: 'Teste 7 dias' },
   { value: 'trial_15_days', label: 'Teste 15 dias' },
   { value: 'monthly', label: 'Mensal' },
+  { value: 'semiannual', label: 'Semestral' },
   { value: 'annual', label: 'Anual' },
   { value: 'verification_required', label: 'Em analise' },
 ]
@@ -167,7 +168,7 @@ export async function updateTeacherSubscription(formData: FormData) {
     )
   if (error) throw new Error(`Subscriptions error: ${error.message}`)
 
-  if (status === 'active' && ['monthly', 'mensal', 'annual', 'anual'].includes(plan.toLowerCase())) {
+  if (status === 'active' && ['monthly', 'mensal', 'semiannual', 'semestral', 'annual', 'anual'].includes(plan.toLowerCase())) {
     await tryGrantReferralReward(teacherId)
   }
 
@@ -259,7 +260,7 @@ async function listOverdueSubscriptions(supabase: ReturnType<typeof createSupaba
 function isPaymentOverdue(subscription: SubscriptionRow) {
   if (subscription.status === 'blocked' || subscription.status === 'canceled') return false
   if (subscription.status === 'overdue') return true
-  if (!['monthly', 'annual'].includes(subscription.plan)) return false
+  if (!['monthly', 'semiannual', 'annual'].includes(subscription.plan)) return false
   if (!subscription.current_period_end) return false
   return new Date(subscription.current_period_end).getTime() < Date.now()
 }

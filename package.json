@@ -10,7 +10,8 @@
     "build:site": "pnpm --filter @approf/site build",
     "build:professora": "pnpm --filter @approf/professora build",
     "build:admin": "pnpm --filter @approf/admin build",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "stripe:setup": "pnpm --filter @approf/admin stripe:setup"
   },
   "engines": {
     "node": ">=20",

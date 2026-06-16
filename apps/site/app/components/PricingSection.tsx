@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { Check, CreditCard, Calendar, X, Gift } from 'lucide-react'
+import { Check, CreditCard, Calendar, X, Gift, Sparkles } from 'lucide-react'
 
 const PROFESSORA_APP_URL = process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? 'https://app.approf.com.br'
 const PROFESSORA_APP_BASE_URL = PROFESSORA_APP_URL.replace(/\/$/, '')
@@ -18,8 +17,44 @@ const allFeatures = [
   'Chat com IA para dúvidas e ideias',
   'Materiais de apoio e compartilhamento',
   'Documentos salvos para editar e reutilizar',
-  'Comunidade de professoras',
+  'Comunidade de professores',
 ]
+
+const plans = [
+  {
+    id: 'monthly',
+    title: 'Plano Mensal',
+    badge: '7 dias grátis',
+    secondaryBadge: null as string | null,
+    featured: false,
+    priceMain: '39,90',
+    priceCompare: '49,90',
+    billingNote: null as string | null,
+    giztokens: '8.000',
+  },
+  {
+    id: 'semiannual',
+    title: 'Plano Semestral',
+    badge: '2 meses grátis',
+    secondaryBadge: null,
+    featured: false,
+    priceMain: '34,90',
+    priceCompare: '49,90',
+    billingNote: 'Cobrado em 6x de R$ 34,90 ou R$ 209,40 à vista',
+    giztokens: '9.000',
+  },
+  {
+    id: 'annual',
+    title: 'Plano Anual',
+    badge: 'Mais popular',
+    secondaryBadge: '4 meses grátis',
+    featured: true,
+    priceMain: '29,90',
+    priceCompare: '49,90',
+    billingNote: 'Cobrado em 12x de R$ 29,90 ou R$ 358,80 à vista',
+    giztokens: '10.000',
+  },
+] as const
 
 function CheckIcon() {
   return (
@@ -29,11 +64,11 @@ function CheckIcon() {
   )
 }
 
-export default function PricingSection() {
-  const [isAnnual, setIsAnnual] = useState(false)
-  const selectedPlan = isAnnual ? 'annual' : 'monthly'
-  const signupUrl = `${PROFESSORA_APP_BASE_URL}?mode=signup&plan=${selectedPlan}`
+function buildSignupUrl(planId: string) {
+  return `${PROFESSORA_APP_BASE_URL}?mode=signup&plan=${planId}&checkout=1`
+}
 
+export default function PricingSection() {
   return (
     <section id="precos" className="pricing">
       <div className="container">
@@ -42,77 +77,68 @@ export default function PricingSection() {
           <p>Sem fidelidade. Cancele quando quiser.</p>
         </div>
 
-        <div className="pricing-toggle" role="group" aria-label="Período de cobrança">
-          <button
-            className={`pricing-toggle-btn${!isAnnual ? ' pricing-toggle-btn--active' : ''}`}
-            onClick={() => setIsAnnual(false)}
-            aria-pressed={!isAnnual}
-          >
-            Mensal
-          </button>
-          <button
-            className={`pricing-toggle-btn${isAnnual ? ' pricing-toggle-btn--active' : ''}`}
-            onClick={() => setIsAnnual(true)}
-            aria-pressed={isAnnual}
-          >
-            Anual
-            <span className="pricing-toggle-badge">
-              <Gift size={13} strokeWidth={2} /> 2 meses grátis
-            </span>
-          </button>
-        </div>
-
-        <div className="pricing__single">
-          <div className="pricing-card">
-            <div className="pricing-badge">
-              {isAnnual ? (
-                <><Gift size={13} strokeWidth={2} /> 2 meses grátis</>
-              ) : (
-                '7 dias grátis'
-              )}
-            </div>
-
+        <div className="pricing__grid">
+          {plans.map((plan) => (
             <div
-              key={isAnnual ? 'annual' : 'monthly'}
-              className="pricing-amount-row pricing-amount-animate"
+              key={plan.id}
+              className={`pricing-card${plan.featured ? ' pricing-card--featured' : ''}`}
             >
-              <span className="pricing-currency">R$</span>
-              <span className="pricing-amount">
-                {isAnnual ? '30' : '36'}
-              </span>
-              <span className="pricing-currency">
-                {isAnnual ? ',75' : ',90'}
-              </span>
-              <span className="pricing-period">/mês</span>
-            </div>
+              <div className="pricing-card__badges">
+                <div className="pricing-badge">
+                  {plan.featured ? (
+                    <><Sparkles size={13} strokeWidth={2} /> {plan.badge}</>
+                  ) : plan.badge.includes('grátis') ? (
+                    <><Gift size={13} strokeWidth={2} /> {plan.badge}</>
+                  ) : (
+                    plan.badge
+                  )}
+                </div>
+                {plan.secondaryBadge && (
+                  <div className="pricing-badge pricing-badge--secondary">
+                    <Gift size={13} strokeWidth={2} /> {plan.secondaryBadge}
+                  </div>
+                )}
+              </div>
 
-            {isAnnual && (
-              <p className="pricing-annual-note">
-                R$ 369,00 cobrado uma vez por ano
+              <p className="pricing-plan-title">{plan.title}</p>
+
+              <div className="pricing-amount-row">
+                <span className="pricing-currency">R$</span>
+                <span className="pricing-amount">{plan.priceMain.split(',')[0]}</span>
+                <span className="pricing-currency">,{plan.priceMain.split(',')[1]}</span>
+                <span className="pricing-period">/mês</span>
+              </div>
+
+              <p className="pricing-compare-price">
+                de <span>R$ {plan.priceCompare}/mês</span>
               </p>
-            )}
 
-            <p className="pricing-tagline">
-              {isAnnual
-                ? 'Você paga 10 meses e usa o ano todo.'
-                : 'Tudo incluso para registrar, planejar e acompanhar sua rotina pedagógica.'}
-            </p>
+              {plan.billingNote && (
+                <p className="pricing-annual-note">{plan.billingNote}</p>
+              )}
 
-            <div className="pricing-divider" />
+              <p className="pricing-giztokens">{plan.giztokens} GizTokens mensais</p>
 
-            <ul className="pricing-features-list">
-              {allFeatures.map((feat) => (
-                <li key={feat} className="pricing-feature-item">
-                  <CheckIcon />
-                  {feat}
-                </li>
-              ))}
-            </ul>
+              <p className="pricing-tagline">
+                Tudo incluso para registrar, planejar e acompanhar sua rotina pedagógica.
+              </p>
 
-            <a href={signupUrl} className="pricing-cta-btn">
-              Testar grátis por 7 dias
-            </a>
-          </div>
+              <div className="pricing-divider" />
+
+              <ul className="pricing-features-list">
+                {allFeatures.map((feat) => (
+                  <li key={feat} className="pricing-feature-item">
+                    <CheckIcon />
+                    {feat}
+                  </li>
+                ))}
+              </ul>
+
+              <a href={buildSignupUrl(plan.id)} className="pricing-cta-btn">
+                Testar grátis por 7 dias
+              </a>
+            </div>
+          ))}
         </div>
 
         <div className="pricing-payment-info">
@@ -122,7 +148,7 @@ export default function PricingSection() {
           </div>
           <div className="pricing-payment-item">
             <Calendar size={14} strokeWidth={1.8} />
-            <span>Cobrança mensal ou anual, sem fidelidade</span>
+            <span>Cobrança mensal, semestral ou anual, sem fidelidade</span>
           </div>
           <div className="pricing-payment-item">
             <X size={14} strokeWidth={2} />

@@ -1,4 +1,5 @@
 import { createSupabaseServiceClient } from './supabase-server'
+import { getGiztokensMonthlyForPlan } from './subscription-plans'
 
 export type AiGenerationType =
   | 'development_report'
@@ -571,7 +572,24 @@ export function getMonthlyWalletPolicy() {
   }
 }
 
+async function resolveOwnerMonthlyGiztokensIncluded(ownerId: string) {
+  const supabase = createSupabaseServiceClient()
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('plan')
+    .eq('user_id', ownerId)
+    .maybeSingle()
+
+  if (error) {
+    throw toError(error, 'Não foi possível ler o plano da assinatura.')
+  }
+
+  const planTokens = getGiztokensMonthlyForPlan(data?.plan)
+  return Math.max(MONTHLY_GIZTOKENS_DEFAULT, planTokens)
+}
+
 async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, monthEnd: string) {
+  const planGiztokensIncluded = await resolveOwnerMonthlyGiztokensIncluded(ownerId)
   const supabase = createSupabaseServiceClient()
   const { data: currentWallet, error: currentWalletError } = await supabase
     .from('ai_usage_wallets')
@@ -589,8 +607,8 @@ async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, 
   if (currentWallet) {
     return {
       giztokensIncluded: Math.max(
-        MONTHLY_GIZTOKENS_DEFAULT,
-        clampNonNegativeInt(currentWallet.giztokens_included ?? MONTHLY_GIZTOKENS_DEFAULT),
+        planGiztokensIncluded,
+        clampNonNegativeInt(currentWallet.giztokens_included ?? planGiztokensIncluded),
       ),
       includedCostLimitCents: Math.max(
         MONTHLY_COST_LIMIT_CENTS,
@@ -615,7 +633,7 @@ async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, 
   const previousWallet = previousWalletRows?.[0]
   if (!previousWallet) {
     return {
-      giztokensIncluded: MONTHLY_GIZTOKENS_DEFAULT,
+      giztokensIncluded: planGiztokensIncluded,
       includedCostLimitCents: MONTHLY_COST_LIMIT_CENTS,
     }
   }
@@ -630,7 +648,10 @@ async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, 
   const carryoverCostCents = Math.min(previousNegativeCostCents, maxOverageCostCents)
 
   return {
-    giztokensIncluded: toGizTokens(Math.max(0, MONTHLY_INCLUDED_COST_CENTS - carryoverCostCents)),
+    giztokensIncluded: Math.max(
+      planGiztokensIncluded,
+      toGizTokens(Math.max(0, MONTHLY_INCLUDED_COST_CENTS - carryoverCostCents)),
+    ),
     includedCostLimitCents: Math.max(0, MONTHLY_COST_LIMIT_CENTS - carryoverCostCents),
   }
 }

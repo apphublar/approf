@@ -1,5 +1,7 @@
 import { getSupabaseClient } from './client'
 
+export type SignupPlan = 'monthly' | 'semiannual' | 'annual'
+
 export async function signInWithEmail(email: string, password: string) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')
@@ -8,8 +10,6 @@ export async function signInWithEmail(email: string, password: string) {
   if (error) throw toAuthError(error)
   return data
 }
-
-export type SignupPlan = 'monthly' | 'annual'
 
 export async function signUpTeacher(input: {
   fullName: string
@@ -124,11 +124,11 @@ export function getAuthErrorMessage(error: unknown) {
     return 'E-mail ou senha incorretos. Verifique os dados e tente novamente.'
   }
 
-  if (normalized.includes('email rate limit') || normalized.includes('rate limit')) {
+  if (normalized.includes('email rate limit') || normalized.includes('rate limit') || normalized.includes('too many requests')) {
     return 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.'
   }
 
-  if (normalized.includes('password should be at least') || normalized.includes('weak password')) {
+  if (normalized.includes('password should be at least') || normalized.includes('weak password') || normalized.includes('signup requires a valid password')) {
     return 'A senha precisa ter pelo menos 6 caracteres.'
   }
 
@@ -158,5 +158,12 @@ function toAuthError(error: unknown) {
 export function getSelectedSignupPlanFromUrl(): SignupPlan {
   if (typeof window === 'undefined') return 'monthly'
   const plan = new URLSearchParams(window.location.search).get('plan')?.toLowerCase()
-  return plan === 'annual' || plan === 'anual' ? 'annual' : 'monthly'
+  if (plan === 'annual' || plan === 'anual' || plan === 'yearly') return 'annual'
+  if (plan === 'semiannual' || plan === 'semestral' || plan === 'semi-annual') return 'semiannual'
+  return 'monthly'
+}
+
+export function shouldStartStripeCheckoutFromUrl() {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('checkout') === '1'
 }
