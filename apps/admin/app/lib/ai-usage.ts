@@ -655,3 +655,67 @@ async function resolveMonthlyWalletTargets(ownerId: string, monthStart: string, 
     includedCostLimitCents: Math.max(0, MONTHLY_COST_LIMIT_CENTS - carryoverCostCents),
   }
 }
+
+export async function syncAndLoadOwnerMonthlyWalletSummary(ownerId: string) {
+  const { start: monthStart, end: monthEnd } = getMonthPeriod(new Date())
+  const targets = await resolveMonthlyWalletTargets(ownerId, monthStart, monthEnd)
+  const supabase = createSupabaseServiceClient()
+
+  const { error: upsertError } = await supabase
+    .from('ai_usage_wallets')
+    .upsert(
+      {
+        owner_id: ownerId,
+        period_type: 'monthly',
+        period_start: monthStart,
+        period_end: monthEnd,
+        giztokens_included: targets.giztokensIncluded,
+        included_cost_limit_cents: targets.includedCostLimitCents,
+      },
+      { onConflict: 'owner_id,period_type,period_start,period_end' },
+    )
+
+  if (upsertError) {
+    throw toError(upsertError, 'Não foi possível sincronizar a carteira mensal de IA.')
+  }
+
+  const { data: wallet, error: walletError } = await supabase
+    .from('ai_usage_wallets')
+    .select('giztokens_included,giztokens_used,included_cost_limit_cents,included_cost_used_cents,period_start,period_end')
+    .eq('owner_id', ownerId)
+    .eq('period_type', 'monthly')
+    .eq('period_start', monthStart)
+    .eq('period_end', monthEnd)
+    .maybeSingle()
+
+  if (walletError) {
+    throw toError(walletError, 'Não foi possível ler a carteira mensal de IA.')
+  }
+
+  const giztokensIncluded = Math.max(
+    targets.giztokensIncluded,
+    clampNonNegativeInt(wallet?.giztokens_included ?? targets.giztokensIncluded),
+  )
+  const includedCostLimitCents = Math.max(
+    targets.includedCostLimitCents,
+    clampNonNegativeInt(wallet?.included_cost_limit_cents ?? targets.includedCostLimitCents),
+  )
+  const giztokensUsed = clampNonNegativeInt(wallet?.giztokens_used ?? 0)
+  const includedCostUsedCents = clampNonNegativeInt(wallet?.included_cost_used_cents ?? 0)
+
+  return {
+    giztokensIncluded,
+    giztokensUsed,
+    giztokensRemaining: giztokensIncluded - giztokensUsed,
+    giztokensOverageLimit: Math.max(
+      0,
+      includedCostLimitCents * GIZTOKENS_PER_COST_CENT - giztokensIncluded,
+    ),
+    includedCostLimitCents,
+    includedCostUsedCents,
+    includedCostRemainingCents: includedCostLimitCents - includedCostUsedCents,
+    includedCostAlertCents: Math.round(giztokensIncluded / GIZTOKENS_PER_COST_CENT),
+    periodStart: wallet?.period_start ?? monthStart,
+    periodEnd: wallet?.period_end ?? monthEnd,
+  }
+}

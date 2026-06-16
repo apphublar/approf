@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { AiAuthError, createSupabaseServiceClient, getAuthenticatedUserId } from '@/app/lib/supabase-server'
-import { getMonthlyWalletPolicy } from '@/app/lib/ai-usage'
+import { syncAndLoadOwnerMonthlyWalletSummary } from '@/app/lib/ai-usage'
 import { buildProfessoraCorsHeaders } from '@/app/lib/cors'
 
 export function OPTIONS(request: Request) {
@@ -12,21 +12,8 @@ export async function GET(request: Request) {
   try {
     const ownerId = await getAuthenticatedUserId(request.headers.get('authorization'))
     const supabase = createSupabaseServiceClient()
-    const policy = getMonthlyWalletPolicy()
     const { start, end } = getMonthPeriod(new Date())
-
-    await ensureMonthlyWallet(supabase, ownerId, start, end, policy)
-
-    const { data: wallet, error: walletError } = await supabase
-      .from('ai_usage_wallets')
-      .select('giztokens_included,giztokens_used,included_cost_limit_cents,included_cost_used_cents,period_start,period_end')
-      .eq('owner_id', ownerId)
-      .eq('period_type', 'monthly')
-      .eq('period_start', start)
-      .eq('period_end', end)
-      .maybeSingle()
-
-    if (walletError) throw walletError
+    const walletSummary = await syncAndLoadOwnerMonthlyWalletSummary(ownerId)
 
     const { data: entitlements, error: entitlementsError } = await supabase
       .from('ai_semester_entitlements')
@@ -76,24 +63,9 @@ export async function GET(request: Request) {
 
     if (recentLogsError) throw recentLogsError
 
-    const giztokensIncluded = policy.giztokensIncluded
-    const giztokensUsed = Math.max(0, wallet?.giztokens_used ?? 0)
-    const costUsed = Math.max(0, wallet?.included_cost_used_cents ?? 0)
-
     return NextResponse.json(
       {
-        wallet: {
-          giztokensIncluded,
-          giztokensUsed,
-          giztokensRemaining: giztokensIncluded - giztokensUsed,
-          giztokensOverageLimit: policy.giztokensOverageLimit,
-          includedCostLimitCents: policy.costLimitCents,
-          includedCostUsedCents: costUsed,
-          includedCostRemainingCents: policy.costLimitCents - costUsed,
-          includedCostAlertCents: policy.includedCostAlertCents,
-          periodStart: wallet?.period_start ?? start,
-          periodEnd: wallet?.period_end ?? end,
-        },
+        wallet: walletSummary,
         entitlements: (entitlements ?? []).map((item) => ({
           entitlementType: item.entitlement_type,
           cycleLabel: item.cycle_label,
@@ -135,30 +107,6 @@ export async function GET(request: Request) {
       { status: 500, headers: corsHeaders },
     )
   }
-}
-
-async function ensureMonthlyWallet(
-  supabase: ReturnType<typeof createSupabaseServiceClient>,
-  ownerId: string,
-  periodStart: string,
-  periodEnd: string,
-  policy: ReturnType<typeof getMonthlyWalletPolicy>,
-) {
-  const { error } = await supabase
-    .from('ai_usage_wallets')
-    .upsert(
-      {
-        owner_id: ownerId,
-        period_type: 'monthly',
-        period_start: periodStart,
-        period_end: periodEnd,
-        giztokens_included: policy.giztokensIncluded,
-        included_cost_limit_cents: policy.costLimitCents,
-      },
-      { onConflict: 'owner_id,period_type,period_start,period_end' },
-    )
-
-  if (error) throw error
 }
 
 function getReportIdFromSummary(value: unknown) {
