@@ -1,8 +1,10 @@
 ﻿import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Check, Loader2 } from 'lucide-react'
-import { getAuthErrorMessage, getSelectedSignupPlanFromUrl, requestPasswordReset, shouldStartStripeCheckoutFromUrl, signInWithEmail, signOut, signUpTeacher, updatePassword } from '@/services/supabase/auth'
+import { getAuthErrorMessage, getEmailVerificationStateFromUser, getSelectedSignupPlanFromUrl, requestPasswordReset, resendSignupConfirmation, shouldStartStripeCheckoutFromUrl, signInWithEmail, signOut, signUpTeacher, updatePassword, completeAuthRedirectIfPresent, isEmailConfirmed } from '@/services/supabase/auth'
 import { redirectToStripeCheckout } from '@/services/stripe-checkout'
+import EmailVerificationBanner from '@/components/ui/EmailVerificationNotice'
+import { resolveEmailVerificationState, type EmailVerificationState } from '@/utils/email-verification'
 import { captureReferralCodeFromUrl, clearStoredReferralCode, getStoredReferralCode } from '@/utils/referral'
 import { loadTeacherWorkspace } from '@/services/supabase/classes'
 import { getSupabaseClient } from '@/services/supabase/client'
@@ -47,6 +49,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
   const [checkingAccess, setCheckingAccess] = useState(false)
   const [subscriptionBlocked, setSubscriptionBlocked] = useState(false)
+  const [emailVerification, setEmailVerification] = useState<EmailVerificationState>(() =>
+    resolveEmailVerificationState(null),
+  )
+  const [emailNoticeMessage, setEmailNoticeMessage] = useState('')
+  const [emailNoticeSending, setEmailNoticeSending] = useState(false)
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(readPersistedHydratedUserId)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const hydrateWorkspace = useAppStore((state) => state.hydrateWorkspace)
@@ -61,8 +68,21 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       setSession(hasPasswordRecoveryUrl() ? null : data.session)
+      setEmailVerification(getEmailVerificationStateFromUser(data.session?.user))
       setLoadingSession(false)
     })
+
+    void completeAuthRedirectIfPresent()
+      .then((handled) => {
+        if (!handled) return
+        return supabase.auth.getSession().then(({ data }) => {
+          setSession(data.session)
+          setEmailVerification(getEmailVerificationStateFromUser(data.session?.user))
+        })
+      })
+      .catch(() => {
+        // Link inválido/expirado: mantém fluxo normal de login.
+      })
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === 'PASSWORD_RECOVERY') {
@@ -78,6 +98,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return
       }
       setSession(nextSession)
+      setEmailVerification(getEmailVerificationStateFromUser(nextSession?.user))
       const nextUserId = nextSession?.user?.id ?? null
       if (event === 'SIGNED_IN' && nextUserId) {
         setHydratedUserId((current) => {
@@ -174,6 +195,31 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [session?.user?.id])
 
+  useEffect(() => {
+    if (!session?.user || emailVerification.status !== 'grace') return
+    const timer = window.setInterval(() => {
+      setEmailVerification(getEmailVerificationStateFromUser(session.user))
+    }, 60_000)
+    return () => window.clearInterval(timer)
+  }, [emailVerification.status, session?.user])
+
+  async function handleResendConfirmationEmail() {
+    const targetEmail = session?.user?.email?.trim()
+    if (!targetEmail) return
+    setEmailNoticeSending(true)
+    setEmailNoticeMessage('')
+    try {
+      await resendSignupConfirmation(targetEmail)
+      setEmailNoticeMessage('Novo e-mail de confirmação enviado. Verifique também a caixa de spam.')
+    } catch (error) {
+      setEmailNoticeMessage(getAuthErrorMessage(error))
+    } finally {
+      setEmailNoticeSending(false)
+    }
+  }
+
+  const emailAccessBlocked = emailVerification.status === 'blocked'
+  const emailGraceActive = emailVerification.status === 'grace'
   const sessionUserId = session?.user?.id ?? null
   const effectiveHydratedUserId = hydratedUserId ?? readPersistedHydratedUserId()
   const isWorkspaceReady = !sessionUserId || effectiveHydratedUserId === sessionUserId
@@ -208,8 +254,15 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (subscriptionBlocked) {
-    return <TeacherAccountSubscreen data={{ forcedMode: true }} />
+  if (subscriptionBlocked || emailAccessBlocked) {
+    return (
+      <TeacherAccountSubscreen
+        data={{
+          forcedMode: true,
+          forcedReason: emailAccessBlocked ? 'email' : 'subscription',
+        }}
+      />
+    )
   }
 
   if (workspaceError) {
@@ -249,7 +302,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     )
   }
 
-  return children
+  return (
+    <>
+      {emailGraceActive && session?.user?.email && (
+        <EmailVerificationBanner
+          email={session.user.email}
+          state={emailVerification}
+          sending={emailNoticeSending}
+          message={emailNoticeMessage}
+          onResend={() => void handleResendConfirmationEmail()}
+        />
+      )}
+      <div className={emailGraceActive ? 'absolute inset-0 pt-[92px]' : 'absolute inset-0'}>
+        {children}
+      </div>
+    </>
+  )
 }
 
 function AuthScreen({
@@ -366,15 +434,20 @@ function AuthScreen({
         clearStoredReferralCode()
         setReferralCode(null)
         if (data.session && shouldStartStripeCheckoutFromUrl()) {
-          await redirectToStripeCheckout(getSelectedSignupPlanFromUrl())
-          return
+          if (isEmailConfirmed(data.user)) {
+            await redirectToStripeCheckout(getSelectedSignupPlanFromUrl())
+            return
+          }
         }
         if (!data.session) {
           setMessage(
             referralCode
               ? 'Cadastro criado com indicação. Confira seu e-mail para confirmar a conta e ganhar 7 dias extras de teste.'
-              : 'Cadastro criado. Confira seu e-mail para confirmar a conta.',
+              : 'Cadastro criado. Confira seu e-mail para confirmar a conta antes de continuar.',
           )
+          setMode('signin')
+        } else if (shouldStartStripeCheckoutFromUrl() && !isEmailConfirmed(data.user)) {
+          setMessage('Cadastro criado. Confirme seu e-mail para continuar com o pagamento.')
         }
       } else if (mode === 'forgot') {
         await requestPasswordReset(email.trim())

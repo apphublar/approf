@@ -28,16 +28,31 @@ import { MOBILE_FILE_INPUT_CLASS } from '@/utils/device'
 import { stashNavigationForFilePicker } from '@/utils/nav-session'
 import { clearPendingFiles, loadPendingFiles, savePendingFiles } from '@/utils/pending-file-store'
 import { buildReferralSignupUrl, buildReferralWhatsAppMessage } from '@/utils/referral'
+import { EmailVerificationCard } from '@/components/ui/EmailVerificationNotice'
+import { getSupabaseClient } from '@/services/supabase/client'
+import { getEmailVerificationStateFromUser, resendSignupConfirmation } from '@/services/supabase/auth'
+import type { EmailVerificationState } from '@/utils/email-verification'
 
 const VERIFICATION_FILES_KEY = 'verification-pending'
 const VERIFICATION_FILE_INPUT_ID = 'verification-file-input'
 
+type ForcedAccountReason = 'subscription' | 'email' | null
+
+function resolveForcedAccountReason(data: unknown): ForcedAccountReason {
+  if (typeof data !== 'object' || !data) return null
+  if ('forcedReason' in data) {
+    const reason = (data as { forcedReason?: string }).forcedReason
+    if (reason === 'email' || reason === 'subscription') return reason
+  }
+  if ('forcedMode' in data && (data as { forcedMode?: boolean }).forcedMode) return 'subscription'
+  return null
+}
+
 export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const { closeSubscreen, subscreens } = useNavStore()
   const { setSchoolName, userId, teacherCode } = useAppStore()
-  const forcedMode = typeof data === 'object' && data && 'forcedMode' in data
-    ? Boolean((data as { forcedMode?: boolean }).forcedMode)
-    : false
+  const forcedReason = resolveForcedAccountReason(data)
+  const forcedMode = forcedReason != null
   const initialSnapshot =
     typeof data === 'object' && data && 'initialSnapshot' in data
       ? ((data as { initialSnapshot?: TeacherAccountSnapshot }).initialSnapshot ?? null)
@@ -66,6 +81,10 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   const [verificationObservation, setVerificationObservation] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [restoringPendingFiles, setRestoringPendingFiles] = useState(true)
+  const [emailVerification, setEmailVerification] = useState<EmailVerificationState | null>(null)
+  const [emailVerificationMessage, setEmailVerificationMessage] = useState('')
+  const [emailVerificationError, setEmailVerificationError] = useState('')
+  const [resendingEmailVerification, setResendingEmailVerification] = useState(false)
 
   async function refreshAccount() {
     const account = await getTeacherAccountSnapshot({ forceRefresh: true })
@@ -81,6 +100,48 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
     setPhone(initialSnapshot.phone ?? '')
     setEmail(initialSnapshot.email ?? '')
   }, [initialSnapshot])
+
+  useEffect(() => {
+    let active = true
+    const supabase = getSupabaseClient()
+    if (!supabase) return () => { active = false }
+
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!active) return
+      setEmailVerification(getEmailVerificationStateFromUser(data.user))
+    })
+
+    const { data: authSubscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setEmailVerification(getEmailVerificationStateFromUser(nextSession?.user))
+    })
+
+    return () => {
+      active = false
+      authSubscription.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (forcedReason === 'email' && emailVerification?.status === 'confirmed') {
+      window.location.reload()
+    }
+  }, [emailVerification?.status, forcedReason])
+
+  async function resendEmailVerification() {
+    const targetEmail = email.trim() || snapshot?.email
+    if (!targetEmail) return
+    setResendingEmailVerification(true)
+    setEmailVerificationMessage('')
+    setEmailVerificationError('')
+    try {
+      await resendSignupConfirmation(targetEmail)
+      setEmailVerificationMessage('Novo e-mail de confirmação enviado. Verifique também a caixa de spam.')
+    } catch (error) {
+      setEmailVerificationError(error instanceof Error ? error.message : 'Não foi possível reenviar o e-mail.')
+    } finally {
+      setResendingEmailVerification(false)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -127,6 +188,10 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
   }, [initialSnapshot])
 
   const blocked = useMemo(() => isTeacherAccessBlocked(snapshot?.subscription?.status ?? null), [snapshot])
+  const showEmailForced = forcedReason === 'email'
+  const showSubscriptionForced = forcedReason === 'subscription'
+  const accountEmail = email.trim() || snapshot?.email || ''
+  const showAccountSections = !showEmailForced
   const approvedVerification = useMemo(
     () => (snapshot?.verifications ?? []).find((item) => item.status === 'approved') ?? null,
     [snapshot],
@@ -406,6 +471,19 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
           <div className="bg-white rounded-app p-4 border border-red-200 text-[12px] text-red-700">{error || 'Conta indisponível.'}</div>
         ) : (
           <>
+            {forcedMode && (
+              <div className="bg-[#FFF3CD] border border-[#F2D58B] rounded-app p-4 mb-4">
+                <p className="text-[13px] font-bold text-[#856404]">
+                  {showEmailForced ? 'Confirme seu e-mail para continuar' : 'Regularize sua assinatura para continuar'}
+                </p>
+                <p className="text-[12px] text-[#856404] mt-1 leading-[1.5]">
+                  {showEmailForced
+                    ? 'Seu acesso está pausado até a confirmação do e-mail cadastrado.'
+                    : 'Seu acesso está restrito por pendência de pagamento ou assinatura cancelada.'}
+                </p>
+              </div>
+            )}
+
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Perfil da professora</p>
               <div className="flex items-start justify-between gap-3">
@@ -422,12 +500,27 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               </div>
             </div>
 
-            <ReferralCard
-              teacherCode={snapshot.referrals?.teacherCode ?? teacherCode}
-              referrals={snapshot.referrals}
-              onMessage={setReferralMessage}
-            />
+            {emailVerification && accountEmail && (
+              <EmailVerificationCard
+                email={accountEmail}
+                state={emailVerification}
+                sending={resendingEmailVerification}
+                message={emailVerificationMessage}
+                error={emailVerificationError}
+                onResend={() => void resendEmailVerification()}
+                compact={showEmailForced}
+              />
+            )}
 
+            {showAccountSections && (
+              <ReferralCard
+                teacherCode={snapshot.referrals?.teacherCode ?? teacherCode}
+                referrals={snapshot.referrals}
+                onMessage={setReferralMessage}
+              />
+            )}
+
+            {showAccountSections && (
             <div className="bg-white rounded-app p-4 border border-gp shadow-card mb-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2">
@@ -594,8 +687,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 </div>
               )}
             </div>
+            )}
 
-            {blocked && (
+            {showAccountSections && blocked && (
               <div className="bg-[#FFF3CD] border border-[#F2D58B] rounded-app p-4 mb-4">
                 <p className="text-[13px] font-bold text-[#856404]">Acesso restrito pelo admin</p>
                 <p className="text-[12px] text-[#856404] mt-1 leading-[1.5]">
@@ -604,6 +698,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
               </div>
             )}
 
+            {showAccountSections && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Cadastro</p>
               <label className="text-[11px] text-muted">Nome completo</label>
@@ -616,7 +711,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 {saving ? 'Salvando...' : 'Salvar cadastro'}
               </button>
             </div>
+            )}
 
+            {showAccountSections && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted mb-3">Senha e segurança</p>
               <label className="text-[11px] text-muted">Senha atual</label>
@@ -659,7 +756,9 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 {saving ? 'Salvando...' : 'Atualizar senha'}
               </button>
             </div>
+            )}
 
+            {(showSubscriptionForced || showAccountSections) && (
             <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
               <div className="flex items-center gap-2 mb-3">
                 <Wallet size={15} className="text-gm" />
@@ -693,6 +792,7 @@ export default function TeacherAccountSubscreen({ data }: { data?: unknown }) {
                 {blocked ? 'Assinatura já restrita' : 'Cancelar assinatura'}
               </button>
             </div>
+            )}
 
             {message && <p className="text-[12px] text-gm mb-3">{message}</p>}
             {referralMessage && <p className="text-[12px] text-gm mb-3">{referralMessage}</p>}
@@ -885,9 +985,13 @@ function formatSubscriptionPlan(plan?: string | null) {
 
 function formatSubscriptionPrice(plan?: string | null) {
   const normalized = plan?.trim().toLowerCase()
-  if (normalized && ['annual', 'anual', 'yearly', 'ano'].includes(normalized)) return 'R$ 358,80 por ano'
-  if (normalized && ['semiannual', 'semestral', 'semi-annual'].includes(normalized)) return 'R$ 209,40 a cada 6 meses'
-  return 'R$ 39,90 por mês'
+  if (normalized && ['annual', 'anual', 'yearly', 'ano'].includes(normalized)) {
+    return 'Cobrança única de R$ 358,80 por ano (após o teste de 7 dias)'
+  }
+  if (normalized && ['semiannual', 'semestral', 'semi-annual'].includes(normalized)) {
+    return 'Cobrança única de R$ 209,40 a cada 6 meses (após o teste de 7 dias)'
+  }
+  return 'R$ 39,90 por mês (após o teste de 7 dias)'
 }
 
 function getPaymentUrl(value?: string | null) {

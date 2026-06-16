@@ -868,9 +868,10 @@ h1, h2, h3, h4 {
 
 .pricing-annual-note {
   font-size: 0.8125rem;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.88);
   margin-bottom: 6px;
-  line-height: 1.45;
+  line-height: 1.5;
+  font-weight: 600;
 }
 
 .pricing-compare-price {

@@ -1,4 +1,10 @@
+import type { User } from '@supabase/supabase-js'
 import { getSupabaseClient } from './client'
+import {
+  isEmailConfirmed,
+  resolveEmailVerificationState,
+  type EmailVerificationState,
+} from '@/utils/email-verification'
 
 export type SignupPlan = 'monthly' | 'semiannual' | 'annual'
 
@@ -27,7 +33,7 @@ export async function signUpTeacher(input: {
     email: input.email,
     password: input.password,
     options: {
-      emailRedirectTo: window.location.origin,
+      emailRedirectTo: resolveAuthRedirectUrl(),
       data: {
         full_name: input.fullName,
         selected_plan: input.plan ?? getSelectedSignupPlanFromUrl(),
@@ -40,12 +46,71 @@ export async function signUpTeacher(input: {
   return data
 }
 
+export async function resendSignupConfirmation(email: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) throw new Error('Supabase não está configurado.')
+
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim(),
+    options: {
+      emailRedirectTo: resolveAuthRedirectUrl(),
+    },
+  })
+  if (error) throw toAuthError(error)
+}
+
+export async function completeAuthRedirectIfPresent() {
+  const supabase = getSupabaseClient()
+  if (!supabase) return false
+
+  const searchParams = new URLSearchParams(window.location.search)
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const code = searchParams.get('code')
+  const accessToken = hashParams.get('access_token')
+  const refreshToken = hashParams.get('refresh_token')
+
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) throw toAuthError(error)
+    cleanupAuthRedirectParams()
+    return true
+  }
+
+  if (accessToken && refreshToken) {
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    })
+    if (error) throw toAuthError(error)
+    cleanupAuthRedirectParams()
+    return true
+  }
+
+  return false
+}
+
+export async function getCurrentEmailVerificationState(): Promise<EmailVerificationState> {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return resolveEmailVerificationState(null)
+  }
+
+  const { data, error } = await supabase.auth.getUser()
+  if (error) throw toAuthError(error)
+  return resolveEmailVerificationState(data.user)
+}
+
+export function getEmailVerificationStateFromUser(user: User | null | undefined) {
+  return resolveEmailVerificationState(user)
+}
+
 export async function requestPasswordReset(email: string) {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin,
+    redirectTo: resolveAuthRedirectUrl(),
   })
   if (error) throw toAuthError(error)
 }
@@ -65,22 +130,7 @@ export async function ensurePasswordRecoverySession() {
   const supabase = getSupabaseClient()
   if (!supabase) throw new Error('Supabase não está configurado.')
 
-  const searchParams = new URLSearchParams(window.location.search)
-  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  const code = searchParams.get('code')
-  const accessToken = hashParams.get('access_token')
-  const refreshToken = hashParams.get('refresh_token')
-
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (error) throw toAuthError(error)
-  } else if (accessToken && refreshToken) {
-    const { error } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    })
-    if (error) throw toAuthError(error)
-  }
+  await completeAuthRedirectIfPresent()
 
   const { data } = await supabase.auth.getSession()
   if (!data.session) {
@@ -115,11 +165,14 @@ export function getAuthErrorMessage(error: unknown) {
     return 'Este e-mail já está cadastrado. Entre com sua senha ou recupere o acesso.'
   }
 
+  if (normalized.includes('email not confirmed')) {
+    return 'Confirme seu e-mail antes de entrar. Verifique a caixa de entrada ou reenvie a confirmação em Minha conta.'
+  }
+
   if (
     normalized.includes('invalid login credentials') ||
     normalized.includes('invalid credentials') ||
-    normalized.includes('invalid email or password') ||
-    normalized.includes('email not confirmed')
+    normalized.includes('invalid email or password')
   ) {
     return 'E-mail ou senha incorretos. Verifique os dados e tente novamente.'
   }
@@ -167,3 +220,19 @@ export function shouldStartStripeCheckoutFromUrl() {
   if (typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get('checkout') === '1'
 }
+
+function resolveAuthRedirectUrl() {
+  if (typeof window === 'undefined') return 'https://app.approf.com.br'
+  return window.location.origin
+}
+
+function cleanupAuthRedirectParams() {
+  if (typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  url.searchParams.delete('code')
+  url.searchParams.delete('type')
+  url.hash = ''
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
+export { isEmailConfirmed }

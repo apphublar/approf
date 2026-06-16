@@ -28,6 +28,7 @@ const plans = [
     secondaryBadge: null as string | null,
     featured: false,
     priceMain: '39,90',
+    pricePeriod: '/mês',
     priceCompare: '49,90',
     billingNote: null as string | null,
     giztokens: '8.000',
@@ -39,8 +40,9 @@ const plans = [
     secondaryBadge: null,
     featured: false,
     priceMain: '34,90',
+    pricePeriod: 'equiv./mês',
     priceCompare: '49,90',
-    billingNote: 'Cobrado em 6x de R$ 34,90 ou R$ 209,40 à vista',
+    billingNote: 'Valor mensal só para comparação. No cartão: cobrança única de R$ 209,40 a cada 6 meses.',
     giztokens: '9.000',
   },
   {
@@ -50,8 +52,9 @@ const plans = [
     secondaryBadge: '4 meses grátis',
     featured: true,
     priceMain: '29,90',
+    pricePeriod: 'equiv./mês',
     priceCompare: '49,90',
-    billingNote: 'Cobrado em 12x de R$ 29,90 ou R$ 358,80 à vista',
+    billingNote: 'Valor mensal só para comparação. No cartão: cobrança única de R$ 358,80 por ano.',
     giztokens: '10.000',
   },
 ] as const
@@ -106,11 +109,15 @@ export default function PricingSection() {
                 <span className="pricing-currency">R$</span>
                 <span className="pricing-amount">{plan.priceMain.split(',')[0]}</span>
                 <span className="pricing-currency">,{plan.priceMain.split(',')[1]}</span>
-                <span className="pricing-period">/mês</span>
+                <span className="pricing-period">{plan.pricePeriod}</span>
               </div>
 
               <p className="pricing-compare-price">
-                de <span>R$ {plan.priceCompare}/mês</span>
+                {plan.id === 'monthly' ? (
+                  <>de <span>R$ {plan.priceCompare}/mês</span></>
+                ) : (
+                  <>comparado a <span>R$ {plan.priceCompare}/mês</span> no plano mensal</>
+                )}
               </p>
 
               {plan.billingNote && (
