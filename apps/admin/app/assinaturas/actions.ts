@@ -23,7 +23,7 @@ const planOptions = [
   { value: 'monthly', label: 'Mensal' },
   { value: 'semiannual', label: 'Semestral' },
   { value: 'annual', label: 'Anual' },
-  { value: 'verification_required', label: 'Em analise' },
+  { value: 'verification_required', label: 'Em análise' },
 ]
 
 const statusOptions: Array<{ value: SubscriptionStatus; label: string }> = [

@@ -2,9 +2,11 @@ import { AdminShell } from './components/AdminShell'
 import { loadAdminNavBadges } from './lib/admin-badges'
 import './globals.css'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Approf Admin',
-  description: 'Painel interno de operacao e privacidade do Approf',
+  description: 'Painel interno de operação e privacidade do Approf',
   icons: {
     icon: '/icon.png',
     apple: '/apple-icon.png',

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Check, ExternalLink, RefreshCcw, X } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { formatRelativeDate, teacherInitials } from '../lib/admin-utils'
@@ -22,6 +23,7 @@ type VerificationRequest = {
 }
 
 export default function VerificationsPage() {
+  const router = useRouter()
   const [requests, setRequests] = useState<VerificationRequest[]>([])
   const [notesById, setNotesById] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -41,10 +43,10 @@ export default function VerificationsPage() {
     try {
       const response = await fetch('/api/account/verification/admin')
       const payload = await response.json().catch(() => null) as { error?: string; requests?: VerificationRequest[] } | null
-      if (!response.ok) throw new Error(payload?.error || 'Falha ao carregar verificacoes.')
+      if (!response.ok) throw new Error(payload?.error || 'Falha ao carregar verificações.')
       setRequests(payload?.requests ?? [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao carregar verificacoes.')
+      setError(err instanceof Error ? err.message : 'Falha ao carregar verificações.')
     } finally {
       setLoading(false)
     }
@@ -67,8 +69,9 @@ export default function VerificationsPage() {
       if (!response.ok) throw new Error(payload?.error || 'Falha ao atualizar status.')
       setRequests(payload?.requests ?? [])
       const teacher = requests.find((item) => item.id === verificationId)?.teacher?.full_name?.split(' ')[0] ?? 'professora'
-      setToast(status === 'approved' ? `Verificacao de ${teacher} aprovada` : `Verificacao de ${teacher} rejeitada`)
+      setToast(status === 'approved' ? `Verificação de ${teacher} aprovada` : `Verificação de ${teacher} rejeitada`)
       window.setTimeout(() => setToast(null), 2600)
+      router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao atualizar status.')
     } finally {
@@ -80,8 +83,8 @@ export default function VerificationsPage() {
     <div className="admin-page-wrap admin-page-wrap-narrow">
       <PageHeader
         eyebrow="Pessoas"
-        title="Verificacoes"
-        description="Fila de comprovantes de vinculo escolar. Aprovar libera o badge da escola no app."
+        title="Verificações"
+        description="Fila de comprovantes de vínculo escolar. Aprovar libera o badge da escola no app."
         action={
           <button type="button" className="btn-ghost-v2" onClick={() => void loadRequests()}>
             <RefreshCcw size={15} /> Atualizar
@@ -90,13 +93,13 @@ export default function VerificationsPage() {
       />
 
       {error ? <p style={{ color: '#b4382f', marginBottom: 16 }}>{error}</p> : null}
-      {loading ? <p style={{ color: '#8a948c' }}>Carregando verificacoes...</p> : null}
+      {loading ? <p style={{ color: '#8a948c' }}>Carregando verificações...</p> : null}
 
       {!loading && pending.length === 0 ? (
         <article className="empty-state-v2">
           <Check size={30} color="#1c6b46" />
           <h3>Tudo em dia</h3>
-          <p>Nenhuma verificacao pendente no momento.</p>
+          <p>Nenhuma verificação pendente no momento.</p>
         </article>
       ) : null}
 
@@ -145,7 +148,7 @@ export default function VerificationsPage() {
                   <textarea
                     value={notesById[request.id] ?? request.notes ?? ''}
                     onChange={(event) => setNotesById((current) => ({ ...current, [request.id]: event.target.value }))}
-                    placeholder="Observacao interna (em caso de rejeicao)"
+                    placeholder="Observação interna (em caso de rejeição)"
                     style={{ width: '100%', minHeight: 60, padding: 10, borderRadius: 9, border: '1px solid #e1e0d8', font: 'inherit' }}
                   />
                 </div>

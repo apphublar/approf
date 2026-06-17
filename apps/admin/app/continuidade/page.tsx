@@ -13,8 +13,8 @@ export default async function ContinuityPage() {
     <div className="admin-page-wrap admin-page-wrap-narrow">
       <PageHeader
         eyebrow="Pessoas"
-        title="Continuidade pedagogica"
-        description="Transferencia de historico de aluno entre professoras. Acesso completo so apos aprovacao."
+        title="Continuidade pedagógica"
+        description="Transferência de histórico de aluno entre professoras. Acesso completo só após aprovação."
       />
       <ContinuityRequestsPanel initialRequests={requests} />
     </div>

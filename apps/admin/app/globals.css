@@ -1354,6 +1354,12 @@ body {
   flex-direction: column;
   gap: 14px;
   padding-top: 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.nav-groups::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-group-label {

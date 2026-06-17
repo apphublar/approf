@@ -39,8 +39,8 @@ export default async function FeatureReleasesPage() {
   return (
     <div className="admin-page-wrap admin-page-wrap-narrow">
       <PageHeader
-        eyebrow="Conteudo"
-        title="Liberacoes de features"
+        eyebrow="Conteúdo"
+        title="Liberações de features"
         description="Ative funcionalidades para professoras selecionadas ou para toda a base (beta)."
       />
 
@@ -59,7 +59,7 @@ export default async function FeatureReleasesPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <strong style={{ fontSize: 15 }}>{flag.name}</strong>
-                  <div style={{ fontSize: 13, color: '#8a948c', marginTop: 4 }}>{flag.description || 'Sem descricao'}</div>
+                  <div style={{ fontSize: 13, color: '#8a948c', marginTop: 4 }}>{flag.description || 'Sem descrição'}</div>
                 </div>
                 <span style={{ fontSize: 13, color: '#5f6b63' }}>{alcance}</span>
                 <div className="toggle-group-v2">

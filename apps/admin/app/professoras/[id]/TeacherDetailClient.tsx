@@ -58,7 +58,7 @@ type TeacherDetailClientProps = {
 }
 
 const planOptions = [
-  { value: 'free', label: 'Gratis' },
+  { value: 'free', label: 'Grátis' },
   { value: 'trial_7_days', label: 'Trial 7 dias' },
   { value: 'monthly', label: 'Mensal' },
   { value: 'semiannual', label: 'Semestral' },
@@ -98,11 +98,11 @@ export function TeacherDetailClient(props: TeacherDetailClientProps) {
             <p>{props.teacher.email} · {props.teacher.schoolLabel}</p>
             <div className="detail-badges">
               <span className={`status-chip status-chip-${status}`}>
-                {status === 'active' ? 'Pagando' : status === 'free' ? 'Gratis' : status === 'overdue' ? 'Em atraso' : status === 'blocked' ? 'Bloqueada' : 'Trial'}
+                {status === 'active' ? 'Pagando' : status === 'free' ? 'Grátis' : status === 'overdue' ? 'Em atraso' : status === 'blocked' ? 'Bloqueada' : 'Trial'}
               </span>
               <span className="status-chip status-chip-free">{formatPlanLabel(props.teacher.subscription?.plan)}</span>
               <span className={`status-chip status-chip-${props.teacher.verificationStatus === 'approved' ? 'approved' : props.teacher.verificationStatus === 'rejected' ? 'rejected' : 'pending'}`}>
-                Verificacao: {verificationStatusLabel(props.teacher.verificationStatus)}
+                Verificação: {verificationStatusLabel(props.teacher.verificationStatus)}
               </span>
             </div>
           </div>
@@ -131,7 +131,7 @@ export function TeacherDetailClient(props: TeacherDetailClientProps) {
           ['visao', 'Visao geral'],
           ['assinatura', 'Assinatura'],
           ['ia', 'IA & GizTokens'],
-          ['verif', 'Verificacao'],
+          ['verif', 'Verificação'],
           ['hist', 'Historico'],
         ] as Array<[TabKey, string]>).map(([key, label]) => (
           <Link

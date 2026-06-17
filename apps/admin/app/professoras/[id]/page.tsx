@@ -128,9 +128,9 @@ function formatAuditAction(action: string) {
     teacher_giztokens_adjusted: 'GizTokens ajustados',
     teacher_payment_overdue_notice_sent: 'Aviso de atraso enviado',
     teacher_access_blocked_manual: 'Conta bloqueada',
-    verification_approved: 'Verificacao aprovada',
-    verification_rejected: 'Verificacao rejeitada',
-    teacher_verification_updated: 'Verificacao atualizada',
+    verification_approved: 'Verificação aprovada',
+    verification_rejected: 'Verificação rejeitada',
+    teacher_verification_updated: 'Verificação atualizada',
     material_status_updated: 'Material moderado',
     app_announcement_sent: 'Aviso enviado ao app',
   }

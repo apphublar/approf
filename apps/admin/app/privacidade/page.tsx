@@ -20,8 +20,8 @@ export default async function PrivacyPage() {
   const checks: PrivacyCheck[] = [
     { label: 'Buckets de documentos privados (RLS ativo)', status: 'ok' },
     { label: 'Consentimento LGPD no cadastro', status: (profilesCount.count ?? 0) > 0 ? 'ok' : 'pending' },
-    { label: 'Auditoria de acoes sensiveis', status: (auditCount.count ?? 0) > 0 ? 'ok' : 'pending' },
-    { label: 'Materiais passam por IA + moderacao', status: (materialsCount.count ?? 0) > 0 ? 'ok' : 'pending' },
+    { label: 'Auditoria de ações sensíveis', status: (auditCount.count ?? 0) > 0 ? 'ok' : 'pending' },
+    { label: 'Materiais passam por IA + moderação', status: (materialsCount.count ?? 0) > 0 ? 'ok' : 'pending' },
     { label: 'Revisao trimestral de acessos admin', status: 'pending' },
     { label: 'Politica de retencao de dados documentada', status: 'pending' },
   ]

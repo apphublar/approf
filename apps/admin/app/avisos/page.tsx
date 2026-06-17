@@ -18,9 +18,9 @@ export default async function AvisosPage() {
   return (
     <div className="admin-page-wrap">
       <PageHeader
-        eyebrow="Comunicacao"
+        eyebrow="Comunicação"
         title="Avisos no app"
-        description="Envie um aviso que aparece dentro do app das professoras. Escolha o publico, o tipo e veja a pre-visualizacao antes de enviar."
+        description="Envie um aviso que aparece dentro do app das professoras. Escolha o público, o tipo e veja a pré-visualização antes de enviar."
       />
 
       <AnnouncementComposer

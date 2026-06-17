@@ -27,7 +27,7 @@ export function ContinuityRequestsPanel({ initialRequests }: { initialRequests: 
       const payload = await response.json().catch(() => null) as { error?: string; requests?: ContinuityRequestRow[] } | null
       if (!response.ok) throw new Error(payload?.error || 'Falha ao revisar solicitacao.')
       setRequests(payload?.requests ?? [])
-      setToast(status === 'approved' ? 'Transferencia aprovada' : 'Transferencia recusada')
+      setToast(status === 'approved' ? 'Transferência aprovada' : 'Transferência recusada')
       window.setTimeout(() => setToast(null), 2600)
     } catch (reviewError) {
       setError(reviewError instanceof Error ? reviewError.message : 'Falha ao revisar solicitacao.')
@@ -43,7 +43,7 @@ export function ContinuityRequestsPanel({ initialRequests }: { initialRequests: 
       <article className="empty-state-v2">
         <Check size={30} color="#1c6b46" />
         <h3>Nenhuma solicitacao pendente</h3>
-        <p>Transferencias aprovadas aparecem no historico da auditoria.</p>
+        <p>Transferências aprovadas aparecem no histórico da auditoria.</p>
       </article>
     )
   }

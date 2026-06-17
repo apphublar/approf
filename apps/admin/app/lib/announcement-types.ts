@@ -6,9 +6,9 @@ export const ANNOUNCEMENT_TYPES: Record<
   { label: string; accent: string }
 > = {
   novidade: { label: 'Novidade', accent: '#1c6b46' },
-  info: { label: 'Informacao', accent: '#2f5f9e' },
-  alerta: { label: 'Atencao', accent: '#8a6516' },
-  manutencao: { label: 'Manutencao', accent: '#b4382f' },
+  info: { label: 'Informação', accent: '#2f5f9e' },
+  alerta: { label: 'Atenção', accent: '#8a6516' },
+  manutencao: { label: 'Manutenção', accent: '#b4382f' },
 }
 
 export const AUDIENCE_LABELS: Record<AnnouncementAudience, string> = {

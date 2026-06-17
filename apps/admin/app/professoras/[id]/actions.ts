@@ -25,7 +25,7 @@ export async function approveTeacherVerificationAction(formData: FormData) {
     metadata: { teacherId, notes: notes || null },
   })
 
-  redirectWithToast(returnTo, 'Verificacao aprovada.')
+  redirectWithToast(returnTo, 'Verificação aprovada.')
 }
 
 export async function rejectTeacherVerificationAction(formData: FormData) {
@@ -47,5 +47,5 @@ export async function rejectTeacherVerificationAction(formData: FormData) {
     metadata: { teacherId, notes: notes || null },
   })
 
-  redirectWithToast(returnTo, 'Verificacao rejeitada.')
+  redirectWithToast(returnTo, 'Verificação rejeitada.')
 }

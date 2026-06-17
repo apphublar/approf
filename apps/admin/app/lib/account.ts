@@ -1,4 +1,6 @@
+import { revalidatePath } from 'next/cache'
 import { createSupabaseServiceClient } from '@/app/lib/supabase-server'
+import { filterActionableVerificationQueue } from '@/app/lib/admin-utils'
 import { getTeacherReferralSummary } from '@/app/lib/referrals'
 import { loadActiveAnnouncementsForUser } from '@/app/lib/announcements'
 
@@ -233,7 +235,8 @@ export async function listTeacherVerificationRequests() {
   const profileById = new Map((profilesResult.data ?? []).map((profile) => [profile.id, profile]))
   const schoolById = new Map((schoolsResult.data ?? []).map((school) => [school.id, school]))
 
-  return Promise.all(
+  return filterActionableVerificationQueue(
+    await Promise.all(
     requests.map(async (request) => {
       const rawDocuments = Array.isArray(request.documents) ? request.documents : []
       const documents = await Promise.all(
@@ -262,6 +265,7 @@ export async function listTeacherVerificationRequests() {
         documents: documents.filter(Boolean),
       }
     }),
+  ),
   )
 }
 
@@ -277,7 +281,7 @@ export async function updateTeacherVerificationStatus(input: {
     .eq('id', input.verificationId)
     .maybeSingle()
   if (currentError) throw currentError
-  if (!current) throw new Error('Solicitacao de verificacao nao encontrada.')
+  if (!current) throw new Error('Solicitação de verificação não encontrada.')
 
   const patch = {
     status: input.status,
@@ -289,6 +293,19 @@ export async function updateTeacherVerificationStatus(input: {
     .update(patch)
     .eq('id', input.verificationId)
   if (error) throw error
+
+  if (input.status !== 'pending') {
+    await supabase
+      .from('teacher_profile_verifications')
+      .update({
+        status: 'rejected',
+        notes: 'Substituída por revisão mais recente.',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('owner_id', current.owner_id)
+      .eq('status', 'pending')
+      .neq('id', input.verificationId)
+  }
 
   const subscriptionPatch = input.status === 'approved'
     ? {
@@ -305,7 +322,7 @@ export async function updateTeacherVerificationStatus(input: {
         provider: 'manual' as const,
         trial_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        notes: appendAdminNote(input.reviewNotes, input.status === 'rejected' ? 'Cadastro rejeitado pelo admin, sem bloqueio automatico de acesso.' : 'Cadastro mantido em analise, sem bloqueio automatico de acesso.'),
+        notes: appendAdminNote(input.reviewNotes, input.status === 'rejected' ? 'Cadastro rejeitado pelo admin, sem bloqueio automático de acesso.' : 'Cadastro mantido em análise, sem bloqueio automático de acesso.'),
       }
 
   const { error: subscriptionError } = await supabase
@@ -324,6 +341,10 @@ export async function updateTeacherVerificationStatus(input: {
     target_id: input.verificationId,
     metadata: { ownerId: current.owner_id, status: input.status, notes: input.reviewNotes ?? null },
   })
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/verificacoes')
+  revalidatePath('/')
 }
 
 function appendAdminNote(notes: string | undefined, action: string) {

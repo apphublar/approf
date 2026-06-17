@@ -9,7 +9,7 @@ type MaterialStatus = 'draft' | 'published' | 'archived' | 'review_required' | '
 
 const statusOptions: Array<{ value: MaterialStatus; label: string }> = [
   { value: 'published', label: 'Aprovado' },
-  { value: 'em_analise', label: 'Em analise' },
+  { value: 'em_analise', label: 'Em análise' },
   { value: 'review_required', label: 'Revisao necessaria' },
   { value: 'blocked', label: 'Bloqueado' },
   { value: 'archived', label: 'Arquivado' },
@@ -82,7 +82,7 @@ export async function reviewReportAction(formData: FormData) {
     metadata: { reportId, decision },
   })
 
-  redirectWithToast('/materiais', 'Denuncia atualizada.')
+  redirectWithToast('/materiais', 'Denúncia atualizada.')
 }
 
 export async function refreshMaterialModerationAction() {
@@ -112,5 +112,5 @@ export async function refreshMaterialModerationAction() {
   }))
 
   revalidatePath('/materiais')
-  redirectWithToast('/materiais', 'Moderacao sincronizada.')
+  redirectWithToast('/materiais', 'Moderação sincronizada.')
 }

@@ -74,7 +74,7 @@ export default async function TeachersPage() {
           <span>Professora</span>
           <span>Plano</span>
           <span>Status</span>
-          <span>Verificacao</span>
+          <span>Verificação</span>
           <span>IA mes</span>
           <span>GizTokens</span>
           <span />
@@ -107,7 +107,7 @@ export default async function TeachersPage() {
               </span>
               <span>{formatPlanLabel(subscription?.plan)}</span>
               <span className={`status-chip status-chip-${status}`}>
-                {status === 'active' ? 'Pagando' : status === 'free' ? 'Gratis' : status === 'overdue' ? 'Em atraso' : status === 'blocked' ? 'Bloqueada' : 'Trial'}
+                {status === 'active' ? 'Pagando' : status === 'free' ? 'Grátis' : status === 'overdue' ? 'Em atraso' : status === 'blocked' ? 'Bloqueada' : 'Trial'}
               </span>
               <span className={`status-chip status-chip-${verifStatus === 'approved' ? 'approved' : verifStatus === 'rejected' ? 'rejected' : 'pending'}`}>
                 {verificationStatusLabel(verifStatus)}

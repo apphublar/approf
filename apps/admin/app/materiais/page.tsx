@@ -24,8 +24,8 @@ type ReportRecord = {
 
 const statusLabel: Record<string, string> = {
   published: 'Publicado',
-  em_analise: 'Em analise',
-  review_required: 'Em analise',
+  em_analise: 'Em análise',
+  review_required: 'Em análise',
   blocked: 'Bloqueado',
   archived: 'Arquivado',
   draft: 'Rascunho',
@@ -84,29 +84,29 @@ export default async function MaterialsPage() {
   return (
     <div className="admin-page-wrap">
       <PageHeader
-        eyebrow="Conteudo"
+        eyebrow="Conteúdo"
         title="Materiais de apoio"
-        description="Biblioteca comunitaria. Denuncias entram na mesma fila — modere por aqui."
+        description="Biblioteca comunitária. Denúncias entram na mesma fila — modere por aqui."
         action={
           <form action={refreshMaterialModerationAction}>
-            <button type="submit" className="btn-ghost-v2">Sincronizar denuncias</button>
+            <button type="submit" className="btn-ghost-v2">Sincronizar denúncias</button>
           </form>
         }
       />
 
       <section className="metric-grid-v2">
         <article className="metric-card-v2"><div className="metric-card-v2-head"><span>Publicados</span><FileText size={18} /></div><strong style={{ color: '#1c6b46' }}>{metrics.pub}</strong></article>
-        <article className="metric-card-v2"><div className="metric-card-v2-head"><span>Em analise</span></div><strong style={{ color: '#8a6516' }}>{metrics.analise}</strong></article>
+        <article className="metric-card-v2"><div className="metric-card-v2-head"><span>Em análise</span></div><strong style={{ color: '#8a6516' }}>{metrics.analise}</strong></article>
         <article className="metric-card-v2"><div className="metric-card-v2-head"><span>Bloqueados</span></div><strong>{metrics.bloq}</strong></article>
         <article className="metric-card-v2" style={{ borderColor: metrics.denuncias ? '#f3cfca' : undefined }}>
-          <div className="metric-card-v2-head"><span style={{ color: metrics.denuncias ? '#b4382f' : undefined }}>Denuncias abertas</span><Flag size={18} /></div>
+          <div className="metric-card-v2-head"><span style={{ color: metrics.denuncias ? '#b4382f' : undefined }}>Denúncias abertas</span><Flag size={18} /></div>
           <strong style={{ color: '#b4382f' }}>{metrics.denuncias}</strong>
         </article>
       </section>
 
       <article className="panel-v2">
         <div className="data-table-v2-head" style={{ gridTemplateColumns: '2.6fr 1.4fr 1fr 1.6fr' }}>
-          <span>Material</span><span>Autora</span><span>Status</span><span style={{ textAlign: 'right' }}>Moderacao</span>
+          <span>Material</span><span>Autora</span><span>Status</span><span style={{ textAlign: 'right' }}>Moderação</span>
         </div>
         {materials.map((material) => {
           const chip = statusChip[material.status] ?? 'free'
@@ -149,7 +149,7 @@ export default async function MaterialsPage() {
 
       {reports.length > 0 ? (
         <article className="panel-v2" style={{ marginTop: 20 }}>
-          <div className="panel-v2-header"><h2>Fila de denuncias</h2></div>
+          <div className="panel-v2-header"><h2>Fila de denúncias</h2></div>
           {reports.map((report) => {
             const material = materials.find((item) => item.id === report.material_id)
             return (
@@ -182,7 +182,7 @@ function formatReportReason(reason: string) {
   const labels: Record<string, string> = {
     dados_pessoais: 'Dados pessoais',
     imagem_crianca: 'Imagem de crianca',
-    conteudo_inadequado: 'Conteudo inadequado',
+    conteudo_inadequado: 'Conteúdo inadequado',
     spam: 'Spam',
     outro: 'Outro',
   }

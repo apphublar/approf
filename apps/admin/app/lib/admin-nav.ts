@@ -36,27 +36,27 @@ export const adminNavGroups: AdminNavGroup[] = [
     label: 'Pessoas',
     items: [
       { href: '/professoras', label: 'Professoras', icon: Users },
-      { href: '/verificacoes', label: 'Verificacoes', icon: UserRoundCheck, badgeKey: 'verificacoes' },
+      { href: '/verificacoes', label: 'Verificações', icon: UserRoundCheck, badgeKey: 'verificacoes' },
       { href: '/assinaturas', label: 'Assinaturas', icon: CreditCard },
       { href: '/continuidade', label: 'Continuidade', icon: MoveRight },
     ],
   },
   {
-    label: 'Conteudo',
+    label: 'Conteúdo',
     items: [
       { href: '/materiais', label: 'Materiais', icon: FileText, badgeKey: 'materiais' },
-      { href: '/liberacoes', label: 'Liberacoes', icon: KeyRound },
+      { href: '/liberacoes', label: 'Liberações', icon: KeyRound },
     ],
   },
   {
-    label: 'Comunicacao',
+    label: 'Comunicação',
     items: [{ href: '/avisos', label: 'Avisos no app', icon: Megaphone }],
   },
   {
     label: 'Sistema',
     items: [
       { href: '/ia', label: 'Uso de IA', icon: Bot },
-      { href: '/notificacoes', label: 'Notificacoes', icon: Bell },
+      { href: '/notificacoes', label: 'Notificações', icon: Bell },
       { href: '/auditoria', label: 'Auditoria', icon: ScrollText },
       { href: '/privacidade', label: 'Privacidade', icon: LockKeyhole },
     ],

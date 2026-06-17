@@ -92,13 +92,13 @@ export default async function SubscriptionsPage() {
             </Link>
             <span>{formatPlanLabel(subscription?.plan)}</span>
             <span className={`status-chip status-chip-${access}`}>
-              {access === 'active' || access === 'paid_ok' ? 'Pagando' : access === 'free' ? 'Gratis' : access === 'overdue' ? 'Em atraso' : access === 'blocked' ? 'Bloqueada' : 'Trial'}
+              {access === 'active' || access === 'paid_ok' ? 'Pagando' : access === 'free' ? 'Grátis' : access === 'overdue' ? 'Em atraso' : access === 'blocked' ? 'Bloqueada' : 'Trial'}
             </span>
             <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
               <form action={liberarAcessoGratuito}>
                 <input type="hidden" name="teacherId" value={teacher.id} />
                 <input type="hidden" name="returnTo" value="/assinaturas" />
-                <button type="submit" className="btn-secondary-v2 btn-sm-v2"><Unlock size={13} /> Gratis</button>
+                <button type="submit" className="btn-secondary-v2 btn-sm-v2"><Unlock size={13} /> Grátis</button>
               </form>
               {access === 'overdue' && (
                 <form action={sendPaymentOverdueNotice}>

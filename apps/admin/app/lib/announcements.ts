@@ -49,11 +49,11 @@ export async function sendAppAnnouncement(input: {
 }) {
   const title = input.title.trim()
   const body = input.body.trim().slice(0, 240)
-  if (!title) throw new Error('Informe um titulo.')
+  if (!title) throw new Error('Informe um título.')
   if (!body) throw new Error('Informe a mensagem.')
 
   const recipientIds = await resolveAnnouncementAudience(input.audience)
-  if (!recipientIds.length) throw new Error('Nenhuma professora corresponde ao publico selecionado.')
+  if (!recipientIds.length) throw new Error('Nenhuma professora corresponde ao público selecionado.')
 
   const supabase = createSupabaseServiceClient()
   const { data: announcement, error } = await supabase
@@ -95,7 +95,7 @@ export async function listSentAnnouncements(limit = 50) {
   const supabase = createSupabaseServiceClient()
   const { data, error } = await supabase
     .from('app_announcements')
-    .select('id, type, title, audience, created_at')
+    .select('id, type, title, audience, created_at, expires_at')
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -117,10 +117,39 @@ export async function listSentAnnouncements(limit = 50) {
     countByAnnouncement.set(row.announcement_id, (countByAnnouncement.get(row.announcement_id) ?? 0) + 1)
   }
 
+  const now = Date.now()
   return announcements.map((item) => ({
     ...item,
     recipientCount: countByAnnouncement.get(item.id) ?? 0,
+    active: !item.expires_at || new Date(item.expires_at).getTime() > now,
   }))
+}
+
+export function isAnnouncementActive(expiresAt: string | null | undefined) {
+  if (!expiresAt) return true
+  return new Date(expiresAt).getTime() > Date.now()
+}
+
+export async function deactivateAppAnnouncement(announcementId: string) {
+  const supabase = createSupabaseServiceClient()
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from('app_announcements')
+    .update({ expires_at: now })
+    .eq('id', announcementId)
+  if (error) throw new Error(error.message)
+
+  await supabase
+    .from('app_announcement_deliveries')
+    .update({ dismissed_at: now })
+    .eq('announcement_id', announcementId)
+    .is('dismissed_at', null)
+}
+
+export async function deleteAppAnnouncement(announcementId: string) {
+  const supabase = createSupabaseServiceClient()
+  const { error } = await supabase.from('app_announcements').delete().eq('id', announcementId)
+  if (error) throw new Error(error.message)
 }
 
 export async function loadActiveAnnouncementsForUser(userId: string) {

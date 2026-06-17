@@ -9,6 +9,7 @@ import {
   formatPlanLabel,
   teacherInitials,
 } from './lib/admin-utils'
+import { countActionableVerifications } from './lib/admin-badges'
 import { createSupabaseServiceClient } from './lib/supabase-server'
 import { getCurrentMonthPeriod } from './lib/giztokens-admin'
 
@@ -45,7 +46,7 @@ export default async function AdminHome() {
       .order('created_at', { ascending: false })
       .limit(500),
     supabase.from('subscriptions').select('status, plan, current_period_end'),
-    supabase.from('teacher_profile_verifications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('teacher_profile_verifications').select('owner_id, status, created_at').order('created_at', { ascending: false }),
     supabase.from('material_reports').select('id', { count: 'exact', head: true }).eq('status', 'open'),
     supabase
       .from('ai_generation_logs')
@@ -65,7 +66,12 @@ export default async function AdminHome() {
 
   if (teachersResult.error) throw new Error(teachersResult.error.message)
   if (subscriptionsResult.error) throw new Error(subscriptionsResult.error.message)
+  if (verificationsResult.error) throw new Error(verificationsResult.error.message)
   if (aiResult.error) throw new Error(aiResult.error.message)
+
+  const pendingVerifications = countActionableVerifications(
+    (verificationsResult.data ?? []) as Array<{ owner_id: string; status: string; created_at: string }>,
+  )
 
   const teachers = (teachersResult.data ?? []) as TeacherRow[]
   const subscriptions = subscriptionsResult.data ?? []
@@ -110,7 +116,7 @@ export default async function AdminHome() {
     { label: 'Mensal', count: planCounts.mensal, pct: Math.round((planCounts.mensal / totalPlans) * 100), color: '#1c6b46' },
     { label: 'Semestral', count: planCounts.semestral, pct: Math.round((planCounts.semestral / totalPlans) * 100), color: '#2f8f5f' },
     { label: 'Anual', count: planCounts.anual, pct: Math.round((planCounts.anual / totalPlans) * 100), color: '#5fae84' },
-    { label: 'Trial / Gratis', count: planCounts.trialFree, pct: Math.round((planCounts.trialFree / totalPlans) * 100), color: '#c2d8cb' },
+    { label: 'Trial / Grátis', count: planCounts.trialFree, pct: Math.round((planCounts.trialFree / totalPlans) * 100), color: '#c2d8cb' },
   ]
 
   const recentTeachers = teachers.slice(0, 5)
@@ -137,27 +143,27 @@ export default async function AdminHome() {
         <article className="metric-card-v2">
           <div className="metric-card-v2-head"><span>Custo de IA (30d)</span><Bolt size={18} /></div>
           <strong>{formatCurrencyFromCents(aiCost)}</strong>
-          <span>{aiLogs.length} geracoes</span>
+          <span>{aiLogs.length} gerações</span>
         </article>
         <article className="metric-card-v2">
           <div className="metric-card-v2-head"><span>GizTokens liberados</span><Bolt size={18} /></div>
           <strong>{formatCompactNumber(gizBonus)}</strong>
-          <span>bonus do mes atual</span>
+          <span>bônus do mês atual</span>
         </article>
       </section>
 
-      <p className="section-label-v2">Filas que precisam de voce</p>
+      <p className="section-label-v2">Filas que precisam de você</p>
       <section className="queue-grid-v2">
         <Link href="/verificacoes" className="queue-card-v2 queue-card-v2-warn">
           <div className="queue-card-v2-label" style={{ color: '#8a6516' }}>
-            <ShieldCheck size={17} /> Verificacoes pendentes
+            <ShieldCheck size={17} /> Verificações pendentes
           </div>
-          <strong>{verificationsResult.count ?? 0}</strong>
-          <p>Comprovantes escolares aguardando aprovacao →</p>
+          <strong>{pendingVerifications}</strong>
+          <p>Comprovantes escolares aguardando aprovação →</p>
         </Link>
         <Link href="/materiais" className="queue-card-v2 queue-card-v2-danger">
           <div className="queue-card-v2-label" style={{ color: '#b4382f' }}>
-            <AlertTriangle size={17} /> Denuncias abertas
+            <AlertTriangle size={17} /> Denúncias abertas
           </div>
           <strong>{reportsResult.count ?? 0}</strong>
           <p>Materiais reportados para moderar →</p>

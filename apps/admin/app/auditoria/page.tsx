@@ -25,9 +25,9 @@ const actionLabels: Record<string, string> = {
   feature_access_granted: 'Acesso a feature liberado',
   feature_access_revoked: 'Acesso a feature removido',
   material_status_updated: 'Material moderado',
-  verification_approved: 'Verificacao aprovada',
-  verification_rejected: 'Verificacao rejeitada',
-  teacher_verification_updated: 'Verificacao atualizada',
+  verification_approved: 'Verificação aprovada',
+  verification_rejected: 'Verificação rejeitada',
+  teacher_verification_updated: 'Verificação atualizada',
   app_announcement_sent: 'Aviso enviado ao app',
 }
 

@@ -25,18 +25,18 @@ export function formatRelativeDate(value: string) {
   const diffMs = Date.now() - date.getTime()
   const minutes = Math.floor(diffMs / 60000)
   if (minutes < 1) return 'agora'
-  if (minutes < 60) return `ha ${minutes} min`
+  if (minutes < 60) return `há ${minutes} min`
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `ha ${hours}h`
+  if (hours < 24) return `há ${hours}h`
   const days = Math.floor(hours / 24)
-  if (days < 7) return `ha ${days} dia${days === 1 ? '' : 's'}`
+  if (days < 7) return `há ${days} dia${days === 1 ? '' : 's'}`
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(date)
 }
 
 export function formatPlanLabel(plan?: string | null) {
   if (!plan) return 'Sem plano'
   const labels: Record<string, string> = {
-    free: 'Gratis',
+    free: 'Grátis',
     trial_7_days: 'Trial 7 dias',
     trial_15_days: 'Trial 15 dias',
     monthly: 'Mensal',
@@ -45,7 +45,7 @@ export function formatPlanLabel(plan?: string | null) {
     semestral: 'Semestral',
     annual: 'Anual',
     anual: 'Anual',
-    verification_required: 'Em analise',
+    verification_required: 'Em análise',
   }
   return labels[plan] ?? plan
 }
@@ -87,4 +87,20 @@ export function safeReturnPath(value: FormDataEntryValue | null, fallback: strin
   const raw = String(value ?? '').trim()
   if (!raw.startsWith('/') || raw.startsWith('//')) return fallback
   return raw
+}
+
+export function filterActionableVerificationQueue<T extends { ownerId: string; status: string; createdAt: string; id: string }>(
+  items: T[],
+) {
+  const latestByOwner = new Map<string, T>()
+  for (const item of items) {
+    const existing = latestByOwner.get(item.ownerId)
+    if (!existing || new Date(item.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
+      latestByOwner.set(item.ownerId, item)
+    }
+  }
+  return items.filter((item) => {
+    const latest = latestByOwner.get(item.ownerId)
+    return latest?.id === item.id && item.status === 'pending'
+  })
 }

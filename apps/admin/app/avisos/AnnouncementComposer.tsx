@@ -8,7 +8,7 @@ import {
   type AnnouncementAudience,
   type AnnouncementType,
 } from '../lib/announcement-types'
-import { sendAnnouncementAction } from './actions'
+import { sendAnnouncementAction, deactivateAnnouncementAction, deleteAnnouncementAction } from './actions'
 
 const TYPE_ICONS: Record<AnnouncementType, typeof PartyPopper> = {
   novidade: PartyPopper,
@@ -32,8 +32,8 @@ export function AnnouncementComposer({
   const typeMeta = ANNOUNCEMENT_TYPES[type]
   const reach = audienceCounts[audience] ?? 0
 
-  const previewTitle = title.trim() || 'Titulo do aviso'
-  const previewBody = body.trim() || 'A mensagem que voce escrever aparece aqui, exatamente como a professora vera no app.'
+  const previewTitle = title.trim() || 'Título do aviso'
+  const previewBody = body.trim() || 'A mensagem que você escrever aparece aqui, exatamente como a professora verá no app.'
 
   return (
     <div className="announcement-layout-v2">
@@ -64,8 +64,8 @@ export function AnnouncementComposer({
         <input type="hidden" name="type" value={type} />
 
         <label className="form-field-v2" style={{ width: '100%' }}>
-          <span>Titulo</span>
-          <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ex.: Manutencao programada neste sabado" required />
+          <span>Título</span>
+          <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ex.: Manutenção programada neste sábado" required />
         </label>
 
         <label className="form-field-v2" style={{ width: '100%', marginTop: 16 }}>
@@ -83,7 +83,7 @@ export function AnnouncementComposer({
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
           <label className="form-field-v2">
-            <span>Publico</span>
+            <span>Público</span>
             <select name="audience" value={audience} onChange={(e) => setAudience(e.target.value as AnnouncementAudience)}>
               {(Object.keys(AUDIENCE_LABELS) as AnnouncementAudience[]).map((key) => (
                 <option key={key} value={key}>{AUDIENCE_LABELS[key]}</option>
@@ -91,7 +91,7 @@ export function AnnouncementComposer({
             </select>
           </label>
           <label className="form-field-v2">
-            <span>Botao de acao (opcional)</span>
+            <span>Botão de ação (opcional)</span>
             <input name="ctaLabel" value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="ex.: Ver detalhes" />
           </label>
         </div>
@@ -100,7 +100,7 @@ export function AnnouncementComposer({
           <input type="checkbox" name="pinned" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
           <span>
             <strong style={{ display: 'block', fontSize: 14 }}>Fixar no topo do app</strong>
-            <small style={{ color: '#8a948c' }}>Mantem o aviso visivel ate a professora dispensar.</small>
+            <small style={{ color: '#8a948c' }}>Mantém o aviso visível até a professora dispensar.</small>
           </span>
         </label>
 
@@ -112,7 +112,7 @@ export function AnnouncementComposer({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div className="preview-phone-v2">
-          <p className="page-eyebrow" style={{ color: '#8fae9d', marginBottom: 14 }}>Pre-visualizacao no app</p>
+          <p className="page-eyebrow" style={{ color: '#8fae9d', marginBottom: 14 }}>Pré-visualização no app</p>
           <div className="preview-phone-inner">
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
               <span className="teacher-avatar" style={{ width: 26, height: 26, borderRadius: 7, background: '#0c2a1e', color: '#fff' }}>A</span>
@@ -148,6 +148,7 @@ export function AnnouncementHistory({
     audience: AnnouncementAudience
     recipientCount: number
     created_at: string
+    active: boolean
   }>
 }) {
   const rows = useMemo(() => items, [items])
@@ -162,7 +163,7 @@ export function AnnouncementHistory({
           const meta = ANNOUNCEMENT_TYPES[item.type]
           const Icon = TYPE_ICONS[item.type]
           return (
-            <div key={item.id} style={{ display: 'flex', gap: 12, padding: '14px 20px', borderBottom: '1px solid #f4f3ee' }}>
+            <div key={item.id} style={{ display: 'flex', gap: 12, padding: '14px 20px', borderBottom: '1px solid #f4f3ee', alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="teacher-avatar" style={{ background: `${meta.accent}20`, color: meta.accent }}>
                 <Icon size={15} />
               </span>
@@ -172,6 +173,21 @@ export function AnnouncementHistory({
                   {AUDIENCE_LABELS[item.audience]} · {item.recipientCount} profs · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(item.created_at))}
                 </small>
               </div>
+              <span className={`status-chip status-chip-${item.active ? 'approved' : 'blocked'}`}>
+                {item.active ? 'Ativo' : 'Desativado'}
+              </span>
+              {item.active ? (
+                <form action={deactivateAnnouncementAction}>
+                  <input type="hidden" name="announcementId" value={item.id} />
+                  <input type="hidden" name="title" value={item.title} />
+                  <button type="submit" className="btn-secondary-v2 btn-sm-v2">Desativar</button>
+                </form>
+              ) : null}
+              <form action={deleteAnnouncementAction}>
+                <input type="hidden" name="announcementId" value={item.id} />
+                <input type="hidden" name="title" value={item.title} />
+                <button type="submit" className="btn-danger-v2 btn-sm-v2">Excluir</button>
+              </form>
             </div>
           )
         })
