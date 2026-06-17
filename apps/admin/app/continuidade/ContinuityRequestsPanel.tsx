@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState } from 'react'
+import { ArrowRight, Check } from 'lucide-react'
 import type { ContinuityRequestRow } from '../lib/continuity'
 
 export function ContinuityRequestsPanel({ initialRequests }: { initialRequests: ContinuityRequestRow[] }) {
@@ -8,6 +9,7 @@ export function ContinuityRequestsPanel({ initialRequests }: { initialRequests: 
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [targetClassById, setTargetClassById] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
 
   async function reviewRequest(requestId: string, status: 'approved' | 'rejected') {
     setUpdatingId(requestId)
@@ -23,10 +25,12 @@ export function ContinuityRequestsPanel({ initialRequests }: { initialRequests: 
         }),
       })
       const payload = await response.json().catch(() => null) as { error?: string; requests?: ContinuityRequestRow[] } | null
-      if (!response.ok) throw new Error(payload?.error || 'Falha ao revisar solicitação.')
+      if (!response.ok) throw new Error(payload?.error || 'Falha ao revisar solicitacao.')
       setRequests(payload?.requests ?? [])
+      setToast(status === 'approved' ? 'Transferencia aprovada' : 'Transferencia recusada')
+      window.setTimeout(() => setToast(null), 2600)
     } catch (reviewError) {
-      setError(reviewError instanceof Error ? reviewError.message : 'Falha ao revisar solicitação.')
+      setError(reviewError instanceof Error ? reviewError.message : 'Falha ao revisar solicitacao.')
     } finally {
       setUpdatingId(null)
     }
@@ -34,101 +38,69 @@ export function ContinuityRequestsPanel({ initialRequests }: { initialRequests: 
 
   const pending = requests.filter((item) => item.status === 'pending')
 
+  if (pending.length === 0) {
+    return (
+      <article className="empty-state-v2">
+        <Check size={30} color="#1c6b46" />
+        <h3>Nenhuma solicitacao pendente</h3>
+        <p>Transferencias aprovadas aparecem no historico da auditoria.</p>
+      </article>
+    )
+  }
+
   return (
-    <article className="panel panel-wide spaced-panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Solicitações</p>
-          <h2>Vínculos e transferências</h2>
-        </div>
-        <span className="status-pill">{pending.length} pendentes</span>
-      </div>
-
-      {error && <p className="text-muted-panel" style={{ color: '#a33a20' }}>{error}</p>}
-
-      {requests.length === 0 ? (
-        <p className="text-muted-panel">Nenhuma solicitação registrada ainda.</p>
-      ) : (
-        <div className="table-list">
-          {requests.map((request) => (
-            <div className="table-row" key={request.id}>
-              <div>
-                <strong>{request.studentName ?? 'Criança'}</strong>
-                <p className="text-muted-panel">
-                  {labelRequestType(request.requestType)} · {request.requesterName ?? 'Professora solicitante'} · {formatDate(request.createdAt)}
-                </p>
-                {request.reason && <p className="text-muted-panel">{request.reason}</p>}
-                {request.targetTeacherCode && <p className="text-muted-panel">Código destino: {request.targetTeacherCode}</p>}
-              </div>
-              <div className="continuity-actions">
-                <span className={`status-pill status-${request.status}`}>{labelStatus(request.status)}</span>
-                {request.status === 'pending' && (
-                  <>
-                    <input
-                      className="input-compact"
-                      placeholder="ID da turma destino (aprovação)"
-                      value={targetClassById[request.id] ?? ''}
-                      onChange={(event) =>
-                        setTargetClassById((current) => ({ ...current, [request.id]: event.target.value }))
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="button-primary"
-                      disabled={updatingId === request.id}
-                      onClick={() => void reviewRequest(request.id, 'approved')}
-                    >
-                      Aprovar
-                    </button>
-                    <button
-                      type="button"
-                      className="button-secondary"
-                      disabled={updatingId === request.id}
-                      onClick={() => void reviewRequest(request.id, 'rejected')}
-                    >
-                      Rejeitar
-                    </button>
-                  </>
-                )}
-              </div>
+    <>
+      {error ? <p style={{ color: '#b4382f', marginBottom: 16 }}>{error}</p> : null}
+      {pending.map((request) => (
+        <article key={request.id} className="card-row-v2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#8a948c', textTransform: 'uppercase' }}>Aluno</div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>{request.studentName ?? 'Crianca'}</div>
             </div>
-          ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, color: '#5f6b63' }}>
+              <span>{request.requesterName ?? 'Origem'}</span>
+              <ArrowRight size={16} color="#1c6b46" />
+              <span style={{ fontWeight: 600, color: '#16201b' }}>{request.targetTeacherCode ? `Codigo ${request.targetTeacherCode}` : 'Destino'}</span>
+            </div>
+          </div>
+          {request.reason ? <p style={{ fontSize: 13, color: '#5f6b63', margin: '0 0 16px' }}>{request.reason}</p> : null}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', borderTop: '1px solid #f1f0ea', paddingTop: 16, flexWrap: 'wrap' }}>
+            <div className="form-field-v2" style={{ flex: 1, maxWidth: 280 }}>
+              <label htmlFor={`class-${request.id}`}>ID da turma de destino</label>
+              <input
+                id={`class-${request.id}`}
+                value={targetClassById[request.id] ?? ''}
+                onChange={(event) => setTargetClassById((current) => ({ ...current, [request.id]: event.target.value }))}
+                placeholder="ex.: turma_2026_3a"
+              />
+            </div>
+            <button
+              type="button"
+              className="btn-danger-v2"
+              style={{ background: '#fff', border: '1px solid #f0c9c5' }}
+              disabled={updatingId === request.id}
+              onClick={() => void reviewRequest(request.id, 'rejected')}
+            >
+              Recusar
+            </button>
+            <button
+              type="button"
+              className="btn-primary-v2"
+              disabled={updatingId === request.id}
+              onClick={() => void reviewRequest(request.id, 'approved')}
+            >
+              Aprovar transferencia
+            </button>
+          </div>
+        </article>
+      ))}
+      {toast ? (
+        <div className="admin-toast" role="status">
+          <Check size={18} />
+          <span>{toast}</span>
         </div>
-      )}
-    </article>
+      ) : null}
+    </>
   )
-}
-
-function labelRequestType(value: ContinuityRequestRow['requestType']) {
-  switch (value) {
-    case 'link':
-      return 'Vínculo'
-    case 'transfer_teacher':
-      return 'Transferência entre professoras'
-    case 'transfer_class':
-      return 'Mudança de turma'
-    default:
-      return value
-  }
-}
-
-function labelStatus(value: ContinuityRequestRow['status']) {
-  switch (value) {
-    case 'pending':
-      return 'Pendente'
-    case 'approved':
-      return 'Aprovada'
-    case 'rejected':
-      return 'Rejeitada'
-    case 'canceled':
-      return 'Cancelada'
-    default:
-      return value
-  }
-}
-
-function formatDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('pt-BR')
 }

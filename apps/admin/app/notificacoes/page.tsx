@@ -1,6 +1,6 @@
-import { Bell } from 'lucide-react'
+import { Bell, Mail, Send } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
-import { StatusBadge } from '../components/StatusBadge'
+import { formatRelativeDate } from '../lib/admin-utils'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
@@ -20,6 +20,12 @@ const channelLabels: Record<string, string> = {
   system: 'Sistema',
 }
 
+const statusLabels: Record<string, string> = {
+  queued: 'Na fila',
+  sent: 'Enviada',
+  failed: 'Falha',
+}
+
 export default async function NotificationsPage() {
   const supabase = createSupabaseServiceClient()
   const { data, error } = await supabase
@@ -31,72 +37,36 @@ export default async function NotificationsPage() {
   if (error) throw new Error(error.message)
   const events = (data ?? []) as unknown as NotificationEvent[]
 
-  const byStatus = {
-    queued: events.filter((e) => e.status === 'queued').length,
-    sent: events.filter((e) => e.status === 'sent').length,
-    failed: events.filter((e) => e.status === 'failed').length,
-  }
-
   return (
-    <>
+    <div className="admin-page-wrap admin-page-wrap-narrow">
       <PageHeader
-        eyebrow="Notificações"
-        title="Email, Telegram e sistema"
-        description="Fila única para mensagens transacionais e alertas operacionais."
-        action={
-          <span className="status-pill">
-            <Bell size={16} />
-            {events.length} eventos
-          </span>
-        }
+        eyebrow="Sistema"
+        title="Notificacoes"
+        badge={<span className="readonly-badge">somente leitura</span>}
+        description="Fila de e-mail, Telegram e sistema. Util para confirmar se um aviso chegou."
       />
 
-      <section className="metrics-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', marginBottom: 18 }}>
-        <article className="metric-card">
-          <Bell size={20} />
-          <p>Na fila</p>
-          <strong>{byStatus.queued}</strong>
-          <span>aguardando envio</span>
-        </article>
-        <article className="metric-card">
-          <Bell size={20} />
-          <p>Enviadas</p>
-          <strong>{byStatus.sent}</strong>
-          <span>concluídas</span>
-        </article>
-        <article className="metric-card">
-          <Bell size={20} />
-          <p>Com falha</p>
-          <strong>{byStatus.failed}</strong>
-          <span>precisam atenção</span>
-        </article>
-      </section>
-
-      <article className="panel">
+      <article className="notif-list-v2">
         {events.length === 0 ? (
-          <p className="text-muted-panel">Nenhuma notificação registrada ainda. Os eventos aparecem aqui quando o sistema enviar emails, Telegram ou alertas internos.</p>
+          <div className="empty-state-v2"><p>Nenhuma notificacao registrada.</p></div>
         ) : (
-          <div className="table">
-            <div className="table-row table-head notifications-grid">
-              <span>Tipo</span>
-              <span>Canal</span>
-              <span>Status</span>
-              <span>Destino</span>
-            </div>
-            {events.map((event) => (
-              <div className="table-row notifications-grid" key={event.id}>
-                <strong>{event.type}</strong>
-                <span>{channelLabels[event.channel] ?? event.channel}</span>
-                <StatusBadge status={event.status} />
-                <span>
-                  {event.recipient?.full_name ?? '—'}
-                  {event.recipient?.email && <small>{event.recipient.email}</small>}
+          events.map((event) => {
+            const Icon = event.channel === 'email' ? Mail : event.channel === 'telegram' ? Send : Bell
+            return (
+              <div key={event.id} className="notif-item-v2">
+                <span className="teacher-avatar"><Icon size={16} /></span>
+                <div style={{ flex: 1 }}>
+                  <strong>{event.type.replaceAll('_', ' ')}</strong>
+                  <small>{channelLabels[event.channel] ?? event.channel} · {formatRelativeDate(event.created_at)}</small>
+                </div>
+                <span className={`status-chip status-chip-${event.status === 'sent' ? 'sent' : event.status === 'failed' ? 'blocked' : 'queued'}`}>
+                  {statusLabels[event.status] ?? event.status}
                 </span>
               </div>
-            ))}
-          </div>
+            )
+          })
         )}
       </article>
-    </>
+    </div>
   )
 }

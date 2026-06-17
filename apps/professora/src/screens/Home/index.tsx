@@ -23,7 +23,7 @@ import { toTitleCaseName } from '@/utils/text'
 import type { BoardNote } from '@/types'
 import AnnotationCard from '@/components/ui/AnnotationCard'
 import { getAiUsageSummary, type AiUsageSummary } from '@/services/ai-usage'
-import { getCachedTeacherAccountSnapshot, getTeacherAccountSnapshot, preloadTeacherAccountSnapshot } from '@/services/supabase/account'
+import { getCachedTeacherAccountSnapshot, getTeacherAccountSnapshot, preloadTeacherAccountSnapshot, dismissAppAnnouncement } from '@/services/supabase/account'
 import { syncBoardNotes } from '@/services/supabase/board-notes'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { listReports } from '@/services/reports'
@@ -45,6 +45,15 @@ export default function HomeScreen() {
   const [modalOpen, setModalOpen] = useState(false)
   const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null)
   const [paymentNotice, setPaymentNotice] = useState<{ title: string; message: string } | null>(null)
+  const [appNotices, setAppNotices] = useState<Array<{
+    deliveryId: string
+    title: string
+    message: string
+    pinned: boolean
+    accent: string
+    ctaLabel?: string | null
+    ctaUrl?: string | null
+  }>>([])
   const [studentsWithDevelopmentReport, setStudentsWithDevelopmentReport] = useState<Set<string>>(() => new Set())
   const [reportSuggestionsLoaded, setReportSuggestionsLoaded] = useState(false)
   const touchStartX = useRef(0)
@@ -96,9 +105,29 @@ export default function HomeScreen() {
         if (!active) return
         const notice = snapshot.notices.find((item) => item.type === 'payment_overdue_notice')
         setPaymentNotice(notice ? { title: notice.title, message: notice.message } : null)
+        const accentByType: Record<string, string> = {
+          novidade: '#1c6b46',
+          info: '#2f5f9e',
+          alerta: '#8a6516',
+          manutencao: '#b4382f',
+        }
+        setAppNotices(
+          snapshot.notices
+            .filter((item) => item.type.startsWith('app_announcement_'))
+            .map((item) => ({
+              deliveryId: item.deliveryId,
+              title: item.title,
+              message: item.message,
+              pinned: item.pinned,
+              accent: accentByType[item.announcementType ?? 'novidade'] ?? '#1c6b46',
+              ctaLabel: item.ctaLabel,
+              ctaUrl: item.ctaUrl,
+            })),
+        )
       })
       .catch(() => {
         if (active) setPaymentNotice(null)
+        if (active) setAppNotices([])
         void preloadTeacherAccountSnapshot()
       })
     return () => {
@@ -321,6 +350,43 @@ export default function HomeScreen() {
       {/* Scrollable content */}
       <div className="scroll-area">
         <div className="px-[18px]">
+          {appNotices.map((notice) => (
+            <div
+              key={notice.deliveryId}
+              className="w-full rounded-app p-4 mt-[14px] mb-[11px] border bg-white text-left shadow-card"
+              style={{ borderColor: `${notice.accent}55`, borderLeftWidth: 4, borderLeftColor: notice.accent }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <p className="text-[12px] font-bold" style={{ color: notice.accent }}>{notice.title}</p>
+                  <p className="mt-1 text-[12px] leading-snug text-[#5f6b63]">{notice.message}</p>
+                  {notice.ctaLabel && notice.ctaUrl ? (
+                    <a
+                      href={notice.ctaUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block mt-2 text-[12px] font-bold"
+                      style={{ color: notice.accent }}
+                    >
+                      {notice.ctaLabel}
+                    </a>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void dismissAppAnnouncement(notice.deliveryId)
+                      .then(() => setAppNotices((current) => current.filter((item) => item.deliveryId !== notice.deliveryId)))
+                      .catch(() => undefined)
+                  }}
+                  className="text-[11px] font-bold text-[#8a948c]"
+                >
+                  Dispensar
+                </button>
+              </div>
+            </div>
+          ))}
+
           {paymentNotice && (
             <button
               type="button"

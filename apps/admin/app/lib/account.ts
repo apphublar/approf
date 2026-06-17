@@ -1,5 +1,6 @@
 import { createSupabaseServiceClient } from '@/app/lib/supabase-server'
 import { getTeacherReferralSummary } from '@/app/lib/referrals'
+import { loadActiveAnnouncementsForUser } from '@/app/lib/announcements'
 
 type SubscriptionStatus = 'trial' | 'active' | 'overdue' | 'blocked' | 'canceled'
 
@@ -15,7 +16,7 @@ type VerificationStatus = 'pending' | 'approved' | 'rejected'
 export async function getTeacherAccountData(ownerId: string) {
   const supabase = createSupabaseServiceClient()
 
-  const [profileResult, schoolsResult, subscriptionResult, verificationsResult, noticesResult] = await Promise.all([
+  const [profileResult, schoolsResult, subscriptionResult, verificationsResult, noticesResult, announcementsResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('id,full_name,email,phone,avatar_url,notification_preferences,school_logo_url,teacher_code')
@@ -46,6 +47,7 @@ export async function getTeacherAccountData(ownerId: string) {
       .in('type', ['payment_overdue_notice'])
       .order('created_at', { ascending: false })
       .limit(3),
+    loadActiveAnnouncementsSafe(ownerId),
   ])
 
   if (profileResult.error) throw profileResult.error
@@ -56,6 +58,32 @@ export async function getTeacherAccountData(ownerId: string) {
 
   const referrals = await getTeacherReferralSummary(ownerId).catch(() => null)
 
+  const legacyNotices = (noticesResult.data ?? []).map((item) => ({
+    id: item.id,
+    type: item.type,
+    deliveryId: item.id,
+    pinned: item.type === 'payment_overdue_notice',
+    payload: item.payload,
+    created_at: item.created_at,
+  }))
+
+  const announcementNotices = (announcementsResult.data ?? [])
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .map((item) => ({
+    id: item.id,
+    type: `app_announcement_${item.type}`,
+    deliveryId: item.deliveryId,
+    pinned: item.pinned,
+    payload: {
+      title: item.title,
+      message: item.message,
+      announcementType: item.type,
+      ctaLabel: item.ctaLabel,
+      ctaUrl: item.ctaUrl,
+    },
+    created_at: item.createdAt,
+  }))
+
   return {
     profile: profileResult.data,
     schools: schoolsResult.data ?? [],
@@ -64,7 +92,7 @@ export async function getTeacherAccountData(ownerId: string) {
       ...item,
       documents: Array.isArray(item.documents) ? item.documents : [],
     })),
-    notices: noticesResult.data ?? [],
+    notices: [...announcementNotices, ...legacyNotices],
     referrals,
   }
 }
@@ -319,4 +347,13 @@ async function createVerificationSignedUrl(path: string) {
   const { data, error } = await supabase.storage.from('profile-verification').createSignedUrl(path, 60 * 60)
   if (error) return null
   return data.signedUrl
+}
+
+async function loadActiveAnnouncementsSafe(ownerId: string) {
+  try {
+    const data = await loadActiveAnnouncementsForUser(ownerId)
+    return { data, error: null }
+  } catch (error) {
+    return { data: [], error }
+  }
 }

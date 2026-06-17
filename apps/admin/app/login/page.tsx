@@ -43,51 +43,53 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="login-shell">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <div className="login-brand">
+    <main className="login-shell-v2">
+      <form className="login-card-v2" onSubmit={handleSubmit}>
+        <div className="login-brand-v2">
           <span className="brand-mark">A</span>
           <div>
             <strong>Approf Admin</strong>
-            <small>Acesso restrito</small>
+            <small>Painel operacional</small>
           </div>
         </div>
 
-        <p className="login-copy">
-          Entre com uma conta de administrador autorizada para operar o painel interno.
+        <p className="login-copy-v2">
+          Entre com uma conta autorizada para operar professoras, assinaturas e conteúdo.
         </p>
 
-        <label className="login-label" htmlFor="admin-email">E-mail</label>
-        <input
-          id="admin-email"
-          className="login-input"
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
+        <div className="form-field-v2">
+          <label htmlFor="admin-email">E-mail</label>
+          <input
+            id="admin-email"
+            type="email"
+            autoComplete="username"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+        </div>
 
-        <label className="login-label" htmlFor="admin-password">Senha</label>
-        <input
-          id="admin-password"
-          className="login-input"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          required
-        />
+        <div className="form-field-v2">
+          <label htmlFor="admin-password">Senha</label>
+          <input
+            id="admin-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+        </div>
 
-        {error && <p className="login-error">{error}</p>}
+        {error ? <p className="login-error-v2">{error}</p> : null}
 
-        <button className="login-button" type="submit" disabled={loading}>
-          {loading ? 'Entrando...' : 'Entrar'}
+        <button className="btn-primary-v2" type="submit" disabled={loading} style={{ width: '100%', marginTop: 8 }}>
+          {loading ? 'Entrando...' : 'Entrar no painel'}
         </button>
 
-        <div className="login-note">
+        <div className="login-note-v2">
           <ShieldCheck size={16} />
-          <span>Somente perfis admin ou super_admin podem acessar este painel.</span>
+          <span>Somente perfis admin ou super_admin podem acessar.</span>
         </div>
       </form>
     </main>

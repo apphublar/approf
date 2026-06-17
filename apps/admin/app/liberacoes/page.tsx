@@ -1,6 +1,6 @@
-import { KeyRound } from 'lucide-react'
+import Link from 'next/link'
 import { PageHeader } from '../components/PageHeader'
-import { StatusBadge } from '../components/StatusBadge'
+import { teacherInitials } from '../lib/admin-utils'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
 import { grantAccess, revokeAccess, setReleaseMode } from './actions'
 
@@ -33,132 +33,112 @@ export default async function FeatureReleasesPage() {
   const flags = (flagsResult.data ?? []) as FeatureFlag[]
   const teachers = (teachersResult.data ?? []) as Teacher[]
 
-  // Fetch all grants for all flags at once
-  const { data: allGrants } = await supabase
-    .from('feature_user_access')
-    .select('feature_key, user_id')
-
+  const { data: allGrants } = await supabase.from('feature_user_access').select('feature_key, user_id')
   const grantSet = new Set((allGrants ?? []).map((g) => `${g.feature_key}::${g.user_id}`))
 
-  const modeLabel: Record<string, string> = {
-    off: 'Desativada',
-    selected: 'Selecionadas',
-    all: 'Todas as contas',
-  }
-
   return (
-    <>
+    <div className="admin-page-wrap admin-page-wrap-narrow">
       <PageHeader
-        eyebrow="Liberacoes"
-        title="Controle de funcionalidades"
-        description="Libere recursos para todas as professoras ou apenas para contas selecionadas. Cada alteração gera log de auditoria."
-        action={
-          <span className="status-pill">
-            <KeyRound size={16} />
-            {flags.length} feature{flags.length !== 1 ? 's' : ''}
-          </span>
-        }
+        eyebrow="Conteudo"
+        title="Liberacoes de features"
+        description="Ative funcionalidades para professoras selecionadas ou para toda a base (beta)."
       />
 
       {flags.length === 0 ? (
-        <article className="panel">
-          <p className="text-muted-panel">
-            Nenhuma feature flag cadastrada ainda. Insira registros na tabela <strong>feature_flags</strong> no Supabase para controlar funcionalidades aqui.
-          </p>
+        <article className="empty-state-v2">
+          <h3>Nenhuma feature cadastrada</h3>
+          <p>Insira registros na tabela feature_flags no Supabase.</p>
         </article>
       ) : (
         flags.map((flag) => {
           const grantedTeachers = teachers.filter((t) => grantSet.has(`${flag.key}::${t.id}`))
+          const alcance = flag.release_mode === 'all' ? 'Toda a base' : `${grantedTeachers.length} selecionada(s)`
 
           return (
-            <section key={flag.key} className="content-grid" style={{ marginBottom: 18 }}>
-              <article className="panel panel-wide">
-                <div className="panel-header">
-                  <div>
-                    <p className="eyebrow">Feature</p>
-                    <h2>{flag.name}</h2>
-                  </div>
-                  <StatusBadge status={flag.release_mode === 'all' ? 'active' : flag.release_mode === 'selected' ? 'trial' : 'blocked'} />
+            <article key={flag.key} className="card-row-v2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <strong style={{ fontSize: 15 }}>{flag.name}</strong>
+                  <div style={{ fontSize: 13, color: '#8a948c', marginTop: 4 }}>{flag.description || 'Sem descricao'}</div>
                 </div>
-
-                {flag.description && <p className="text-muted-panel">{flag.description}</p>}
-
-                <div className="release-options">
+                <span style={{ fontSize: 13, color: '#5f6b63' }}>{alcance}</span>
+                <div className="toggle-group-v2">
                   {(['selected', 'all'] as const).map((mode) => (
                     <form key={mode} action={setReleaseMode}>
                       <input type="hidden" name="featureKey" value={flag.key} />
+                      <input type="hidden" name="featureName" value={flag.name} />
                       <input type="hidden" name="mode" value={mode} />
                       <button
                         type="submit"
-                        className={`release-card ${flag.release_mode === mode ? 'release-card-active' : ''}`}
+                        className={flag.release_mode === mode ? 'is-active' : ''}
+                        style={{
+                          border: 'none',
+                          borderRadius: 7,
+                          padding: '7px 12px',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          background: flag.release_mode === mode ? '#fff' : 'transparent',
+                          color: flag.release_mode === mode ? '#1c6b46' : '#5f6b63',
+                          boxShadow: flag.release_mode === mode ? '0 1px 3px rgba(0,0,0,.1)' : 'none',
+                        }}
                       >
-                        <strong>{mode === 'selected' ? 'Selecionadas' : 'Todas as contas'}</strong>
-                        <span>
-                          {mode === 'selected'
-                            ? `Apenas as ${grantedTeachers.length} professora(s) escolhidas acessam ${flag.name}.`
-                            : `Libera ${flag.name} para toda a base de professoras.`}
-                        </span>
+                        {mode === 'selected' ? 'Selecionadas' : 'Todas'}
                       </button>
                     </form>
                   ))}
                 </div>
+              </div>
 
-                <div className="table">
-                  <div className="table-row table-head teachers-grid">
-                    <span>Professora</span>
-                    <span>Status de acesso</span>
-                    <span>{flag.name}</span>
-                    <span>Ação</span>
-                  </div>
-                  {teachers.length === 0 ? (
-                    <div className="table-row">
-                      <span style={{ gridColumn: '1 / -1', color: 'var(--muted)' }}>Nenhuma professora cadastrada.</span>
-                    </div>
-                  ) : (
-                    teachers.map((teacher) => {
+              {flag.release_mode === 'selected' ? (
+                <details style={{ marginTop: 16, borderTop: '1px solid #f1f0ea', paddingTop: 16 }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#1c6b46' }}>
+                    Gerenciar professoras selecionadas ({grantedTeachers.length})
+                  </summary>
+                  <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                    {teachers.map((teacher) => {
                       const hasAccess = grantSet.has(`${flag.key}::${teacher.id}`)
                       return (
-                        <div className="table-row teachers-grid" key={teacher.id}>
-                          <div>
-                            <strong>{teacher.full_name}</strong>
-                            <small>{teacher.email}</small>
+                        <div
+                          key={teacher.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '10px 12px',
+                            borderRadius: 9,
+                            background: '#f8f8f4',
+                          }}
+                        >
+                          <span className="teacher-avatar">{teacherInitials(teacher.full_name)}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ fontSize: 13 }}>{teacher.full_name}</strong>
+                            <div style={{ fontSize: 12, color: '#8a948c' }}>{teacher.email}</div>
                           </div>
-                          <span className={`badge badge-${hasAccess ? 'published' : 'archived'}`}>
-                            {hasAccess ? 'liberada' : 'oculta'}
+                          <span className={`status-chip status-chip-${hasAccess ? 'approved' : 'blocked'}`}>
+                            {hasAccess ? 'Liberada' : 'Oculta'}
                           </span>
-                          <span>{flag.name}</span>
                           <form action={hasAccess ? revokeAccess : grantAccess}>
                             <input type="hidden" name="featureKey" value={flag.key} />
                             <input type="hidden" name="userId" value={teacher.id} />
-                            <button className="quiet-button secondary-action" type="submit">
+                            <input type="hidden" name="teacherName" value={teacher.full_name} />
+                            <button type="submit" className={hasAccess ? 'btn-danger-v2 btn-sm-v2' : 'btn-secondary-v2 btn-sm-v2'}>
                               {hasAccess ? 'Remover' : 'Liberar'}
                             </button>
                           </form>
+                          <Link href={`/professoras/${teacher.id}`} style={{ fontSize: 12, color: '#1c6b46' }}>
+                            Ficha
+                          </Link>
                         </div>
                       )
-                    })
-                  )}
-                </div>
-              </article>
-
-              <article className="panel">
-                <div className="panel-header">
-                  <div>
-                    <p className="eyebrow">Modo atual</p>
-                    <h2>{modeLabel[flag.release_mode]}</h2>
+                    })}
                   </div>
-                </div>
-                <ol className="number-list">
-                  <li>Feature existe no app mas pode ficar invisível.</li>
-                  <li><strong>Selecionadas:</strong> apenas as professoras marcadas acessam.</li>
-                  <li><strong>Todas as contas:</strong> libera para toda a base.</li>
-                  <li>Toda alteração gera log de auditoria automático.</li>
-                </ol>
-              </article>
-            </section>
+                </details>
+              ) : null}
+            </article>
           )
         })
       )}
-    </>
+    </div>
   )
 }

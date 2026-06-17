@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, RefreshCcw, XCircle } from 'lucide-react'
+import Link from 'next/link'
+import { Check, ExternalLink, RefreshCcw, X } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
-import { StatusBadge } from '../components/StatusBadge'
+import { formatRelativeDate, teacherInitials } from '../lib/admin-utils'
 
 type VerificationRequest = {
   id: string
@@ -11,26 +12,13 @@ type VerificationRequest = {
   status: 'pending' | 'approved' | 'rejected'
   notes: string | null
   createdAt: string
-  updatedAt: string
   teacher: {
     id: string
     full_name: string
     email: string
-    phone: string | null
   } | null
-  schools: Array<{
-    id: string
-    name: string
-    city: string | null
-    state: string | null
-  }>
-  documents: Array<{
-    path: string
-    fileName: string
-    mimeType: string
-    size: number
-    signedUrl: string | null
-  }>
+  schools: Array<{ id: string; name: string }>
+  documents: Array<{ fileName: string; signedUrl: string | null }>
 }
 
 export default function VerificationsPage() {
@@ -39,11 +27,9 @@ export default function VerificationsPage() {
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
 
-  const pendingCount = useMemo(
-    () => requests.filter((item) => item.status === 'pending').length,
-    [requests],
-  )
+  const pending = useMemo(() => requests.filter((item) => item.status === 'pending'), [requests])
 
   useEffect(() => {
     void loadRequests()
@@ -55,16 +41,16 @@ export default function VerificationsPage() {
     try {
       const response = await fetch('/api/account/verification/admin')
       const payload = await response.json().catch(() => null) as { error?: string; requests?: VerificationRequest[] } | null
-      if (!response.ok) throw new Error(payload?.error || 'Falha ao carregar verificações.')
+      if (!response.ok) throw new Error(payload?.error || 'Falha ao carregar verificacoes.')
       setRequests(payload?.requests ?? [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao carregar verificações.')
+      setError(err instanceof Error ? err.message : 'Falha ao carregar verificacoes.')
     } finally {
       setLoading(false)
     }
   }
 
-  async function updateStatus(verificationId: string, status: 'pending' | 'approved' | 'rejected') {
+  async function updateStatus(verificationId: string, status: 'approved' | 'rejected') {
     setUpdatingId(verificationId)
     setError('')
     try {
@@ -80,6 +66,9 @@ export default function VerificationsPage() {
       const payload = await response.json().catch(() => null) as { error?: string; requests?: VerificationRequest[] } | null
       if (!response.ok) throw new Error(payload?.error || 'Falha ao atualizar status.')
       setRequests(payload?.requests ?? [])
+      const teacher = requests.find((item) => item.id === verificationId)?.teacher?.full_name?.split(' ')[0] ?? 'professora'
+      setToast(status === 'approved' ? `Verificacao de ${teacher} aprovada` : `Verificacao de ${teacher} rejeitada`)
+      window.setTimeout(() => setToast(null), 2600)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao atualizar status.')
     } finally {
@@ -88,133 +77,96 @@ export default function VerificationsPage() {
   }
 
   return (
-    <>
+    <div className="admin-page-wrap admin-page-wrap-narrow">
       <PageHeader
-        eyebrow="Conformidade da conta"
-        title="Verificações de perfil"
-        description="Revise documentos enviados pelas professoras e aprove ou rejeite o vínculo escolar."
+        eyebrow="Pessoas"
+        title="Verificacoes"
+        description="Fila de comprovantes de vinculo escolar. Aprovar libera o badge da escola no app."
         action={
-          <button className="quiet-button secondary-action" onClick={() => void loadRequests()}>
-            <RefreshCcw size={15} />
-            Atualizar
+          <button type="button" className="btn-ghost-v2" onClick={() => void loadRequests()}>
+            <RefreshCcw size={15} /> Atualizar
           </button>
         }
       />
 
-      <article className="panel">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">Fila atual</p>
-            <h2>{pendingCount} solicitação(ões) pendente(s)</h2>
-          </div>
-        </div>
+      {error ? <p style={{ color: '#b4382f', marginBottom: 16 }}>{error}</p> : null}
+      {loading ? <p style={{ color: '#8a948c' }}>Carregando verificacoes...</p> : null}
 
-        {error && <p className="topbar-description" style={{ color: 'var(--red-700)', marginTop: 0 }}>{error}</p>}
+      {!loading && pending.length === 0 ? (
+        <article className="empty-state-v2">
+          <Check size={30} color="#1c6b46" />
+          <h3>Tudo em dia</h3>
+          <p>Nenhuma verificacao pendente no momento.</p>
+        </article>
+      ) : null}
 
-        {loading ? (
-          <p className="topbar-description" style={{ marginTop: 0 }}>Carregando verificações...</p>
-        ) : requests.length === 0 ? (
-          <p className="topbar-description" style={{ marginTop: 0 }}>Sem solicitações no momento.</p>
-        ) : (
-          <div className="table">
-            <div className="table-row table-head verifications-grid">
-              <span>Professora</span>
-              <span>Status</span>
-              <span>Escolas</span>
-              <span>Documentos</span>
-              <span>Ações</span>
-            </div>
-
-            {requests.map((request) => {
-              const isUpdating = updatingId === request.id
-              return (
-                <div key={request.id} className="table-row verifications-grid">
-                  <span>
-                    <strong>{request.teacher?.full_name || 'Professora não identificada'}</strong>
-                    <small>{request.teacher?.email || request.ownerId}</small>
-                    <small>Enviado em {formatDate(request.createdAt)}</small>
-                  </span>
-
-                  <StatusBadge status={request.status} />
-
-                  <span>
-                    {request.schools.length === 0 ? (
-                      <small>Sem escola informada</small>
-                    ) : (
-                      request.schools.map((school) => (
-                        <small key={school.id}>{school.name}</small>
-                      ))
-                    )}
-                  </span>
-
-                  <span>
-                    {request.documents.length === 0 ? (
-                      <small>Sem documentos</small>
-                    ) : (
-                      request.documents.map((document, index) => (
-                        document.signedUrl ? (
-                          <a
-                            key={`${document.path}-${index}`}
-                            href={document.signedUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="verification-doc-link"
-                          >
-                            {document.fileName}
-                          </a>
-                        ) : (
-                          <small key={`${document.path}-${index}`}>{document.fileName}</small>
-                        )
-                      ))
-                    )}
-                  </span>
-
-                  <div>
-                    <textarea
-                      value={notesById[request.id] ?? request.notes ?? ''}
-                      onChange={(event) =>
-                        setNotesById((current) => ({ ...current, [request.id]: event.target.value }))
-                      }
-                      className="verification-notes"
-                      placeholder="Observação para auditoria interna."
-                    />
-                    <div className="action-row">
-                      <button
-                        className="quiet-button"
-                        disabled={isUpdating}
-                        onClick={() => void updateStatus(request.id, 'approved')}
-                      >
-                        <CheckCircle2 size={14} />
-                        Aprovar
-                      </button>
-                      <button
-                        className="quiet-button secondary-action"
-                        disabled={isUpdating}
-                        onClick={() => void updateStatus(request.id, 'rejected')}
-                      >
-                        <XCircle size={14} />
-                        Rejeitar
-                      </button>
+      {!loading
+        ? pending.map((request) => {
+            const name = request.teacher?.full_name || 'Professora'
+            const doc = request.documents[0]
+            const isUpdating = updatingId === request.id
+            return (
+              <article key={request.id} className="card-row-v2">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <span className="teacher-avatar">{teacherInitials(name)}</span>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <strong style={{ fontSize: 15 }}>{name}</strong>
+                    <div style={{ fontSize: 13, color: '#8a948c' }}>
+                      {request.teacher?.email} · enviado {formatRelativeDate(request.createdAt)}
                     </div>
+                    {request.schools[0]?.name ? (
+                      <div style={{ fontSize: 12, color: '#5f6b63', marginTop: 4 }}>{request.schools[0].name}</div>
+                    ) : null}
                   </div>
+                  {doc?.signedUrl ? (
+                    <a href={doc.signedUrl} target="_blank" rel="noreferrer" className="btn-ghost-v2">
+                      <ExternalLink size={15} /> Ver documento
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn-danger-v2 btn-sm-v2"
+                    style={{ background: '#fff', border: '1px solid #f0c9c5' }}
+                    disabled={isUpdating}
+                    onClick={() => void updateStatus(request.id, 'rejected')}
+                  >
+                    <X size={14} /> Rejeitar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary-v2 btn-sm-v2"
+                    disabled={isUpdating}
+                    onClick={() => void updateStatus(request.id, 'approved')}
+                  >
+                    <Check size={14} /> Aprovar
+                  </button>
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </article>
-    </>
-  )
-}
+                <div style={{ marginTop: 12 }}>
+                  <textarea
+                    value={notesById[request.id] ?? request.notes ?? ''}
+                    onChange={(event) => setNotesById((current) => ({ ...current, [request.id]: event.target.value }))}
+                    placeholder="Observacao interna (em caso de rejeicao)"
+                    style={{ width: '100%', minHeight: 60, padding: 10, borderRadius: 9, border: '1px solid #e1e0d8', font: 'inherit' }}
+                  />
+                </div>
+                {request.teacher?.id ? (
+                  <div style={{ marginTop: 10 }}>
+                    <Link href={`/professoras/${request.teacher.id}?tab=verif`} style={{ fontSize: 12, color: '#1c6b46', fontWeight: 600 }}>
+                      Abrir ficha completa →
+                    </Link>
+                  </div>
+                ) : null}
+              </article>
+            )
+          })
+        : null}
 
-function formatDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'data inválida'
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+      {toast ? (
+        <div className="admin-toast" role="status">
+          <Check size={18} />
+          <span>{toast}</span>
+        </div>
+      ) : null}
+    </div>
+  )
 }

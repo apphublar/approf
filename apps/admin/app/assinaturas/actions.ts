@@ -1,7 +1,8 @@
 'use server'
 
-import { redirect } from 'next/navigation'
 import { requireAdminSession } from '../lib/admin-auth'
+import { safeReturnPath } from '../lib/admin-utils'
+import { redirectWithToast } from '../lib/redirect-with-toast'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
 import { tryGrantReferralReward } from '@/app/lib/referrals'
 
@@ -36,6 +37,7 @@ const statusOptions: Array<{ value: SubscriptionStatus; label: string }> = [
 export async function liberarAcessoGratuito(formData: FormData) {
   const admin = await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
+  const returnTo = safeReturnPath(formData.get('returnTo'), '/assinaturas')
   if (!teacherId) return
 
   const supabase = createSupabaseServiceClient()
@@ -96,44 +98,49 @@ export async function liberarAcessoGratuito(formData: FormData) {
     metadata: { teacherId, status: 'active', plan: 'free', verification: 'approved' },
   })
 
-  redirect('/assinaturas')
+  redirectWithToast(returnTo, 'Acesso gratuito liberado com sucesso.')
 }
 
 export async function sendPaymentOverdueNotice(formData: FormData) {
   await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
+  const returnTo = safeReturnPath(formData.get('returnTo'), '/assinaturas')
   if (!teacherId) return
   await createPaymentNotice([teacherId])
-  redirect('/assinaturas')
+  redirectWithToast(returnTo, 'Aviso de atraso enviado.')
 }
 
-export async function sendAllPaymentOverdueNotices() {
+export async function sendAllPaymentOverdueNotices(formData?: FormData) {
   await requireAdminSession()
+  const returnTo = safeReturnPath(formData?.get('returnTo') ?? null, '/assinaturas')
   const supabase = createSupabaseServiceClient()
   const overdue = await listOverdueSubscriptions(supabase)
   await createPaymentNotice(overdue.map((item) => item.user_id))
-  redirect('/assinaturas')
+  redirectWithToast(returnTo, 'Aviso enviado para todas as contas em atraso.')
 }
 
 export async function blockTeacherAccess(formData: FormData) {
   await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
+  const returnTo = safeReturnPath(formData.get('returnTo'), '/assinaturas')
   if (!teacherId) return
   await blockSubscriptions([teacherId], 'Bloqueio manual individual pelo admin.')
-  redirect('/assinaturas')
+  redirectWithToast(returnTo, 'Conta bloqueada.')
 }
 
-export async function blockAllOverdueAccess() {
+export async function blockAllOverdueAccess(formData?: FormData) {
   await requireAdminSession()
+  const returnTo = safeReturnPath(formData?.get('returnTo') ?? null, '/assinaturas')
   const supabase = createSupabaseServiceClient()
   const overdue = await listOverdueSubscriptions(supabase)
   await blockSubscriptions(overdue.map((item) => item.user_id), 'Bloqueio manual em massa de contas em atraso pelo admin.')
-  redirect('/assinaturas')
+  redirectWithToast(returnTo, 'Contas em atraso bloqueadas.')
 }
 
 export async function updateTeacherSubscription(formData: FormData) {
   const admin = await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
+  const returnTo = safeReturnPath(formData.get('returnTo'), '/assinaturas')
   const status = String(formData.get('status') ?? '').trim() as SubscriptionStatus
   const plan = String(formData.get('plan') ?? '').trim()
   const paymentLink = String(formData.get('paymentLink') ?? '').trim()
@@ -180,7 +187,7 @@ export async function updateTeacherSubscription(formData: FormData) {
     metadata: { teacherId, status, plan, paymentLink: paymentLink || null, currentPeriodEnd: currentPeriodEnd || null },
   })
 
-  redirect('/assinaturas')
+  redirectWithToast(returnTo, 'Assinatura atualizada.')
 }
 
 async function createPaymentNotice(teacherIds: string[]) {

@@ -1,7 +1,7 @@
 'use server'
 
-import { redirect } from 'next/navigation'
 import { requireAdminSession } from '../lib/admin-auth'
+import { redirectWithToast } from '../lib/redirect-with-toast'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
 
 type ReleaseMode = 'off' | 'selected' | 'all'
@@ -10,6 +10,7 @@ export async function setReleaseMode(formData: FormData) {
   const admin = await requireAdminSession()
   const featureKey = String(formData.get('featureKey') ?? '').trim()
   const mode = String(formData.get('mode') ?? '').trim() as ReleaseMode
+  const featureName = String(formData.get('featureName') ?? featureKey).trim()
 
   if (!featureKey || !['off', 'selected', 'all'].includes(mode)) return
 
@@ -28,13 +29,15 @@ export async function setReleaseMode(formData: FormData) {
     metadata: { featureKey, mode },
   })
 
-  redirect('/liberacoes')
+  const label = mode === 'all' ? 'todas as contas' : 'selecionadas'
+  redirectWithToast('/liberacoes', `${featureName} → ${label}.`)
 }
 
 export async function grantAccess(formData: FormData) {
   const admin = await requireAdminSession()
   const featureKey = String(formData.get('featureKey') ?? '').trim()
   const userId = String(formData.get('userId') ?? '').trim()
+  const teacherName = String(formData.get('teacherName') ?? 'Professora').trim()
 
   if (!featureKey || !userId) return
 
@@ -49,16 +52,17 @@ export async function grantAccess(formData: FormData) {
     action: 'feature_access_granted',
     target_table: 'feature_user_access',
     target_id: null,
-    metadata: { featureKey, userId },
+    metadata: { featureKey, userId, teacherName },
   })
 
-  redirect('/liberacoes')
+  redirectWithToast('/liberacoes', `Acesso liberado para ${teacherName.split(' ')[0]}.`)
 }
 
 export async function revokeAccess(formData: FormData) {
   const admin = await requireAdminSession()
   const featureKey = String(formData.get('featureKey') ?? '').trim()
   const userId = String(formData.get('userId') ?? '').trim()
+  const teacherName = String(formData.get('teacherName') ?? 'Professora').trim()
 
   if (!featureKey || !userId) return
 
@@ -75,8 +79,8 @@ export async function revokeAccess(formData: FormData) {
     action: 'feature_access_revoked',
     target_table: 'feature_user_access',
     target_id: null,
-    metadata: { featureKey, userId },
+    metadata: { featureKey, userId, teacherName },
   })
 
-  redirect('/liberacoes')
+  redirectWithToast('/liberacoes', `Acesso removido de ${teacherName.split(' ')[0]}.`)
 }

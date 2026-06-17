@@ -84,9 +84,14 @@ export interface TeacherAccountSnapshot {
   notices: Array<{
     id: string
     type: string
+    deliveryId: string
     createdAt: string
     title: string
     message: string
+    pinned: boolean
+    announcementType?: string
+    ctaLabel?: string | null
+    ctaUrl?: string | null
   }>
   referrals: TeacherReferralSummary | null
 }
@@ -150,10 +155,15 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
     notices?: Array<{
       id: string
       type: string
+      deliveryId?: string
+      pinned?: boolean
       created_at: string
       payload?: {
         title?: string
         message?: string
+        announcementType?: string
+        ctaLabel?: string | null
+        ctaUrl?: string | null
       }
     }>
     referrals?: TeacherReferralSummary | null
@@ -187,9 +197,14 @@ export async function getTeacherAccountSnapshot(options?: { forceRefresh?: boole
     notices: (response.notices ?? []).map((item) => ({
       id: item.id,
       type: item.type,
+      deliveryId: item.deliveryId ?? item.id,
       createdAt: item.created_at,
       title: item.payload?.title || 'Aviso importante',
-      message: item.payload?.message || 'Há uma atualização importante na sua conta.',
+      message: item.payload?.message || 'Ha uma atualizacao importante na sua conta.',
+      pinned: Boolean(item.pinned),
+      announcementType: item.payload?.announcementType,
+      ctaLabel: item.payload?.ctaLabel ?? null,
+      ctaUrl: item.payload?.ctaUrl ?? null,
     })),
     referrals: response.referrals ?? null,
   }
@@ -207,6 +222,11 @@ export async function preloadTeacherAccountSnapshot() {
   } catch {
     // Silent preload failure: menu can still load normally.
   }
+}
+
+export async function dismissAppAnnouncement(deliveryId: string) {
+  await callAccountApi(`/api/account/announcements/${deliveryId}/dismiss`, { method: 'POST' })
+  teacherAccountCache = null
 }
 
 export async function updateTeacherProfile(input: {
