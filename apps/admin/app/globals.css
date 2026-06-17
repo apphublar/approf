@@ -318,7 +318,31 @@ a {
 }
 
 .teachers-page-grid {
-  grid-template-columns: 1.4fr 0.7fr 1.2fr 0.5fr 0.5fr 0.5fr;
+  grid-template-columns: 1.4fr 0.7fr 1.2fr 0.5fr 0.5fr 0.5fr 0.75fr;
+}
+
+.giztokens-admin-form {
+  width: 100%;
+}
+
+.giztokens-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(0, 0.6fr);
+  gap: 12px;
+}
+
+.giztokens-admin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.giztokens-admin-form label > span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .subscriptions-grid {
@@ -1083,6 +1107,10 @@ a {
   .subscriptions-bulk-panel {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .giztokens-admin-grid {
+    grid-template-columns: 1fr;
   }
 
   .table-row,

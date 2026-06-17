@@ -1,7 +1,10 @@
 import Link from 'next/link'
+import { Coins } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
+import { getCurrentMonthPeriod, loadTeacherWalletsForMonth } from '../lib/giztokens-admin'
 import { createSupabaseServiceClient } from '../lib/supabase-server'
+import { adjustTeacherGiztokensAction } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,15 +50,61 @@ export default async function TeachersPage() {
 
   if (error) throw new Error(error.message)
   const teachers = (data ?? []) as TeacherRow[]
+  const { start: monthStart, end: monthEnd } = getCurrentMonthPeriod()
+  const wallets = await loadTeacherWalletsForMonth(teachers.map((teacher) => teacher.id), monthStart)
 
   return (
     <>
       <PageHeader
         eyebrow="Professoras"
         title="Usuarias cadastradas"
-        description="Cadastros reais, status de acesso, verificação automatica e uso do app em produção."
+        description="Cadastros reais, status de acesso, verificacao automatica e uso do app em producao."
         action={<Link className="quiet-button" href="/assinaturas">Gerenciar planos</Link>}
       />
+
+      <article className="panel subscriptions-bulk-panel">
+        <div>
+          <h2>Ajustar GizTokens do mes</h2>
+          <p>
+            Libere saldo extra para uma professora escolhida. O ajuste vale para o ciclo mensal atual
+            ({formatMonthLabel(monthStart)} a {formatMonthLabel(monthEnd)}).
+          </p>
+        </div>
+        <form action={adjustTeacherGiztokensAction} className="subs-edit-form giztokens-admin-form">
+          <div className="giztokens-admin-grid">
+            <label>
+              <span>Professora</span>
+              <select name="teacherId" required defaultValue="">
+                <option value="" disabled>Selecione...</option>
+                {teachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.full_name || 'Professora'} ({teacher.email})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Tipo de ajuste</span>
+              <select name="mode" defaultValue="add">
+                <option value="add">Adicionar GizTokens</option>
+                <option value="set_minimum">Definir saldo minimo do mes</option>
+              </select>
+            </label>
+            <label>
+              <span>Quantidade</span>
+              <input name="amount" type="number" min={1} max={100000} step={1} placeholder="Ex.: 5000" required />
+            </label>
+          </div>
+          <label>
+            <span>Observacao interna (auditoria)</span>
+            <textarea name="reason" rows={2} placeholder="Motivo do ajuste para a trilha de auditoria." />
+          </label>
+          <button className="quiet-button secondary-action" type="submit">
+            <Coins size={14} />
+            Aplicar ajuste
+          </button>
+        </form>
+      </article>
 
       <article className="panel">
         <div className="table">
@@ -66,10 +115,12 @@ export default async function TeachersPage() {
             <span>Turmas</span>
             <span>Alunos</span>
             <span>IA</span>
+            <span>GizTokens</span>
           </div>
           {teachers.map((teacher) => {
             const subscription = teacher.subscriptions?.[0]
             const verification = latestVerification(teacher.teacher_profile_verifications ?? [])
+            const wallet = wallets.get(teacher.id)
             return (
               <div className="table-row teachers-page-grid" key={teacher.id}>
                 <span>
@@ -94,6 +145,20 @@ export default async function TeachersPage() {
                 <span>{teacher.classes?.length ?? 0}</span>
                 <span>{teacher.students?.length ?? 0}</span>
                 <span>{teacher.ai_generation_logs?.length ?? 0}</span>
+                <span>
+                  {wallet ? (
+                    <>
+                      <strong>{formatNumber(wallet.giztokensRemaining)}</strong>
+                      <small>de {formatNumber(wallet.giztokensIncluded)} neste mes</small>
+                      <small>{formatNumber(wallet.giztokensUsed)} usados</small>
+                    </>
+                  ) : (
+                    <>
+                      <strong>—</strong>
+                      <small>Sem carteira neste mes</small>
+                    </>
+                  )}
+                </span>
               </div>
             )
           })}
@@ -114,6 +179,7 @@ function formatPlan(plan?: string | null) {
     trial_7_days: 'Teste 7 dias',
     trial_15_days: 'Teste 15 dias',
     monthly: 'Mensal',
+    semiannual: 'Semestral',
     annual: 'Anual',
     verification_required: 'Aguardando analise',
   }
@@ -122,4 +188,14 @@ function formatPlan(plan?: string | null) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(value))
+}
+
+function formatMonthLabel(value: string) {
+  const date = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(date)
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('pt-BR').format(Math.round(value))
 }
