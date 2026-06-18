@@ -122,10 +122,10 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   }, [freeOutput, mode])
 
   const guidedUsesAnnotations = mode === 'guided' && guidedTypeUsesAnnotations(documentType)
-  const showAnnotationSource = guidedUsesAnnotations
+  const showAnnotationSource = guidedUsesAnnotations || mode === 'visual_portfolio'
 
   useEffect(() => {
-    if (mode === 'visual_portfolio' || (mode === 'guided' && !guidedTypeUsesAnnotations(documentType))) {
+    if (mode === 'guided' && !guidedTypeUsesAnnotations(documentType)) {
       setSourceMode('prompt_only')
     }
   }, [documentType, mode])
@@ -173,7 +173,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   const canGenerate = useMemo(() => {
     if (generating || generatingRef.current) return false
     if (mode !== 'free' && !documentType) return false
-    const needsNotes = guidedUsesAnnotations
+    const needsNotes = guidedUsesAnnotations || (mode === 'visual_portfolio' && sourceMode !== 'prompt_only')
     if (needsNotes && selectedNotes.length === 0) return false
     if (mode === 'free' && teacherPrompt.trim().length < 8) return false
     if (mode !== 'free' && sourceMode === 'prompt_only' && teacherPrompt.trim().length < 8) return false
