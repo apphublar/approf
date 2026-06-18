@@ -1,9 +1,12 @@
 'use client'
 
-import { Check, CreditCard, Calendar, X, Gift, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Check, ChevronDown, ChevronUp, CreditCard, Calendar, X, Gift, Sparkles } from 'lucide-react'
 
 const PROFESSORA_APP_URL = process.env.NEXT_PUBLIC_PROFESSORA_APP_URL ?? 'https://app.approf.com.br'
 const PROFESSORA_APP_BASE_URL = PROFESSORA_APP_URL.replace(/\/$/, '')
+
+const VISIBLE_FEATURE_COUNT = 4
 
 const allFeatures = [
   'Anotações pedagógicas ilimitadas',
@@ -36,9 +39,9 @@ const plans = [
   {
     id: 'semiannual',
     title: 'Plano Semestral',
-    badge: '2 meses grátis',
-    secondaryBadge: null,
-    featured: false,
+    badge: 'Mais popular',
+    secondaryBadge: '2 meses grátis',
+    featured: true,
     priceMain: '34,90',
     pricePeriod: 'equiv./mês',
     priceCompare: '49,90',
@@ -48,9 +51,9 @@ const plans = [
   {
     id: 'annual',
     title: 'Plano Anual',
-    badge: 'Mais popular',
-    secondaryBadge: '4 meses grátis',
-    featured: true,
+    badge: '4 meses grátis',
+    secondaryBadge: null,
+    featured: false,
     priceMain: '29,90',
     pricePeriod: 'equiv./mês',
     priceCompare: '49,90',
@@ -58,6 +61,8 @@ const plans = [
     giztokens: '10.000',
   },
 ] as const
+
+type Plan = (typeof plans)[number]
 
 function CheckIcon() {
   return (
@@ -71,6 +76,98 @@ function buildSignupUrl(planId: string) {
   return `${PROFESSORA_APP_BASE_URL}?mode=signup&plan=${planId}&checkout=1`
 }
 
+function PricingPlanCard({ plan }: { plan: Plan }) {
+  const [expanded, setExpanded] = useState(false)
+  const hiddenCount = allFeatures.length - VISIBLE_FEATURE_COUNT
+  const visibleFeatures = expanded ? allFeatures : allFeatures.slice(0, VISIBLE_FEATURE_COUNT)
+
+  return (
+    <div
+      className={`pricing-card${plan.featured ? ' pricing-card--featured' : ''}`}
+    >
+      <div className="pricing-card__badges">
+        <div className={`pricing-badge${plan.featured ? ' pricing-badge--popular' : ''}`}>
+          {plan.featured ? (
+            <><Sparkles size={13} strokeWidth={2} /> {plan.badge}</>
+          ) : plan.badge.includes('grátis') ? (
+            <><Gift size={13} strokeWidth={2} /> {plan.badge}</>
+          ) : (
+            plan.badge
+          )}
+        </div>
+        {plan.secondaryBadge && (
+          <div className="pricing-badge pricing-badge--secondary">
+            <Gift size={13} strokeWidth={2} /> {plan.secondaryBadge}
+          </div>
+        )}
+      </div>
+
+      <p className="pricing-plan-title">{plan.title}</p>
+
+      <div className="pricing-amount-row">
+        <span className="pricing-currency">R$</span>
+        <span className="pricing-amount">{plan.priceMain.split(',')[0]}</span>
+        <span className="pricing-currency">,{plan.priceMain.split(',')[1]}</span>
+        <span className="pricing-period">{plan.pricePeriod}</span>
+      </div>
+
+      <p className="pricing-compare-price">
+        {plan.id === 'monthly' ? (
+          <>de <span>R$ {plan.priceCompare}/mês</span></>
+        ) : (
+          <>comparado a <span>R$ {plan.priceCompare}/mês</span> no plano mensal</>
+        )}
+      </p>
+
+      {plan.billingNote && (
+        <p className="pricing-annual-note">{plan.billingNote}</p>
+      )}
+
+      <p className="pricing-giztokens">{plan.giztokens} GizTokens mensais</p>
+
+      <p className="pricing-tagline">
+        Tudo incluso para registrar, planejar e acompanhar sua rotina pedagógica.
+      </p>
+
+      <div className="pricing-divider" />
+
+      <ul className="pricing-features-list">
+        {visibleFeatures.map((feat) => (
+          <li key={feat} className="pricing-feature-item">
+            <CheckIcon />
+            {feat}
+          </li>
+        ))}
+      </ul>
+
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="pricing-features-toggle"
+          aria-expanded={expanded}
+        >
+          {expanded ? (
+            <>
+              Ver menos
+              <ChevronUp size={16} strokeWidth={2.2} />
+            </>
+          ) : (
+            <>
+              Ver mais {hiddenCount} funcionalidades
+              <ChevronDown size={16} strokeWidth={2.2} />
+            </>
+          )}
+        </button>
+      )}
+
+      <a href={buildSignupUrl(plan.id)} className={`pricing-cta-btn${plan.featured ? ' pricing-cta-btn--featured' : ''}`}>
+        Testar grátis por 7 dias
+      </a>
+    </div>
+  )
+}
+
 export default function PricingSection() {
   return (
     <section id="precos" className="pricing">
@@ -82,69 +179,7 @@ export default function PricingSection() {
 
         <div className="pricing__grid">
           {plans.map((plan) => (
-            <div
-              key={plan.id}
-              className={`pricing-card${plan.featured ? ' pricing-card--featured' : ''}`}
-            >
-              <div className="pricing-card__badges">
-                <div className="pricing-badge">
-                  {plan.featured ? (
-                    <><Sparkles size={13} strokeWidth={2} /> {plan.badge}</>
-                  ) : plan.badge.includes('grátis') ? (
-                    <><Gift size={13} strokeWidth={2} /> {plan.badge}</>
-                  ) : (
-                    plan.badge
-                  )}
-                </div>
-                {plan.secondaryBadge && (
-                  <div className="pricing-badge pricing-badge--secondary">
-                    <Gift size={13} strokeWidth={2} /> {plan.secondaryBadge}
-                  </div>
-                )}
-              </div>
-
-              <p className="pricing-plan-title">{plan.title}</p>
-
-              <div className="pricing-amount-row">
-                <span className="pricing-currency">R$</span>
-                <span className="pricing-amount">{plan.priceMain.split(',')[0]}</span>
-                <span className="pricing-currency">,{plan.priceMain.split(',')[1]}</span>
-                <span className="pricing-period">{plan.pricePeriod}</span>
-              </div>
-
-              <p className="pricing-compare-price">
-                {plan.id === 'monthly' ? (
-                  <>de <span>R$ {plan.priceCompare}/mês</span></>
-                ) : (
-                  <>comparado a <span>R$ {plan.priceCompare}/mês</span> no plano mensal</>
-                )}
-              </p>
-
-              {plan.billingNote && (
-                <p className="pricing-annual-note">{plan.billingNote}</p>
-              )}
-
-              <p className="pricing-giztokens">{plan.giztokens} GizTokens mensais</p>
-
-              <p className="pricing-tagline">
-                Tudo incluso para registrar, planejar e acompanhar sua rotina pedagógica.
-              </p>
-
-              <div className="pricing-divider" />
-
-              <ul className="pricing-features-list">
-                {allFeatures.map((feat) => (
-                  <li key={feat} className="pricing-feature-item">
-                    <CheckIcon />
-                    {feat}
-                  </li>
-                ))}
-              </ul>
-
-              <a href={buildSignupUrl(plan.id)} className="pricing-cta-btn">
-                Testar grátis por 7 dias
-              </a>
-            </div>
+            <PricingPlanCard key={plan.id} plan={plan} />
           ))}
         </div>
 

@@ -774,13 +774,14 @@ h1, h2, h3, h4 {
 }
 
 .pricing-card--featured {
-  transform: translateY(-6px);
-  box-shadow: 0 24px 48px rgba(27, 67, 50, 0.28);
-  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(155deg, #0f3d2a 0%, #1b5e3f 38%, #2a7a52 72%, #3d9a6a 100%);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 28px 56px rgba(15, 61, 42, 0.35);
+  border: 1.5px solid rgba(255, 220, 140, 0.42);
 }
 
 .pricing-card--featured:hover {
-  transform: translateY(-10px);
+  transform: translateY(-12px) scale(1.02);
 }
 
 .pricing-card__badges {
@@ -818,6 +819,12 @@ h1, h2, h3, h4 {
 .pricing-badge--secondary {
   background: rgba(255, 243, 205, 0.18);
   border-color: rgba(255, 243, 205, 0.35);
+}
+
+.pricing-badge--popular {
+  background: rgba(255, 220, 140, 0.22);
+  border-color: rgba(255, 220, 140, 0.45);
+  color: #fff8e8;
 }
 
 /* Animação ao trocar de plano */
@@ -908,8 +915,31 @@ h1, h2, h3, h4 {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 12px;
   flex: 1;
+}
+
+.pricing-features-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pricing-features-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.32);
 }
 
 .pricing-feature-item {
@@ -954,6 +984,17 @@ h1, h2, h3, h4 {
   background: var(--gl);
   color: white;
   transform: translateY(-1px);
+}
+
+.pricing-cta-btn--featured {
+  background: #fff8e8;
+  color: #14532d;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+
+.pricing-cta-btn--featured:hover {
+  background: white;
+  color: var(--gd);
 }
 
 /* ---- Informações de pagamento ---- */
