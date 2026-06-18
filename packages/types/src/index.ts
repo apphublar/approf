@@ -44,3 +44,4 @@ export interface PrivacyStoragePath {
 }
 
 export * from './documents'
+export * from './creator-v2'

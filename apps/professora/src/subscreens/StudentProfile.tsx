@@ -277,12 +277,11 @@ export default function StudentProfileSubscreen() {
 
         <button
           onClick={() => openSubscreen('report', {
-            unifiedCreator: true,
-            documentTitle: `Documento pedagógico de ${student.name}`,
+            mode: 'guided',
+            documentType: 'individual_report',
             classId: cls.id,
             studentId: student.id,
-            useUnifiedAnnotations: true,
-            includeUnifiedChildNotes: true,
+            sourceMode: 'student_notes',
           })}
           className="w-full py-[14px] rounded-app bg-gd text-white font-bold text-[14px] border-none flex items-center justify-center gap-2 mb-5 cursor-pointer"
         >

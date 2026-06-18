@@ -2,6 +2,8 @@
 
 Atualizado em: 2026-05-15
 
+> **Documento operacional atual (OpenAI / GPT):** para visão do produto, regras por funcionalidade, limites do chat e modelos em produção, use [ia-openai-funcionamento.md](./ia-openai-funcionamento.md) (jun/2026).
+
 Este documento registra a arquitetura de IA analisada a partir do arquivo local `approf-arquitetura-ia.docx` e compara essa visao com o estado atual do projeto.
 
 ## Principio Central

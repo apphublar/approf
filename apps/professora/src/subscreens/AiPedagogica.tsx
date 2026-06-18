@@ -184,7 +184,7 @@ export default function AiPedagogicaSubscreen() {
             </div>
 
             <button
-              onClick={() => openSubscreen('report', { unifiedCreator: true })}
+              onClick={() => openSubscreen('report', { mode: 'guided' })}
               className="w-full bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
             >
               <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center flex-shrink-0 text-gm" style={{ background: '#D8F3DC' }}>

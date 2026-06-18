@@ -1,9 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, Download, Eye, FileText, Image as ImageIcon, Plus, Search, Share2 } from 'lucide-react'
+import { ChevronLeft, Download, Eye, FileText, Image as ImageIcon, Search, Share2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { getCachedReportById, listReports, prefetchReportsByIds } from '@/services/reports'
-import { generateImage, type ImageLayoutFormat } from '@/services/ai-usage'
-import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import type { GeneratedDocument } from '@/types'
 import { getImageVariants, prefetchImageVariants, type ImageVariants } from '@/utils/image-performance'
 import { formatReportBodyPreview } from '@/utils/report-body'
@@ -34,11 +32,6 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [description, setDescription] = useState('')
-  const [imageFormat, setImageFormat] = useState<ImageLayoutFormat>('portrait')
-  const [creating, setCreating] = useState(false)
   const [imageDetailsById, setImageDetailsById] = useState<Record<string, { imageDataUrl?: string; prompt?: string; quality?: string }>>({})
   const [imageVariantsById, setImageVariantsById] = useState<Record<string, ImageVariants>>({})
   const isImagesMode = filters.kind === 'images'
@@ -187,41 +180,6 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
   const title = getTitle(filters)
   const subtitle = getSubtitle(filters, classes)
 
-  async function createImage() {
-    const normalized = description.trim()
-    if (normalized.length < 12) {
-      setError('Descreva melhor a imagem para continuar.')
-      return
-    }
-
-    setCreating(true)
-    setError('')
-    setMessage('')
-    try {
-      const result = await generateImage({
-        description: normalized,
-        imageFormat,
-        classId: filters.classId ?? null,
-        studentId: filters.studentId ?? null,
-      })
-
-      if (!result.allowed) {
-        setError('Você não possui GizTokens suficientes para criar esta imagem.')
-        return
-      }
-
-      setMessage('Imagem criada com sucesso.')
-      setIsCreateOpen(false)
-      setDescription('')
-      setImageFormat('portrait')
-      await loadDocuments(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível criar a imagem. Tente novamente.')
-    } finally {
-      setCreating(false)
-    }
-  }
-
   function downloadImage(doc: GeneratedDocument) {
     const imageDataUrl = imageVariantsById[doc.id]?.originalUrl
       ?? imageDetailsById[doc.id]?.imageDataUrl
@@ -288,24 +246,10 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
           </p>
         </div>
 
-        {message && (
-          <div className="mb-4 rounded-app-sm border border-gp bg-gbg px-3 py-2 text-[12px] text-gd">
-            {message}
-          </div>
-        )}
-
         {isImagesMode && (
-          <button
-            onClick={() => {
-              setError('')
-              setMessage('')
-              setIsCreateOpen(true)
-            }}
-            className="w-full mb-4 rounded-app-sm bg-gm text-white font-bold text-sm py-[13px] flex items-center justify-center gap-2"
-          >
-            <Plus size={16} />
-            Nova imagem
-          </button>
+          <div className="mb-4 rounded-app-sm border border-gp bg-gbg px-3 py-3 text-[12px] text-gd leading-[1.5]">
+            Para criar novas imagens, use o Criador com IA em <strong>Criação Livre → Imagem livre</strong>.
+          </div>
         )}
 
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -490,84 +434,6 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
           </button>
         )}
       </div>
-
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-end">
-          <div className="w-full bg-white rounded-t-[22px] border-t border-border max-h-[85vh] overflow-auto stage-fade-in">
-            {creating ? (
-              <div className="p-5 bg-cream">
-                <GenerationImageLoadingScreen />
-              </div>
-            ) : (
-              <div className="p-5">
-                <p className="text-[16px] font-serif text-gd">Nova imagem</p>
-                <p className="text-[12px] text-muted mt-1 leading-[1.5]">
-                  Descreva estilo, cores e cenário. Escolha o formato da imagem abaixo (padrão: retrato A4).
-                </p>
-                <textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Ex.: ilustração infantil de uma sala de aula acolhedora, tons pastel, sem texto."
-                  className="w-full mt-3 min-h-[180px] resize-none bg-cream border border-border rounded-app-sm px-3 py-3 text-[13px] text-ink outline-none leading-[1.6]"
-                />
-
-                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Formato da imagem</p>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {([
-                    { id: 'portrait', label: 'Retrato A4', preview: '▮' },
-                    { id: 'landscape', label: 'Paisagem A4', preview: '▬' },
-                    { id: 'square', label: 'Quadrado', preview: '■' },
-                  ] as const).map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setImageFormat(item.id)}
-                      className={`rounded-app-sm border px-2 py-3 text-center ${
-                        imageFormat === item.id
-                          ? 'bg-gbg border-gp text-gd'
-                          : 'bg-cream border-border text-muted'
-                      }`}
-                    >
-                      <span className="block text-[18px] leading-none">{item.preview}</span>
-                      <span className="block text-[11px] font-bold mt-2">{item.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mt-4">Qualidade da imagem</p>
-                <div className="mt-2 rounded-app-sm border border-gp bg-gbg px-3 py-3">
-                  <p className="text-[13px] font-bold text-ink">Padrão otimizada</p>
-                  <p className="text-[11px] text-muted mt-1">
-                    Qualidade equilibrada para manter bom resultado com custo mais baixo.
-                  </p>
-                </div>
-
-                {error && (
-                  <p className="mt-3 rounded-app-sm border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
-                    {error}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  <button
-                    onClick={() => setIsCreateOpen(false)}
-                    className="rounded-app-sm border border-border py-3 text-[13px] font-bold text-muted"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={createImage}
-                    disabled={creating}
-                    className="rounded-app-sm bg-gm text-white py-3 text-[13px] font-bold disabled:opacity-50"
-                  >
-                    Criar imagem
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

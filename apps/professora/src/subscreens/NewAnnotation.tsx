@@ -1,8 +1,9 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, Check, Mic, Paperclip, Pencil, PlusCircle, Send, Square, Trash2 } from 'lucide-react'
+import { ChevronLeft, Check, Mic, Paperclip, Pencil, PlusCircle, Send, Square, Trash2, Wand2 } from 'lucide-react'
 import { useNavStore, useAppStore } from '@/store'
 import { getAppDataMode } from '@/services/app-data'
 import { formatAiUsageMessage, generateAiChatReply, transcribeAnnotationAudio } from '@/services/ai-usage'
+import { improveAnnotationText } from '@/creator-v2/api'
 import { createSupabaseAnnotation, deleteSupabaseAnnotation, updateSupabaseAnnotation } from '@/services/supabase/annotations'
 import { isSupabaseConfigured } from '@/services/supabase/config'
 import { clearDraft, loadDraft, saveDraft } from '@/utils/draft'
@@ -96,6 +97,7 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
   const [chatLoading, setChatLoading] = useState(false)
   const [chatUsageMessage, setChatUsageMessage] = useState('')
   const [chatError, setChatError] = useState('')
+  const [improvingNote, setImprovingNote] = useState(false)
   const [draftMessage, setDraftMessage] = useState('')
   const chatBottomRef = useRef<HTMLDivElement | null>(null)
   const draftKeyRef = useRef('')
@@ -648,6 +650,36 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
     }
   }
 
+  async function handleImproveNote() {
+    if (text.trim().length < 12) {
+      setError('Escreva a anotação antes de aprimorar com IA.')
+      return
+    }
+    setImprovingNote(true)
+    setError('')
+    setUsageMessage('')
+    try {
+      const selectedClass = classes.find((item) => item.id === classId)
+      const selectedStudent = selectedClass?.students.find((item) => item.id === studentId)
+      const result = await improveAnnotationText({
+        noteText: text.trim(),
+        label: selectedModel?.label,
+        studentName: selectedStudent?.name,
+        className: selectedClass?.name,
+        classId: classId || null,
+        studentId: studentId || null,
+      })
+      setText(result.improvedText ?? text)
+      setUsageMessage(result.wallet?.giztokensRemaining != null
+        ? `Anotação aprimorada. GizTokens restantes: ${result.wallet.giztokensRemaining}.`
+        : 'Anotação aprimorada com sucesso.')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Não foi possível aprimorar a anotação.')
+    } finally {
+      setImprovingNote(false)
+    }
+  }
+
   async function save() {
     if (!canSave || (!selectedModel && !isDirectStudentNote)) {
       setError('Preencha a anotação e siga as escolhas indicadas.')
@@ -893,6 +925,16 @@ export default function NewAnnotationSubscreen(props?: { data?: unknown }) {
             onChange={(event) => setText(event.target.value)}
           />
           <p className="text-[10px] text-muted text-right">{text.length}</p>
+
+          <button
+            type="button"
+            onClick={handleImproveNote}
+            disabled={improvingNote || text.trim().length < 12}
+            className="mt-3 w-full rounded-app-sm border border-gp bg-gbg py-[11px] text-[12px] font-bold text-gd flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Wand2 size={14} />
+            {improvingNote ? 'Aprimorando nota...' : 'Aprimorar nota com IA'}
+          </button>
 
           <div className="mt-3 rounded-app-sm border border-border bg-cream p-3">
             <div className="flex items-center justify-between gap-3 mb-2">

@@ -14,7 +14,7 @@ export default function PedagogicalGeneratorSubscreen({ data }: PedagogicalGener
     const docKind = typeof navData.docKind === 'string' ? navData.docKind.trim() : ''
     closeSubscreen()
     openSubscreen('report', {
-      unifiedCreator: true,
+      mode: 'guided',
       documentTitle: docKind || undefined,
     })
   }, [closeSubscreen, data, openSubscreen])
