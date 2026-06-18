@@ -87,7 +87,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   const [tone, setTone] = useState<CreatorTone | null>(null)
   const [visualStyle, setVisualStyle] = useState<CreatorVisualStyle | null>(null)
   const [imageFormat, setImageFormat] = useState<CreatorImageFormat>('portrait')
-  const [freeOutput, setFreeOutput] = useState<FreeOutputChoice>('text')
+  const [freeOutput, setFreeOutput] = useState<FreeOutputChoice>(nav.freeOutput === 'image' ? 'image' : 'text')
   const [visualTitle, setVisualTitle] = useState('')
   const [visualSubtitle, setVisualSubtitle] = useState('')
   const [generating, setGenerating] = useState(false)

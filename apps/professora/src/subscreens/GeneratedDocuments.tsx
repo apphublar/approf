@@ -247,9 +247,14 @@ export default function GeneratedDocumentsSubscreen({ data }: { data?: unknown }
         </div>
 
         {isImagesMode && (
-          <div className="mb-4 rounded-app-sm border border-gp bg-gbg px-3 py-3 text-[12px] text-gd leading-[1.5]">
-            Para criar novas imagens, use o Criador com IA em <strong>Criação Livre → Imagem livre</strong>.
-          </div>
+          <button
+            type="button"
+            onClick={() => openSubscreen('report', { mode: 'free', freeOutput: 'image' })}
+            className="mb-4 w-full rounded-app-sm border border-gp bg-gbg px-3 py-3 text-left text-[12px] text-gd leading-[1.5] cursor-pointer"
+          >
+            Quer criar uma nova imagem? Toque aqui para abrir o Criador Pedagógico em{' '}
+            <strong>Criação Livre → Imagem livre</strong>.
+          </button>
         )}
 
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -522,8 +527,8 @@ function getTitle(filters: GeneratedDocumentsData) {
 function getSubtitle(filters: GeneratedDocumentsData, classes: ReturnType<typeof useAppStore.getState>['classes']) {
   if (filters.kind === 'images') {
     return {
-      heading: 'Imagens',
-      body: 'Crie imagens e acesse seu histórico.',
+      heading: 'Histórico de imagens',
+      body: 'Aqui ficam todas as imagens que você já gerou. Visualize, baixe, compartilhe ou arquive quando quiser.',
     }
   }
 
