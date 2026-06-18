@@ -25,6 +25,16 @@ export const CREATOR_MODES: Array<{ id: CreatorMode; title: string; description:
   },
 ]
 
+export const GUIDED_TYPES_WITH_ANNOTATIONS: CreatorDocumentType[] = [
+  'individual_report',
+  'portfolio_text',
+  'pedagogical_referral',
+]
+
+export function guidedTypeUsesAnnotations(documentType: CreatorDocumentType) {
+  return GUIDED_TYPES_WITH_ANNOTATIONS.includes(documentType)
+}
+
 export const GUIDED_TYPES: Array<{ id: CreatorDocumentType; label: string }> = [
   { id: 'individual_report', label: 'Relatório de Desenvolvimento Individual' },
   { id: 'portfolio_text', label: 'Portfólio Escrito' },

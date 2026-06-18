@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, Sparkles, Wand2 } from 'lucide-react'
+import { ChevronLeft, CircleAlert, Sparkles, Wand2 } from 'lucide-react'
 import type {
   CreatorDocumentType,
   CreatorImageFormat,
@@ -21,6 +21,7 @@ import {
   CREATOR_MODES,
   defaultDocumentTypeForMode,
   GUIDED_TYPES,
+  guidedTypeUsesAnnotations,
   IMAGE_FORMATS,
   outputFormatForFreeChoice,
   RECOMMENDED_PROMPTS,
@@ -81,14 +82,14 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   const [selectedClassId, setSelectedClassId] = useState(initialClassId)
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId)
   const [title, setTitle] = useState(typeof nav.title === 'string' ? nav.title : '')
+  const [otherDocumentTitle, setOtherDocumentTitle] = useState('')
   const [teacherPrompt, setTeacherPrompt] = useState('')
-  const [tone, setTone] = useState<CreatorTone>('acolhedor')
-  const [visualStyle, setVisualStyle] = useState<CreatorVisualStyle>('escolar')
+  const [tone, setTone] = useState<CreatorTone | null>(null)
+  const [visualStyle, setVisualStyle] = useState<CreatorVisualStyle | null>(null)
   const [imageFormat, setImageFormat] = useState<CreatorImageFormat>('portrait')
   const [freeOutput, setFreeOutput] = useState<FreeOutputChoice>('text')
   const [visualTitle, setVisualTitle] = useState('')
   const [visualSubtitle, setVisualSubtitle] = useState('')
-  const [includeShortText, setIncludeShortText] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [improving, setImproving] = useState(false)
   const [generated, setGenerated] = useState(false)
@@ -97,6 +98,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   const [reportId, setReportId] = useState('')
   const [usageMessage, setUsageMessage] = useState('')
   const [usageError, setUsageError] = useState('')
+  const [showPromptHelp, setShowPromptHelp] = useState(false)
 
   const selectedClass = classes.find((cls) => cls.id === selectedClassId) ?? classes[0]
   const selectedStudent = allStudents.find((student) => student.id === selectedStudentId) ?? allStudents[0]
@@ -111,10 +113,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
     prevModeRef.current = mode
     setDocumentType(defaultDocumentTypeForMode(mode))
     if (mode === 'free') setFreeOutput('text')
-    if (mode === 'visual_portfolio' && sourceMode === 'prompt_only') {
-      setSourceMode('student_notes')
-    }
-  }, [mode, sourceMode])
+  }, [mode])
 
   useEffect(() => {
     if (mode === 'free') {
@@ -122,8 +121,17 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
     }
   }, [freeOutput, mode])
 
+  const guidedUsesAnnotations = mode === 'guided' && guidedTypeUsesAnnotations(documentType)
+  const showAnnotationSource = guidedUsesAnnotations
+
+  useEffect(() => {
+    if (mode === 'visual_portfolio' || (mode === 'guided' && !guidedTypeUsesAnnotations(documentType))) {
+      setSourceMode('prompt_only')
+    }
+  }, [documentType, mode])
+
   const selectedNotes = useMemo(() => {
-    if (sourceMode === 'prompt_only' && mode !== 'visual_portfolio') return []
+    if (sourceMode === 'prompt_only') return []
     const classId = selectedClass?.id
     const studentId = selectedStudent?.id
     const studentName = selectedStudent?.name
@@ -165,13 +173,23 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   const canGenerate = useMemo(() => {
     if (generating || generatingRef.current) return false
     if (mode !== 'free' && !documentType) return false
-    if ((sourceMode !== 'prompt_only' || mode === 'visual_portfolio') && selectedNotes.length === 0 && mode !== 'free') return false
+    const needsNotes = guidedUsesAnnotations
+    if (needsNotes && selectedNotes.length === 0) return false
     if (mode === 'free' && teacherPrompt.trim().length < 8) return false
     if (mode !== 'free' && sourceMode === 'prompt_only' && teacherPrompt.trim().length < 8) return false
-    if ((sourceMode === 'student_notes' || sourceMode === 'notes_and_prompt') && !selectedStudent?.id && mode !== 'free') return false
-    if (sourceMode === 'class_notes' && !selectedClass?.id && mode !== 'free') return false
+    if (mode === 'guided' && documentType === 'other_pedagogical' && otherDocumentTitle.trim().length < 3) return false
+    if ((sourceMode === 'student_notes' || sourceMode === 'notes_and_prompt') && !selectedStudent?.id && showAnnotationSource) return false
+    if (sourceMode === 'class_notes' && !selectedClass?.id && showAnnotationSource) return false
     return true
-  }, [documentType, freeOutput, generating, mode, selectedClass?.id, selectedNotes.length, selectedStudent?.id, sourceMode, teacherPrompt])
+  }, [documentType, freeOutput, generating, guidedUsesAnnotations, mode, otherDocumentTitle, selectedClass?.id, selectedNotes.length, selectedStudent?.id, showAnnotationSource, sourceMode, teacherPrompt])
+
+  function toggleTone(next: CreatorTone) {
+    setTone((current) => (current === next ? null : next))
+  }
+
+  function toggleVisualStyle(next: CreatorVisualStyle) {
+    setVisualStyle((current) => (current === next ? null : next))
+  }
 
   function buildPayload(): CreatorPayload {
     return {
@@ -179,7 +197,9 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
       documentType: mode === 'free' ? outputFormatForFreeChoice(freeOutput) : documentType,
       outputFormat,
       sourceMode: mode === 'free' ? 'prompt_only' : sourceMode,
-      title: title.trim() || undefined,
+      title: mode === 'guided' && documentType === 'other_pedagogical'
+        ? otherDocumentTitle.trim() || undefined
+        : title.trim() || undefined,
       teacherPrompt: teacherPrompt.trim(),
       selectedNotes: selectedNotes.map((note) => ({
         id: note.id,
@@ -197,13 +217,12 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
         id: selectedClass.id,
         name: selectedClass.name,
       } : undefined,
-      tone,
-      visualStyle,
+      tone: tone ?? undefined,
+      visualStyle: visualStyle ?? undefined,
       imageFormat,
       visualOptions: mode === 'visual_portfolio' ? {
         visualTitle: visualTitle || undefined,
         subtitle: visualSubtitle || undefined,
-        includeShortText,
       } : undefined,
     }
   }
@@ -336,9 +355,11 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
           </button>
           <span className="font-serif text-[18px] text-gd">Gerando...</span>
         </div>
-        {outputFormat === 'image'
-          ? <GenerationImageLoadingScreen />
-          : <GenerationDocumentLoadingScreen variant="report" />}
+        <div className="flex-1 flex items-center justify-center min-h-0 px-[18px]">
+          {outputFormat === 'image'
+            ? <GenerationImageLoadingScreen />
+            : <GenerationDocumentLoadingScreen variant="report" />}
+        </div>
       </div>
     )
   }
@@ -394,10 +415,18 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
         <button onClick={closeSubscreen} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted bg-white">
           <ChevronLeft size={18} />
         </button>
-        <span className="font-serif text-[18px] text-gd flex-1">Criador com IA</span>
+        <span className="font-serif text-[18px] text-gd flex-1">Criador Pedagógico</span>
       </div>
 
       <div className="scroll-area px-[18px] py-5 pb-10">
+        <div className="rounded-app p-5 mb-5 text-white" style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}>
+          <p className="text-[12px] opacity-70 mb-1">Com inteligência artificial</p>
+          <h2 className="font-serif text-[22px] mb-2">Criador Pedagógico</h2>
+          <p className="text-[13px] opacity-80 leading-[1.6]">
+            Crie relatórios, planejamentos, diários, portfólios ou documentos livres a partir do título, das suas instruções e das anotações autorizadas.
+          </p>
+        </div>
+
         <p className="text-[13px] font-bold text-ink mb-3">O que você deseja criar?</p>
         <div className="flex flex-col gap-2 mb-5">
           {CREATOR_MODES.map((item) => (
@@ -440,6 +469,18 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
+
+            {documentType === 'other_pedagogical' && (
+              <>
+                <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Título do documento desejado</label>
+                <input
+                  value={otherDocumentTitle}
+                  onChange={(event) => setOtherDocumentTitle(event.target.value)}
+                  placeholder="Ex.: Registro de adaptação curricular"
+                  className="w-full mt-2 mb-4 rounded-app-sm border border-border bg-white px-3 py-3 text-[13px]"
+                />
+              </>
+            )}
           </>
         )}
 
@@ -458,7 +499,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
           </>
         )}
 
-        {mode !== 'free' && (
+        {showAnnotationSource && (
           <>
             <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Fonte do conteúdo</label>
             <div className="grid grid-cols-1 gap-2 mt-2 mb-4">
@@ -476,7 +517,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
           </>
         )}
 
-        {(sourceMode !== 'prompt_only' || mode === 'visual_portfolio') && mode !== 'free' && (
+        {showAnnotationSource && sourceMode !== 'prompt_only' && (
           <div className="bg-white rounded-app border border-border p-4 mb-4">
             <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Turma</label>
             <select
@@ -489,7 +530,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
               ))}
             </select>
 
-            {(sourceMode === 'student_notes' || sourceMode === 'notes_and_prompt' || mode === 'visual_portfolio') && sourceMode !== 'class_notes' && (
+            {(sourceMode === 'student_notes' || sourceMode === 'notes_and_prompt') && (
               <>
                 <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Criança</label>
                 <select
@@ -520,7 +561,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
           </div>
         )}
 
-        {mode !== 'free' && (
+        {mode === 'guided' && documentType !== 'other_pedagogical' && (
           <>
             <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">Título do documento</label>
             <input
@@ -546,29 +587,29 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
               placeholder="Subtítulo (opcional)"
               className="rounded-app-sm border border-border bg-white px-3 py-2 text-[13px]"
             />
-            <label className="flex items-center gap-2 text-[12px] text-muted px-1">
-              <input
-                type="checkbox"
-                checked={includeShortText}
-                onChange={(event) => setIncludeShortText(event.target.checked)}
-              />
-              Incluir frases curtas na imagem
-            </label>
           </div>
         )}
 
         {mode === 'visual_portfolio' && (
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="mb-4">
+            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">
+              Estilo visual rápido <span className="font-normal normal-case tracking-normal">(opcional)</span>
+            </label>
+            <p className="text-[11px] text-muted mt-1 mb-2 leading-[1.5]">
+              Escolha um estilo para orientar cores e composição da imagem. Toque de novo para desmarcar.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
             {VISUAL_STYLES.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setVisualStyle(item.id)}
+                onClick={() => toggleVisualStyle(item.id)}
                 className={`rounded-app-sm border py-2 text-[12px] font-bold ${visualStyle === item.id ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'}`}
               >
                 {item.label}
               </button>
             ))}
+            </div>
           </div>
         )}
 
@@ -588,47 +629,74 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
         )}
 
         {mode === 'guided' && (
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {TONE_OPTIONS.slice(0, 4).map((item) => (
+          <div className="mb-4">
+            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">
+              Tom do texto <span className="font-normal normal-case tracking-normal">(opcional)</span>
+            </label>
+            <p className="text-[11px] text-muted mt-1 mb-2 leading-[1.5]">
+              Toque em uma opção para selecionar. Toque de novo na mesma opção para desmarcar.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+            {TONE_OPTIONS.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setTone(item.id)}
+                onClick={() => toggleTone(item.id)}
                 className={`rounded-app-sm border py-2 text-[12px] font-bold ${tone === item.id ? 'bg-gbg border-gp text-gd' : 'bg-white border-border text-muted'}`}
               >
                 {item.label}
               </button>
             ))}
+            </div>
           </div>
         )}
 
-        <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">
-          {mode === 'free' ? 'O que você quer criar?' : 'Prompt da professora'}
-        </label>
+        {mode !== 'free' ? (
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">
+              Prompt da professora
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowPromptHelp((current) => !current)}
+              className="inline-flex items-center gap-1 rounded-full border border-[#F1D58B] bg-[#FFF8DC] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-[#6B5300]"
+              aria-expanded={showPromptHelp}
+            >
+              <CircleAlert size={13} strokeWidth={2.2} />
+              Entenda
+            </button>
+          </div>
+        ) : (
+          <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">
+            O que você quer criar?
+          </label>
+        )}
+
+        {mode !== 'free' && showPromptHelp && (
+          <div className="mb-2 rounded-app-sm border border-[#F1D58B] bg-[#FFF8DC] px-3 py-3 text-[12px] leading-[1.6] text-[#6B5300]">
+            Colocamos um modelo pronto para orientar a geração — você não precisa usar exatamente assim.
+            Pode editar, apagar ou escrever do seu jeito. Se quiser, use o botão abaixo para a IA organizar
+            melhor o seu pedido antes de gerar o documento.
+          </div>
+        )}
+
         <textarea
           value={teacherPrompt}
           onChange={(event) => setTeacherPrompt(event.target.value)}
           className="w-full mt-2 min-h-[180px] rounded-app-sm border border-border bg-white px-3 py-3 text-[13px] text-ink leading-[1.7] outline-none resize-y"
         />
 
-        <div className="grid grid-cols-2 gap-2 mt-3 mb-4">
-          <button
-            type="button"
-            onClick={() => setTeacherPrompt(RECOMMENDED_PROMPTS[documentType] ?? '')}
-            className="rounded-app-sm border border-border bg-white py-2 text-[12px] font-bold text-muted"
-          >
-            Usar modelo recomendado
-          </button>
+        {mode !== 'free' && (
           <button
             type="button"
             onClick={handleImprovePrompt}
             disabled={improving}
-            className="rounded-app-sm border border-gp bg-gbg py-2 text-[12px] font-bold text-gd disabled:opacity-50 flex items-center justify-center gap-1"
+            className="mt-3 mb-4 w-full rounded-app-sm border border-gp bg-gbg py-3 text-[12px] font-bold text-gd disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <Wand2 size={14} />
-            {improving ? 'Aprimorando...' : 'Aprimorar prompt com IA'}
+            {improving ? 'Aprimorando...' : 'Clique aqui para aprimorar texto com IA'}
           </button>
-        </div>
+        )}
 
         {(usageError || usageMessage) && (
           <p className={`mb-4 rounded-app-sm border px-3 py-2 text-[12px] ${usageError ? 'border-red-200 bg-red-50 text-red-700' : 'border-gp bg-gbg text-gd'}`}>

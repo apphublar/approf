@@ -6,7 +6,6 @@ import { getAppDataMode } from '@/services/app-data'
 import { deleteSupabaseAnnotation } from '@/services/supabase/annotations'
 import { deleteSupabaseTimelineEvent } from '@/services/supabase/timeline'
 import { getCachedReportById, listReports, prefetchReportsByIds } from '@/services/reports'
-import { listReportReviewEvents, type ReportReviewEvent } from '@/services/coordinator-review'
 import { getAdjustedPhotoStyle } from '@/utils/photo'
 import { getStudentAttendanceSummary } from '@/utils/attendance'
 import { countStudentMilestones, countStudentNotes } from '@/utils/pedagogical-records'
@@ -34,7 +33,6 @@ export default function StudentProfileSubscreen() {
   const [generatedCount, setGeneratedCount] = useState(0)
   const [notesCount, setNotesCount] = useState<number | null>(null)
   const [developmentReports, setDevelopmentReports] = useState<GeneratedDocument[]>([])
-  const [reviewEvents, setReviewEvents] = useState<ReportReviewEvent[]>([])
 
   useEffect(() => {
     setShowAllAnnotations(false)
@@ -77,21 +75,6 @@ export default function StudentProfileSubscreen() {
     }
   }, [activeStudentId])
 
-  useEffect(() => {
-    if (!activeStudentId) return
-    let active = true
-    listReportReviewEvents({ studentId: activeStudentId })
-      .then((events) => {
-        if (active) setReviewEvents(events)
-      })
-      .catch(() => {
-        if (active) setReviewEvents([])
-      })
-    return () => {
-      active = false
-    }
-  }, [activeStudentId])
-
   const activeClass = classes.find((item) => item.id === activeClassId)
   const classWithActiveStudent = classes.find((item) => item.students.some((student) => student.id === activeStudentId))
   const cls = activeClass?.students.some((student) => student.id === activeStudentId)
@@ -127,6 +110,13 @@ export default function StudentProfileSubscreen() {
     ? studentAnns
     : studentAnns.slice(0, ANNOTATION_PREVIEW_COUNT)
   const hasMoreAnnotations = studentAnns.length > ANNOTATION_PREVIEW_COUNT
+  const approvedDevelopmentReports = developmentReports
+    .filter((report) => report.coordinator_review_status === 'approved')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  const latestApprovedReports = approvedDevelopmentReports.slice(0, 3)
+  const pendingDevelopmentReports = developmentReports.filter(
+    (report) => report.coordinator_review_status !== 'approved' && report.status !== 'archived',
+  )
 
   async function handleDeleteTimelineEvent(eventId: string) {
     const confirmed = window.confirm('Deseja excluir este marco? Esta ação não pode ser desfeita.')
@@ -292,15 +282,20 @@ export default function StudentProfileSubscreen() {
         <div className="bg-white rounded-app p-4 border border-border shadow-card mb-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[10px] font-bold tracking-[0.08em] uppercase text-muted">Aprovação da coordenadora</p>
-            <span className="text-[11px] text-muted">{developmentReports.length} relatório(s)</span>
+            <span className="text-[11px] text-muted">{approvedDevelopmentReports.length} aprovado(s)</span>
           </div>
-          {developmentReports.length === 0 ? (
+          {pendingDevelopmentReports.length > 0 && (
+            <p className="text-[12px] text-[#856404] bg-[#FFF8DC] border border-[#F1D58B] rounded-app-sm px-3 py-2 mb-3 leading-[1.5]">
+              {pendingDevelopmentReports.length} relatório(s) aguardando revisão ou correção. Toque em um relatório para ver detalhes.
+            </p>
+          )}
+          {latestApprovedReports.length === 0 ? (
             <p className="text-[12px] text-muted leading-[1.6]">
-              Nenhum relatório de desenvolvimento foi gerado para esta criança.
+              Nenhum relatório aprovado pela coordenadora ainda.
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {developmentReports.slice(0, 5).map((report) => (
+              {latestApprovedReports.map((report) => (
                 <button
                   key={report.id}
                   onClick={() => openDevelopmentReport(report)}
@@ -312,24 +307,21 @@ export default function StudentProfileSubscreen() {
                       {formatReviewStatus(report.coordinator_review_status)}
                     </span>
                   </div>
-                  {report.coordinator_review_notes && (
-                    <p className="text-[11px] text-muted mt-2 leading-[1.4]">{report.coordinator_review_notes}</p>
-                  )}
                 </button>
               ))}
             </div>
           )}
-          {reviewEvents.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-border">
-              <p className="text-[11px] font-bold text-muted mb-2">Histórico da coordenadora</p>
-              {reviewEvents.slice(0, 4).map((event) => (
-                <div key={event.id} className="mb-3">
-                  <p className="text-[12px] font-bold text-ink">{formatReviewAction(event.action)}</p>
-                  <p className="text-[11px] text-muted">{event.actor_name || 'Coordenadora'} · {formatShortDate(event.created_at)}</p>
-                  {event.notes && <p className="text-[11px] text-muted mt-1 leading-[1.4]">{event.notes}</p>}
-                </div>
-              ))}
-            </div>
+          {developmentReports.length > 0 && (
+            <button
+              type="button"
+              onClick={() => openSubscreen('generated-documents', {
+                studentId: student.id,
+                reportType: 'development_report',
+              })}
+              className="w-full mt-3 py-2 text-[12px] font-bold text-gd"
+            >
+              Ver todos
+            </button>
           )}
         </div>
 
@@ -506,13 +498,6 @@ function getReviewStatusClass(status?: string | null) {
   if (status === 'approved') return 'bg-gbg text-gd border border-gp'
   if (status === 'changes_requested') return 'bg-[#FFF1F1] text-[#C1440E] border border-[#F3C0B1]'
   return 'bg-[#FFF3CD] text-[#856404] border border-[#EAD58A]'
-}
-
-function formatReviewAction(action: string) {
-  if (action === 'approve') return 'Relatório aprovado'
-  if (action === 'request_changes') return 'Correção solicitada'
-  if (action === 'comment') return 'Observação registrada'
-  return action
 }
 
 function formatStudentAge(years?: number, months?: number) {

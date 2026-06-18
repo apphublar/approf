@@ -21,7 +21,7 @@ export default function GenerationImageLoadingScreen() {
   }, [])
 
   return (
-    <div className="min-h-full flex items-center justify-center py-8">
+    <div className="h-full w-full flex items-center justify-center px-[18px]">
       <div className="w-full max-w-[360px] bg-white rounded-app border border-border shadow-card p-5">
         <div className="w-14 h-14 rounded-[16px] bg-gbg border border-gp text-gm flex items-center justify-center mx-auto animate-pulse">
           <ImageIcon size={24} />

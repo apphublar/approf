@@ -175,17 +175,9 @@ export default function AiPedagogicaSubscreen() {
 
       <div className="scroll-area px-[18px]">
         <>
-            <div className="rounded-app p-5 mt-[14px] mb-[16px] text-white" style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}>
-              <p className="text-[12px] opacity-70 mb-1">Criador Pedagógico</p>
-              <h2 className="font-serif text-[22px] mb-2">O que você precisa hoje?</h2>
-              <p className="text-[13px] opacity-80 leading-[1.6]">
-                Crie relatórios, planejamentos, diários, portfólios ou documentos livres a partir do título, das suas instruções e das anotações autorizadas.
-              </p>
-            </div>
-
             <button
               onClick={() => openSubscreen('report', { mode: 'guided' })}
-              className="w-full bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4"
+              className="w-full bg-white rounded-app px-[15px] py-[15px] border border-border shadow-card flex items-center gap-[13px] text-left active:scale-[.98] transition-transform mb-4 mt-[14px]"
             >
               <div className="w-[44px] h-[44px] rounded-[11px] flex items-center justify-center flex-shrink-0 text-gm" style={{ background: '#D8F3DC' }}>
                 <Sparkles size={20} />

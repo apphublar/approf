@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, Download, FileText, KeyRound, Pencil, Printer, Share2 } from 'lucide-react'
 import { useAppStore, useNavStore } from '@/store'
 import { createReportShareLink, getCachedReportById, getReportById, updateReport } from '@/services/reports'
-import { shareDocumentWithCoordinator } from '@/services/coordinator-review'
+import { listReportReviewEvents, shareDocumentWithCoordinator, type ReportReviewEvent } from '@/services/coordinator-review'
 import { isSupabaseAuthEnabled } from '@/services/supabase/config'
 import { generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
 import { previewGeneratedMaterialShare, publishGeneratedMaterialShare, type GeneratedMaterialPreview } from '@/services/materials'
@@ -42,6 +42,7 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
   const [materialPreview, setMaterialPreview] = useState<GeneratedMaterialPreview | null>(null)
   const [sharingAsMaterial, setSharingAsMaterial] = useState(false)
   const [coordinatorShareOpen, setCoordinatorShareOpen] = useState(false)
+  const [reviewEvents, setReviewEvents] = useState<ReportReviewEvent[]>([])
   const [coordinatorName, setCoordinatorName] = useState('')
   const [coordinatorEmail, setCoordinatorEmail] = useState('')
   const [sharingWithCoordinator, setSharingWithCoordinator] = useState(false)
@@ -115,6 +116,39 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
     if (document.report_type === 'development_report' || !isSupabaseAuthEnabled()) return
     setCoordinatorShareOpen(true)
   }, [openCoordinatorShareOnLoad, document, loading])
+
+  useEffect(() => {
+    if (!document?.id || document.report_type !== 'development_report') {
+      setReviewEvents([])
+      return
+    }
+    if (!document.coordinator_review_status || document.coordinator_review_status === 'not_required') {
+      setReviewEvents([])
+      return
+    }
+    if (!isSupabaseAuthEnabled()) return
+
+    let active = true
+    listReportReviewEvents({
+      studentId: document.student_id ?? undefined,
+      classId: document.class_id ?? undefined,
+    })
+      .then((events) => {
+        if (!active) return
+        setReviewEvents(
+          events
+            .filter((event) => event.report_id === document.id)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+        )
+      })
+      .catch(() => {
+        if (active) setReviewEvents([])
+      })
+
+    return () => {
+      active = false
+    }
+  }, [document?.id, document?.report_type, document?.coordinator_review_status, document?.student_id, document?.class_id])
 
   useEffect(() => {
     if (!document) return
@@ -454,6 +488,25 @@ export default function DocumentDetailSubscreen({ data }: DocumentDetailSubscree
                 </div>
               )}
 
+              {reviewEvents.length > 0 && (
+                <div className="rounded-app p-4 border border-border shadow-card mb-4 bg-white">
+                  <p className="text-[11px] font-bold text-muted mb-3 uppercase tracking-[0.08em]">Histórico da coordenadora</p>
+                  <div className="flex flex-col gap-3">
+                    {reviewEvents.map((event) => (
+                      <div key={event.id} className="border-b border-border pb-3 last:border-b-0 last:pb-0">
+                        <p className="text-[12px] font-bold text-ink">{formatReviewAction(event.action)}</p>
+                        <p className="text-[11px] text-muted mt-1">
+                          {event.actor_name || 'Coordenadora'} • {formatShortReviewDate(event.created_at)}
+                        </p>
+                        {event.notes && (
+                          <p className="text-[12px] text-muted mt-2 leading-[1.5]">{event.notes}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {isImageDocument && document.ai_artifacts?.imageDataUrl && (
                 <div className="bg-white rounded-app p-4 border border-border shadow-card mb-4">
                   <img
@@ -754,6 +807,19 @@ function formatCoordinatorReviewStatus(status: string) {
   if (status === 'approved') return 'Aprovado'
   if (status === 'changes_requested') return 'Correção solicitada'
   return 'Aguardando revisão'
+}
+
+function formatReviewAction(action: string) {
+  if (action === 'approve') return 'Relatório aprovado'
+  if (action === 'request_changes') return 'Correção solicitada'
+  if (action === 'comment') return 'Observação registrada'
+  return action
+}
+
+function formatShortReviewDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'data não informada'
+  return date.toLocaleDateString('pt-BR')
 }
 
 function getCoordinatorReviewBoxClass(status: string) {
