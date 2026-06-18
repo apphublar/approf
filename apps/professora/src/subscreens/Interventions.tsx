@@ -38,10 +38,20 @@ export default function InterventionsSubscreen() {
     [classes],
   )
 
+  const sortedClasses = useMemo(
+    () => [...classes].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [classes],
+  )
+
   const defaultStudentId = activeStudentId ?? allStudents[0]?.id ?? ''
+  const defaultClassId = classes.find((classData) => classData.students.some((student) => student.id === defaultStudentId))?.id
+    ?? sortedClasses[0]?.id
+    ?? ''
+
   const skipStudentResetRef = useRef(false)
   const restoringDraftRef = useRef(false)
 
+  const [selectedClassId, setSelectedClassId] = useState(defaultClassId)
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>(defaultStudentId ? [defaultStudentId] : [])
   const [activeStudentIndex, setActiveStudentIndex] = useState(0)
   const [historyFilterStudentId, setHistoryFilterStudentId] = useState('all')
@@ -68,6 +78,18 @@ export default function InterventionsSubscreen() {
 
   const currentStudentId = selectedStudentIds[activeStudentIndex] ?? selectedStudentIds[0] ?? ''
   const selectedStudent = allStudents.find((student) => student.id === currentStudentId) ?? allStudents[0]
+  const hasMultipleClasses = sortedClasses.length > 1
+
+  const studentsInSelectedClass = useMemo(() => {
+    const classItem = sortedClasses.find((item) => item.id === selectedClassId) ?? sortedClasses[0]
+    if (!classItem) return []
+    return [...classItem.students].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  }, [selectedClassId, sortedClasses])
+
+  const sortedAllStudents = useMemo(
+    () => [...allStudents].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [allStudents],
+  )
 
   const filteredHistory = useMemo(() => {
     const sorted = [...interventions].sort((a, b) => {
@@ -78,6 +100,20 @@ export default function InterventionsSubscreen() {
     if (historyFilterStudentId === 'all') return sorted
     return sorted.filter((item) => item.studentId === historyFilterStudentId)
   }, [historyFilterStudentId, interventions])
+
+  useEffect(() => {
+    if (!currentStudentId) return
+    const classId = allStudents.find((student) => student.id === currentStudentId)?.classId
+    if (classId && classId !== selectedClassId) {
+      setSelectedClassId(classId)
+    }
+  }, [allStudents, currentStudentId, selectedClassId])
+
+  useEffect(() => {
+    if (sortedClasses.length === 1 && sortedClasses[0].id !== selectedClassId) {
+      setSelectedClassId(sortedClasses[0].id)
+    }
+  }, [selectedClassId, sortedClasses])
 
   useEffect(() => {
     if (skipStudentResetRef.current) {
@@ -159,14 +195,20 @@ export default function InterventionsSubscreen() {
     return () => window.clearTimeout(timeout)
   }, [draftMessage])
 
-  function toggleStudentSelection(studentId: string) {
-    setSelectedStudentIds((current) => {
-      if (current.includes(studentId)) {
-        const next = current.filter((id) => id !== studentId)
-        return next.length > 0 ? next : current
-      }
-      return [...current, studentId]
-    })
+  function handleClassChange(classId: string) {
+    setSelectedClassId(classId)
+    const nextStudents = [...(sortedClasses.find((item) => item.id === classId)?.students ?? [])]
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+    const nextStudentId = nextStudents[0]?.id ?? ''
+    if (nextStudentId) {
+      setSelectedStudentIds([nextStudentId])
+      setActiveStudentIndex(0)
+    }
+  }
+
+  function handleStudentChange(studentId: string) {
+    setSelectedStudentIds([studentId])
+    setActiveStudentIndex(0)
   }
 
   function validateAnalyzeReturn() {
@@ -580,14 +622,6 @@ export default function InterventionsSubscreen() {
   }
 
   function beginGenerationForSelection() {
-    if (selectedStudentIds.length > 1) {
-      const [first, ...rest] = selectedStudentIds
-      setPendingStudentQueue(rest)
-      setSelectedStudentIds([first])
-      setActiveStudentIndex(0)
-      void handleGenerateSuggestions(first)
-      return
-    }
     void handleGenerateSuggestions()
   }
 
@@ -628,11 +662,7 @@ export default function InterventionsSubscreen() {
               <>
                 <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
                   <p className="text-[13px] text-soft leading-[1.6]">
-                    Registre uma observação e receba sugestões pedagógicas alinhadas à BNCC. Você pode selecionar
-                    {' '}
-                    <strong>uma ou mais crianças</strong>
-                    {' '}
-                    para solicitar intervenções.
+                    Registre uma observação e receba sugestões pedagógicas alinhadas à BNCC para a criança selecionada.
                   </p>
                   {pendingStudentQueue.length > 0 && (
                     <p className="mt-2 text-[11px] text-gm font-bold leading-[1.5]">
@@ -641,40 +671,33 @@ export default function InterventionsSubscreen() {
                   )}
                 </div>
 
-                <p className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted mb-2">Crianças</p>
-                <div className="flex flex-col gap-2 mb-4">
-                  {allStudents.map((student) => {
-                    const checked = selectedStudentIds.includes(student.id)
-                    return (
-                      <label
-                        key={student.id}
-                        className={`flex items-start gap-3 rounded-app-sm border px-3 py-3 cursor-pointer ${
-                          checked ? 'border-gp bg-gbg' : 'border-border bg-white'
-                        }`}
+                <div className="bg-white rounded-app border border-border shadow-card p-4 mb-4">
+                  {hasMultipleClasses && (
+                    <>
+                      <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Turma</label>
+                      <select
+                        value={selectedClassId}
+                        onChange={(event) => handleClassChange(event.target.value)}
+                        className="w-full mt-2 mb-3 rounded-app-sm border border-border bg-cream px-3 py-3 text-[13px] text-ink"
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleStudentSelection(student.id)}
-                          className="mt-1"
-                        />
-                        <span>
-                          <span className="block text-[13px] font-bold text-ink">{student.name}</span>
-                          <span className="block text-[11px] text-muted mt-0.5">{student.className}</span>
-                        </span>
-                      </label>
-                    )
-                  })}
-                </div>
+                        {sortedClasses.map((classItem) => (
+                          <option key={classItem.id} value={classItem.id}>{classItem.name}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
 
-                {selectedStudentIds.length > 1 && (
-                  <p className="text-[11px] text-muted mb-3 leading-[1.5]">
-                    As sugestões serão geradas para
-                    {' '}
-                    <strong>{selectedStudent.name}</strong>
-                    . Após concluir, você poderá continuar com as demais crianças selecionadas.
-                  </p>
-                )}
+                  <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Criança</label>
+                  <select
+                    value={currentStudentId}
+                    onChange={(event) => handleStudentChange(event.target.value)}
+                    className="w-full mt-2 rounded-app-sm border border-border bg-cream px-3 py-3 text-[13px] text-ink"
+                  >
+                    {studentsInSelectedClass.map((student) => (
+                      <option key={student.id} value={student.id}>{student.name}</option>
+                    ))}
+                  </select>
+                </div>
 
                 <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted">Observação da professora</label>
                 <textarea
@@ -691,7 +714,6 @@ export default function InterventionsSubscreen() {
                 >
                   <Sparkles size={17} />
                   Gerar sugestões
-                  {selectedStudentIds.length > 1 ? ` (${selectedStudentIds.length} crianças)` : ''}
                 </button>
               </>
             )}
@@ -899,7 +921,7 @@ export default function InterventionsSubscreen() {
                     className="rounded-app-sm border border-border bg-white px-2 py-1 text-[11px] text-ink"
                   >
                     <option value="all">Todas as crianças</option>
-                    {allStudents.map((student) => (
+                    {sortedAllStudents.map((student) => (
                       <option key={student.id} value={student.id}>{student.name}</option>
                     ))}
                   </select>

@@ -421,13 +421,12 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
       <div className="scroll-area px-[18px] py-5 pb-10">
         <div className="rounded-app p-5 mb-5 text-white" style={{ background: 'linear-gradient(135deg,#1B4332,#4F8341)' }}>
           <p className="text-[12px] opacity-70 mb-1">Com inteligência artificial</p>
-          <h2 className="font-serif text-[22px] mb-2">Criador Pedagógico</h2>
+          <h2 className="font-serif text-[22px] mb-2">O que você deseja criar?</h2>
           <p className="text-[13px] opacity-80 leading-[1.6]">
             Crie relatórios, planejamentos, diários, portfólios ou documentos livres a partir do título, das suas instruções e das anotações autorizadas.
           </p>
         </div>
 
-        <p className="text-[13px] font-bold text-ink mb-3">O que você deseja criar?</p>
         <div className="flex flex-col gap-2 mb-5">
           {CREATOR_MODES.map((item) => (
             <button
