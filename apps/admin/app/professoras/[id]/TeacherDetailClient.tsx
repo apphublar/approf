@@ -16,6 +16,7 @@ import { adjustTeacherGiztokensAction } from '../actions'
 import {
   blockTeacherAccess,
   liberarAcessoGratuito,
+  removePaymentOverdueNotice,
   sendPaymentOverdueNotice,
   updateTeacherSubscription,
 } from '../../assinaturas/actions'
@@ -55,6 +56,7 @@ type TeacherDetailClientProps = {
   activity: Array<{ id: string; action: string; detail: string; when: string; actor: string }>
   teacherOptions: Array<{ id: string; name: string; email: string }>
   monthStart: string
+  hasPaymentOverdueNotice: boolean
 }
 
 const planOptions = [
@@ -112,11 +114,19 @@ export function TeacherDetailClient(props: TeacherDetailClientProps) {
               <input type="hidden" name="returnTo" value={returnTo} />
               <button type="submit" className="btn-secondary-v2">Liberar gratis</button>
             </form>
-            <form action={sendPaymentOverdueNotice}>
-              <input type="hidden" name="teacherId" value={props.teacher.id} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <button type="submit" className="btn-warn-v2">Avisar atraso</button>
-            </form>
+            {props.hasPaymentOverdueNotice ? (
+              <form action={removePaymentOverdueNotice}>
+                <input type="hidden" name="teacherId" value={props.teacher.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <button type="submit" className="btn-warn-v2">REMOVER AVISO</button>
+              </form>
+            ) : (
+              <form action={sendPaymentOverdueNotice}>
+                <input type="hidden" name="teacherId" value={props.teacher.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <button type="submit" className="btn-warn-v2">Avisar atraso</button>
+              </form>
+            )}
             <form action={blockTeacherAccess}>
               <input type="hidden" name="teacherId" value={props.teacher.id} />
               <input type="hidden" name="returnTo" value={returnTo} />

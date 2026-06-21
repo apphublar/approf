@@ -20,6 +20,7 @@ const actionLabels: Record<string, string> = {
   teacher_access_granted_free: 'Acesso gratuito liberado',
   teacher_giztokens_adjusted: 'GizTokens ajustados',
   teacher_payment_overdue_notice_sent: 'Aviso de atraso enviado',
+  teacher_payment_overdue_notice_removed: 'Aviso de atraso removido',
   teacher_access_blocked_manual: 'Conta bloqueada',
   feature_mode_updated: 'Modo de feature alterado',
   feature_access_granted: 'Acesso a feature liberado',

@@ -75,6 +75,7 @@ export interface GeneratedImageInput {
   quality?: 'standard' | 'medium' | 'high'
   classId?: string | null
   studentId?: string | null
+  referenceImageDataUrls?: string[]
 }
 
 export interface AiChatGenerationInput {
@@ -393,6 +394,7 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
           description: input.description,
           imageFormat: input.imageFormat ?? 'portrait',
           imageQuality: quality,
+          referenceImageDataUrls: input.referenceImageDataUrls ?? [],
         },
       }),
       signal: controller.signal,

@@ -72,6 +72,7 @@ export async function POST(request: Request) {
         imageQuality: quality,
       },
       logId: reservedLogId,
+      referenceImageDataUrls: parseReferenceImageDataUrls(requestSummary),
     })
     generatedReportId = generated.reportId
 
@@ -98,8 +99,13 @@ export async function POST(request: Request) {
         message: reservation.message || 'Imagem criada com sucesso.',
         chargeSource: reservation.chargeSource,
         wallet: reservation.wallet,
+        imageDataUrl: generated.imageDataUrl,
+        prompt: generated.prompt,
+        quality: generated.quality,
         reportId: generated.reportId,
         promptVersion,
+        provider: generated.provider,
+        model: generated.model,
       },
       { status: 200, headers: corsHeaders },
     )
@@ -184,4 +190,13 @@ function resolveStandaloneImageModel() {
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+function parseReferenceImageDataUrls(requestSummary: unknown) {
+  if (!isObjectRecord(requestSummary)) return []
+  const value = requestSummary.referenceImageDataUrls
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is string => typeof item === 'string' && item.startsWith('data:image/'))
+    .slice(0, 12)
 }

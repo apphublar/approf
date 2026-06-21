@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createSupabaseServiceClient } from '../../lib/supabase-server'
 import { getCurrentMonthPeriod, loadTeacherWalletsForMonth } from '../../lib/giztokens-admin'
 import { listTeacherVerificationRequests } from '../../lib/account'
+import { listTeachersWithActivePaymentNotice } from '../../assinaturas/actions'
 import { TeacherDetailClient } from './TeacherDetailClient'
 
 export const dynamic = 'force-dynamic'
@@ -67,6 +68,7 @@ export default async function TeacherDetailPage({ params }: { params: Promise<{ 
     }))
 
   const verificationForTeacher = verificationRequests.find((item) => item.ownerId === id) ?? null
+  const activePaymentNotices = await listTeachersWithActivePaymentNotice([id])
   const verificationPayload = verificationForTeacher
     ? {
         id: verificationForTeacher.id,
@@ -102,6 +104,7 @@ export default async function TeacherDetailPage({ params }: { params: Promise<{ 
       activity={activity}
       teacherOptions={[{ id: teacher.id, name: teacherName, email: teacher.email }]}
       monthStart={monthStart}
+      hasPaymentOverdueNotice={activePaymentNotices.has(id)}
       />
     </Suspense>
   )
@@ -127,6 +130,7 @@ function formatAuditAction(action: string) {
     teacher_access_granted_free: 'Acesso gratuito liberado',
     teacher_giztokens_adjusted: 'GizTokens ajustados',
     teacher_payment_overdue_notice_sent: 'Aviso de atraso enviado',
+    teacher_payment_overdue_notice_removed: 'Aviso de atraso removido',
     teacher_access_blocked_manual: 'Conta bloqueada',
     verification_approved: 'Verificação aprovada',
     verification_rejected: 'Verificação rejeitada',

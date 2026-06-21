@@ -37,6 +37,7 @@ interface GenerateStandaloneImageInput {
   promptVersion: string
   requestSummary?: Record<string, unknown>
   logId: string
+  referenceImageDataUrls?: string[]
 }
 
 interface GenerateStandaloneImageResult {
@@ -85,7 +86,7 @@ export async function generatePortfolioImage(
   const generated = input.inputImageDataUrl
     ? await requestOpenAiImageEdit({
         model,
-        inputImageDataUrl: input.inputImageDataUrl,
+        inputImageDataUrls: [input.inputImageDataUrl],
         prompt,
         size,
         quality,
@@ -150,20 +151,35 @@ export async function generateStandaloneImage(
   input: GenerateStandaloneImageInput,
 ): Promise<GenerateStandaloneImageResult> {
   const summary = input.requestSummary ?? {}
+  const referenceImageDataUrls = normalizeReferenceImageDataUrls(
+    input.referenceImageDataUrls ?? summary.referenceImageDataUrls,
+  )
   const model = resolveOpenAiStandaloneImageModel()
   const size = resolveStandaloneImageSize(summary)
   const quality = resolveStandaloneImageQuality(summary)
-  const prompt = buildStandaloneImagePrompt(summary, size)
+  const prompt = referenceImageDataUrls.length
+    ? buildStandaloneImageEditPrompt(summary, size, referenceImageDataUrls.length)
+    : buildStandaloneImagePrompt(summary, size)
 
-  const generated = await requestOpenAiImage({
-    model,
-    prompt,
-    size,
-    quality,
-    user: input.ownerId,
-    timeoutMs: 270000,
-    preferJpeg: true,
-  })
+  const generated = referenceImageDataUrls.length
+    ? await requestOpenAiImageEdit({
+        model,
+        inputImageDataUrls: referenceImageDataUrls,
+        prompt,
+        size,
+        quality,
+        user: input.ownerId,
+        timeoutMs: 270000,
+      })
+    : await requestOpenAiImage({
+        model,
+        prompt,
+        size,
+        quality,
+        user: input.ownerId,
+        timeoutMs: 270000,
+        preferJpeg: true,
+      })
 
   const actualCostCents = estimateOpenAiImageCostCents(generated.inputTokens, generated.outputTokens, 'standalone')
   const body = buildPersistedStandaloneImageBody({
@@ -307,7 +323,7 @@ async function requestOpenAiImage(input: {
 
 async function requestOpenAiImageEdit(input: {
   model: string
-  inputImageDataUrl: string
+  inputImageDataUrls: string[]
   prompt: string
   size: string
   quality: string
@@ -319,15 +335,9 @@ async function requestOpenAiImageEdit(input: {
     throw new PublicAiGenerationError('Serviço de imagem indisponível no momento. Tente novamente em instantes.')
   }
 
-  const separatorIdx = input.inputImageDataUrl.indexOf(',')
-  if (separatorIdx < 0) {
-    throw new PublicAiGenerationError('Foto inválida. Tente novamente com outra imagem.')
+  if (!input.inputImageDataUrls.length) {
+    throw new PublicAiGenerationError('Nenhuma imagem anexada válida foi enviada.')
   }
-  const header = input.inputImageDataUrl.slice(0, separatorIdx)
-  const base64 = input.inputImageDataUrl.slice(separatorIdx + 1)
-  const mimeType = header.match(/data:([^;]+)/)?.[1] ?? 'image/jpeg'
-  const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
-  const imageBytes = Buffer.from(base64, 'base64')
 
   const MAX_ATTEMPTS = 2
   let lastError: PublicAiGenerationError | null = null
@@ -337,10 +347,23 @@ async function requestOpenAiImageEdit(input: {
       await new Promise((resolve) => setTimeout(resolve, 3000))
     }
 
-    const imageBlob = new Blob([imageBytes], { type: mimeType })
     const form = new FormData()
     form.append('model', input.model)
-    form.append('image[]', imageBlob, `photo.${ext}`)
+    let appendedImages = 0
+    for (const [index, dataUrl] of input.inputImageDataUrls.entries()) {
+      const separatorIdx = dataUrl.indexOf(',')
+      if (separatorIdx < 0) continue
+      const header = dataUrl.slice(0, separatorIdx)
+      const base64 = dataUrl.slice(separatorIdx + 1)
+      const mimeType = header.match(/data:([^;]+)/)?.[1] ?? 'image/jpeg'
+      const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
+      const imageBytes = Buffer.from(base64, 'base64')
+      form.append('image[]', new Blob([imageBytes], { type: mimeType }), `reference-${index + 1}.${ext}`)
+      appendedImages += 1
+    }
+    if (appendedImages === 0) {
+      throw new PublicAiGenerationError('Nenhuma imagem anexada válida foi enviada.')
+    }
     form.append('prompt', input.prompt)
     form.append('n', '1')
     form.append('size', input.size)
@@ -593,6 +616,36 @@ Requisitos:
 
 Descrição da professora:
 ${description}`
+}
+
+function buildStandaloneImageEditPrompt(summary: Record<string, unknown>, size: string, attachedCount: number) {
+  const description = asString(summary.description)?.trim()
+  if (!description) {
+    throw new PublicAiGenerationError('Descreva o que deseja gerar.')
+  }
+
+  const layout = describeImageLayoutFromSize(size)
+  const attachmentNote = attachedCount > 1
+    ? `A professora anexou ${attachedCount} imagens. Siga exatamente o pedido dela sobre como usar cada uma.`
+    : 'A professora anexou uma imagem. Siga exatamente o pedido dela sobre como usar a foto.'
+
+  return `${attachmentNote}
+
+Requisitos:
+- Formato obrigatório: ${layout} (${size}).
+- Use português brasileiro quando houver texto visível.
+- Respeite fielmente o pedido da professora.
+- Evite elementos ofensivos, diagnósticos médicos, marcas externas ou conteúdo impróprio para ambiente escolar.
+
+Pedido da professora:
+${description}`
+}
+
+function normalizeReferenceImageDataUrls(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is string => typeof item === 'string' && item.startsWith('data:image/'))
+    .slice(0, 12)
 }
 
 function buildPersistedImageBody(input: {

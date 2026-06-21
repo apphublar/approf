@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, CircleAlert, Sparkles, Wand2 } from 'lucide-react'
+import { ChevronLeft, CircleAlert, ImagePlus, Sparkles, Wand2, X } from 'lucide-react'
 import type {
   CreatorDocumentType,
   CreatorImageFormat,
@@ -36,6 +36,14 @@ interface CreatorV2ScreenProps {
 }
 
 type FreeOutputChoice = 'text' | 'image'
+type ReferenceImageAttachment = {
+  id: string
+  name: string
+  dataUrl: string
+}
+
+const MAX_FREE_REFERENCE_IMAGES = 12
+const MAX_FREE_REFERENCE_IMAGE_BYTES = 5 * 1024 * 1024
 
 function parseNavData(data: unknown) {
   if (!data || typeof data !== 'object') return {}
@@ -88,6 +96,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   const [visualStyle, setVisualStyle] = useState<CreatorVisualStyle | null>(null)
   const [imageFormat, setImageFormat] = useState<CreatorImageFormat>('portrait')
   const [freeOutput, setFreeOutput] = useState<FreeOutputChoice>(nav.freeOutput === 'image' ? 'image' : 'text')
+  const [referenceImages, setReferenceImages] = useState<ReferenceImageAttachment[]>([])
   const [visualTitle, setVisualTitle] = useState('')
   const [visualSubtitle, setVisualSubtitle] = useState('')
   const [generating, setGenerating] = useState(false)
@@ -119,6 +128,11 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
     if (mode === 'free') {
       setDocumentType(outputFormatForFreeChoice(freeOutput))
     }
+  }, [freeOutput, mode])
+
+  useEffect(() => {
+    if (mode === 'free' && freeOutput === 'image') return
+    setReferenceImages([])
   }, [freeOutput, mode])
 
   const guidedUsesAnnotations = mode === 'guided' && guidedTypeUsesAnnotations(documentType)
@@ -189,6 +203,48 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
 
   function toggleVisualStyle(next: CreatorVisualStyle) {
     setVisualStyle((current) => (current === next ? null : next))
+  }
+
+  async function handleReferenceImagesSelected(fileList: FileList | null) {
+    if (!fileList?.length) return
+    const remainingSlots = MAX_FREE_REFERENCE_IMAGES - referenceImages.length
+    if (remainingSlots <= 0) {
+      setUsageError('Você atingiu o limite de imagens para esta geração. Remova alguma para adicionar outra.')
+      return
+    }
+
+    const files = Array.from(fileList).slice(0, remainingSlots)
+    const nextItems: ReferenceImageAttachment[] = []
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        setUsageError('Anexe apenas arquivos de imagem.')
+        continue
+      }
+      if (file.size > MAX_FREE_REFERENCE_IMAGE_BYTES) {
+        setUsageError('Cada imagem pode ter no máximo 5 MB.')
+        continue
+      }
+      try {
+        const dataUrl = await readFileAsDataUrl(file)
+        nextItems.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: file.name,
+          dataUrl,
+        })
+      } catch {
+        setUsageError('Não foi possível ler uma das imagens selecionadas.')
+      }
+    }
+
+    if (nextItems.length > 0) {
+      setReferenceImages((current) => [...current, ...nextItems])
+      setUsageError('')
+    }
+  }
+
+  function removeReferenceImage(id: string) {
+    setReferenceImages((current) => current.filter((item) => item.id !== id))
   }
 
   function buildPayload(): CreatorPayload {
@@ -278,6 +334,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
           imageFormat: payload.imageFormat,
           classId,
           studentId,
+          referenceImageDataUrls: referenceImages.map((item) => item.dataUrl),
         })
         if (!result.allowed || !result.imageDataUrl) {
           setUsageError(result.message || 'Não foi possível gerar a imagem.')
@@ -671,6 +728,62 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
           </label>
         )}
 
+        {mode === 'free' && freeOutput === 'image' && (
+          <div className="mb-4 mt-3 rounded-app border border-border bg-white p-4">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <label className="text-[11px] font-bold text-muted uppercase tracking-[0.08em]">
+                Anexar imagens <span className="font-normal normal-case tracking-normal">(opcional)</span>
+              </label>
+              {referenceImages.length > 0 && (
+                <span className="text-[11px] text-muted">
+                  {referenceImages.length} {referenceImages.length === 1 ? 'imagem' : 'imagens'}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-muted leading-[1.5] mb-3">
+              Inclua quantas imagens quiser. No pedido abaixo, diga o que deseja que a IA faça com elas.
+            </p>
+
+            {referenceImages.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {referenceImages.map((item) => (
+                  <div key={item.id} className="relative rounded-app-sm border border-border overflow-hidden bg-cream">
+                    <img
+                      src={item.dataUrl}
+                      alt={item.name}
+                      className="w-full h-24 object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeReferenceImage(item.id)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/55 text-white flex items-center justify-center"
+                      aria-label={`Remover ${item.name}`}
+                    >
+                      <X size={12} />
+                    </button>
+                    <p className="px-2 py-1 text-[10px] text-muted truncate">{item.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="relative w-full py-3 rounded-app-sm border border-gp bg-gbg text-gd font-bold text-[12px] flex items-center justify-center gap-2 overflow-hidden cursor-pointer">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                onChange={(event) => {
+                  void handleReferenceImagesSelected(event.currentTarget.files)
+                  event.currentTarget.value = ''
+                }}
+              />
+              <ImagePlus size={15} />
+              Anexar imagem
+            </label>
+          </div>
+        )}
+
         {mode !== 'free' && showPromptHelp && (
           <div className="mb-2 rounded-app-sm border border-[#F1D58B] bg-[#FFF8DC] px-3 py-3 text-[12px] leading-[1.6] text-[#6B5300]">
             Colocamos um modelo pronto para orientar a geração — você não precisa usar exatamente assim.
@@ -715,4 +828,16 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
       </div>
     </div>
   )
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result)
+      else reject(new Error('invalid file'))
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('invalid file'))
+    reader.readAsDataURL(file)
+  })
 }

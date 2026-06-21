@@ -11,6 +11,8 @@ import {
   blockAllOverdueAccess,
   blockTeacherAccess,
   liberarAcessoGratuito,
+  listTeachersWithActivePaymentNotice,
+  removePaymentOverdueNotice,
   sendAllPaymentOverdueNotices,
   sendPaymentOverdueNotice,
 } from './actions'
@@ -44,6 +46,7 @@ export default async function SubscriptionsPage() {
     return { teacher, subscription, access: accessStatusFromSubscription(subscription) }
   })
   const overdueTeachers = classified.filter((item) => item.access === 'overdue')
+  const activePaymentNotices = await listTeachersWithActivePaymentNotice(teachers.map((teacher) => teacher.id))
 
   return (
     <div className="admin-page-wrap">
@@ -101,11 +104,19 @@ export default async function SubscriptionsPage() {
                 <button type="submit" className="btn-secondary-v2 btn-sm-v2"><Unlock size={13} /> Grátis</button>
               </form>
               {access === 'overdue' && (
-                <form action={sendPaymentOverdueNotice}>
-                  <input type="hidden" name="teacherId" value={teacher.id} />
-                  <input type="hidden" name="returnTo" value="/assinaturas" />
-                  <button type="submit" className="btn-warn-v2 btn-sm-v2">Avisar</button>
-                </form>
+                activePaymentNotices.has(teacher.id) ? (
+                  <form action={removePaymentOverdueNotice}>
+                    <input type="hidden" name="teacherId" value={teacher.id} />
+                    <input type="hidden" name="returnTo" value="/assinaturas" />
+                    <button type="submit" className="btn-warn-v2 btn-sm-v2">Remover aviso</button>
+                  </form>
+                ) : (
+                  <form action={sendPaymentOverdueNotice}>
+                    <input type="hidden" name="teacherId" value={teacher.id} />
+                    <input type="hidden" name="returnTo" value="/assinaturas" />
+                    <button type="submit" className="btn-warn-v2 btn-sm-v2">Avisar</button>
+                  </form>
+                )
               )}
               {access !== 'blocked' && (
                 <form action={blockTeacherAccess}>

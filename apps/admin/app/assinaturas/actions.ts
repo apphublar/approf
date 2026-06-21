@@ -102,20 +102,29 @@ export async function liberarAcessoGratuito(formData: FormData) {
 }
 
 export async function sendPaymentOverdueNotice(formData: FormData) {
-  await requireAdminSession()
+  const admin = await requireAdminSession()
   const teacherId = String(formData.get('teacherId') ?? '').trim()
   const returnTo = safeReturnPath(formData.get('returnTo'), '/assinaturas')
   if (!teacherId) return
-  await createPaymentNotice([teacherId])
+  await createPaymentNotice([teacherId], admin.userId)
   redirectWithToast(returnTo, 'Aviso de atraso enviado.')
 }
 
+export async function removePaymentOverdueNotice(formData: FormData) {
+  const admin = await requireAdminSession()
+  const teacherId = String(formData.get('teacherId') ?? '').trim()
+  const returnTo = safeReturnPath(formData.get('returnTo'), '/assinaturas')
+  if (!teacherId) return
+  await cancelPaymentNotices([teacherId], admin.userId)
+  redirectWithToast(returnTo, 'Aviso removido.')
+}
+
 export async function sendAllPaymentOverdueNotices(formData?: FormData) {
-  await requireAdminSession()
+  const admin = await requireAdminSession()
   const returnTo = safeReturnPath(formData?.get('returnTo') ?? null, '/assinaturas')
   const supabase = createSupabaseServiceClient()
   const overdue = await listOverdueSubscriptions(supabase)
-  await createPaymentNotice(overdue.map((item) => item.user_id))
+  await createPaymentNotice(overdue.map((item) => item.user_id), admin.userId)
   redirectWithToast(returnTo, 'Aviso enviado para todas as contas em atraso.')
 }
 
@@ -190,12 +199,15 @@ export async function updateTeacherSubscription(formData: FormData) {
   redirectWithToast(returnTo, 'Assinatura atualizada.')
 }
 
-async function createPaymentNotice(teacherIds: string[]) {
+async function createPaymentNotice(teacherIds: string[], actorId: string) {
   const uniqueIds = Array.from(new Set(teacherIds.filter(Boolean)))
   if (!uniqueIds.length) return
 
   const supabase = createSupabaseServiceClient()
   const now = new Date().toISOString()
+
+  await cancelPaymentNotices(uniqueIds)
+
   const { error } = await supabase.from('notification_events').insert(
     uniqueIds.map((teacherId) => ({
       user_id: teacherId,
@@ -205,19 +217,62 @@ async function createPaymentNotice(teacherIds: string[]) {
       sent_at: now,
       payload: {
         title: 'Pagamento em atraso',
-        message: 'Identificamos uma pendencia no pagamento do Approf. O acesso continua liberado por enquanto, mas regularize para evitar bloqueio manual pelo admin.',
+        message: 'Identificamos uma pendencia no pagamento do Approf. O acesso continua liberado por enquanto, mas regularize para evitar bloqueio.',
       },
     })),
   )
   if (error) throw new Error(`Notification error: ${error.message}`)
 
   await supabase.from('admin_action_logs').insert({
-    actor_id: null,
+    actor_id: actorId,
     action: 'teacher_payment_overdue_notice_sent',
     target_table: 'notification_events',
     target_id: null,
     metadata: { teacherIds: uniqueIds },
   })
+}
+
+async function cancelPaymentNotices(teacherIds: string[], actorId?: string) {
+  const uniqueIds = Array.from(new Set(teacherIds.filter(Boolean)))
+  if (!uniqueIds.length) return
+
+  const supabase = createSupabaseServiceClient()
+  const { error } = await supabase
+    .from('notification_events')
+    .update({ status: 'canceled' })
+    .in('user_id', uniqueIds)
+    .eq('channel', 'system')
+    .eq('type', 'payment_overdue_notice')
+    .eq('status', 'sent')
+
+  if (error) throw new Error(`Notification cancel error: ${error.message}`)
+
+  if (actorId) {
+    await supabase.from('admin_action_logs').insert({
+      actor_id: actorId,
+      action: 'teacher_payment_overdue_notice_removed',
+      target_table: 'notification_events',
+      target_id: null,
+      metadata: { teacherIds: uniqueIds },
+    })
+  }
+}
+
+export async function listTeachersWithActivePaymentNotice(teacherIds: string[]) {
+  const uniqueIds = Array.from(new Set(teacherIds.filter(Boolean)))
+  if (!uniqueIds.length) return new Set<string>()
+
+  const supabase = createSupabaseServiceClient()
+  const { data, error } = await supabase
+    .from('notification_events')
+    .select('user_id')
+    .in('user_id', uniqueIds)
+    .eq('channel', 'system')
+    .eq('type', 'payment_overdue_notice')
+    .eq('status', 'sent')
+
+  if (error) throw new Error(`Notification lookup error: ${error.message}`)
+  return new Set((data ?? []).map((item) => item.user_id))
 }
 
 async function blockSubscriptions(teacherIds: string[], note: string) {
