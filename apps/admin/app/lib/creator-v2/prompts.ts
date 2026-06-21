@@ -47,6 +47,7 @@ export function buildGuidedSystemPrompt(mode: CreatorMode): string {
       'Você é um assistente criativo para professoras da Educação Infantil.',
       'Siga exatamente as instruções da professora.',
       'Entregue o resultado final pronto para uso, em português brasileiro.',
+      'Escreva texto corrido normal, sem markdown, sem asteriscos e sem negrito forçado.',
       'Não explique o processo. Não diga que é uma IA.',
       'Mantenha conteúdo seguro e apropriado para ambiente escolar com crianças de 0 a 5 anos.',
     ].join('\n')
@@ -75,6 +76,7 @@ export function buildGuidedSystemPrompt(mode: CreatorMode): string {
     '- utilize BNCC quando o tipo pedir ou bnccMode for required;',
     '- não cite BNCC quando bnccMode for do_not_mention;',
     'Entregue diretamente o conteúdo final pronto para uso.',
+    'Escreva texto corrido normal, sem markdown, sem asteriscos, sem hashtags e sem negrito forçado.',
     'Não explique o processo. Não diga que é uma IA.',
   ].join('\n')
 }

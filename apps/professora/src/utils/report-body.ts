@@ -19,7 +19,7 @@ const STRUCTURED_FIELD_LABELS: Record<string, string> = {
 }
 
 export function normalizeReportBodyHtml(value: string) {
-  const trimmed = value.trim()
+  const trimmed = stripMarkdownFromPedagogicalText(value.trim())
   if (!trimmed) return ''
 
   const structured = parseStructuredBody(trimmed)
@@ -137,7 +137,7 @@ function formatStructuredReportContent(value: unknown): string {
         if (item && typeof item === 'object' && !Array.isArray(item)) {
           const record = item as Record<string, unknown>
           const title = typeof record.title === 'string' && record.title.trim()
-            ? record.title.trim()
+            ? stripMarkdownFromPedagogicalText(record.title.trim())
             : `Sugestão ${index + 1}`
           const { title: _title, ...rest } = record
           const inner = formatStructuredReportContent(Object.keys(rest).length ? rest : record)
@@ -158,7 +158,7 @@ function formatStructuredReportContent(value: unknown): string {
       if (typeof item === 'string' && !item.trim()) return ''
       const label = STRUCTURED_FIELD_LABELS[key] || formatFieldLabel(key)
       if (typeof item === 'string') {
-        return `<section><h3>${escapeHtml(label)}</h3><p>${escapeHtml(decodeUnicodeEscapes(item)).replace(/\n/g, '<br>')}</p></section>`
+        return `<section><h3>${escapeHtml(label)}</h3><p>${escapeHtml(stripMarkdownFromPedagogicalText(decodeUnicodeEscapes(item))).replace(/\n/g, '<br>')}</p></section>`
       }
       if (Array.isArray(item) || typeof item === 'object') {
         const nested = formatStructuredReportContent(item)
@@ -193,6 +193,25 @@ function formatFieldLabel(key: string) {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^./, (char) => char.toUpperCase())
+}
+
+function stripMarkdownFromPedagogicalText(value: string) {
+  return value
+    .replace(/\r\n/g, '\n')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/`{3}[\s\S]*?`{3}/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    .replace(/^-{3,}$/gm, '')
+    .replace(/^={3,}$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function decodeHtmlEntities(value: string) {

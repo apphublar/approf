@@ -5,11 +5,12 @@ import {
   withOpenAiTemperature,
 } from './openai-models'
 import { createSupabaseServiceClient } from './supabase-server'
-import type { BuildPromptInput } from './pedagogical-prompts'
+import { stripMarkdownFromPedagogicalText } from './pedagogical-text-format'
 import {
   buildStage1DraftPrompt,
   buildStage2BnccReviewPrompt,
   pipelineStagePromptVersion,
+  type BuildPromptInput,
 } from './pedagogical-prompts'
 import {
   DOCUMENT_WORD_LIMITS,
@@ -699,24 +700,10 @@ function cleanupGeneratedText(value: string) {
   const structured = tryParseStructuredJson(trimmed)
   if (structured != null) {
     const readable = structuredObjectToReadableText(structured)
-    if (readable.trim()) return readable.trim()
+    if (readable.trim()) return stripMarkdownFromPedagogicalText(readable.trim())
   }
 
-  return trimmed
-    .replace(/^#{1,6}\s+/gm, '')              // ## Títulos
-    .replace(/\*\*(.*?)\*\*/g, '$1')          // **negrito**
-    .replace(/__(.*?)__/g, '$1')              // __negrito__
-    .replace(/\*(.*?)\*/g, '$1')              // *itálico*
-    .replace(/_(.*?)_/g, '$1')               // _itálico_
-    .replace(/`{3}[\s\S]*?`{3}/g, '')        // ```bloco de código```
-    .replace(/`([^`]+)`/g, '$1')             // `código inline`
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [link](url)
-    .replace(/^[-*+]\s+/gm, '')              // - listas com traço/asterisco
-    .replace(/^\d+\.\s+/gm, '')              // 1. listas numeradas
-    .replace(/^-{3,}$/gm, '')                // --- separadores
-    .replace(/^={3,}$/gm, '')                // === separadores
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  return stripMarkdownFromPedagogicalText(trimmed)
 }
 
 function tryParseStructuredJson(raw: string): unknown | null {

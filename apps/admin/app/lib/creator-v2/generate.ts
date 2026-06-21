@@ -5,6 +5,7 @@ import {
   withOpenAiTemperature,
 } from '../openai-models'
 import { estimateOpenAiTextCostCents } from '../openai-cost'
+import { stripMarkdownFromPedagogicalText } from '../pedagogical-text-format'
 import { PublicAiGenerationError } from '../ai-generation'
 import type { AiGenerationType } from '../ai-usage'
 import { createSupabaseServiceClient } from '../supabase-server'
@@ -187,6 +188,7 @@ export async function generateCreatorTextDocument(input: {
   const system = buildGuidedSystemPrompt(input.payload.mode)
   const user = buildCreatorUserPrompt(input.payload, notes)
   const openAi = await requestCreatorOpenAiText(system, user)
+  const cleanedText = stripMarkdownFromPedagogicalText(openAi.text)
   const generationType = mapDocumentTypeToGenerationType(input.payload.documentType)
 
   const reportId = await persistGeneratedReport({
@@ -195,7 +197,7 @@ export async function generateCreatorTextDocument(input: {
     studentId: input.studentId,
     classId: input.classId,
     promptVersion: input.promptVersion,
-    body: openAi.text,
+    body: cleanedText,
   })
 
   await persistUsage(
@@ -208,7 +210,7 @@ export async function generateCreatorTextDocument(input: {
   )
 
   return {
-    text: openAi.text,
+    text: cleanedText,
     model: openAi.model,
     provider: 'openai',
     pipeline: 'creator-v2-single-shot',
