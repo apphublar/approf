@@ -9,7 +9,54 @@ export interface ImageVariants {
 }
 
 const VARIANT_CACHE_LIMIT = 80
+const DEFAULT_UPLOAD_MAX_SIDE = 1280
+const DEFAULT_UPLOAD_MAX_BYTES = 700_000
 const variantCache = new Map<string, Promise<ImageVariants>>()
+
+export async function compressImageFileForUpload(
+  file: File,
+  options: { maxSide?: number; maxBytes?: number } = {},
+): Promise<{ dataUrl: string; name: string }> {
+  const maxSide = options.maxSide ?? DEFAULT_UPLOAD_MAX_SIDE
+  const maxBytes = options.maxBytes ?? DEFAULT_UPLOAD_MAX_BYTES
+  const bitmap = await createImageBitmap(file)
+
+  try {
+    let side = maxSide
+    let quality = 0.82
+
+    for (let round = 0; round < 8; round += 1) {
+      const blob = await renderResized(bitmap, side, quality)
+      if (blob.size <= maxBytes) {
+        return {
+          dataUrl: await blobToDataUrl(blob),
+          name: toWebpName(file.name),
+        }
+      }
+
+      if (quality > 0.58) {
+        quality -= 0.07
+      } else {
+        side = Math.max(640, Math.round(side * 0.85))
+        quality = 0.82
+      }
+    }
+
+    const blob = await renderResized(bitmap, 640, 0.6)
+    return {
+      dataUrl: await blobToDataUrl(blob),
+      name: toWebpName(file.name),
+    }
+  } finally {
+    bitmap.close()
+  }
+}
+
+export function estimateDataUrlBytes(dataUrl: string) {
+  if (!dataUrl.startsWith('data:')) return 0
+  const base64 = dataUrl.split(',')[1] ?? ''
+  return Math.floor((base64.length * 3) / 4)
+}
 
 export function prefetchImageVariants(sourceUrl: string, cacheKey: string) {
   void getImageVariants(sourceUrl, cacheKey).catch(() => undefined)
@@ -110,8 +157,24 @@ function dataUrlToBlob(dataUrl: string) {
 }
 
 function estimateDataUrlSize(dataUrl: string) {
-  const base64 = dataUrl.split(',')[1] ?? ''
-  return Math.floor((base64.length * 3) / 4)
+  return estimateDataUrlBytes(dataUrl)
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result)
+      else reject(new Error('Falha ao preparar imagem.'))
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('Falha ao preparar imagem.'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+function toWebpName(fileName: string) {
+  const base = fileName.replace(/\.[^.]+$/, '') || 'imagem'
+  return `${base}.webp`
 }
 
 function cleanupVariantCache() {

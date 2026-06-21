@@ -16,6 +16,7 @@ import { normalizeReportBodyHtml } from '@/utils/report-body'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
+import { compressImageFileForUpload } from '@/utils/image-performance'
 import { generateCreatorDocument, improveCreatorPrompt } from './api'
 import {
   CREATOR_MODES,
@@ -97,6 +98,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   const [imageFormat, setImageFormat] = useState<CreatorImageFormat>('portrait')
   const [freeOutput, setFreeOutput] = useState<FreeOutputChoice>(nav.freeOutput === 'image' ? 'image' : 'text')
   const [referenceImages, setReferenceImages] = useState<ReferenceImageAttachment[]>([])
+  const [compressingAttachments, setCompressingAttachments] = useState(false)
   const [visualTitle, setVisualTitle] = useState('')
   const [visualSubtitle, setVisualSubtitle] = useState('')
   const [generating, setGenerating] = useState(false)
@@ -206,7 +208,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
   }
 
   async function handleReferenceImagesSelected(fileList: FileList | null) {
-    if (!fileList?.length) return
+    if (!fileList?.length || compressingAttachments) return
     const remainingSlots = MAX_FREE_REFERENCE_IMAGES - referenceImages.length
     if (remainingSlots <= 0) {
       setUsageError('Você atingiu o limite de imagens para esta geração. Remova alguma para adicionar outra.')
@@ -214,32 +216,39 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
     }
 
     const files = Array.from(fileList).slice(0, remainingSlots)
-    const nextItems: ReferenceImageAttachment[] = []
+    setCompressingAttachments(true)
+    setUsageError('')
 
-    for (const file of files) {
-      if (!file.type.startsWith('image/')) {
-        setUsageError('Anexe apenas arquivos de imagem.')
-        continue
-      }
-      if (file.size > MAX_FREE_REFERENCE_IMAGE_BYTES) {
-        setUsageError('Cada imagem pode ter no máximo 5 MB.')
-        continue
-      }
-      try {
-        const dataUrl = await readFileAsDataUrl(file)
-        nextItems.push({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          name: file.name,
-          dataUrl,
-        })
-      } catch {
-        setUsageError('Não foi possível ler uma das imagens selecionadas.')
-      }
-    }
+    try {
+      const nextItems: ReferenceImageAttachment[] = []
 
-    if (nextItems.length > 0) {
-      setReferenceImages((current) => [...current, ...nextItems])
-      setUsageError('')
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) {
+          setUsageError('Anexe apenas arquivos de imagem.')
+          continue
+        }
+        if (file.size > MAX_FREE_REFERENCE_IMAGE_BYTES) {
+          setUsageError('Cada imagem pode ter no máximo 5 MB.')
+          continue
+        }
+        try {
+          const compressed = await compressImageFileForUpload(file)
+          nextItems.push({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: compressed.name,
+            dataUrl: compressed.dataUrl,
+          })
+        } catch {
+          setUsageError('Não foi possível preparar uma das imagens selecionadas.')
+        }
+      }
+
+      if (nextItems.length > 0) {
+        setReferenceImages((current) => [...current, ...nextItems])
+        setUsageError('')
+      }
+    } finally {
+      setCompressingAttachments(false)
     }
   }
 
@@ -767,19 +776,20 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
               </div>
             )}
 
-            <label className="relative w-full py-3 rounded-app-sm border border-gp bg-gbg text-gd font-bold text-[12px] flex items-center justify-center gap-2 overflow-hidden cursor-pointer">
+            <label className={`relative w-full py-3 rounded-app-sm border border-gp bg-gbg text-gd font-bold text-[12px] flex items-center justify-center gap-2 overflow-hidden ${compressingAttachments ? 'opacity-60 pointer-events-none' : 'cursor-pointer'}`}>
               <input
                 type="file"
                 accept="image/*"
                 multiple
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={compressingAttachments}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                 onChange={(event) => {
                   void handleReferenceImagesSelected(event.currentTarget.files)
                   event.currentTarget.value = ''
                 }}
               />
               <ImagePlus size={15} />
-              Anexar imagem
+              {compressingAttachments ? 'Preparando imagens...' : 'Anexar imagem'}
             </label>
           </div>
         )}
@@ -828,16 +838,4 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
       </div>
     </div>
   )
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') resolve(reader.result)
-      else reject(new Error('invalid file'))
-    }
-    reader.onerror = () => reject(reader.error ?? new Error('invalid file'))
-    reader.readAsDataURL(file)
-  })
 }

@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './supabase/client'
+import { estimateDataUrlBytes } from '@/utils/image-performance'
 
 export type AiGenerationType =
   | 'development_report'
@@ -375,6 +376,11 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
   }
 
   const quality = input.quality ?? 'standard'
+  const referenceImageDataUrls = input.referenceImageDataUrls ?? []
+  const attachmentBytes = referenceImageDataUrls.reduce((total, dataUrl) => total + estimateDataUrlBytes(dataUrl), 0)
+  if (attachmentBytes > 4_000_000) {
+    throw new Error('As imagens anexadas são grandes demais para enviar. Remova alguma foto e tente novamente.')
+  }
 
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 300000)
@@ -394,7 +400,7 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
           description: input.description,
           imageFormat: input.imageFormat ?? 'portrait',
           imageQuality: quality,
-          referenceImageDataUrls: input.referenceImageDataUrls ?? [],
+          referenceImageDataUrls,
         },
       }),
       signal: controller.signal,
@@ -403,7 +409,10 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
     if (requestError instanceof DOMException && requestError.name === 'AbortError') {
       throw new Error('A geração da imagem demorou mais do que o esperado. Tente novamente.')
     }
-    throw requestError
+    if (referenceImageDataUrls.length > 0 && requestError instanceof TypeError && /failed to fetch/i.test(requestError.message)) {
+      throw new Error('Não foi possível enviar as imagens anexadas. Tente com menos fotos ou aguarde terminar a preparação delas.')
+    }
+    throw wrapAiFetchError(requestError)
   } finally {
     window.clearTimeout(timeout)
   }
