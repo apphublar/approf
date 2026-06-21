@@ -186,10 +186,10 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
       ? 'image'
       : 'text'
 
+  const needsNotes = sourceMode !== 'prompt_only' && (guidedUsesAnnotations || mode === 'visual_portfolio')
   const canGenerate = useMemo(() => {
     if (generating || generatingRef.current) return false
     if (mode !== 'free' && !documentType) return false
-    const needsNotes = guidedUsesAnnotations || (mode === 'visual_portfolio' && sourceMode !== 'prompt_only')
     if (needsNotes && selectedNotes.length === 0) return false
     if (mode === 'free' && teacherPrompt.trim().length < 8) return false
     if (mode !== 'free' && sourceMode === 'prompt_only' && teacherPrompt.trim().length < 8) return false
@@ -197,7 +197,7 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
     if ((sourceMode === 'student_notes' || sourceMode === 'notes_and_prompt') && !selectedStudent?.id && showAnnotationSource) return false
     if (sourceMode === 'class_notes' && !selectedClass?.id && showAnnotationSource) return false
     return true
-  }, [documentType, freeOutput, generating, guidedUsesAnnotations, mode, otherDocumentTitle, selectedClass?.id, selectedNotes.length, selectedStudent?.id, showAnnotationSource, sourceMode, teacherPrompt])
+  }, [documentType, freeOutput, generating, mode, needsNotes, otherDocumentTitle, selectedClass?.id, selectedNotes.length, selectedStudent?.id, showAnnotationSource, sourceMode, teacherPrompt])
 
   function toggleTone(next: CreatorTone) {
     setTone((current) => (current === next ? null : next))
