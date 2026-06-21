@@ -10,7 +10,7 @@ export interface ImageVariants {
 
 const VARIANT_CACHE_LIMIT = 80
 const DEFAULT_UPLOAD_MAX_SIDE = 1280
-const DEFAULT_UPLOAD_MAX_BYTES = 700_000
+const DEFAULT_UPLOAD_MAX_BYTES = 550_000
 const variantCache = new Map<string, Promise<ImageVariants>>()
 
 export async function compressImageFileForUpload(

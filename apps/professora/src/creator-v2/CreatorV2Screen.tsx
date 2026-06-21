@@ -16,7 +16,7 @@ import { normalizeReportBodyHtml } from '@/utils/report-body'
 import GenerationDocumentLoadingScreen from '@/components/ui/GenerationDocumentLoadingScreen'
 import GenerationImageLoadingScreen from '@/components/ui/GenerationImageLoadingScreen'
 import { formatAiUsageMessage, generateAiPortfolioImage, generateImage } from '@/services/ai-usage'
-import { compressImageFileForUpload } from '@/utils/image-performance'
+import { compressImageFileForUpload, estimateDataUrlBytes } from '@/utils/image-performance'
 import { generateCreatorDocument, improveCreatorPrompt } from './api'
 import {
   CREATOR_MODES,
@@ -44,7 +44,8 @@ type ReferenceImageAttachment = {
 }
 
 const MAX_FREE_REFERENCE_IMAGES = 12
-const MAX_FREE_REFERENCE_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_SOURCE_IMAGE_BYTES = 25 * 1024 * 1024
+const MAX_ATTACHMENT_PAYLOAD_BYTES = 3_500_000
 
 function parseNavData(data: unknown) {
   if (!data || typeof data !== 'object') return {}
@@ -221,31 +222,51 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
 
     try {
       const nextItems: ReferenceImageAttachment[] = []
+      const warnings: string[] = []
+      let runningBytes = referenceImages.reduce((total, item) => total + estimateDataUrlBytes(item.dataUrl), 0)
+      const expectedTotal = Math.min(MAX_FREE_REFERENCE_IMAGES, referenceImages.length + files.length)
+      const maxBytesPerImage = Math.max(
+        180_000,
+        Math.floor(MAX_ATTACHMENT_PAYLOAD_BYTES / Math.max(1, expectedTotal)),
+      )
 
       for (const file of files) {
         if (!file.type.startsWith('image/')) {
-          setUsageError('Anexe apenas arquivos de imagem.')
+          warnings.push('Anexe apenas arquivos de imagem.')
           continue
         }
-        if (file.size > MAX_FREE_REFERENCE_IMAGE_BYTES) {
-          setUsageError('Cada imagem pode ter no máximo 5 MB.')
+        if (file.size > MAX_SOURCE_IMAGE_BYTES) {
+          warnings.push(`"${file.name}" é grande demais para preparar aqui. Tente outra foto.`)
           continue
         }
+
         try {
-          const compressed = await compressImageFileForUpload(file)
+          const compressed = await compressImageFileForUpload(file, { maxBytes: maxBytesPerImage })
+          const compressedBytes = estimateDataUrlBytes(compressed.dataUrl)
+          if (runningBytes + compressedBytes > MAX_ATTACHMENT_PAYLOAD_BYTES) {
+            warnings.push('Algumas fotos não couberam no envio. Remova alguma imagem para adicionar mais.')
+            continue
+          }
+
+          runningBytes += compressedBytes
           nextItems.push({
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             name: compressed.name,
             dataUrl: compressed.dataUrl,
           })
         } catch {
-          setUsageError('Não foi possível preparar uma das imagens selecionadas.')
+          warnings.push(`Não foi possível preparar "${file.name}".`)
         }
       }
 
       if (nextItems.length > 0) {
         setReferenceImages((current) => [...current, ...nextItems])
+      }
+
+      if (nextItems.length > 0 && warnings.length === 0) {
         setUsageError('')
+      } else if (warnings.length > 0) {
+        setUsageError(warnings[0])
       }
     } finally {
       setCompressingAttachments(false)

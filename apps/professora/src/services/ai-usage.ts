@@ -378,7 +378,7 @@ export async function generateImage(input: GeneratedImageInput): Promise<AiImage
   const quality = input.quality ?? 'standard'
   const referenceImageDataUrls = input.referenceImageDataUrls ?? []
   const attachmentBytes = referenceImageDataUrls.reduce((total, dataUrl) => total + estimateDataUrlBytes(dataUrl), 0)
-  if (attachmentBytes > 4_000_000) {
+  if (attachmentBytes > 3_500_000) {
     throw new Error('As imagens anexadas são grandes demais para enviar. Remova alguma foto e tente novamente.')
   }
 
