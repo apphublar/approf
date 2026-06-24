@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Check, Loader2 } from 'lucide-react'
-import { getAuthErrorMessage, getEmailVerificationStateFromUser, getSelectedSignupPlanFromUrl, requestPasswordReset, resendSignupConfirmation, shouldStartStripeCheckoutFromUrl, signInWithEmail, signOut, signUpTeacher, updatePassword, completeAuthRedirectIfPresent, isEmailConfirmed } from '@/services/supabase/auth'
+import { getAuthErrorMessage, getEmailVerificationStateFromUser, getSelectedSignupPlanFromUrl, requestPasswordReset, resendSignupConfirmation, shouldStartStripeCheckoutFromUrl, signInWithEmail, signOut, signUpTeacher, updatePassword, completeAuthRedirectIfPresent, isEmailConfirmed, type SignupPlan } from '@/services/supabase/auth'
 import { redirectToStripeCheckout } from '@/services/stripe-checkout'
 import EmailVerificationBanner from '@/components/ui/EmailVerificationNotice'
 import { resolveEmailVerificationState, type EmailVerificationState } from '@/utils/email-verification'
@@ -20,6 +20,12 @@ import { rememberMemberSince } from '@/utils/achievements'
 
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
 const HYDRATED_USER_KEY = 'approf:hydrated-user-id'
+
+const SIGNUP_PLAN_OPTIONS: Array<{ id: SignupPlan; title: string; desc: string }> = [
+  { id: 'monthly', title: 'Plano Mensal', desc: 'R$ 39,90/mês · 8.000 GizTokens mensais' },
+  { id: 'semiannual', title: 'Plano Semestral', desc: 'R$ 34,90/mês equiv. · cobrança de R$ 209,40 a cada 6 meses' },
+  { id: 'annual', title: 'Plano Anual', desc: 'R$ 29,90/mês equiv. · cobrança de R$ 358,80 por ano' },
+]
 
 function readPersistedHydratedUserId() {
   try {
@@ -341,8 +347,10 @@ function AuthScreen({
   const [installInstalled, setInstallInstalled] = useState(() => isRunningStandalone() || getLocalStorageFlag('approf:pwa-installed'))
   const [isStandalone, setIsStandalone] = useState(() => isRunningStandalone())
   const [referralCode, setReferralCode] = useState<string | null>(() => getStoredReferralCode())
+  const [selectedSignupPlan, setSelectedSignupPlan] = useState<SignupPlan>(() => getSelectedSignupPlanFromUrl())
 
   const isIos = isIosDevice()
+  const showSignupPlanPicker = mode === 'signup' && !shouldStartStripeCheckoutFromUrl()
   const shouldShowInstallPopup =
     !isStandalone &&
     !installInstalled &&
@@ -424,11 +432,12 @@ function AuthScreen({
       if (mode === 'signin') {
         await signInWithEmail(email.trim(), password)
       } else if (mode === 'signup') {
+        const signupPlan = showSignupPlanPicker ? selectedSignupPlan : getSelectedSignupPlanFromUrl()
         const data = await signUpTeacher({
           fullName: fullName.trim(),
           email: email.trim(),
           password,
-          plan: getSelectedSignupPlanFromUrl(),
+          plan: signupPlan,
           referralCode,
         })
         clearStoredReferralCode()
@@ -550,6 +559,27 @@ function AuthScreen({
               <strong>{referralCode}</strong>
               . Ao confirmar o cadastro, ganha 7 dias extras de teste.
             </p>
+          )}
+
+          {showSignupPlanPicker && (
+            <Field label="Escolha seu plano">
+              <div className="flex flex-col gap-2">
+                {SIGNUP_PLAN_OPTIONS.map((option) => (
+                  <SignupPlanChoice
+                    key={option.id}
+                    selected={selectedSignupPlan === option.id}
+                    title={option.title}
+                    desc={option.desc}
+                    onClick={() => setSelectedSignupPlan(option.id)}
+                  />
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-muted leading-relaxed">
+                {referralCode
+                  ? 'Teste grátis por 14 dias (7 + 7 extras pela indicação). O pagamento só é feito ao final do teste.'
+                  : 'Teste grátis por 7 dias. O pagamento só é feito ao final do teste.'}
+              </p>
+            </Field>
           )}
 
           {mode === 'signup' && (
@@ -741,6 +771,23 @@ function getSubmitLabel(mode: AuthMode) {
   if (mode === 'forgot') return 'Enviar link'
   if (mode === 'reset') return 'Salvar senha'
   return 'Entrar'
+}
+
+function SignupPlanChoice({ selected, title, desc, onClick }: { selected: boolean; title: string; desc: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-app-sm border text-left px-3 py-3"
+      style={{
+        borderColor: selected ? '#4F8341' : '#D4EBC8',
+        background: selected ? '#F0FAF4' : '#fff',
+      }}
+    >
+      <span className="block text-[13px] font-bold" style={{ color: selected ? '#4F8341' : '#1A1A1A' }}>{title}</span>
+      <span className="block text-[11px] text-muted mt-[2px] leading-snug">{desc}</span>
+    </button>
+  )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

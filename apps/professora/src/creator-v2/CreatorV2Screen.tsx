@@ -515,17 +515,24 @@ export default function CreatorV2Screen({ data }: CreatorV2ScreenProps) {
         </div>
 
         <div className="flex flex-col gap-2 mb-5">
-          {CREATOR_MODES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setMode(item.id)}
-              className={`rounded-app border px-4 py-3 text-left ${mode === item.id ? 'border-gd bg-gbg' : 'border-border bg-white'}`}
-            >
-              <p className="text-[14px] font-bold text-ink">{item.title}</p>
-              <p className="text-[12px] text-muted mt-1 leading-[1.5]">{item.description}</p>
-            </button>
-          ))}
+          {CREATOR_MODES.map((item) => {
+            const selected = mode === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setMode(item.id)}
+                className="w-full rounded-app-sm border text-left px-3 py-3"
+                style={{
+                  borderColor: selected ? '#4F8341' : '#D4EBC8',
+                  background: selected ? '#F0FAF4' : '#fff',
+                }}
+              >
+                <span className="block text-[13px] font-bold" style={{ color: selected ? '#4F8341' : '#1A1A1A' }}>{item.title}</span>
+                <span className="block text-[11px] text-muted mt-[2px] leading-snug">{item.description}</span>
+              </button>
+            )
+          })}
         </div>
 
         {mode === 'free' && (
