@@ -43,6 +43,9 @@ export async function signUpTeacher(input: {
   })
 
   if (error) throw toAuthError(error)
+  if (data.user && data.user.identities?.length === 0) {
+    throw new Error('User already registered')
+  }
   return data
 }
 
